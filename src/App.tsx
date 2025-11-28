@@ -10,9 +10,14 @@ import { MarginControl } from './components/MarginControl';
 import { OffersList } from './components/OffersList';
 import { SalesDashboard } from './components/SalesDashboard';
 import { SettingsPage } from './components/SettingsPage';
+import { MigrationPage } from './components/MigrationPage';
+import { RegisterPage } from './components/RegisterPage';
+import { UserManagementPage } from './components/UserManagementPage';
+import { SalesTeamDashboard } from './components/admin/SalesTeamDashboard';
 import { calculatePrice } from './utils/pricing';
 import { calculateCommission } from './utils/commission';
-import { saveOffer, getCommissionStats } from './utils/storage';
+import { DatabaseService } from './services/database';
+// import { getCommissionStats } from './utils/storage'; // Removed
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReportsList } from './components/reports/ReportsList';
 import { ReportForm } from './components/reports/ReportForm';
@@ -27,7 +32,13 @@ type Step = 'customer' | 'product' | 'summary';
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+    </div>;
+  }
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
@@ -51,51 +62,64 @@ function NewOfferPage() {
     setStep('product');
   };
 
-  const handleProductComplete = (config: ProductConfig) => {
+  const handleProductComplete = async (config: ProductConfig) => {
     setProduct(config);
 
-    if (customer && snowZone) {
+    if (customer && snowZone && currentUser) {
       const pricing = calculatePrice(config, margin, snowZone, customer.postalCode);
-      const stats = getCommissionStats();
-      // Commission: 5% of Net Selling Price (including installation)
-      const commission = calculateCommission(pricing.sellingPriceNet, pricing.marginPercentage, stats.soldOffers);
 
-      const newOffer: Offer = {
-        id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        status: 'draft',
-        customer,
-        snowZone,
-        product: config,
-        pricing,
-        commission,
-        createdBy: currentUser?.id || 'unknown', // Assign to current user
-      };
+      try {
+        const soldOffersCount = await DatabaseService.getSoldOffersCount(currentUser.id);
 
-      saveOffer(newOffer);
-      toast.success('Oferta utworzona pomyślnie!');
-      setOffer(newOffer);
-      setStep('summary');
+        // Commission: 5% of Net Selling Price (including installation)
+        const commission = calculateCommission(pricing.sellingPriceNet, pricing.marginPercentage, soldOffersCount);
+
+        const newOffer: Omit<Offer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
+          offerNumber: `OFF/${new Date().getFullYear()}/${Math.floor(Math.random() * 10000)}`, // Temp number generation
+          status: 'draft',
+          customer,
+          snowZone,
+          product: config,
+          pricing,
+          commission,
+        };
+
+        const savedOffer = await DatabaseService.createOffer(newOffer);
+        toast.success('Oferta utworzona pomyślnie!');
+        setOffer(savedOffer);
+        setStep('summary');
+      } catch (error) {
+        console.error('Error creating offer:', error);
+        toast.error('Błąd podczas tworzenia oferty');
+      }
     }
   };
 
-  const handleMarginChange = (newMargin: number) => {
+  const handleMarginChange = async (newMargin: number) => {
     setMargin(newMargin);
-    if (offer) {
+    if (offer && currentUser) {
       const newPricing = calculatePrice(offer.product, newMargin, offer.snowZone, offer.customer.postalCode);
-      const stats = getCommissionStats();
-      const newCommission = calculateCommission(newPricing.sellingPriceNet, newPricing.marginPercentage, stats.soldOffers);
 
-      const updatedOffer = {
-        ...offer,
-        pricing: newPricing,
-        commission: newCommission,
-        updatedAt: new Date(),
-      };
+      try {
+        const soldOffersCount = await DatabaseService.getSoldOffersCount(currentUser.id);
+        const newCommission = calculateCommission(newPricing.sellingPriceNet, newPricing.marginPercentage, soldOffersCount);
 
-      saveOffer(updatedOffer);
-      setOffer(updatedOffer);
+        const updatedOffer = {
+          ...offer,
+          pricing: newPricing,
+          commission: newCommission,
+          updatedAt: new Date(),
+        };
+
+        await DatabaseService.updateOffer(offer.id, {
+          pricing: newPricing,
+          commission: newCommission
+        });
+        setOffer(updatedOffer);
+      } catch (error) {
+        console.error('Error updating offer:', error);
+        toast.error('Błąd aktualizacji oferty');
+      }
     }
   };
 
@@ -174,6 +198,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             <Route path="/" element={
               <ProtectedRoute>
@@ -184,6 +209,9 @@ function App() {
               <Route path="offers" element={<OffersList />} />
               <Route path="new-offer" element={<NewOfferPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="migration" element={<MigrationPage />} />
+              <Route path="admin/users" element={<UserManagementPage />} />
+              <Route path="admin/stats" element={<SalesTeamDashboard />} />
               <Route path="reports" element={<ReportsList />} />
               <Route path="reports/new" element={<ReportForm />} />
               <Route path="installations" element={<InstallationDashboard />} />

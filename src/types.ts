@@ -7,7 +7,7 @@ export interface SnowZoneInfo {
 }
 
 // User Roles
-export type UserRole = 'admin' | 'sales_rep';
+export type UserRole = 'admin' | 'sales_rep' | 'manager';
 
 export interface User {
     id: string;
@@ -17,6 +17,9 @@ export interface User {
     email: string;
     role: UserRole;
     createdAt: Date;
+    phone?: string;
+    monthlyTarget?: number;
+    status?: 'pending' | 'active' | 'blocked';
 }
 
 export interface Customer {
@@ -119,6 +122,7 @@ export interface PricingResult {
 
 export interface Offer {
     id: string;
+    offerNumber: string;
     createdAt: Date;
     updatedAt: Date;
     status: OfferStatus;
@@ -127,6 +131,7 @@ export interface Offer {
     product: ProductConfig;
     pricing: PricingResult;
     commission: number;
+    distance?: number;
     createdBy: string; // User ID of creator
 }
 

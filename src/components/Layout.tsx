@@ -35,6 +35,8 @@ export const Layout: React.FC = () => {
                     <NavLink to="/reports" label="Raporty" icon="reports" />
                     <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
                     <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
+                    {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" />}
+                    <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />
                     <NavLink to="/settings" label="Ustawienia" icon="settings" />
                 </nav>
                 <div className="p-4 border-t border-slate-800 space-y-2">

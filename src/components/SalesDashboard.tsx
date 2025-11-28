@@ -3,10 +3,11 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
-import { getCommissionStats, getAllOffers, getSalesProfile, getStatsPerSalesRep, getOffersForUser } from '../utils/storage';
+import { DatabaseService } from '../services/database';
+import { calculateCommissionStats, calculateSalesRepStats } from '../utils/statistics';
+import type { SalesRepStats } from '../utils/statistics';
 import { useAuth } from '../contexts/AuthContext';
 import type { CommissionStats, Offer, SalesProfile } from '../types';
-import type { SalesRepStats } from '../utils/storage';
 import { Link } from 'react-router-dom';
 
 export const SalesDashboard: React.FC = () => {
@@ -15,31 +16,63 @@ export const SalesDashboard: React.FC = () => {
     const [offers, setOffers] = useState<Offer[]>([]);
     const [profile, setProfile] = useState<SalesProfile | null>(null);
     const [teamStats, setTeamStats] = useState<SalesRepStats[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Month Selection State
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
     useEffect(() => {
-        if (!currentUser) return;
+        const loadData = async () => {
+            if (!currentUser) return;
+            setLoading(true);
 
-        setStats(getCommissionStats());
+            try {
+                // 1. Fetch Offers
+                const allOffers = await DatabaseService.getOffers();
 
-        // Load offers based on user role
-        const userOffers = isAdmin()
-            ? getAllOffers()
-            : getOffersForUser(currentUser.id, currentUser.role);
-        setOffers(userOffers);
+                let userOffers: Offer[] = [];
+                if (isAdmin()) {
+                    userOffers = allOffers;
+                } else {
+                    userOffers = allOffers.filter(o => o.createdBy === currentUser.id);
+                }
+                setOffers(userOffers);
 
-        setProfile(getSalesProfile());
+                // 2. Calculate Stats
+                const computedStats = calculateCommissionStats(userOffers);
+                setStats(computedStats);
 
-        // Load team stats for admin
-        if (isAdmin()) {
-            setTeamStats(getStatsPerSalesRep());
-        }
+                // 3. Set Profile (Mock for now, or fetch from DB if we store targets)
+                setProfile({
+                    userId: currentUser.id,
+                    firstName: currentUser.firstName,
+                    lastName: currentUser.lastName,
+                    email: currentUser.email,
+                    phone: '',
+                    monthlyTarget: 50000 // Default target
+                });
+
+                // 4. Admin: Team Stats
+                if (isAdmin()) {
+                    const reps = await DatabaseService.getSalesReps();
+                    const teamStatistics = calculateSalesRepStats(allOffers, reps);
+                    setTeamStats(teamStatistics);
+                }
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
     }, [currentUser, isAdmin]);
 
-    if (!stats || !offers) return <div>Loading...</div>;
+    if (loading || !stats || !offers) {
+        return <div className="p-12 text-center text-slate-400">Ładowanie danych...</div>;
+    }
 
     // Filter offers for the selected month/year
     const soldOffers = offers.filter(o => o.status === 'sold');

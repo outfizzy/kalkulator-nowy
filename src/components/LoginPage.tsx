@@ -1,64 +1,62 @@
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
 export const LoginPage: React.FC = () => {
-    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setLoading(true);
 
-        if (login(username, password)) {
-            toast.success('Zalogowano pomyślnie!');
-            navigate('/');
-        } else {
-            toast.error('Nieprawidłowa nazwa użytkownika lub hasło');
+        try {
+            const { error } = await login(email, password);
+            if (error) throw error;
+            // Login successful - AuthContext will handle redirect via user state change or we can do it here
+            navigate('/'); // AuthContext usually handles this or App.tsx routing
+        } catch (error: any) {
+            console.error('Login error:', error);
+            toast.error(error.message || 'Błąd logowania. Sprawdź email i hasło.');
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-primary via-secondary to-primary flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-                {/* Logo */}
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+            <div className="bg-surface p-8 rounded-xl shadow-xl w-full max-w-md border border-slate-800">
                 <div className="text-center mb-8">
-                    <img
-                        src="/logo.png"
-                        alt="PolenDach 24"
-                        className="h-16 mx-auto mb-4"
-                    />
-                    <h1 className="text-2xl font-bold text-slate-800">System Ofert</h1>
-                    <p className="text-slate-500 text-sm mt-2">Zaloguj się do systemu</p>
+                    <img src="/logo.png" alt="PolenDach 24" className="h-12 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white">Logowanie</h2>
+                    <p className="text-slate-400 mt-2">Zaloguj się do systemu ofertowania</p>
                 </div>
 
-                {/* Login Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Nazwa użytkownika
-                        </label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">Email</label>
                         <input
-                            type="text"
-                            value={username}
-                            onChange={e => setUsername(e.target.value)}
-                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                            placeholder="np. jan.kowalski"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-accent"
+                            placeholder="twoj@email.com"
                             required
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Hasło
-                        </label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">Hasło</label>
                         <input
                             type="password"
                             value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-accent"
                             placeholder="••••••••"
                             required
                         />
@@ -66,21 +64,18 @@ export const LoginPage: React.FC = () => {
 
                     <button
                         type="submit"
-                        className="w-full py-3 bg-accent text-white font-bold rounded-lg hover:bg-blue-600 transition-colors shadow-lg"
+                        disabled={loading}
+                        className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50"
                     >
-                        Zaloguj się
+                        {loading ? 'Logowanie...' : 'Zaloguj się'}
                     </button>
-                </form>
 
-                {/* Test Credentials */}
-                <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-xs font-bold text-slate-600 mb-2">Dane testowe:</p>
-                    <div className="text-xs text-slate-600 space-y-1">
-                        <p><strong>Administrator:</strong> admin / admin123</p>
-                        <p><strong>Przedstawiciel 1:</strong> jan.kowalski / pass123</p>
-                        <p><strong>Przedstawiciel 2:</strong> anna.nowak / pass123</p>
+                    <div className="text-center mt-4">
+                        <Link to="/register" className="text-sm text-accent hover:text-accent-hover">
+                            Nie masz konta? Zarejestruj się
+                        </Link>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
     );

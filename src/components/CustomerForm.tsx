@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Customer } from '../types';
 import { getSnowZone } from '../utils/snowZones';
-import { getUniqueCustomers } from '../utils/storage';
+import { DatabaseService } from '../services/database';
 
 interface CustomerFormProps {
     onComplete: (customer: Customer, snowZone: any) => void;
@@ -23,14 +23,21 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [snowZone, setSnowZone] = useState<any>(null);
-    const [previousCustomers, setPreviousCustomers] = useState<ReturnType<typeof getUniqueCustomers>>([]);
+    const [previousCustomers, setPreviousCustomers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
 
     // Load previous customers on mount
     useEffect(() => {
-        setPreviousCustomers(getUniqueCustomers());
+        const loadCustomers = async () => {
+            try {
+                const customers = await DatabaseService.getUniqueCustomers();
+                setPreviousCustomers(customers);
+            } catch (error) {
+                console.error('Error loading customers:', error);
+            }
+        };
+        loadCustomers();
     }, []);
 
     // Close dropdown when clicking outside
@@ -46,14 +53,11 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Effect to update snow zone when postal code changes
-    useEffect(() => {
+    const snowZone = React.useMemo(() => {
         if (customer.postalCode.length === 5) {
-            const zone = getSnowZone(customer.postalCode);
-            setSnowZone(zone);
-        } else {
-            setSnowZone(null);
+            return getSnowZone(customer.postalCode);
         }
+        return null;
     }, [customer.postalCode]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -69,7 +73,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         setShowDropdown(true);
     };
 
-    const handleSelectCustomer = (selectedCustomer: ReturnType<typeof getUniqueCustomers>[0]) => {
+    const handleSelectCustomer = (selectedCustomer: any) => {
         setCustomer(selectedCustomer.customer);
         setSearchQuery(`${selectedCustomer.customer.firstName} ${selectedCustomer.customer.lastName}`);
         setShowDropdown(false);

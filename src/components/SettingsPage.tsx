@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import type { SalesProfile } from '../types';
-import { saveSalesProfile, getSalesProfile } from '../utils/storage';
+import type { User } from '../types';
+import { DatabaseService } from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 export const SettingsPage: React.FC = () => {
     const { currentUser } = useAuth();
-    const [profile, setProfile] = useState<SalesProfile>({
-        userId: currentUser?.id || '',
+    const [profile, setProfile] = useState<Partial<User>>({
         firstName: '',
         lastName: '',
         email: '',
@@ -16,20 +15,16 @@ export const SettingsPage: React.FC = () => {
     });
 
     useEffect(() => {
-        const saved = getSalesProfile();
-        if (saved) setProfile(saved);
-        else if (currentUser) {
-            // Initialize with current user data
+        if (currentUser && profile.email !== currentUser.email) {
             setProfile({
-                userId: currentUser.id,
                 firstName: currentUser.firstName,
                 lastName: currentUser.lastName,
                 email: currentUser.email,
-                phone: '',
-                monthlyTarget: 50000
+                phone: currentUser.phone || '',
+                monthlyTarget: currentUser.monthlyTarget || 50000
             });
         }
-    }, [currentUser]);
+    }, [currentUser, profile.email]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -39,9 +34,14 @@ export const SettingsPage: React.FC = () => {
         }));
     };
 
-    const handleSave = () => {
-        saveSalesProfile(profile);
-        toast.success('Profil zapisany pomyślnie');
+    const handleSave = async () => {
+        try {
+            await DatabaseService.updateUserProfile(profile);
+            toast.success('Profil zapisany pomyślnie');
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            toast.error('Błąd zapisu profilu');
+        }
     };
 
     return (
@@ -55,7 +55,7 @@ export const SettingsPage: React.FC = () => {
                         <input
                             type="text"
                             name="firstName"
-                            value={profile.firstName}
+                            value={profile.firstName || ''}
                             onChange={handleChange}
                             className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                         />
@@ -65,7 +65,7 @@ export const SettingsPage: React.FC = () => {
                         <input
                             type="text"
                             name="lastName"
-                            value={profile.lastName}
+                            value={profile.lastName || ''}
                             onChange={handleChange}
                             className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                         />
@@ -75,9 +75,10 @@ export const SettingsPage: React.FC = () => {
                         <input
                             type="email"
                             name="email"
-                            value={profile.email}
+                            value={profile.email || ''}
                             onChange={handleChange}
-                            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            disabled
+                            className="w-full p-2 border rounded-lg bg-slate-50 text-slate-500 outline-none cursor-not-allowed"
                         />
                     </div>
                     <div>
@@ -85,7 +86,7 @@ export const SettingsPage: React.FC = () => {
                         <input
                             type="tel"
                             name="phone"
-                            value={profile.phone}
+                            value={profile.phone || ''}
                             onChange={handleChange}
                             className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                         />
@@ -95,7 +96,7 @@ export const SettingsPage: React.FC = () => {
                         <input
                             type="number"
                             name="monthlyTarget"
-                            value={profile.monthlyTarget}
+                            value={profile.monthlyTarget || 50000}
                             onChange={handleChange}
                             className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                         />
