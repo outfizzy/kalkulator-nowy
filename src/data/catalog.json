@@ -1,0 +1,183 @@
+{
+    "models": [
+        {
+            "id": "orangestyle",
+            "name": "Orangestyle",
+            "description": "Klasyczny design, idealny do każdego ogrodu.",
+            "image": "/images/orangestyle.jpg",
+            "roofTypes": [
+                "polycarbonate",
+                "glass"
+            ],
+            "maxSnowLoad": 1.5,
+            "pricing": {
+                "3000": {
+                    "2500": 1200,
+                    "3000": 1400
+                },
+                "4000": {
+                    "2500": 1500,
+                    "3000": 1700
+                }
+            }
+        },
+        {
+            "id": "trendstyle",
+            "name": "Trendstyle",
+            "description": "Nowoczesny wygląd z płaskimi profilami.",
+            "image": "/images/trendstyle.jpg",
+            "roofTypes": [
+                "polycarbonate",
+                "glass"
+            ],
+            "maxSnowLoad": 2.0,
+            "pricing": {
+                "3000": {
+                    "2500": 1300,
+                    "3000": 1500
+                },
+                "4000": {
+                    "2500": 1600,
+                    "3000": 1800
+                }
+            }
+        },
+        {
+            "id": "trendstyle_plus",
+            "name": "Trendstyle+",
+            "description": "Wzmocniona wersja Trendstyle dla większych obciążeń.",
+            "image": "/images/trendstyle_plus.jpg",
+            "roofTypes": [
+                "glass"
+            ],
+            "maxSnowLoad": 2.5,
+            "pricing": {
+                "3000": {
+                    "2500": 1500,
+                    "3000": 1700
+                }
+            }
+        },
+        {
+            "id": "topstyle",
+            "name": "Topstyle",
+            "description": "Premium design z ukrytym systemem odpływu.",
+            "image": "/images/topstyle.jpg",
+            "roofTypes": [
+                "polycarbonate",
+                "glass"
+            ],
+            "maxSnowLoad": 2.5,
+            "pricing": {}
+        },
+        {
+            "id": "topstyle_xl",
+            "name": "Topstyle XL",
+            "description": "Dla największych tarasów i dużych rozpiętości.",
+            "image": "/images/topstyle_xl.jpg",
+            "roofTypes": [
+                "glass"
+            ],
+            "maxSnowLoad": 3.5,
+            "pricing": {}
+        },
+        {
+            "id": "ultrastyle_style",
+            "name": "Ultrastyle Style",
+            "description": "Minimalistyczny design.",
+            "image": "/images/ultrastyle_style.jpg",
+            "roofTypes": [
+                "glass"
+            ],
+            "maxSnowLoad": 2.0,
+            "pricing": {}
+        },
+        {
+            "id": "carport",
+            "name": "Carport",
+            "description": "Zadaszenie samochodowe.",
+            "image": "/images/carport.jpg",
+            "roofTypes": [
+                "polycarbonate"
+            ],
+            "maxSnowLoad": 1.5,
+            "pricing": {}
+        }
+    ],
+    "addons": {
+        "lighting": {
+            "spots": {
+                "name": "LED Spots",
+                "unit": "szt.",
+                "price": 150
+            },
+            "strip": {
+                "name": "LED Listwa",
+                "unit": "mb",
+                "price": 80
+            }
+        },
+        "slidingWalls": {
+            "description": "Systemy szyb przesuwnych",
+            "models": [
+                {
+                    "id": "AL23",
+                    "name": "AL23 (Hoch)",
+                    "description": "System wysoki, idealny do zabudowy bocznej.",
+                    "image": "/images/al23.jpg",
+                    "pricing": [
+                        {
+                            "width": 2000,
+                            "height": 2100,
+                            "price": 800
+                        },
+                        {
+                            "width": 3000,
+                            "height": 2100,
+                            "price": 1100
+                        }
+                    ]
+                },
+                {
+                    "id": "AL24",
+                    "name": "AL24",
+                    "description": "Standardowy system przesuwny.",
+                    "image": "/images/al24.jpg",
+                    "pricing": []
+                }
+            ]
+        },
+        "awnings": {
+            "roof": {
+                "name": "Markiza Dachowa (Aufdach)",
+                "pricePerSqM": 250
+            },
+            "under": {
+                "name": "Markiza Poddachowa (Unterdach)",
+                "pricePerSqM": 200
+            }
+        },
+        "zipScreen": {
+            "name": "ZIP Screen",
+            "pricePerSqM": 180
+        },
+        "heater": {
+            "name": "Promiennik Ciepła",
+            "price": 450
+        },
+        "keilfenster": {
+            "name": "Keilfenster (Okno klinowe)",
+            "price": 600
+        },
+        "aluminumWall": {
+            "side": {
+                "name": "Ściana boczna aluminiowa",
+                "pricePerSqM": 300
+            },
+            "front": {
+                "name": "Ściana frontowa aluminiowa",
+                "pricePerSqM": 300
+            }
+        }
+    }
+}

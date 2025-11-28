@@ -1,0 +1,391 @@
+{
+  "system": "Trendstyle",
+  "type": "accessories",
+  "items": [
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "110x110x2400 mm",
+      "unit": "Stk.",
+      "price_eur": 58.37
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "110x110x3000 mm",
+      "unit": "Stk.",
+      "price_eur": 72.96
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "110x110x6000 mm",
+      "unit": "Stk.",
+      "price_eur": 145.92
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "110x110x7200 mm",
+      "unit": "Stk.",
+      "price_eur": 175.1
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "100x55x3900 mm",
+      "unit": "Stk.",
+      "price_eur": 139.63
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "100x55x4900 mm",
+      "unit": "Stk.",
+      "price_eur": 175.44
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "80x55x2400 mm",
+      "unit": "Stk.",
+      "price_eur": 63.82
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "80x55x2900 mm",
+      "unit": "Stk.",
+      "price_eur": 77.12
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "80x55x3400 mm",
+      "unit": "Stk.",
+      "price_eur": 90.41
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Pfosten Trendline",
+      "description": "80x55x3900 mm",
+      "unit": "Stk.",
+      "price_eur": 103.71
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "2500 mm",
+      "unit": "Stk.",
+      "price_eur": 18.3
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "3000 mm",
+      "unit": "Stk.",
+      "price_eur": 21.95
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "3500 mm",
+      "unit": "Stk.",
+      "price_eur": 25.62
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 29.28
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 51.23
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "2500 mm",
+      "unit": "Stk.",
+      "price_eur": 20.56
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "3000 mm",
+      "unit": "Stk.",
+      "price_eur": 24.67
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "3500 mm",
+      "unit": "Stk.",
+      "price_eur": 28.79
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 32.9
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Abdeckleiste",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 57.57
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "3000 mm",
+      "unit": "Stk.",
+      "price_eur": 198.9
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 265.2
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "5000 mm",
+      "unit": "Stk.",
+      "price_eur": 331.51
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "6000 mm",
+      "unit": "Stk.",
+      "price_eur": 397.81
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 464.11
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7950 mm",
+      "unit": "Stk.",
+      "price_eur": 527.1
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 291.56
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "5000 mm",
+      "unit": "Stk.",
+      "price_eur": 364.45
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "6000 mm",
+      "unit": "Stk.",
+      "price_eur": 437.33
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 510.23
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "3000 mm",
+      "unit": "Stk.",
+      "price_eur": 95.82
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 127.75
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "5000 mm",
+      "unit": "Stk.",
+      "price_eur": 159.69
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "6000 mm",
+      "unit": "Stk.",
+      "price_eur": 191.62
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 223.56
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7950 mm",
+      "unit": "Stk.",
+      "price_eur": 253.91
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "2994 mm",
+      "unit": "Stk.",
+      "price_eur": 42.35
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "3994 mm",
+      "unit": "Stk.",
+      "price_eur": 56.48
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "4994 mm",
+      "unit": "Stk.",
+      "price_eur": 70.59
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "5994 mm",
+      "unit": "Stk.",
+      "price_eur": 84.71
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "6994 mm",
+      "unit": "Stk.",
+      "price_eur": 98.83
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7944 mm",
+      "unit": "Stk.",
+      "price_eur": 112.95
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "3000 mm",
+      "unit": "Stk.",
+      "price_eur": 48.03
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 64.04
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "5000 mm",
+      "unit": "Stk.",
+      "price_eur": 80.05
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "6000 mm",
+      "unit": "Stk.",
+      "price_eur": 96.06
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 112.07
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Rinne Trendline",
+      "description": "7950 mm",
+      "unit": "Stk.",
+      "price_eur": 128.08
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "3000 mm",
+      "unit": "Stk.",
+      "price_eur": 48.03
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "4000 mm",
+      "unit": "Stk.",
+      "price_eur": 64.04
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "5000 mm",
+      "unit": "Stk.",
+      "price_eur": 80.05
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "6000 mm",
+      "unit": "Stk.",
+      "price_eur": 96.06
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "7000 mm",
+      "unit": "Stk.",
+      "price_eur": 112.07
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "7950 mm",
+      "unit": "Stk.",
+      "price_eur": 128.08
+    },
+    {
+      "system": "Trendstyle",
+      "category": "Zierleiste Klassik",
+      "description": "944 mm",
+      "unit": "Stk.",
+      "price_eur": 17.1
+    }
+  ]
+}
