@@ -175,6 +175,27 @@ export const RegisterPage: React.FC = () => {
                             />
                         </div>
 
+                        <div>
+                            <label htmlFor="role" className="block text-sm font-medium text-slate-300 mb-2">
+                                Stanowisko *
+                            </label>
+                            <select
+                                id="role"
+                                value={formData.role}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                                required
+                                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                                disabled={loading}
+                            >
+                                <option value="sales_rep">Przedstawiciel Handlowy</option>
+                                <option value="manager">Menedżer</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Wybierz stanowisko odpowiadające Twoim obowiązkom
+                            </p>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
