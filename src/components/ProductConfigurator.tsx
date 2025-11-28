@@ -72,6 +72,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
             };
         }
 
+        if (config.modelId === 'topstyle') {
+            const entries = (trendstyleData as any).products.filter((p: any) => p.model === 'Topstyle');
+            const widths = entries.map((p: any) => p.width_mm);
+            const depths = entries.map((p: any) => p.depth_mm);
+            return {
+                minWidth: Math.min(...widths),
+                maxWidth: Math.max(...widths),
+                minDepth: Math.min(...depths),
+                maxDepth: Math.max(...depths)
+            };
+        }
+
         return defaultLimits;
     }, [config.modelId]);
 
@@ -195,7 +207,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                 {[
                                     { id: 'orangestyle', name: 'Orangestyle', desc: 'Klasyczny design, do 1.5 kN/m²', features: ['Softline Design', 'Rynna zintegrowana'] },
                                     { id: 'trendstyle', name: 'Trendstyle', desc: 'Nowoczesny, do 2.0 kN/m²', features: ['Płaskie profile', 'Wzmocniona konstrukcja'] },
-                                    { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] }
+                                    { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] },
+                                    { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] }
                                 ].map(model => (
                                     <div
                                         key={model.id}
