@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { getAllOffers, saveReport } from '../../utils/storage';
+import { getAllOffers } from '../../utils/storage';
+import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import type { MeasurementReport, Visit, Offer } from '../../types';
 
@@ -95,7 +96,7 @@ export const ReportForm: React.FC = () => {
         setVisits(visits.filter(v => v.id !== id));
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!carPlate) {
             toast.error('Podaj numer rejestracyjny pojazdu');
             return;
@@ -140,9 +141,14 @@ export const ReportForm: React.FC = () => {
             createdAt: new Date()
         };
 
-        saveReport(report);
-        toast.success('Raport zapisany');
-        navigate('/reports');
+        try {
+            await DatabaseService.createReport(report);
+            toast.success('Raport zapisany');
+            navigate('/reports');
+        } catch (error) {
+            console.error('Error saving report:', error);
+            toast.error('Błąd zapisu raportu');
+        }
     };
 
     return (
@@ -317,7 +323,7 @@ export const ReportForm: React.FC = () => {
 
             {/* Debug info for offers */}
             {offers.length > 0 && (
-                <div className="text-xs text-slate-500 bg-blue-50 p-2 rounded">
+                <div className="text-xs text-slate-500 bg-accent-soft/60 p-2 rounded">
                     Załadowano {offers.length} ofert do wyszukiwania
                 </div>
             )}
@@ -389,7 +395,7 @@ export const ReportForm: React.FC = () => {
                     </div>
                     <button
                         onClick={handleAddVisit}
-                        className="mt-4 w-full py-2 bg-white border-2 border-dashed border-primary text-primary font-bold rounded-lg hover:bg-blue-50 transition-colors"
+                        className="mt-4 w-full py-2 bg-white border-2 border-dashed border-primary text-primary font-bold rounded-lg hover:bg-accent-soft/60 transition-colors"
                     >
                         + Dodaj do listy
                     </button>
@@ -418,7 +424,7 @@ export const ReportForm: React.FC = () => {
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold 
                                                 ${visit.outcome === 'signed' ? 'bg-green-100 text-green-700' :
                                                     visit.outcome === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                        'bg-blue-100 text-blue-700'}`}>
+                                                        'bg-accent-soft text-accent-dark'}`}>
                                                 {visit.outcome === 'signed' ? 'Umowa' :
                                                     visit.outcome === 'rejected' ? 'Odrzucone' :
                                                         visit.outcome === 'measured' ? 'Pomiar' : 'Decyzja'}
@@ -452,7 +458,7 @@ export const ReportForm: React.FC = () => {
                 </div>
                 <button
                     onClick={handleSubmit}
-                    className="px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition-colors"
+                    className="px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-accent-dark transition-colors"
                 >
                     Zapisz Raport
                 </button>

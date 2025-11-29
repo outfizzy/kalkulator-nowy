@@ -71,11 +71,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     firstName: data.full_name?.split(' ')[0] || '',
                     lastName: data.full_name?.split(' ').slice(1).join(' ') || '',
                     email: email,
-                    role: (['admin', 'sales_rep', 'manager'].includes(data.role) ? data.role : 'sales_rep') as UserRole,
+                    role: (['admin', 'sales_rep', 'manager', 'partner'].includes(data.role) ? data.role : 'sales_rep') as UserRole,
                     createdAt: new Date(data.created_at),
                     phone: data.phone,
                     monthlyTarget: data.monthly_target,
-                    status: data.status as 'pending' | 'active' | 'blocked'
+                    status: data.status as 'pending' | 'active' | 'blocked',
+                    companyName: data.company_name || undefined,
+                    nip: data.nip || undefined,
+                    partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined
                 };
 
                 // Block non-active users
@@ -146,8 +149,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             options: {
                 data: {
                     full_name: `${firstName} ${lastName}`,
+                    firstName,
+                    lastName,
                     phone,
-                    role
+                    role,
+                    companyName: (data as any).companyName,
+                    nip: (data as any).nip
                 }
             }
         });

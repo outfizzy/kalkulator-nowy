@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Layout } from './components/Layout';
@@ -79,7 +79,16 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
   const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
   const [product, setProduct] = useState<ProductConfig | null>(null);
   const [offer, setOffer] = useState<Offer | null>(null);
-  const [margin, setMargin] = useState<number>(mode === 'partner' ? 0.25 : 0.40); // Lower default margin for partners
+  const [margin, setMargin] = useState<number>(0.40);
+
+  // Set initial margin based on user role / mode
+  useEffect(() => {
+    if (mode === 'partner') {
+      setMargin(currentUser?.partnerMargin ?? 0.25);
+    } else {
+      setMargin(0.40);
+    }
+  }, [mode, currentUser]);
 
   const handleCustomerComplete = (data: Customer, zone: SnowZoneInfo) => {
     setCustomer(data);
@@ -155,7 +164,7 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
     setSnowZone(null);
     setProduct(null);
     setOffer(null);
-    setMargin(mode === 'partner' ? 0.25 : 0.40);
+    setMargin(mode === 'partner' ? (currentUser?.partnerMargin ?? 0.25) : 0.40);
   };
 
   return (
@@ -201,12 +210,24 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
         {step === 'summary' && offer && (
           <div className="space-y-6">
             <div className="print:hidden">
-              <MarginControl
-                value={margin}
-                onChange={handleMarginChange}
-                purchasePrice={offer.pricing.totalCost}
-                sellingPrice={offer.pricing.sellingPriceNet}
-              />
+              {mode === 'partner' ? (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="text-lg font-semibold text-slate-800">Marża partnera B2B</h3>
+                  <p className="mt-2 text-2xl font-bold text-accent">
+                    {Math.round(margin * 100)}%
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Marża ustalona przez administratora. Ceny w konfiguratorze uwzględniają tę marżę.
+                  </p>
+                </div>
+              ) : (
+                <MarginControl
+                  value={margin}
+                  onChange={handleMarginChange}
+                  purchasePrice={offer.pricing.totalCost}
+                  sellingPrice={offer.pricing.sellingPriceNet}
+                />
+              )}
             </div>
 
             <OfferSummary offer={offer} onReset={handleReset} />

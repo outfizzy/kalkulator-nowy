@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ProductConfig, SelectedAddon } from '../types';
 import { orangestyleAccessories } from '../data/orangestyle_accessories';
 import { trendstyleAccessories } from '../data/trendstyle_accessories';
@@ -34,6 +34,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
         projection: 2500,
         postsHeight: 2500,
         color: 'RAL 7016',
+        customColor: false,
+        customColorRAL: '',
         roofType: 'polycarbonate',
         polycarbonateType: 'standard',
         glassType: 'standard',
@@ -43,6 +45,12 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
     });
 
     const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories'>('sliding');
+
+    const totalPrice = useMemo(() => {
+        const addonsTotal = config.addons.reduce((sum, a) => sum + a.price, 0);
+        const accessoriesTotal = config.selectedAccessories?.reduce((sum, a) => sum + a.price * (a.quantity || 1), 0) || 0;
+        return addonsTotal + accessoriesTotal;
+    }, [config.addons, config.selectedAccessories]);
 
     // --- Logic & Calculations ---
 
@@ -100,9 +108,15 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
         }
 
         if (config.modelId === 'skystyle') {
+            const mountingType = config.installationType === 'wall-mounted' ? 'wall' : 'freestanding';
             const entries = (skystyleData as any).products.filter((p: any) =>
-                p.model === 'Skystyle' && p.mounting_type === config.installationType
+                p.model === 'Skystyle' && p.mounting_type === mountingType
             );
+            if (!entries.length) {
+                // Brak danych dla danego typu montażu – wracamy do domyślnego zakresu,
+                // zamiast psuć slider nieskończonymi wartościami
+                return defaultLimits;
+            }
             const widths = entries.map((p: any) => p.width_mm);
             const depths = entries.map((p: any) => p.depth_mm);
             return {
@@ -114,7 +128,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
         }
 
         return defaultLimits;
-    }, [config.modelId]);
+    }, [config.modelId, config.installationType]);
 
     const accessoryPool = useMemo(() => {
         if (config.modelId === 'trendstyle' || config.modelId === 'trendstyle_plus') {
@@ -160,6 +174,36 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
 
     const invalidWidth = config.width > limits.maxWidth || config.width < limits.minWidth;
     const invalidDepth = config.projection > limits.maxDepth || config.projection < limits.minDepth;
+
+    // Skystyle: automatycznie koryguj wymiary do dopuszczalnego zakresu,
+    // żeby nie blokować konfiguracji błędem po zmianie modelu
+    useEffect(() => {
+        if (config.modelId !== 'skystyle') return;
+
+        let nextWidth = config.width;
+        let nextDepth = config.projection;
+
+        if (nextWidth < limits.minWidth) nextWidth = limits.minWidth;
+        if (nextWidth > limits.maxWidth) nextWidth = limits.maxWidth;
+        if (nextDepth < limits.minDepth) nextDepth = limits.minDepth;
+        if (nextDepth > limits.maxDepth) nextDepth = limits.maxDepth;
+
+        if (nextWidth !== config.width || nextDepth !== config.projection) {
+            setConfig(prev => ({
+                ...prev,
+                width: nextWidth,
+                projection: nextDepth
+            }));
+        }
+    }, [
+        config.modelId,
+        config.width,
+        config.projection,
+        limits.minWidth,
+        limits.maxWidth,
+        limits.minDepth,
+        limits.maxDepth
+    ]);
 
     const [activeStep, setActiveStep] = useState(0);
 
@@ -239,11 +283,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                     { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] },
                                     { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] },
                                     { id: 'topstyle_xl', name: 'Topstyle XL', desc: 'Premium XL, szerokości 6-7m', features: ['Większe rozpiętości', 'Ukryty odpływ'] },
-                                    { id: 'skystyle', name: 'Skystyle', desc: 'Tylko szkło, 4-7m szerokości', features: ['Tylko szkło VSG', 'Wall/Wolnostojący'] }
+                                    { id: 'skystyle', name: 'Skystyle', desc: 'Tylko szkło VSG, 4-7m szerokości', features: ['Tylko szkło VSG', 'Przyścienny / wolnostojący'] }
                                 ].map(model => (
                                     <div
                                         key={model.id}
-                                        onClick={() => handleBasicConfigChange('modelId', model.id)}
+                                        onClick={() => {
+                                            handleBasicConfigChange('modelId', model.id);
+                                            if (model.id === 'skystyle') {
+                                                // Skystyle: tylko szkło VSG
+                                                handleBasicConfigChange('roofType', 'glass');
+                                                handleBasicConfigChange('glassType', 'standard');
+                                            }
+                                        }}
                                         className={`cursor-pointer border-2 rounded-xl p-6 transition-all ${config.modelId === model.id ? 'border-accent bg-accent/5 shadow-md' : 'border-slate-100 hover:border-accent/30'}`}
                                     >
                                         <h3 className="text-xl font-bold mb-2 text-slate-900">{model.name}</h3>
@@ -418,31 +469,37 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                     {activeStep === 2 && (
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                             <SectionHeader title="Dach i Kolor" icon="🎨" />
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className={`grid ${config.modelId === 'skystyle' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-8`}>
                                 {/* Roof Type */}
                                 <div className="space-y-4">
                                     <label className="block text-sm font-medium text-slate-700">Rodzaj pokrycia</label>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div
-                                            onClick={() => handleBasicConfigChange('roofType', 'polycarbonate')}
-                                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${config.roofType === 'polycarbonate' ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}
-                                        >
-                                            <div className="text-2xl mb-2">🛡️</div>
-                                            <div className="font-bold text-slate-900">Poliwęglan</div>
-                                            <div className="text-xs text-slate-500">Lekki i wytrzymały</div>
-                                        </div>
+                                        {config.modelId !== 'skystyle' && (
+                                            <div
+                                                onClick={() => handleBasicConfigChange('roofType', 'polycarbonate')}
+                                                className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${config.roofType === 'polycarbonate' ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}
+                                            >
+                                                <div className="text-2xl mb-2">🛡️</div>
+                                                <div className="font-bold text-slate-900">Poliwęglan</div>
+                                                <div className="text-xs text-slate-500">Lekki i wytrzymały</div>
+                                            </div>
+                                        )}
                                         <div
                                             onClick={() => handleBasicConfigChange('roofType', 'glass')}
                                             className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${config.roofType === 'glass' ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}
                                         >
                                             <div className="text-2xl mb-2">💎</div>
                                             <div className="font-bold text-slate-900">Szkło VSG</div>
-                                            <div className="text-xs text-slate-500">Premium wygląd</div>
+                                            <div className="text-xs text-slate-500">
+                                                {config.modelId === 'skystyle'
+                                                    ? 'Jedyny wariant dachu dla Skystyle'
+                                                    : 'Premium wygląd'}
+                                            </div>
                                         </div>
                                     </div>
 
                                     {/* Sub-options */}
-                                    {config.roofType === 'polycarbonate' && (
+                                    {config.modelId !== 'skystyle' && config.roofType === 'polycarbonate' && (
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                                             <label className="flex items-center gap-3 cursor-pointer">
                                                 <input
@@ -730,8 +787,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: Sticky Summary */}
-            <div className="col-span-12 lg:col-span-3 w-full lg:sticky lg:top-6 space-y-4">
+            {/* RIGHT COLUMN: Sticky Summary (Desktop) */}
+            <div className="hidden lg:block col-span-12 lg:col-span-3 w-full lg:sticky lg:top-6 space-y-4">
                 <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="bg-slate-900 text-white p-6">
                         <h3 className="text-xl font-bold">Podsumowanie</h3>
@@ -794,10 +851,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                             <div className="flex justify-between items-baseline">
                                 <span className="text-slate-500 text-sm">Cena Netto</span>
                                 <span className="font-bold text-slate-700 text-lg">
-                                    {formatCurrency(
-                                        config.addons.reduce((sum, a) => sum + a.price, 0) +
-                                        (config.selectedAccessories?.reduce((sum, a) => sum + a.price * (a.quantity || 1), 0) || 0)
-                                    )}
+                                    {formatCurrency(totalPrice)}
                                 </span>
                             </div>
                         </div>
@@ -824,6 +878,34 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* MOBILE BOTTOM BAR */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] p-4 z-50">
+                <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
+                    <div className="flex flex-col">
+                        <span className="text-xs text-slate-500">Cena Netto</span>
+                        <span className="text-xl font-bold text-slate-800">{formatCurrency(totalPrice)}</span>
+                    </div>
+                    <button
+                        onClick={() => onComplete(config)}
+                        disabled={!config.modelId || invalidWidth || invalidDepth}
+                        className={`flex-1 max-w-[200px] py-3 rounded-xl font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2 ${!config.modelId || invalidWidth || invalidDepth
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                            : 'bg-accent text-white hover:bg-accent/90'
+                            }`}
+                    >
+                        <span>Generuj</span>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </button>
+                </div>
+                {(invalidWidth || invalidDepth) && (
+                    <div className="mt-2 text-xs text-red-500 text-center font-medium">
+                        ⚠️ Wymiary poza zakresem!
+                    </div>
+                )}
             </div>
         </div>
     );

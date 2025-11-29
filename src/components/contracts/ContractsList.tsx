@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getContracts } from '../../utils/storage';
 import type { Contract } from '../../types';
+import { DatabaseService } from '../../services/database';
 
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
@@ -9,7 +9,16 @@ export const ContractsList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        setContracts(getContracts());
+        const loadContracts = async () => {
+            try {
+                const data = await DatabaseService.getContracts();
+                setContracts(data);
+            } catch (error) {
+                console.error('Error loading contracts:', error);
+            }
+        };
+
+        loadContracts();
     }, []);
 
     const filteredContracts = contracts.filter(c => {
@@ -22,7 +31,7 @@ export const ContractsList: React.FC = () => {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'signed': return 'bg-green-100 text-green-700';
-            case 'completed': return 'bg-blue-100 text-blue-700';
+            case 'completed': return 'bg-accent-soft text-accent-dark';
             case 'cancelled': return 'bg-red-100 text-red-700';
             default: return 'bg-slate-100 text-slate-700';
         }

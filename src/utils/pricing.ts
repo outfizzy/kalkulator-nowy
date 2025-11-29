@@ -249,7 +249,7 @@ export function calculatePrice(
         const orangelineZone = mapSnowZoneToOrangelineZone(snowZone);
         console.log('[PRICING DEBUG] Skystyle - Mapped zone', snowZone.id, 'to:', orangelineZone);
 
-        // Filter by mounting type (wall/freestanding)
+        // Filter by mounting type (wall-mounted / freestanding)
         const zonePrices = skystylePricingEntries.filter(p =>
             p.snowZone === orangelineZone &&
             p.mountingType === config.installationType
@@ -258,33 +258,35 @@ export function calculatePrice(
 
         if (zonePrices.length > 0) {
             console.log('[PRICING DEBUG] Sample zone price:', zonePrices[0]);
-        }
 
-        const availableWidths = Array.from(new Set(zonePrices.map(p => p.width))).sort((a, b) => a - b);
-        console.log('[PRICING DEBUG] Available widths:', availableWidths);
-        const matchedWidth = availableWidths.find(w => w >= config.width) || availableWidths[availableWidths.length - 1];
-        console.log('[PRICING DEBUG] Matched width:', matchedWidth);
+            const availableWidths = Array.from(new Set(zonePrices.map(p => p.width))).sort((a, b) => a - b);
+            console.log('[PRICING DEBUG] Available widths:', availableWidths);
+            const matchedWidth = availableWidths.find(w => w >= config.width) || availableWidths[availableWidths.length - 1];
+            console.log('[PRICING DEBUG] Matched width:', matchedWidth);
 
-        const entriesForWidth = zonePrices.filter(p => p.width === matchedWidth).sort((a, b) => a.depth - b.depth);
-        const matchedEntry = entriesForWidth.find(p => p.depth >= config.projection) || entriesForWidth[entriesForWidth.length - 1];
-        console.log('[PRICING DEBUG] Matched entry:', matchedEntry);
+            const entriesForWidth = zonePrices.filter(p => p.width === matchedWidth).sort((a, b) => a.depth - b.depth);
+            const matchedEntry = entriesForWidth.find(p => p.depth >= config.projection) || entriesForWidth[entriesForWidth.length - 1];
+            console.log('[PRICING DEBUG] Matched entry:', matchedEntry);
 
-        if (matchedEntry) {
-            basePrice = matchedEntry.price;
-            numberOfFields = matchedEntry.fields;
-            numberOfPosts = matchedEntry.posts;
-            console.log('[PRICING DEBUG] Base price set to:', basePrice);
+            if (matchedEntry) {
+                basePrice = matchedEntry.price;
+                numberOfFields = matchedEntry.fields;
+                numberOfPosts = matchedEntry.posts;
+                console.log('[PRICING DEBUG] Base price set to:', basePrice);
 
-            // Skystyle only has glass - add glass surcharges
-            if (config.glassType === 'mat' && matchedEntry.glass_matt_surcharge_eur) {
-                basePrice += matchedEntry.glass_matt_surcharge_eur;
-                console.log('[PRICING DEBUG] With matt glass surcharge:', basePrice);
-            } else if (config.glassType === 'sunscreen' && matchedEntry.glass_sun_protection_surcharge_eur) {
-                basePrice += matchedEntry.glass_sun_protection_surcharge_eur;
-                console.log('[PRICING DEBUG] With sun protection surcharge:', basePrice);
+                // Skystyle only has glass - add glass surcharges
+                if (config.glassType === 'mat' && matchedEntry.glass_matt_surcharge_eur) {
+                    basePrice += matchedEntry.glass_matt_surcharge_eur;
+                    console.log('[PRICING DEBUG] With matt glass surcharge:', basePrice);
+                } else if (config.glassType === 'sunscreen' && matchedEntry.glass_sun_protection_surcharge_eur) {
+                    basePrice += matchedEntry.glass_sun_protection_surcharge_eur;
+                    console.log('[PRICING DEBUG] With sun protection surcharge:', basePrice);
+                }
+            } else {
+                console.log('[PRICING DEBUG] No matching entry found for width/depth!');
             }
         } else {
-            console.log('[PRICING DEBUG] No matching entry found!');
+            console.log('[PRICING DEBUG] No zone prices found for Skystyle and installation type:', config.installationType);
         }
     } else {
         // Fallback to catalog.json for other models

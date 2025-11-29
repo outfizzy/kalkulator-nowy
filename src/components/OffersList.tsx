@@ -77,15 +77,29 @@ export const OffersList: React.FC = () => {
         try {
             await DatabaseService.updateOffer(id, { status: newStatus });
 
-            // Auto-create contract if sold
+            // Auto-create contract if sold and no contract exists yet for this offer
             if (newStatus === 'sold') {
                 const offer = offers.find(o => o.id === id);
-                if (offer) {
-                    // Check if contract exists
-                    // We need a way to check if contract exists. 
-                    // For now, let's assume we can try to create and if it fails (unique constraint) or we check first.
-                    // DatabaseService doesn't have getContractByOfferId yet.
-                    // Let's just update status for now and let user click "Generate Contract".
+                const existingContract = contracts.find(c => c.offerId === id);
+
+                if (offer && !existingContract) {
+                    const contract = await DatabaseService.createContract({
+                        offerId: offer.id,
+                        status: 'draft',
+                        client: offer.customer,
+                        product: offer.product,
+                        pricing: offer.pricing,
+                        commission: offer.commission,
+                        requirements: {
+                            constructionProject: false,
+                            powerSupply: false,
+                            foundation: false
+                        },
+                        comments: [],
+                        attachments: []
+                    });
+                    toast.success(`Utworzono umowę ${contract.contractNumber}`);
+                } else {
                     toast.success('Status zaktualizowany');
                 }
             } else {
@@ -146,7 +160,6 @@ export const OffersList: React.FC = () => {
             try {
                 const contract = await DatabaseService.createContract({
                     offerId: offer.id,
-                    contractNumber: `CNT/${offer.offerNumber}`, // Generate number
                     status: 'draft',
                     client: offer.customer,
                     product: offer.product,
@@ -218,7 +231,7 @@ export const OffersList: React.FC = () => {
     const getStatusColor = (status: OfferStatus) => {
         switch (status) {
             case 'draft': return 'bg-gray-100 text-gray-700';
-            case 'sent': return 'bg-blue-100 text-blue-700';
+            case 'sent': return 'bg-accent-soft text-accent-dark';
             case 'sold': return 'bg-green-100 text-green-700';
             case 'rejected': return 'bg-red-100 text-red-700';
         }
@@ -345,7 +358,7 @@ export const OffersList: React.FC = () => {
                                                 <div className="font-medium text-slate-900">{offer.customer.firstName} {offer.customer.lastName}</div>
                                                 <button
                                                     onClick={() => handleOpenCRM(offer.customer)}
-                                                    className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200 transition-colors"
+                                                    className="text-xs bg-accent-soft text-accent-dark px-2 py-0.5 rounded hover:bg-accent/10 transition-colors"
                                                     title="Otwórz Kartę Klienta"
                                                 >
                                                     CRM
@@ -392,7 +405,7 @@ export const OffersList: React.FC = () => {
                                                 const contract = contracts.find(c => c.offerId === offer.id);
                                                 if (!contract) return <span className="text-slate-300">-</span>;
                                                 const color = contract.status === 'signed' ? 'bg-green-100 text-green-700' :
-                                                    contract.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                    contract.status === 'completed' ? 'bg-accent-soft text-accent-dark' :
                                                         'bg-yellow-100 text-yellow-700';
                                                 const label = contract.status === 'signed' ? 'Podpisana' :
                                                     contract.status === 'completed' ? 'Zakończona' : 'W trakcie';
@@ -404,7 +417,7 @@ export const OffersList: React.FC = () => {
                                                 const installation = installations.find(i => i.offerId === offer.id);
                                                 if (!installation) return <span className="text-slate-300">-</span>;
                                                 const color = installation.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                    installation.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                                    installation.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
                                                         'bg-yellow-100 text-yellow-700';
                                                 const label = installation.status === 'completed' ? 'Zakończony' :
                                                     installation.status === 'scheduled' ? 'Zaplanowany' : 'Oczekuje';
@@ -415,7 +428,7 @@ export const OffersList: React.FC = () => {
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => setPreviewOffer(offer)}
-                                                    className="text-slate-400 hover:text-blue-600 transition-colors"
+                                                    className="text-slate-400 hover:text-accent transition-colors"
                                                     title="Podgląd"
                                                 >
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -436,7 +449,7 @@ export const OffersList: React.FC = () => {
                                                     <>
                                                         <button
                                                             onClick={() => handlePriceUpdate(offer.id, offer.pricing.sellingPriceNet)}
-                                                            className="text-blue-600 hover:text-blue-900"
+                                                            className="text-accent hover:text-accent-dark"
                                                             title="Zmień Cenę Umowy"
                                                         >
                                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -445,7 +458,7 @@ export const OffersList: React.FC = () => {
                                                         </button>
                                                         <button
                                                             onClick={() => handleCreateContract(offer)}
-                                                            className="text-slate-400 hover:text-blue-600 transition-colors mr-1"
+                                                            className="text-slate-400 hover:text-accent transition-colors mr-1"
                                                             title="Generuj Umowę"
                                                         >
                                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

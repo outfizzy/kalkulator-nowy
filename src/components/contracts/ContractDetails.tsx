@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getContracts, updateContract } from '../../utils/storage';
 import { generateInstallationProtocolPDF } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
 import type { Contract, ContractComment, ContractAttachment } from '../../types';
 import { toast } from 'react-hot-toast';
+import { DatabaseService } from '../../services/database';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -16,28 +16,42 @@ export const ContractDetails: React.FC = () => {
     const [photos, setPhotos] = useState<string[]>([]);
 
     useEffect(() => {
-        if (id) {
-            const contracts = getContracts();
-            const found = contracts.find(c => c.id === id);
-            if (found) {
-                setContract(found);
-                setPhotos(getOfferPhotos(found.offerId));
-            } else {
-                toast.error('Nie znaleziono umowy');
+        if (!id) return;
+
+        const loadContract = async () => {
+            try {
+                const contracts = await DatabaseService.getContracts();
+                const found = contracts.find(c => c.id === id);
+                if (found) {
+                    setContract(found);
+                    setPhotos(getOfferPhotos(found.offerId));
+                } else {
+                    toast.error('Nie znaleziono umowy');
+                    navigate('/contracts');
+                }
+            } catch (error) {
+                console.error('Error loading contract:', error);
+                toast.error('Błąd ładowania umowy');
                 navigate('/contracts');
             }
-        }
+        };
+
+        loadContract();
     }, [id, navigate]);
 
-    const handleSave = () => {
-        if (contract) {
-            updateContract(contract);
+    const handleSave = async () => {
+        if (!contract) return;
+        try {
+            await DatabaseService.updateContract(contract.id, contract);
             toast.success('Zapisano zmiany');
             setIsEditing(false);
+        } catch (error) {
+            console.error('Error updating contract:', error);
+            toast.error('Błąd zapisu umowy');
         }
     };
 
-    const handleAddComment = () => {
+    const handleAddComment = async () => {
         if (!contract || !newComment.trim()) return;
 
         const comment: ContractComment = {
@@ -47,18 +61,23 @@ export const ContractDetails: React.FC = () => {
             createdAt: new Date()
         };
 
-        const updatedContract = {
+        const updatedContract: Contract = {
             ...contract,
             comments: [...contract.comments, comment]
         };
 
         setContract(updatedContract);
-        updateContract(updatedContract);
-        setNewComment('');
-        toast.success('Dodano komentarz');
+        try {
+            await DatabaseService.updateContract(updatedContract.id, updatedContract);
+            setNewComment('');
+            toast.success('Dodano komentarz');
+        } catch (error) {
+            console.error('Error updating contract with comment:', error);
+            toast.error('Błąd dodawania komentarza');
+        }
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!contract || !e.target.files || e.target.files.length === 0) return;
 
         const file = e.target.files[0];
@@ -71,14 +90,19 @@ export const ContractDetails: React.FC = () => {
             createdAt: new Date()
         };
 
-        const updatedContract = {
+        const updatedContract: Contract = {
             ...contract,
             attachments: [...contract.attachments, attachment]
         };
 
         setContract(updatedContract);
-        updateContract(updatedContract);
-        toast.success('Dodano załącznik');
+        try {
+            await DatabaseService.updateContract(updatedContract.id, updatedContract);
+            toast.success('Dodano załącznik');
+        } catch (error) {
+            console.error('Error updating contract with attachment:', error);
+            toast.error('Błąd dodawania załącznika');
+        }
     };
 
     if (!contract) return <div>Ładowanie...</div>;

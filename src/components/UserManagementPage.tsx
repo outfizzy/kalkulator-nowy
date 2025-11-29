@@ -27,6 +27,22 @@ export const UserManagementPage: React.FC = () => {
 
     const handleApprove = async (userId: string) => {
         try {
+            const user = users.find(u => u.id === userId);
+
+            // For partners, ask for B2B margin on approval
+            if (user?.role === 'partner') {
+                const defaultMargin = user.partnerMargin ? Math.round(user.partnerMargin * 100) : 25;
+                const input = window.prompt('Podaj marżę B2B w % (np. 25):', defaultMargin.toString());
+                if (input === null) return; // Cancelled
+                const normalized = input.replace(',', '.');
+                const value = parseFloat(normalized);
+                if (isNaN(value) || value <= 0 || value > 100) {
+                    toast.error('Nieprawidłowa marża. Podaj wartość od 1 do 100.');
+                    return;
+                }
+                await DatabaseService.updatePartnerMargin(userId, value / 100);
+            }
+
             await DatabaseService.updateUserStatus(userId, 'active');
             toast.success('Użytkownik zaakceptowany');
             await loadUsers();
@@ -44,6 +60,26 @@ export const UserManagementPage: React.FC = () => {
         } catch (error) {
             console.error('Error blocking user:', error);
             toast.error('Błąd blokowania użytkownika');
+        }
+    };
+
+    const handleSetPartnerMargin = async (user: User) => {
+        try {
+            const defaultMargin = user.partnerMargin ? Math.round(user.partnerMargin * 100) : 25;
+            const input = window.prompt(`Marża B2B dla ${user.companyName || user.firstName}:`, defaultMargin.toString());
+            if (input === null) return;
+            const normalized = input.replace(',', '.');
+            const value = parseFloat(normalized);
+            if (isNaN(value) || value <= 0 || value > 100) {
+                toast.error('Nieprawidłowa marża. Podaj wartość od 1 do 100.');
+                return;
+            }
+            await DatabaseService.updatePartnerMargin(user.id, value / 100);
+            toast.success('Zaktualizowano marżę partnera');
+            await loadUsers();
+        } catch (error) {
+            console.error('Error updating partner margin:', error);
+            toast.error('Błąd aktualizacji marży partnera');
         }
     };
 
@@ -108,11 +144,11 @@ export const UserManagementPage: React.FC = () => {
 
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-blue-400 transition-all duration-300 hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-0.5">
+                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-accent transition-all duration-300 hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-slate-600 text-sm font-medium">Wszyscy użytkownicy</span>
-                        <div className="p-2 bg-blue-50 rounded-lg">
-                            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-2 bg-accent-soft rounded-lg">
+                            <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                         </div>
@@ -172,11 +208,11 @@ export const UserManagementPage: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Szukaj po nazwisku, emailu..."
-                                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                             />
                         </div>
                     </div>
-                    <button className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2">
+                    <button className="px-4 py-2.5 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
@@ -235,6 +271,11 @@ export const UserManagementPage: React.FC = () => {
                             <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                 Telefon
                             </th>
+                            {activeTab === 'partners' && (
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Marża B2B
+                                </th>
+                            )}
                             <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                 Status
                             </th>
@@ -248,7 +289,7 @@ export const UserManagementPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-700 bg-slate-800/50">
                         {filteredUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-slate-900/50 transition-colors">
+                            <tr key={user.id} className="hover:bg-slate-900/40 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center">
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.role === 'partner' ? 'bg-emerald-600' : 'bg-accent'}`}>
@@ -280,6 +321,13 @@ export const UserManagementPage: React.FC = () => {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-slate-400">{user.phone || '-'}</div>
                                 </td>
+                                {activeTab === 'partners' && (
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className="text-sm text-emerald-300 font-semibold">
+                                            {user.partnerMargin !== undefined ? `${Math.round(user.partnerMargin * 100)}%` : '—'}
+                                        </span>
+                                    </td>
+                                )}
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     {getStatusBadge(user.status)}
                                 </td>
@@ -303,10 +351,18 @@ export const UserManagementPage: React.FC = () => {
                                             Zablokuj
                                         </button>
                                     )}
+                                    {user.role === 'partner' && (
+                                        <button
+                                            onClick={() => handleSetPartnerMargin(user)}
+                                            className="inline-flex items-center px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                                        >
+                                            Ustaw marżę
+                                        </button>
+                                    )}
                                     {user.status === 'blocked' && (
                                         <button
                                             onClick={() => handleApprove(user.id)}
-                                            className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                            className="inline-flex items-center px-3 py-1 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors"
                                         >
                                             Odblokuj
                                         </button>

@@ -67,10 +67,10 @@ export const RegisterPage: React.FC = () => {
                             <h2 className="text-2xl font-bold text-white mb-2">
                                 Rejestracja przesłana pomyślnie!
                             </h2>
-                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mt-6">
-                                <p className="text-blue-300 text-sm leading-relaxed">
+                            <div className="bg-accent-soft/60 border border-accent/40 rounded-lg p-4 mt-6">
+                                <p className="text-accent text-sm leading-relaxed">
                                     Twoje konto zostało utworzone i oczekuje na weryfikację przez administratora systemu.
-                                    Proces akceptacji trwa zwykle do <strong className="text-blue-200">24 godzin roboczych</strong>.
+                                    Proces akceptacji trwa zwykle do <strong className="text-white">24 godzin roboczych</strong>.
                                     Po zatwierdzeniu konta otrzymasz powiadomienie email z potwierdzeniem dostępu do platformy.
                                 </p>
                             </div>

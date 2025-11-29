@@ -19,9 +19,7 @@ export const PartnerOffersList: React.FC = () => {
         loadOffers();
     }, []);
 
-    useEffect(() => {
-        applyFilters();
-    }, [offers, searchQuery, statusFilter]);
+
 
     const loadOffers = async () => {
         try {
@@ -36,7 +34,7 @@ export const PartnerOffersList: React.FC = () => {
         }
     };
 
-    const applyFilters = () => {
+    const applyFilters = React.useCallback(() => {
         let filtered = [...offers];
 
         // Status filter
@@ -58,12 +56,16 @@ export const PartnerOffersList: React.FC = () => {
         }
 
         setFilteredOffers(filtered);
-    };
+    }, [offers, searchQuery, statusFilter]);
+
+    useEffect(() => {
+        applyFilters();
+    }, [applyFilters]);
 
     const getStatusBadge = (status: string) => {
         const badges = {
             draft: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-            sent: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+            sent: 'bg-accent/20 text-accent border-accent/30',
             sold: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
             rejected: 'bg-red-500/20 text-red-300 border-red-500/30'
         };
@@ -129,16 +131,16 @@ export const PartnerOffersList: React.FC = () => {
                     <p className="text-3xl font-bold text-slate-900">{stats.totalOffers}</p>
                 </div>
 
-                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-blue-400 transition-all duration-300 hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-0.5">
+                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-accent transition-all duration-300 hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-slate-600 text-sm font-medium">Łączny przychód</span>
-                        <div className="p-2 bg-blue-50 rounded-lg">
-                            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-2 bg-accent-soft rounded-lg">
+                            <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
-                    <p className="text-3xl font-bold text-blue-600">
+                    <p className="text-3xl font-bold text-accent">
                         {formatCurrency(stats.totalRevenue)}
                     </p>
                 </div>
@@ -211,7 +213,7 @@ export const PartnerOffersList: React.FC = () => {
                     <div className="flex items-end">
                         <button
                             onClick={loadOffers}
-                            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                            className="w-full px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors flex items-center justify-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -257,7 +259,7 @@ export const PartnerOffersList: React.FC = () => {
                         <tbody className="divide-y divide-slate-700 bg-slate-800/50">
                             {filteredOffers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
+                                    <td colSpan={8} className="px-6 py-8 text-center text-slate-400">
                                         {searchQuery || statusFilter !== 'all'
                                             ? 'Brak ofert spełniających kryteria wyszukiwania'
                                             : 'Brak ofert od partnerów'}
@@ -288,7 +290,7 @@ export const PartnerOffersList: React.FC = () => {
                                             {getStatusBadge(offer.status)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
-                                            <button className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors">
+                                            <button className="inline-flex items-center px-3 py-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-medium rounded-lg transition-colors">
                                                 <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />

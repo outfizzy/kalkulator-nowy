@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getInstallations, getTeams, updateInstallation } from '../../utils/storage';
+import { getTeams } from '../../utils/storage';
 import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
@@ -7,6 +7,7 @@ import { OfferSearchModal } from './OfferSearchModal';
 import { InstallationCalendar } from './InstallationCalendar';
 import type { Installation, InstallationTeam } from '../../types';
 import { toast } from 'react-hot-toast';
+import { DatabaseService } from '../../services/database';
 
 export const InstallationDashboard: React.FC = () => {
     const [installations, setInstallations] = useState<Installation[]>([]);
@@ -23,13 +24,22 @@ export const InstallationDashboard: React.FC = () => {
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
-    const loadData = () => {
-        setInstallations(getInstallations());
-        setTeams(getTeams());
+    const loadData = async () => {
+        try {
+            const [dbInstallations, localTeams] = await Promise.all([
+                DatabaseService.getInstallations(),
+                Promise.resolve(getTeams())
+            ]);
+            setInstallations(dbInstallations);
+            setTeams(localTeams);
+        } catch (error) {
+            console.error('Error loading installations:', error);
+            toast.error('Błąd ładowania montaży');
+        }
     };
 
     useEffect(() => {
-        loadData();
+        void loadData();
     }, []);
 
     const handleGeocodeMissing = async () => {
@@ -43,11 +53,11 @@ export const InstallationDashboard: React.FC = () => {
 
             const coords = await geocodeAddress(inst.client.address, inst.client.city);
             if (coords) {
-                const updated = {
+                const updated: Installation = {
                     ...inst,
                     client: { ...inst.client, coordinates: coords }
                 };
-                updateInstallation(updated);
+                await DatabaseService.updateInstallation(inst.id, updated);
                 updatedCount++;
             }
         }
@@ -67,24 +77,23 @@ export const InstallationDashboard: React.FC = () => {
         );
     };
 
-    const handleAssignTeam = (teamId: string, date: string) => {
-        if (selectedIds.length === 0) return;
+    const handleAssignTeam = async (teamId: string, date: string) => {
+        if (selectedIds.length === 0 || !date) return;
 
-        selectedIds.forEach(id => {
+        for (const id of selectedIds) {
             const inst = installations.find(i => i.id === id);
             if (inst) {
-                updateInstallation({
-                    ...inst,
+                await DatabaseService.updateInstallation(inst.id, {
                     teamId,
                     scheduledDate: date,
                     status: 'scheduled'
                 });
             }
-        });
+        }
 
         toast.success(`Przypisano ${selectedIds.length} montaży do ekipy`);
         setSelectedIds([]);
-        loadData();
+        await loadData();
     };
 
     const handleEdit = (installation: Installation) => {
@@ -93,7 +102,7 @@ export const InstallationDashboard: React.FC = () => {
     };
 
     const handleModalUpdate = () => {
-        loadData();
+        void loadData();
     };
 
     const filteredInstallations = installations.filter(inst => {
@@ -275,10 +284,13 @@ export const InstallationDashboard: React.FC = () => {
                         onClick={() => {
                             const date = (document.getElementById('assign-date') as HTMLInputElement).value;
                             const team = (document.getElementById('assign-team') as HTMLSelectElement).value;
-                            if (!date) return toast.error('Wybierz datę');
-                            handleAssignTeam(team, date);
+                            if (!date) {
+                                toast.error('Wybierz datę');
+                                return;
+                            }
+                            void handleAssignTeam(team, date);
                         }}
-                        className="bg-accent hover:bg-blue-600 px-6 py-2 rounded-lg font-bold transition-colors"
+                        className="bg-accent hover:bg-accent-dark px-6 py-2 rounded-lg font-bold transition-colors"
                     >
                         Przypisz do Ekipy
                     </button>
@@ -297,7 +309,7 @@ export const InstallationDashboard: React.FC = () => {
             <OfferSearchModal
                 isOpen={isSearchModalOpen}
                 onClose={() => setIsSearchModalOpen(false)}
-                onInstallationCreated={handleModalUpdate}
+                onInstallationCreated={loadData}
             />
         </div>
     );

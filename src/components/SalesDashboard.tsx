@@ -198,12 +198,12 @@ export const SalesDashboard: React.FC = () => {
 
                 <Link
                     to="/reports"
-                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-blue-500 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
                 >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16" />
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
-                            <svg className="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
+                            <svg className="w-7 h-7 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
@@ -264,7 +264,7 @@ export const SalesDashboard: React.FC = () => {
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Skuteczność (Win Rate)</div>
-                    <div className="text-3xl font-bold text-blue-600">
+                    <div className="text-3xl font-bold text-accent">
                         {stats.totalOffers > 0 ? ((stats.soldOffers / stats.totalOffers) * 100).toFixed(1) : 0}%
                     </div>
                 </div>
@@ -398,7 +398,7 @@ export const SalesDashboard: React.FC = () => {
                         {teamStats.map(stat => (
                             <div key={stat.user.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center text-white font-bold text-lg">
                                         {stat.user.firstName[0]}{stat.user.lastName[0]}
                                     </div>
                                     <div>
@@ -418,7 +418,7 @@ export const SalesDashboard: React.FC = () => {
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-sm text-slate-600">Wysłane/Draft:</span>
-                                        <span className="font-bold text-blue-600">{stat.sentCount} / {stat.draftCount}</span>
+                                        <span className="font-bold text-accent-dark">{stat.sentCount} / {stat.draftCount}</span>
                                     </div>
                                     <div className="border-t pt-3 mt-3">
                                         <div className="flex justify-between items-center">

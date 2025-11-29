@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Customer, Offer, Contract, Installation } from '../../types';
-import { getAllOffers, getContracts, getInstallations } from '../../utils/storage';
+import { DatabaseService } from '../../services/database';
 
 interface ClientCRMModalProps {
     customer: Customer;
@@ -16,36 +16,45 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
     const [clientInstallations, setClientInstallations] = useState<Installation[]>([]);
 
     useEffect(() => {
-        // Fetch and filter data for this customer
-        const allOffers = getAllOffers();
-        const allContracts = getContracts();
-        const allInstallations = getInstallations();
+        const loadData = async () => {
+            try {
+                const [allOffers, allContracts, allInstallations] = await Promise.all([
+                    DatabaseService.getOffers(),
+                    DatabaseService.getContracts(),
+                    DatabaseService.getInstallations()
+                ]);
 
-        // Filter logic: Match by Email OR (FirstName + LastName + City)
-        // Normalizing strings for comparison
-        const normalize = (str: string) => str.toLowerCase().trim();
-        const customerKey = customer.email ? normalize(customer.email) : `${normalize(customer.firstName)}_${normalize(customer.lastName)}_${normalize(customer.city)}`;
+                // Filter logic: Match by Email OR (FirstName + LastName + City)
+                const normalize = (str: string) => str.toLowerCase().trim();
+                const customerKey = customer.email
+                    ? normalize(customer.email)
+                    : `${normalize(customer.firstName)}_${normalize(customer.lastName)}_${normalize(customer.city)}`;
 
-        const isMatch = (c: Partial<Customer> & { firstName: string; lastName: string; city?: string; email?: string }) => {
-            if (customer.email && c.email) {
-                return normalize(c.email) === normalize(customer.email);
+                const isMatch = (c: Partial<Customer> & { firstName: string; lastName: string; city?: string; email?: string }) => {
+                    if (customer.email && c.email) {
+                        return normalize(c.email) === normalize(customer.email);
+                    }
+                    const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city || '')}`;
+                    return key === customerKey;
+                };
+
+                const offers = allOffers
+                    .filter(o => isMatch(o.customer))
+                    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+                setClientOffers(offers);
+
+                const offerIds = new Set(offers.map(o => o.id));
+                const contracts = allContracts.filter(c => offerIds.has(c.offerId) || isMatch(c.client));
+                setClientContracts(contracts);
+
+                const installations = allInstallations.filter(i => offerIds.has(i.offerId) || isMatch(i.client));
+                setClientInstallations(installations);
+            } catch (error) {
+                console.error('Error loading CRM data:', error);
             }
-            const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city || '')}`;
-            return key === customerKey;
         };
 
-        const offers = allOffers.filter(o => isMatch(o.customer)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-        setClientOffers(offers);
-
-        // Contracts are linked to offers, but we can also double check client data if needed
-        // Ideally contracts should be linked to offers which are linked to clients
-        const offerIds = new Set(offers.map(o => o.id));
-        const contracts = allContracts.filter(c => offerIds.has(c.offerId) || isMatch(c.client));
-        setClientContracts(contracts);
-
-        const installations = allInstallations.filter(i => offerIds.has(i.offerId) || isMatch(i.client));
-        setClientInstallations(installations);
-
+        loadData();
     }, [customer]);
 
     // Stats
@@ -61,7 +70,7 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                 {/* Header */}
                 <div className="bg-slate-900 text-white p-6 flex justify-between items-start shrink-0">
                     <div className="flex gap-4 items-center">
-                        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-2xl font-bold">
+                        <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center text-2xl font-bold">
                             {customer.firstName[0]}{customer.lastName[0]}
                         </div>
                         <div>
@@ -100,7 +109,7 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as Tab)}
                                 className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
-                                    ? 'border-blue-600 text-blue-600'
+                                    ? 'border-accent text-accent'
                                     : 'border-transparent text-slate-500 hover:text-slate-700'
                                     }`}
                             >
@@ -126,7 +135,7 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                             </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                                 <h3 className="text-sm font-medium text-slate-500 mb-2">Aktywne oferty</h3>
-                                <p className="text-3xl font-bold text-blue-600">
+                                <p className="text-3xl font-bold text-accent">
                                     {clientOffers.filter(o => ['draft', 'sent'].includes(o.status)).length}
                                 </p>
                             </div>
@@ -143,7 +152,7 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                                             </div>
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${offer.status === 'sold' ? 'bg-green-100 text-green-700' :
                                                 offer.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                    'bg-blue-100 text-blue-700'
+                                                    'bg-accent-soft text-accent-dark'
                                                 }`}>
                                                 {offer.status}
                                             </span>
@@ -171,7 +180,7 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                                         <div className="font-bold text-slate-800">
                                             {offer.pricing.sellingPriceGross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                         </div>
-                                        <div className={`text-xs font-medium uppercase mt-1 ${offer.status === 'sold' ? 'text-green-600' : 'text-blue-600'
+                                        <div className={`text-xs font-medium uppercase mt-1 ${offer.status === 'sold' ? 'text-green-600' : 'text-accent-dark'
                                             }`}>
                                             {offer.status}
                                         </div>
@@ -219,7 +228,7 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                                                 <p className="text-sm text-slate-500">Adres: {inst.client.address}, {inst.client.city}</p>
                                             </div>
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${inst.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                inst.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                                inst.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
                                                     'bg-yellow-100 text-yellow-700'
                                                 }`}>
                                                 {inst.status}

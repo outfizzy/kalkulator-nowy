@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
-export const LoginPage: React.FC = () => {
+export const PartnerLoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,9 @@ export const LoginPage: React.FC = () => {
         try {
             const { error } = await login(email, password);
             if (error) throw error;
-            navigate('/dashboard');
+            // Redirect will be handled by AuthContext or App.tsx logic based on role
+            // For now, we can force navigation if needed, but App.tsx usually handles it
+            navigate('/partner/dashboard');
         } catch (error: any) {
             console.error('Login error:', error);
             toast.error(error.message || 'Błąd logowania. Sprawdź email i hasło.');
@@ -28,7 +30,6 @@ export const LoginPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-            {/* Background Pattern */}
             <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
 
             <div className="w-full max-w-md relative z-10">
@@ -42,10 +43,10 @@ export const LoginPage: React.FC = () => {
                         />
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2">
-                        System Ofertowy
+                        Strefa Partnera B2B
                     </h1>
                     <p className="text-slate-400">
-                        Zaloguj się do platformy zarządzania ofertami
+                        Zaloguj się do panelu hurtowego
                     </p>
                 </div>
 
@@ -62,8 +63,8 @@ export const LoginPage: React.FC = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                                placeholder="twoj.email@firma.pl"
+                                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                                placeholder="biuro@twojafirma.pl"
                                 disabled={loading}
                             />
                         </div>
@@ -78,7 +79,7 @@ export const LoginPage: React.FC = () => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                                 placeholder="••••••••"
                                 disabled={loading}
                             />
@@ -87,7 +88,7 @@ export const LoginPage: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-accent/20"
+                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
                         >
                             {loading ? (
                                 <span className="flex items-center justify-center">
@@ -105,12 +106,12 @@ export const LoginPage: React.FC = () => {
 
                     <div className="mt-6 text-center">
                         <p className="text-slate-400 text-sm">
-                            Nie masz konta?{' '}
+                            Nie masz konta partnera?{' '}
                             <button
-                                onClick={() => navigate('/register')}
-                                className="text-accent hover:text-accent/80 font-medium transition-colors"
+                                onClick={() => navigate('/partner/register')}
+                                className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
                             >
-                                Zarejestruj się
+                                Zarejestruj firmę
                             </button>
                         </p>
                     </div>
@@ -119,7 +120,7 @@ export const LoginPage: React.FC = () => {
                 {/* Footer */}
                 <div className="mt-8 text-center">
                     <p className="text-slate-500 text-sm">
-                        © 2024 PolenDach 24. Profesjonalne zadaszenia aluminiowe.
+                        © 2024 PolenDach 24. Strefa Partnera B2B.
                     </p>
                 </div>
             </div>

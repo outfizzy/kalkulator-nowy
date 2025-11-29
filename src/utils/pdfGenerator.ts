@@ -163,7 +163,7 @@ export async function generateOfferPDF(offer: Offer) {
                         <div class="font-bold text-slate-900">${installationType}</div>
 
                         <div class="text-slate-500">${translations.snowZone}:</div>
-                        <div class="font-bold text-blue-600">
+                        <div class="font-bold text-accent-dark">
                             Zone ${offer.snowZone.id} (${offer.snowZone.value} kN/m²)
                         </div>
                     </div>

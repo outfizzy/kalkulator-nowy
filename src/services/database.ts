@@ -1,6 +1,29 @@
 import { supabase } from '../lib/supabase';
 import type { Offer, MeasurementReport, Installation, Contract, User } from '../types';
 
+// Helper: generate sequential contract number PL/1100/MM/RRRR for current month/year
+const generateContractNumberFromList = (contracts: Contract[]): string => {
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const year = now.getFullYear();
+
+    const currentMonthContracts = contracts.filter(c => {
+        const parts = (c.contractNumber || '').split('/');
+        return parts.length >= 4 && parts[2] === month && parts[3] === year.toString();
+    });
+
+    let maxNum = 0;
+    currentMonthContracts.forEach(c => {
+        const parts = c.contractNumber.split('/');
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+
+    const base = 1100;
+    const nextNum = maxNum === 0 ? base : maxNum + 1;
+    return `PL/${nextNum}/${month}/${year}`;
+};
+
 export const DatabaseService = {
     // --- Offers ---
     async getOffers(): Promise<Offer[]> {
@@ -154,7 +177,8 @@ export const DatabaseService = {
     async getContracts(): Promise<Contract[]> {
         const { data, error } = await supabase
             .from('contracts')
-            .select('*');
+            .select('*')
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -175,12 +199,16 @@ export const DatabaseService = {
         }));
     },
 
-    async createContract(contract: Omit<Contract, 'id' | 'createdAt'>): Promise<Contract> {
+    async createContract(contract: Omit<Contract, 'id' | 'createdAt' | 'contractNumber'>): Promise<Contract> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // Generate sequential contract number for current month/year
+        const existingContracts = await DatabaseService.getContracts();
+        const newContractNumber = generateContractNumberFromList(existingContracts);
+
         const contractData = {
-            contractNumber: contract.contractNumber,
+            contractNumber: newContractNumber,
             client: contract.client,
             product: contract.product,
             pricing: contract.pricing,
@@ -206,6 +234,7 @@ export const DatabaseService = {
 
         return {
             ...contract,
+            contractNumber: newContractNumber,
             id: data.id,
             createdAt: new Date(data.created_at)
         } as Contract;
@@ -337,11 +366,14 @@ export const DatabaseService = {
             firstName: row.full_name?.split(' ')[0] || '',
             lastName: row.full_name?.split(' ').slice(1).join(' ') || '',
             email: '', // Email is in auth.users, not accessible easily from public table unless we duplicate it. 
-            // For display purposes, name is enough usually.
-            // If we need email, we should store it in profiles or use a secure function.
-            // Let's assume we don't need email for dropdowns.
             role: row.role as User['role'],
-            createdAt: new Date(row.created_at)
+            createdAt: new Date(row.created_at),
+            phone: row.phone,
+            monthlyTarget: row.monthly_target,
+            status: row.status as 'pending' | 'active' | 'blocked',
+            companyName: row.company_name || undefined,
+            nip: row.nip || undefined,
+            partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined
         }));
     },
 
@@ -361,7 +393,13 @@ export const DatabaseService = {
             lastName: data.full_name?.split(' ').slice(1).join(' ') || '',
             email: '',
             role: data.role as User['role'],
-            createdAt: new Date(data.created_at)
+            createdAt: new Date(data.created_at),
+            phone: data.phone,
+            monthlyTarget: data.monthly_target,
+            status: data.status as 'pending' | 'active' | 'blocked',
+            companyName: data.company_name || undefined,
+            nip: data.nip || undefined,
+            partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined
         };
     },
     async updateUserProfile(profile: Partial<User>): Promise<void> {
@@ -415,7 +453,10 @@ export const DatabaseService = {
             createdAt: new Date(row.created_at),
             phone: row.phone,
             monthlyTarget: row.monthly_target,
-            status: row.status as 'pending' | 'active' | 'blocked'
+            status: row.status as 'pending' | 'active' | 'blocked',
+            companyName: row.company_name || undefined,
+            nip: row.nip || undefined,
+            partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined
         }));
     },
 
@@ -423,6 +464,15 @@ export const DatabaseService = {
         const { error } = await supabase
             .from('profiles')
             .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
+    async updatePartnerMargin(userId: string, margin: number): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ partner_margin: margin, updated_at: new Date().toISOString() })
             .eq('id', userId);
 
         if (error) throw error;

@@ -7,7 +7,7 @@ export interface SnowZoneInfo {
 }
 
 // User Roles
-export type UserRole = 'admin' | 'sales_rep' | 'manager';
+export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner';
 
 export interface User {
     id: string;
@@ -20,6 +20,10 @@ export interface User {
     phone?: string;
     monthlyTarget?: number;
     status?: 'pending' | 'active' | 'blocked';
+    // Partner specific fields
+    companyName?: string;
+    nip?: string;
+    partnerMargin?: number; // e.g. 0.25 = 25%
 }
 
 export interface Customer {
@@ -83,6 +87,8 @@ export interface ProductConfig {
     projection: number;
     postsHeight?: number;
     color: string;
+    customColor: boolean; // true if custom RAL color selected
+    customColorRAL?: string; // RAL number when custom color is selected
     roofType: RoofType;
     polycarbonateType?: 'standard' | 'ir-gold';
     glassType?: 'standard' | 'mat' | 'sunscreen';
@@ -292,4 +298,17 @@ export interface OfferPhotos {
     offerId: string;
     photos: string[];
     updatedAt: Date;
+}
+
+export interface SalesRepStat {
+    userId: string;
+    userName: string;
+    role: UserRole;
+    totalOffers: number;
+    soldOffers: number;
+    totalValue: number;
+    totalMarginValue: number;
+    totalDistance: number;
+    avgMarginPercent: number;
+    conversionRate: number;
 }

@@ -107,7 +107,7 @@ export const SettingsPage: React.FC = () => {
                 <div className="mt-8 flex justify-end">
                     <button
                         onClick={handleSave}
-                        className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-sky-600 font-bold shadow-lg shadow-accent/20"
+                        className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20"
                     >
                         Zapisz Ustawienia
                     </button>

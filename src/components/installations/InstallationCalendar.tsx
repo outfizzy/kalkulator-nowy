@@ -81,7 +81,7 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({ inst
                                 Ekipa
                             </th>
                             {weekDates.map(date => (
-                                <th key={date.toISOString()} className={`p-3 border-b border-r border-slate-200 bg-slate-50 text-center min-w-[140px] ${date.toDateString() === new Date().toDateString() ? 'bg-blue-50' : ''
+                                <th key={date.toISOString()} className={`p-3 border-b border-r border-slate-200 bg-slate-50 text-center min-w-[140px] ${date.toDateString() === new Date().toDateString() ? 'bg-accent-soft' : ''
                                     }`}>
                                     <div className="text-xs font-bold text-slate-700 capitalize">
                                         {date.toLocaleDateString('pl-PL', { weekday: 'long' })}
@@ -121,7 +121,7 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({ inst
                                                         <div className="truncate text-slate-600">{inst.client.lastName}</div>
                                                         <div className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${inst.status === 'completed' ? 'bg-green-100 text-green-700' :
                                                             inst.status === 'issue' ? 'bg-red-100 text-red-700' :
-                                                                'bg-blue-100 text-blue-700'
+                                                                'bg-accent-soft text-accent-dark'
                                                             }`}>
                                                             {inst.status === 'completed' ? 'Zakończony' :
                                                                 inst.status === 'issue' ? 'Problem' : 'Zaplanowany'}

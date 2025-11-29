@@ -71,8 +71,8 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                         <div className="col-span-2 border-t border-slate-200 pt-4 mt-2">
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-slate-500">{translations.snowZone}:</span>
-                                <span className="font-bold text-blue-600">Zone {offer.snowZone.id}</span>
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                <span className="font-bold text-accent">Zone {offer.snowZone.id}</span>
+                                <span className="text-xs bg-accent-soft text-accent-dark px-2 py-0.5 rounded-full">
                                     {offer.snowZone.value} kN/m²
                                 </span>
                             </div>
@@ -185,7 +185,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                             </div>
                             <div className="flex justify-between pt-3 border-t border-blue-400">
                                 <span className="font-bold text-slate-800">Gesamt ({translations.installation}):</span>
-                                <span className="font-bold text-lg text-blue-700">
+                                <span className="font-bold text-lg text-accent-dark">
                                     {formatCurrency(offer.pricing.installationCosts.totalInstallation)}
                                 </span>
                             </div>

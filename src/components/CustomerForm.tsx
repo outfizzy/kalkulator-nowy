@@ -126,16 +126,16 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         <div className="space-y-8">
             {/* Customer Selection (if exists) */}
             {previousCustomers.length > 0 && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl shadow-sm border border-blue-200">
+                <div className="bg-gradient-to-r from-accent-soft/70 to-accent-soft p-6 rounded-2xl shadow-sm border border-accent/40">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
                             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 016 0z" />
                             </svg>
                         </div>
                         <div>
-                            <h3 className="font-bold text-blue-900">Wyszukaj istniejącego klienta</h3>
-                            <p className="text-sm text-blue-700">Lub wprowadź nowe dane poniżej</p>
+                            <h3 className="font-bold text-slate-900">Wyszukaj istniejącego klienta</h3>
+                            <p className="text-sm text-accent-dark">Lub wprowadź nowe dane poniżej</p>
                         </div>
                     </div>
                     <div className="relative customer-search-container">
@@ -145,9 +145,9 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             onChange={handleSearchChange}
                             onFocus={() => setShowDropdown(true)}
                             placeholder="Wpisz imię, nazwisko, miasto lub kod pocztowy..."
-                            className="w-full p-3 pl-10 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white shadow-sm transition-all"
+                            className="w-full p-3 pl-10 border-2 border-accent/60 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white shadow-sm transition-all"
                         />
-                        <svg className="w-5 h-5 text-blue-400 absolute left-3 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5 text-accent absolute left-3 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         {searchQuery && (
@@ -164,12 +164,12 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
 
                         {/* Dropdown results */}
                         {showDropdown && filteredCustomers.length > 0 && (
-                            <div className="absolute z-10 w-full mt-2 bg-white border-2 border-blue-300 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                            <div className="absolute z-10 w-full mt-2 bg-white border-2 border-accent/40 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                                 {filteredCustomers.map((item, idx) => (
                                     <div
                                         key={idx}
                                         onClick={() => handleSelectCustomer(item)}
-                                        className="p-4 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                        className="p-4 hover:bg-accent-soft/60 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
                                     >
                                         <div className="font-bold text-slate-900">
                                             {item.customer.firstName} {item.customer.lastName}
@@ -183,7 +183,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         )}
 
                         {showDropdown && searchQuery && filteredCustomers.length === 0 && (
-                            <div className="absolute z-10 w-full mt-2 bg-white border-2 border-blue-300 rounded-xl shadow-xl p-4 text-slate-500 text-sm">
+                            <div className="absolute z-10 w-full mt-2 bg-white border-2 border-accent/40 rounded-xl shadow-xl p-4 text-slate-500 text-sm">
                                 <svg className="w-5 h-5 inline mr-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
@@ -331,7 +331,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 </div>
                                 <div>
                                     <p className="font-bold text-blue-900">Wykryto Strefę Śniegową: {snowZone.id}</p>
-                                    <p className="text-sm text-blue-700 mt-1">Obciążenie: {snowZone.value} kN/m²</p>
+                                    <p className="text-sm text-accent-dark mt-1">Obciążenie: {snowZone.value} kN/m²</p>
                                 </div>
                             </div>
                         )}

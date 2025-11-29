@@ -58,7 +58,9 @@ export const skystylePricingEntries: PricingEntry[] = skystylePricing.products
         depth: p.depth_mm,
         price: p.price_total_base_glass_eur,
         coverType: 'glass',
-        mountingType: p.mounting_type,
+        // Normalizujemy typ montażu do wartości używanych w konfiguratorze
+        // (wall-mounted | freestanding)
+        mountingType: p.mounting_type === 'wall' ? 'wall-mounted' : 'freestanding',
         glassType: p.base_glass_type,
         // Matt surcharge if alt glass is matt
         glass_matt_surcharge_eur: p.alt_glass_type === '44.2_matt' ? p.surcharge_alt_glass_eur : undefined,

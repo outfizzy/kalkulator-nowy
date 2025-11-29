@@ -5,11 +5,22 @@ import type { SalesRepStat } from '../../types';
 
 type DateRange = 'thisMonth' | 'lastMonth' | 'thisYear';
 
-export const SalesTeamStats: React.FC = () => {
+interface SalesTeamStatsProps {
+    viewMode?: 'reps' | 'partners';
+    title?: string;
+}
+
+export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title }) => {
     const [stats, setStats] = useState<SalesRepStat[]>([]);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState<DateRange>('thisMonth');
-    const [showPartners, setShowPartners] = useState(false);
+    const [showPartners, setShowPartners] = useState(viewMode === 'partners');
+
+    useEffect(() => {
+        if (viewMode) {
+            setShowPartners(viewMode === 'partners');
+        }
+    }, [viewMode]);
 
     const getDateRange = useCallback((): { start: Date; end: Date } => {
         const now = new Date();
@@ -97,55 +108,47 @@ export const SalesTeamStats: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Controls */}
-            <div className="flex justify-end items-center">
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowPartners(!showPartners)}
-                        className={`px-4 py-2 rounded-lg transition-colors border border-slate-700 ${showPartners
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                            : 'bg-surface text-slate-400 hover:bg-slate-700'
-                            }`}
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h3 className="text-lg font-bold text-slate-700">{title || 'Statystyki'}</h3>
+
+                <div className="flex items-center gap-4">
+                    {!viewMode && (
+                        <div className="flex items-center bg-slate-100 rounded-lg p-1">
+                            <button
+                                onClick={() => setShowPartners(false)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${!showPartners ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Przedstawiciele
+                            </button>
+                            <button
+                                onClick={() => setShowPartners(true)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${showPartners ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Partnerzy B2B
+                            </button>
+                        </div>
+                    )}
+
+                    <select
+                        value={dateRange}
+                        onChange={(e) => setDateRange(e.target.value as DateRange)}
+                        className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-accent focus:border-accent block p-2"
                     >
-                        {showPartners ? 'Pokaż Pracowników' : 'Pokaż Partnerów B2B'}
-                    </button>
-                    <div className="w-px h-8 bg-slate-700 mx-2"></div>
-                    <button
-                        onClick={() => setDateRange('thisMonth')}
-                        className={`px-4 py-2 rounded-lg transition-colors ${dateRange === 'thisMonth'
-                            ? 'bg-accent text-white'
-                            : 'bg-surface text-slate-400 hover:bg-slate-700'
-                            }`}
-                    >
-                        Ten miesiąc
-                    </button>
-                    <button
-                        onClick={() => setDateRange('lastMonth')}
-                        className={`px-4 py-2 rounded-lg transition-colors ${dateRange === 'lastMonth'
-                            ? 'bg-accent text-white'
-                            : 'bg-surface text-slate-400 hover:bg-slate-700'
-                            }`}
-                    >
-                        Poprzedni miesiąc
-                    </button>
-                    <button
-                        onClick={() => setDateRange('thisYear')}
-                        className={`px-4 py-2 rounded-lg transition-colors ${dateRange === 'thisYear'
-                            ? 'bg-accent text-white'
-                            : 'bg-surface text-slate-400 hover:bg-slate-700'
-                            }`}
-                    >
-                        Ten rok
-                    </button>
+                        <option value="thisMonth">Ten miesiąc</option>
+                        <option value="lastMonth">Poprzedni miesiąc</option>
+                        <option value="thisYear">Ten rok</option>
+                    </select>
                 </div>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="group relative bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-blue-400 transition-all duration-300 hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-0.5">
+                <div className="group relative bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-accent transition-all duration-300 hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
                     <div className="flex items-center justify-between mb-3">
                         <div className="text-slate-600 text-sm font-medium">Wszystkie oferty</div>
-                        <div className="p-2 bg-blue-50 rounded-lg">
-                            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-2 bg-accent-soft rounded-lg">
+                            <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
@@ -171,7 +174,7 @@ export const SalesTeamStats: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                         <span className="text-slate-500">Conversion:</span>
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                        <span className="px-2 py-0.5 bg-accent-soft text-accent-dark rounded-full font-medium">
                             {totalStats.offers > 0 ? ((totalStats.soldOffers / totalStats.offers) * 100).toFixed(1) : 0}%
                         </span>
                     </div>

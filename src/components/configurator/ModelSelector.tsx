@@ -41,7 +41,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onSelect, selected
                             <p className="text-sm text-slate-500 mt-1">{model.description}</p>
                             <div className="mt-3 flex gap-2">
                                 {model.roofTypes.includes('glass') && (
-                                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">Szkło</span>
+                                    <span className="text-xs bg-accent-soft text-accent-dark px-2 py-1 rounded">Szkło</span>
                                 )}
                                 {model.roofTypes.includes('polycarbonate') && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded">Poliwęglan</span>

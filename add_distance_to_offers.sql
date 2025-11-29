@@ -1,6 +1,5 @@
--- Add distance column to offers table for mileage tracking
-ALTER TABLE public.offers 
-ADD COLUMN IF NOT EXISTS distance NUMERIC DEFAULT 0;
+-- Add distance column to offers table
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS distance INTEGER DEFAULT 0;
 
--- Comment on column
-COMMENT ON COLUMN public.offers.distance IS 'Distance to client in kilometers';
+-- Update existing rows to have default value (optional, as default handles new rows)
+UPDATE offers SET distance = 0 WHERE distance IS NULL;

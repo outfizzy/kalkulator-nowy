@@ -164,7 +164,7 @@ export const ReportsList: React.FC = () => {
                                         {report.totalKm} km
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                                        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent/20 text-accent">
                                             {report.visits.length}
                                         </span>
                                     </td>

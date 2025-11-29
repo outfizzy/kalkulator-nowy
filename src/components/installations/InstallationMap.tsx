@@ -108,7 +108,7 @@ export const InstallationMap: React.FC<InstallationMapProps> = ({ installations,
                                             e.stopPropagation();
                                             onEdit(inst);
                                         }}
-                                        className="text-accent hover:text-blue-700 font-bold underline ml-2"
+                                        className="text-accent hover:text-accent-dark font-bold underline ml-2"
                                     >
                                         Edytuj
                                     </button>

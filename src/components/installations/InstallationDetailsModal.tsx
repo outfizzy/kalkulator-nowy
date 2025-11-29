@@ -268,7 +268,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                         <button
                             onClick={handleSave}
                             disabled={isGeocoding}
-                            className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                            className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50"
                         >
                             {isGeocoding ? 'Zapisywanie...' : 'Zapisz Zmiany'}
                         </button>
