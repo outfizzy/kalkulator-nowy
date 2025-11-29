@@ -11,6 +11,7 @@ import { AwningSelector } from './configurator/AwningSelector';
 import trendstyleData from '../data/trendstyle_full.json';
 import orangelineData from '../data/orangeline_full.json';
 import topstyleData from '../data/topstyle_full.json';
+import topstyleXlData from '../data/topstyle_xl_full.json';
 import { formatCurrency } from '../utils/translations';
 
 interface ProductConfiguratorProps {
@@ -75,6 +76,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
 
         if (config.modelId === 'topstyle') {
             const entries = (topstyleData as any).products.filter((p: any) => p.model === 'Topstyle');
+            const widths = entries.map((p: any) => p.width_mm);
+            const depths = entries.map((p: any) => p.depth_mm);
+            return {
+                minWidth: Math.min(...widths),
+                maxWidth: Math.max(...widths),
+                minDepth: Math.min(...depths),
+                maxDepth: Math.max(...depths)
+            };
+        }
+
+        if (config.modelId === 'topstyle_xl') {
+            const entries = (topstyleXlData as any).products.filter((p: any) => p.model === 'Topstyle XL');
             const widths = entries.map((p: any) => p.width_mm);
             const depths = entries.map((p: any) => p.depth_mm);
             return {
@@ -209,7 +222,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                     { id: 'orangestyle', name: 'Orangestyle', desc: 'Klasyczny design, do 1.5 kN/m²', features: ['Softline Design', 'Rynna zintegrowana'] },
                                     { id: 'trendstyle', name: 'Trendstyle', desc: 'Nowoczesny, do 2.0 kN/m²', features: ['Płaskie profile', 'Wzmocniona konstrukcja'] },
                                     { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] },
-                                    { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] }
+                                    { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] },
+                                    { id: 'topstyle_xl', name: 'Topstyle XL', desc: 'Premium XL, szerokości 6-7m', features: ['Większe rozpiętości', 'Ukryty odpływ'] }
                                 ].map(model => (
                                     <div
                                         key={model.id}
@@ -713,7 +727,11 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                         <div className="space-y-3 pb-6 border-b border-slate-100">
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-sm">Model</span>
-                                <span className="font-bold text-slate-800">{config.modelId === 'trendstyle_plus' ? 'Trendstyle+' : config.modelId ? config.modelId.charAt(0).toUpperCase() + config.modelId.slice(1) : '-'}</span>
+                                <span className="font-bold text-slate-800">{
+                                    config.modelId === 'trendstyle_plus' ? 'Trendstyle+' :
+                                        config.modelId === 'topstyle_xl' ? 'Topstyle XL' :
+                                            config.modelId ? config.modelId.charAt(0).toUpperCase() + config.modelId.slice(1) : '-'
+                                }</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-sm">Wymiary</span>

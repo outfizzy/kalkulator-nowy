@@ -3,6 +3,7 @@ import catalogData from '../data/catalog.json';
 import { orangestylePricing, type PricingEntry } from '../data/orangestyle_pricing';
 import { trendstylePricingEntries, trendstylePlusPricingEntries } from '../data/trendstyle_pricing';
 import { topstylePricingEntries } from '../data/topstyle_pricing';
+import { topstyleXlPricingEntries } from '../data/topstyle_xl_pricing';
 import { calculateDistanceFromGubin, calculateInstallationCosts } from './distanceCalculator';
 
 // Normalize snow zone IDs coming from postal-code lookup (1/2/3) or Roman numerals (I/II/III)
@@ -160,6 +161,50 @@ export function calculatePrice(
         console.log('[PRICING DEBUG] Topstyle - Mapped zone', snowZone.id, 'to:', orangelineZone);
 
         const zonePrices = topstylePricingEntries.filter(p =>
+            p.snowZone === orangelineZone &&
+            p.coverType === config.roofType
+        );
+        console.log('[PRICING DEBUG] Zone prices found:', zonePrices.length, 'entries');
+
+        if (zonePrices.length > 0) {
+            console.log('[PRICING DEBUG] Sample zone price:', zonePrices[0]);
+        }
+
+        const availableWidths = Array.from(new Set(zonePrices.map(p => p.width))).sort((a, b) => a - b);
+        console.log('[PRICING DEBUG] Available widths:', availableWidths);
+        const matchedWidth = availableWidths.find(w => w >= config.width) || availableWidths[availableWidths.length - 1];
+        console.log('[PRICING DEBUG] Matched width:', matchedWidth);
+
+        const entriesForWidth = zonePrices.filter(p => p.width === matchedWidth).sort((a, b) => a.depth - b.depth);
+        const matchedEntry = entriesForWidth.find(p => p.depth >= config.projection) || entriesForWidth[entriesForWidth.length - 1];
+        console.log('[PRICING DEBUG] Matched entry:', matchedEntry);
+
+        if (matchedEntry) {
+            basePrice = matchedEntry.price;
+            numberOfFields = matchedEntry.fields;
+            numberOfPosts = matchedEntry.posts;
+            console.log('[PRICING DEBUG] Base price set to:', basePrice);
+
+            if (config.roofType === 'polycarbonate' && config.polycarbonateType === 'ir-gold' && matchedEntry.irGoldSurcharge) {
+                basePrice += matchedEntry.irGoldSurcharge;
+                console.log('[PRICING DEBUG] With IR Gold surcharge:', basePrice);
+            }
+
+            if (config.roofType === 'glass') {
+                const surcharge = applyGlassSurcharge(matchedEntry);
+                if (surcharge) {
+                    basePrice += surcharge;
+                    console.log('[PRICING DEBUG] With glass surcharge:', basePrice);
+                }
+            }
+        } else {
+            console.log('[PRICING DEBUG] No matching entry found!');
+        }
+    } else if (config.modelId === 'topstyle_xl' && snowZone) {
+        const orangelineZone = mapSnowZoneToOrangelineZone(snowZone);
+        console.log('[PRICING DEBUG] Topstyle XL - Mapped zone', snowZone.id, 'to:', orangelineZone);
+
+        const zonePrices = topstyleXlPricingEntries.filter(p =>
             p.snowZone === orangelineZone &&
             p.coverType === config.roofType
         );
