@@ -6,7 +6,6 @@ import { CustomerForm } from './components/CustomerForm';
 import { ProductConfigurator } from './components/ProductConfigurator';
 import { OfferSummary } from './components/OfferSummary';
 import { MarginControl } from './components/MarginControl';
-// import { Dashboard } from './components/Dashboard'; // Replaced by SalesDashboard
 import { OffersList } from './components/OffersList';
 import { SalesDashboard } from './components/SalesDashboard';
 import { SettingsPage } from './components/SettingsPage';
@@ -14,10 +13,11 @@ import { MigrationPage } from './components/MigrationPage';
 import { RegisterPage } from './components/RegisterPage';
 import { UserManagementPage } from './components/UserManagementPage';
 import { SalesTeamDashboard } from './components/admin/SalesTeamDashboard';
+import { PartnerOffersPage } from './components/admin/PartnerOffersPage';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { calculatePrice } from './utils/pricing';
 import { calculateCommission } from './utils/commission';
 import { DatabaseService } from './services/database';
-// import { getCommissionStats } from './utils/storage'; // Removed
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReportsList } from './components/reports/ReportsList';
 import { ReportForm } from './components/reports/ReportForm';
@@ -26,12 +26,19 @@ import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
+
+// Partner Components
+import { LandingPage } from './components/LandingPage';
+import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
+import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
+import { PartnerLayout } from './components/partner/PartnerLayout';
+
 import type { Customer, ProductConfig, Offer, SnowZoneInfo } from './types';
 
 type Step = 'customer' | 'product' | 'summary';
 
 // Protected Route component
-function ProtectedRoute({ children }: { children: React.ReactElement }) {
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactElement, allowedRoles?: string[] }) {
   const { currentUser, loading } = useAuth();
 
   if (loading) {
@@ -41,20 +48,38 @@ function ProtectedRoute({ children }: { children: React.ReactElement }) {
   }
 
   if (!currentUser) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+    // Redirect based on role if trying to access unauthorized area
+    if (currentUser.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 }
 
-function NewOfferPage() {
+
+
+function DashboardRouter() {
+  const { currentUser } = useAuth();
+
+  if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
+    return <AdminDashboard />;
+  }
+
+  return <SalesDashboard />;
+}
+
+function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) {
   const { currentUser } = useAuth();
   const [step, setStep] = useState<Step>('customer');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
   const [product, setProduct] = useState<ProductConfig | null>(null);
   const [offer, setOffer] = useState<Offer | null>(null);
-  const [margin, setMargin] = useState<number>(0.40); // Default 40%
+  const [margin, setMargin] = useState<number>(mode === 'partner' ? 0.25 : 0.40); // Lower default margin for partners
 
   const handleCustomerComplete = (data: Customer, zone: SnowZoneInfo) => {
     setCustomer(data);
@@ -69,7 +94,8 @@ function NewOfferPage() {
       const pricing = calculatePrice(config, margin, snowZone, customer.postalCode);
 
       try {
-        const soldOffersCount = await DatabaseService.getSoldOffersCount(currentUser.id);
+        // Partners might not have soldOffersCount logic or it might be different
+        const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
 
         // Commission: 5% of Net Selling Price (including installation)
         const commission = calculateCommission(pricing.sellingPriceNet, pricing.marginPercentage, soldOffersCount);
@@ -101,7 +127,7 @@ function NewOfferPage() {
       const newPricing = calculatePrice(offer.product, newMargin, offer.snowZone, offer.customer.postalCode);
 
       try {
-        const soldOffersCount = await DatabaseService.getSoldOffersCount(currentUser.id);
+        const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
         const newCommission = calculateCommission(newPricing.sellingPriceNet, newPricing.marginPercentage, soldOffersCount);
 
         const updatedOffer = {
@@ -129,7 +155,7 @@ function NewOfferPage() {
     setSnowZone(null);
     setProduct(null);
     setOffer(null);
-    setMargin(0.40);
+    setMargin(mode === 'partner' ? 0.25 : 0.40);
   };
 
   return (
@@ -197,30 +223,52 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
-            <Route path="/" element={
-              <ProtectedRoute>
+            {/* Partner Public Routes */}
+            <Route path="/partner/login" element={<PartnerLoginPage />} />
+            <Route path="/partner/register" element={<PartnerRegisterPage />} />
+
+            {/* Sales Rep / Admin Routes */}
+            <Route element={
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}>
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route index element={<SalesDashboard />} />
-              <Route path="offers" element={<OffersList />} />
-              <Route path="new-offer" element={<NewOfferPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="migration" element={<MigrationPage />} />
-              <Route path="admin/users" element={<UserManagementPage />} />
-              <Route path="admin/stats" element={<SalesTeamDashboard />} />
-              <Route path="reports" element={<ReportsList />} />
-              <Route path="reports/new" element={<ReportForm />} />
-              <Route path="installations" element={<InstallationDashboard />} />
-              <Route path="contracts" element={<ContractsList />} />
-              <Route path="contracts/:id" element={<ContractDetails />} />
-              {/* The installations route is now a top-level route */}
-              {/* <Route path="installations" element={<InstallationDashboard />} /> */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="/dashboard" element={<DashboardRouter />} />
+              <Route path="/offers" element={<OffersList />} />
+              <Route path="/new-offer" element={<NewOfferPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/migration" element={<MigrationPage />} />
+              <Route path="/admin/users" element={<UserManagementPage />} />
+              <Route path="/admin/stats" element={<SalesTeamDashboard />} />
+              <Route path="/admin/partner-offers" element={<PartnerOffersPage />} />
+              <Route path="/reports" element={<ReportsList />} />
+              <Route path="/reports/new" element={<ReportForm />} />
+              <Route path="/installations" element={<InstallationDashboard />} />
+              <Route path="/contracts" element={<ContractsList />} />
+              <Route path="/contracts/:id" element={<ContractDetails />} />
             </Route>
+
+
+
+            {/* Partner Protected Routes */}
+            <Route path="/partner" element={
+              <ProtectedRoute allowedRoles={['partner']}>
+                <PartnerLayout />
+              </ProtectedRoute>
+            }>
+              <Route path="dashboard" element={<OffersList />} /> {/* Reusing OffersList for now */}
+              <Route path="new-offer" element={<NewOfferPage mode="partner" />} />
+              <Route path="offers" element={<OffersList />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route index element={<Navigate to="/partner/dashboard" replace />} />
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Toaster
             position="top-right"

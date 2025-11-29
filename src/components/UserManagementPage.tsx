@@ -102,8 +102,8 @@ export const UserManagementPage: React.FC = () => {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">Zarządzanie Użytkownikami</h1>
-                <p className="text-slate-600">Zatwierdzaj, blokuj i zarządzaj kontami użytkowników</p>
+                <h1 className="text-3xl font-bold text-slate-700 mb-2">Zarządzanie Użytkownikami</h1>
+                <p className="text-slate-500">Zatwierdzaj, blokuj i zarządzaj kontami użytkowników</p>
             </div>
 
             {/* Statistics Cards */}
