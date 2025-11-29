@@ -4,6 +4,7 @@ import { orangestylePricing, type PricingEntry } from '../data/orangestyle_prici
 import { trendstylePricingEntries, trendstylePlusPricingEntries } from '../data/trendstyle_pricing';
 import { topstylePricingEntries } from '../data/topstyle_pricing';
 import { topstyleXlPricingEntries } from '../data/topstyle_xl_pricing';
+import { skystylePricingEntries } from '../data/skystyle_pricing';
 import { calculateDistanceFromGubin, calculateInstallationCosts } from './distanceCalculator';
 
 // Normalize snow zone IDs coming from postal-code lookup (1/2/3) or Roman numerals (I/II/III)
@@ -240,6 +241,47 @@ export function calculatePrice(
                     basePrice += surcharge;
                     console.log('[PRICING DEBUG] With glass surcharge:', basePrice);
                 }
+            }
+        } else {
+            console.log('[PRICING DEBUG] No matching entry found!');
+        }
+    } else if (config.modelId === 'skystyle' && snowZone) {
+        const orangelineZone = mapSnowZoneToOrangelineZone(snowZone);
+        console.log('[PRICING DEBUG] Skystyle - Mapped zone', snowZone.id, 'to:', orangelineZone);
+
+        // Filter by mounting type (wall/freestanding)
+        const zonePrices = skystylePricingEntries.filter(p =>
+            p.snowZone === orangelineZone &&
+            p.mountingType === config.installationType
+        );
+        console.log('[PRICING DEBUG] Zone prices found:', zonePrices.length, 'entries for', config.installationType);
+
+        if (zonePrices.length > 0) {
+            console.log('[PRICING DEBUG] Sample zone price:', zonePrices[0]);
+        }
+
+        const availableWidths = Array.from(new Set(zonePrices.map(p => p.width))).sort((a, b) => a - b);
+        console.log('[PRICING DEBUG] Available widths:', availableWidths);
+        const matchedWidth = availableWidths.find(w => w >= config.width) || availableWidths[availableWidths.length - 1];
+        console.log('[PRICING DEBUG] Matched width:', matchedWidth);
+
+        const entriesForWidth = zonePrices.filter(p => p.width === matchedWidth).sort((a, b) => a.depth - b.depth);
+        const matchedEntry = entriesForWidth.find(p => p.depth >= config.projection) || entriesForWidth[entriesForWidth.length - 1];
+        console.log('[PRICING DEBUG] Matched entry:', matchedEntry);
+
+        if (matchedEntry) {
+            basePrice = matchedEntry.price;
+            numberOfFields = matchedEntry.fields;
+            numberOfPosts = matchedEntry.posts;
+            console.log('[PRICING DEBUG] Base price set to:', basePrice);
+
+            // Skystyle only has glass - add glass surcharges
+            if (config.glassType === 'mat' && matchedEntry.glass_matt_surcharge_eur) {
+                basePrice += matchedEntry.glass_matt_surcharge_eur;
+                console.log('[PRICING DEBUG] With matt glass surcharge:', basePrice);
+            } else if (config.glassType === 'sunscreen' && matchedEntry.glass_sun_protection_surcharge_eur) {
+                basePrice += matchedEntry.glass_sun_protection_surcharge_eur;
+                console.log('[PRICING DEBUG] With sun protection surcharge:', basePrice);
             }
         } else {
             console.log('[PRICING DEBUG] No matching entry found!');
