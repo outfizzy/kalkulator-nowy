@@ -65,7 +65,7 @@ export const DatabaseService = {
                 status: offer.status,
                 snow_zone: offer.snowZone,
                 commission: offer.commission,
-                distance: offer.distance || 0
+                margin_percentage: offer.pricing.marginPercentage
             })
             .select()
             .single();
@@ -81,7 +81,6 @@ export const DatabaseService = {
             status: data.status as Offer['status'],
             snowZone: data.snow_zone,
             commission: data.commission,
-            distance: data.distance,
             createdAt: new Date(data.created_at),
             updatedAt: new Date(data.updated_at),
             createdBy: data.user_id
@@ -102,7 +101,6 @@ export const DatabaseService = {
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.snowZone) dbUpdates.snow_zone = updates.snowZone;
         if (updates.commission !== undefined) dbUpdates.commission = updates.commission;
-        if (updates.distance !== undefined) dbUpdates.distance = updates.distance;
 
         const { error } = await supabase
             .from('offers')
@@ -322,58 +320,7 @@ export const DatabaseService = {
         if (error) throw error;
     },
 
-    // --- Reports ---
-    async getReports(): Promise<MeasurementReport[]> {
-        const { data, error } = await supabase
-            .from('reports')
-            .select('*');
 
-        if (error) throw error;
-
-        return data.map(row => ({
-            ...row.data,
-            id: row.id,
-            userId: row.user_id,
-            createdAt: new Date(row.created_at)
-        }));
-    },
-
-    async saveReport(report: Omit<MeasurementReport, 'id' | 'createdAt'>): Promise<MeasurementReport> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
-
-        const dateObj = new Date(report.date);
-        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-        const year = dateObj.getFullYear();
-
-        const { data, error } = await supabase
-            .from('reports')
-            .insert({
-                user_id: user.id,
-                month: month,
-                year: year,
-                data: report
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return {
-            ...report,
-            id: data.id,
-            createdAt: new Date(data.created_at)
-        } as MeasurementReport;
-    },
-
-    async deleteReport(id: string): Promise<void> {
-        const { error } = await supabase
-            .from('reports')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-    },
 
     // --- Users ---
     async getSalesReps(): Promise<User[]> {
@@ -482,7 +429,7 @@ export const DatabaseService = {
     },
 
     // --- Stats ---
-    async getSalesRepStats(startDate?: Date, endDate?: Date): Promise<any[]> {
+    async getSalesRepStats(startDate?: Date, endDate?: Date): Promise<import('../types').SalesRepStat[]> {
         // Fetch offers for stats
         let offersQuery = supabase
             .from('offers')
@@ -521,6 +468,7 @@ export const DatabaseService = {
                 statsMap.set(userId, {
                     userId,
                     userName: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+                    role: user?.role || 'sales_rep',
                     totalOffers: 0,
                     soldOffers: 0,
                     totalValue: 0,
@@ -560,6 +508,7 @@ export const DatabaseService = {
                 statsMap.set(userId, {
                     userId,
                     userName: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+                    role: user?.role || 'sales_rep',
                     totalOffers: 0,
                     soldOffers: 0,
                     totalValue: 0,
@@ -580,5 +529,208 @@ export const DatabaseService = {
             avgMarginPercent: stats.totalOffers > 0 ? stats.marginSum / stats.totalOffers : 0,
             conversionRate: stats.totalOffers > 0 ? (stats.soldOffers / stats.totalOffers) * 100 : 0
         }));
+    },
+
+    // --- Reports ---
+    async getReports(): Promise<MeasurementReport[]> {
+        const { data, error } = await supabase
+            .from('reports')
+            .select('*');
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            date: row.data.date,
+            salesRepId: row.user_id,
+            carPlate: row.data.carPlate,
+            odometerStart: row.data.odometerStart,
+            odometerEnd: row.data.odometerEnd,
+            totalKm: row.data.totalKm,
+            withDriver: row.data.withDriver,
+            carIssues: row.data.carIssues,
+            reportDescription: row.data.reportDescription,
+            visits: row.data.visits || [],
+            signedContractsCount: row.data.signedContractsCount,
+            offerIds: row.data.offerIds || [],
+            createdAt: new Date(row.created_at)
+        }));
+    },
+
+    async createReport(report: Omit<MeasurementReport, 'createdAt'>): Promise<MeasurementReport> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const reportData = {
+            date: report.date,
+            carPlate: report.carPlate,
+            odometerStart: report.odometerStart,
+            odometerEnd: report.odometerEnd,
+            totalKm: report.totalKm,
+            withDriver: report.withDriver,
+            carIssues: report.carIssues,
+            reportDescription: report.reportDescription,
+            visits: report.visits,
+            signedContractsCount: report.signedContractsCount,
+            offerIds: report.offerIds
+        };
+
+        const { data, error } = await supabase
+            .from('reports')
+            .insert({
+                user_id: user.id,
+                data: reportData
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            date: data.data.date,
+            salesRepId: data.user_id,
+            carPlate: data.data.carPlate,
+            odometerStart: data.data.odometerStart,
+            odometerEnd: data.data.odometerEnd,
+            totalKm: data.data.totalKm,
+            withDriver: data.data.withDriver,
+            carIssues: data.data.carIssues,
+            reportDescription: data.data.reportDescription,
+            visits: data.data.visits || [],
+            signedContractsCount: data.data.signedContractsCount,
+            offerIds: data.data.offerIds || [],
+            createdAt: new Date(data.created_at)
+        };
+    },
+
+    async deleteReport(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('reports')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    // --- Admin Offer Tracking ---
+    async getPartnerOffers(): Promise<Offer[]> {
+        const { data, error } = await supabase
+            .from('offers')
+            .select(`
+                *,
+                profiles!offers_user_id_fkey (
+                    id,
+                    full_name,
+                    role,
+                    company_name,
+                    nip
+                )
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data
+            .filter(row => row.profiles?.role === 'partner')
+            .map(row => ({
+                id: row.id,
+                offerNumber: row.offer_number,
+                customer: row.customer_data,
+                product: row.product_config,
+                pricing: row.pricing,
+                status: row.status as Offer['status'],
+                snowZone: row.snow_zone,
+                commission: row.commission,
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at),
+                createdBy: row.user_id,
+                // Add company info from joined profile
+                companyName: row.profiles?.company_name,
+                createdByName: row.profiles?.full_name
+            }));
+    },
+
+    async getOffersByRole(role: string): Promise<Offer[]> {
+        const { data, error } = await supabase
+            .from('offers')
+            .select(`
+                *,
+                profiles!offers_user_id_fkey (
+                    id,
+                    full_name,
+                    role,
+                    company_name
+                )
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data
+            .filter(row => row.profiles?.role === role)
+            .map(row => ({
+                id: row.id,
+                offerNumber: row.offer_number,
+                customer: row.customer_data,
+                product: row.product_config,
+                pricing: row.pricing,
+                status: row.status as Offer['status'],
+                snowZone: row.snow_zone,
+                commission: row.commission,
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at),
+                createdBy: row.user_id,
+                companyName: row.profiles?.company_name,
+                createdByName: row.profiles?.full_name
+            }));
+    },
+
+    async searchOffers(query: string): Promise<Offer[]> {
+        const { data, error } = await supabase
+            .from('offers')
+            .select(`
+                *,
+                profiles!offers_user_id_fkey (
+                    id,
+                    full_name,
+                    role,
+                    company_name
+                )
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const lowerQuery = query.toLowerCase();
+
+        return data
+            .filter(row => {
+                const offerNumber = row.offer_number?.toLowerCase() || '';
+                const customerName = `${row.customer_data?.firstName || ''} ${row.customer_data?.lastName || ''}`.toLowerCase();
+                const companyName = row.profiles?.company_name?.toLowerCase() || '';
+                const createdByName = row.profiles?.full_name?.toLowerCase() || '';
+
+                return offerNumber.includes(lowerQuery) ||
+                    customerName.includes(lowerQuery) ||
+                    companyName.includes(lowerQuery) ||
+                    createdByName.includes(lowerQuery);
+            })
+            .map(row => ({
+                id: row.id,
+                offerNumber: row.offer_number,
+                customer: row.customer_data,
+                product: row.product_config,
+                pricing: row.pricing,
+                status: row.status as Offer['status'],
+                snowZone: row.snow_zone,
+                commission: row.commission,
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at),
+                createdBy: row.user_id,
+                companyName: row.profiles?.company_name,
+                createdByName: row.profiles?.full_name
+            }));
     }
+
 };
