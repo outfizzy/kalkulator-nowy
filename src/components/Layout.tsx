@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Layout: React.FC = () => {
     const { currentUser, logout, isAdmin } = useAuth();
     const navigate = useNavigate();
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const handleLogout = () => {
         logout();
@@ -62,17 +63,95 @@ export const Layout: React.FC = () => {
                 </div>
             </aside>
 
+            {/* Mobile Navigation Drawer */}
+            {mobileMenuOpen && (
+                <>
+                    {/* Overlay */}
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                        onClick={() => setMobileMenuOpen(false)}
+                    />
+
+                    {/* Drawer */}
+                    <aside className="fixed top-0 left-0 bottom-0 w-80 bg-primary text-white z-50 md:hidden flex flex-col transform transition-transform">
+                        {/* Header with close button */}
+                        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                            <img
+                                src="/logo.png"
+                                alt="PolenDach 24"
+                                className="h-12 w-auto"
+                            />
+                            <button
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+                                aria-label="Close menu"
+                            >
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                            <NavLink to="/dashboard" label="Dashboard" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/offers" label="Lista Ofert" icon="offers" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/reports" label="Raporty" icon="reports" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
+                            {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
+                            {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
+                            <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/settings" label="Ustawienia" icon="settings" onClick={() => setMobileMenuOpen(false)} />
+                        </nav>
+
+                        <div className="p-4 border-t border-slate-800 space-y-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center font-bold text-lg">
+                                    {userInitials}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">{currentUser.firstName} {currentUser.lastName}</p>
+                                    <p className="text-xs text-slate-400">{roleName}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                                className="w-full px-4 py-3 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                                Wyloguj
+                            </button>
+                        </div>
+                    </aside>
+                </>
+            )}
+
             {/* Main Content */}
             <main className="flex-1 flex flex-col">
-                <header className="h-16 border-b border-slate-200 bg-surface flex items-center justify-between px-8">
-                    <h2 className="text-lg font-semibold text-slate-800">Kreator Ofert</h2>
+                <header className="h-16 border-b border-slate-200 bg-surface flex items-center justify-between px-4 md:px-8">
+                    <div className="flex items-center gap-4">
+                        {/* Mobile menu button */}
+                        <button
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                            className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            aria-label="Toggle menu"
+                        >
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                        <h2 className="text-lg font-semibold text-slate-800">Kreator Ofert</h2>
+                    </div>
+                    {/* Mobile logo */}
                     <div className="md:hidden">
-                        {/* Mobile menu button placeholder */}
-                        <button className="p-2 text-slate-600">Menu</button>
+                        <img src="/logo.png" alt="PolenDach 24" className="h-8 w-auto" />
                     </div>
                 </header>
-                <div className="flex-1 p-8 overflow-auto">
-                    <div className="max-w-4xl mx-auto">
+                <div className="flex-1 p-4 md:p-8 overflow-auto">
+                    <div className="max-w-7xl mx-auto">
                         <Outlet />
                     </div>
                 </div>
@@ -85,9 +164,10 @@ interface NavLinkProps {
     to: string;
     label: string;
     icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard';
+    onClick?: () => void;
 }
 
-const NavLink: React.FC<NavLinkProps> = ({ to, label, icon }) => {
+const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
     const location = useLocation();
     const isActive = location.pathname === to;
 
@@ -139,7 +219,8 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon }) => {
     return (
         <Link
             to={to}
-            className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-colors ${isActive
+            onClick={onClick}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive
                 ? 'bg-accent/10 text-accent'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
