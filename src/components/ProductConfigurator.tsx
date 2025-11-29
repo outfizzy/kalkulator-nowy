@@ -10,6 +10,7 @@ import { PanoramaWallSelector } from './configurator/PanoramaWallSelector';
 import { AwningSelector } from './configurator/AwningSelector';
 import trendstyleData from '../data/trendstyle_full.json';
 import orangelineData from '../data/orangeline_full.json';
+import topstyleData from '../data/topstyle_full.json';
 import { formatCurrency } from '../utils/translations';
 
 interface ProductConfiguratorProps {
@@ -73,7 +74,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
         }
 
         if (config.modelId === 'topstyle') {
-            const entries = (trendstyleData as any).products.filter((p: any) => p.model === 'Topstyle');
+            const entries = (topstyleData as any).products.filter((p: any) => p.model === 'Topstyle');
             const widths = entries.map((p: any) => p.width_mm);
             const depths = entries.map((p: any) => p.depth_mm);
             return {
