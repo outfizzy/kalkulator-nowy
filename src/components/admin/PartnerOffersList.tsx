@@ -116,69 +116,57 @@ export const PartnerOffersList: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="group relative bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-900 backdrop-blur-xl rounded-2xl p-6 border border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/20 hover:scale-[1.02]">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-slate-400 text-sm font-medium">Łączna liczba ofert</span>
-                            <div className="p-2.5 bg-emerald-500/10 rounded-xl">
-                                <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-green-400 transition-all duration-300 hover:shadow-lg hover:shadow-green-100/50 hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-slate-600 text-sm font-medium">Łączna liczba ofert</span>
+                        <div className="p-2 bg-green-50 rounded-lg">
+                            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
                         </div>
-                        <p className="text-4xl font-bold text-white tracking-tight">{stats.totalOffers}</p>
                     </div>
+                    <p className="text-3xl font-bold text-slate-900">{stats.totalOffers}</p>
                 </div>
 
-                <div className="group relative bg-gradient-to-br from-blue-500/10 via-slate-800/50 to-slate-900 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.02]">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-slate-400 text-sm font-medium">Łączny przychód</span>
-                            <div className="p-2.5 bg-blue-500/10 rounded-xl">
-                                <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
+                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-blue-400 transition-all duration-300 hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-slate-600 text-sm font-medium">Łączny przychód</span>
+                        <div className="p-2 bg-blue-50 rounded-lg">
+                            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                         </div>
-                        <p className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent tracking-tight">
-                            {formatCurrency(stats.totalRevenue).replace(/\s/g, '')}
-                        </p>
                     </div>
+                    <p className="text-3xl font-bold text-blue-600">
+                        {formatCurrency(stats.totalRevenue)}
+                    </p>
                 </div>
 
-                <div className="group relative bg-gradient-to-br from-orange-500/10 via-slate-800/50 to-slate-900 backdrop-blur-xl rounded-2xl p-6 border border-orange-500/20 hover:border-orange-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-orange-500/20 hover:scale-[1.02]">
-                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-slate-400 text-sm font-medium">Średnia marża</span>
-                            <div className="p-2.5 bg-orange-500/10 rounded-xl">
-                                <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                </svg>
-                            </div>
+                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-orange-400 transition-all duration-300 hover:shadow-lg hover:shadow-orange-100/50 hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-slate-600 text-sm font-medium">Średnia marża</span>
+                        <div className="p-2 bg-orange-50 rounded-lg">
+                            <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
                         </div>
-                        <p className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-yellow-300 bg-clip-text text-transparent tracking-tight">
-                            {(stats.avgMargin * 100).toFixed(1)}%
-                        </p>
                     </div>
+                    <p className="text-3xl font-bold text-orange-600">
+                        {(stats.avgMargin * 100).toFixed(1)}%
+                    </p>
                 </div>
 
-                <div className="group relative bg-gradient-to-br from-yellow-500/10 via-slate-800/50 to-slate-900 backdrop-blur-xl rounded-2xl p-6 border border-yellow-500/20 hover:border-yellow-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-yellow-500/20 hover:scale-[1.02]">
-                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-slate-400 text-sm font-medium">Oferty w szkicach</span>
-                            <div className="p-2.5 bg-yellow-500/10 rounded-xl">
-                                <svg className="w-6 h-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
+                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-yellow-400 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-100/50 hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-slate-600 text-sm font-medium">Oferty w szkicach</span>
+                        <div className="p-2 bg-yellow-50 rounded-lg">
+                            <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                         </div>
-                        <p className="text-4xl font-bold text-white tracking-tight">{stats.pendingCount}</p>
                     </div>
+                    <p className="text-3xl font-bold text-slate-900">{stats.pendingCount}</p>
                 </div>
             </div>
 
