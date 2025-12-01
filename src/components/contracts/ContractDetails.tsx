@@ -119,10 +119,25 @@ export const ContractDetails: React.FC = () => {
                             </svg>
                         </button>
                         <h1 className="text-2xl font-bold text-slate-800">Umowa {contract.contractNumber}</h1>
-                        <span className={`px-3 py-1 text-sm font-bold rounded-full ${contract.status === 'signed' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-700'
-                            }`}>
-                            {contract.status === 'signed' ? 'Podpisana' : 'Szkic'}
-                        </span>
+                        {isEditing ? (
+                            <select
+                                value={contract.status}
+                                onChange={e => setContract({ ...contract, status: e.target.value as Contract['status'] })}
+                                className="px-3 py-1 text-sm font-bold rounded-full border-2 border-purple-300 focus:ring-2 focus:ring-purple-500"
+                            >
+                                <option value="draft">Szkic</option>
+                                <option value="signed">Podpisana</option>
+                                <option value="completed">Zakończona</option>
+                            </select>
+                        ) : (
+                            <span className={`px-3 py-1 text-sm font-bold rounded-full ${contract.status === 'signed' ? 'bg-green-100 text-green-700' :
+                                    contract.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-slate-200 text-slate-700'
+                                }`}>
+                                {contract.status === 'signed' ? 'Podpisana' :
+                                    contract.status === 'completed' ? 'Zakończona' : 'Szkic'}
+                            </span>
+                        )}
                     </div>
                     <p className="text-slate-500 ml-9 mt-1">Utworzono: {new Date(contract.createdAt).toLocaleDateString()}</p>
                 </div>
