@@ -8,18 +8,28 @@ export const ContractsList: React.FC = () => {
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    useEffect(() => {
-        const loadContracts = async () => {
-            try {
-                const data = await DatabaseService.getContracts();
-                setContracts(data);
-            } catch (error) {
-                console.error('Error loading contracts:', error);
-            }
-        };
+    const loadContracts = async () => {
+        try {
+            const data = await DatabaseService.getContracts();
+            setContracts(data);
+        } catch (error) {
+            console.error('Error loading contracts:', error);
+        }
+    };
 
+    useEffect(() => {
         loadContracts();
     }, []);
+
+    const handleStatusChange = async (contractId: string, currentContract: Contract, newStatus: Contract['status']) => {
+        try {
+            await DatabaseService.updateContract(contractId, { ...currentContract, status: newStatus });
+            await loadContracts(); // Reload to show updated status
+        } catch (error) {
+            console.error('Error updating contract status:', error);
+            alert('Błąd przy zmianie statusu umowy');
+        }
+    };
 
     const filteredContracts = contracts.filter(c => {
         const term = searchTerm.toLowerCase();
@@ -43,14 +53,6 @@ export const ContractsList: React.FC = () => {
         }
     };
 
-    const getStatusLabel = (status: string) => {
-        switch (status) {
-            case 'signed': return 'Podpisana';
-            case 'completed': return 'Zakończona';
-            case 'cancelled': return 'Anulowana';
-            default: return 'Szkic';
-        }
-    };
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
@@ -114,9 +116,16 @@ export const ContractsList: React.FC = () => {
                                                 {new Date(contract.createdAt).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${getStatusColor(contract.status)}`}>
-                                                    {getStatusLabel(contract.status)}
-                                                </span>
+                                                <select
+                                                    value={contract.status}
+                                                    onChange={(e) => handleStatusChange(contract.id, contract, e.target.value as Contract['status'])}
+                                                    className={`px-3 py-1 text-xs font-bold rounded-full border-2 cursor-pointer ${getStatusColor(contract.status)}`}
+                                                >
+                                                    <option value="draft">Szkic</option>
+                                                    <option value="signed">Podpisana</option>
+                                                    <option value="completed">Zakończona</option>
+                                                    <option value="cancelled">Anulowana</option>
+                                                </select>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-900">
                                                 {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
