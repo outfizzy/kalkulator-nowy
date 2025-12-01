@@ -146,9 +146,23 @@ export const ContractBulkSelectionPanel: React.FC<ContractBulkSelectionPanelProp
     return (
         <div className="h-full flex flex-col bg-white rounded-xl border border-slate-200">
             {/* Header */}
-            <div className="p-6 border-b border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Podpisane Umowy bez Montażu</h2>
-                <p className="text-sm text-slate-500">Wybierz umowy, aby utworzyć montaże</p>
+            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-blue-50">
+                <div className="flex items-center gap-3 mb-2">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Tworzenie Montaży z Podpisanych Umów</h2>
+                        <p className="text-sm text-slate-600 mt-1">Wybierz umowy, dla których chcesz utworzyć zlecenia montażu</p>
+                    </div>
+                </div>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                        <span className="font-bold">ℹ️ Informacja:</span> Ta lista zawiera <span className="font-bold">podpisane umowy z klientami</span>,
+                        które nie mają jeszcze utworzonych zleceń montażu. Zaznacz umowy i kliknij "Utwórz Montaże",
+                        aby automatycznie wygenerować zlecenia dla ekip montażowych.
+                    </p>
+                </div>
             </div>
 
             {/* Filters */}
@@ -235,11 +249,20 @@ export const ContractBulkSelectionPanel: React.FC<ContractBulkSelectionPanelProp
                     </div>
                 ) : filteredContracts.length === 0 ? (
                     <div className="text-center py-12">
-                        <svg className="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-20 h-20 text-slate-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <p className="text-slate-500 text-lg mb-1">Brak umów do wyświetlenia</p>
-                        <p className="text-slate-400 text-sm">Wszystkie podpisane umowy mają już przypisane montaże</p>
+                        <p className="text-slate-500 text-lg mb-2 font-bold">Brak podpisanych umów bez montażu</p>
+                        <p className="text-slate-400 text-sm max-w-md mx-auto">
+                            Wszystkie podpisane umowy mają już przypisane montaże
+                            <br />lub nie ma jeszcze żadnych podpisanych umów w systemie.
+                        </p>
+                        <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg max-w-lg mx-auto">
+                            <p className="text-sm text-amber-800">
+                                <span className="font-bold">💡 Wskazówka:</span> Aby utworzyć montaż, musisz najpierw podpisać umowę
+                                (zmień status umowy na "Podpisana" w sekcji "Umowy").
+                            </p>
+                        </div>
                     </div>
                 ) : (
                     <div className="grid gap-3">
@@ -252,8 +275,8 @@ export const ContractBulkSelectionPanel: React.FC<ContractBulkSelectionPanelProp
                                     key={contract.id}
                                     onClick={() => handleToggleSelect(contract.id)}
                                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${isSelected
-                                            ? 'border-purple-500 bg-purple-50 shadow-md'
-                                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                                        ? 'border-purple-500 bg-purple-50 shadow-md'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
                                         }`}
                                 >
                                     <div className="flex items-start gap-3">
@@ -267,7 +290,12 @@ export const ContractBulkSelectionPanel: React.FC<ContractBulkSelectionPanelProp
                                         <div className="flex-1">
                                             <div className="flex items-start justify-between mb-2">
                                                 <div>
-                                                    <h3 className="font-bold text-slate-800">{contract.contractNumber}</h3>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded">
+                                                            UMOWA
+                                                        </span>
+                                                        <h3 className="font-bold text-slate-800">{contract.contractNumber}</h3>
+                                                    </div>
                                                     <p className="text-sm text-slate-600">
                                                         {contract.client.firstName} {contract.client.lastName}
                                                     </p>
