@@ -156,6 +156,15 @@ export const OffersList: React.FC = () => {
     };
 
     const handleCreateContract = async (offer: Offer) => {
+        // Check if contract already exists
+        const existingContract = contracts.find(c => c.offerId === offer.id);
+        if (existingContract) {
+            toast.error('Umowa dla tej oferty już istnieje!');
+            // Optional: navigate to existing contract
+            // navigate(`/contracts/${existingContract.id}`);
+            return;
+        }
+
         if (window.confirm('Czy na pewno chcesz wygenerować umowę dla tej oferty?')) {
             try {
                 const contract = await DatabaseService.createContract({
@@ -363,142 +372,142 @@ export const OffersList: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className="text-sm font-mono text-slate-500">{offer.offerNumber || offer.id.substring(0, 8)}</span>
                                             </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm text-slate-700">{createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="font-medium text-slate-900">{offer.customer.firstName} {offer.customer.lastName}</div>
-                                                <button
-                                                    onClick={() => handleOpenCRM(offer.customer)}
-                                                    className="text-xs bg-accent-soft text-accent-dark px-2 py-0.5 rounded hover:bg-accent/10 transition-colors"
-                                                    title="Otwórz Kartę Klienta"
-                                                >
-                                                    CRM
-                                                </button>
-                                            </div>
-                                            <div className="text-xs text-slate-500">{offer.customer.city}</div>
-                                        </td>
-                                        {isAdmin() && (
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-sm text-slate-700">{createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</span>
+                                            </td>
                                             <td className="px-6 py-4">
-                                                <div className="text-sm text-slate-700">
-                                                    {/* We need to fetch user name or map it. For now show ID or '...' */}
-                                                    {offer.createdBy}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-medium text-slate-900">{offer.customer.firstName} {offer.customer.lastName}</div>
+                                                    <button
+                                                        onClick={() => handleOpenCRM(offer.customer)}
+                                                        className="text-xs bg-accent-soft text-accent-dark px-2 py-0.5 rounded hover:bg-accent/10 transition-colors"
+                                                        title="Otwórz Kartę Klienta"
+                                                    >
+                                                        CRM
+                                                    </button>
+                                                </div>
+                                                <div className="text-xs text-slate-500">{offer.customer.city}</div>
+                                            </td>
+                                            {isAdmin() && (
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm text-slate-700">
+                                                        {/* We need to fetch user name or map it. For now show ID or '...' */}
+                                                        {offer.createdBy}
+                                                    </div>
+                                                </td>
+                                            )}
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm text-slate-700">{offer.product.width}x{offer.product.projection} mm</div>
+                                                <div className="text-xs text-slate-500">{offer.product.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <span className="text-sm font-medium text-slate-900">
+                                                    {priceGross.toLocaleString('de-DE', {
+                                                        style: 'currency',
+                                                        currency: 'EUR',
+                                                        maximumFractionDigits: 0
+                                                    })}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <span className="text-sm font-medium text-green-600">
+                                                    {commission.toLocaleString('de-DE', {
+                                                        style: 'currency',
+                                                        currency: 'EUR',
+                                                        maximumFractionDigits: 0
+                                                    })}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <select
+                                                    value={offer.status}
+                                                    onChange={(e) => handleStatusChange(offer.id, e.target.value as OfferStatus)}
+                                                    className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(offer.status)} border-0 cursor-pointer`}
+                                                >
+                                                    <option value="draft">Utworzona</option>
+                                                    <option value="sent">Wysłana</option>
+                                                    <option value="sold">Sprzedana</option>
+                                                    <option value="rejected">Odrzucona</option>
+                                                </select>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {(() => {
+                                                    const contract = contracts.find(c => c.offerId === offer.id);
+                                                    if (!contract) return <span className="text-slate-300">-</span>;
+                                                    const color = contract.status === 'signed' ? 'bg-green-100 text-green-700' :
+                                                        contract.status === 'completed' ? 'bg-accent-soft text-accent-dark' :
+                                                            'bg-yellow-100 text-yellow-700';
+                                                    const label = contract.status === 'signed' ? 'Podpisana' :
+                                                        contract.status === 'completed' ? 'Zakończona' : 'W trakcie';
+                                                    return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
+                                                })()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {(() => {
+                                                    const installation = installations.find(i => i.offerId === offer.id);
+                                                    if (!installation) return <span className="text-slate-300">-</span>;
+                                                    const color = installation.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                        installation.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
+                                                            'bg-yellow-100 text-yellow-700';
+                                                    const label = installation.status === 'completed' ? 'Zakończony' :
+                                                        installation.status === 'scheduled' ? 'Zaplanowany' : 'Oczekuje';
+                                                    return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
+                                                })()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => setPreviewOffer(offer)}
+                                                        className="text-slate-400 hover:text-accent transition-colors"
+                                                        title="Podgląd"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(offer.id)}
+                                                        className="text-red-600 hover:text-red-900"
+                                                        title="Usuń"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                    {offer.status === 'sold' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handlePriceUpdate(offer.id, offer.pricing?.sellingPriceNet || 0)}
+                                                                className="text-accent hover:text-accent-dark"
+                                                                title="Zmień Cenę Umowy"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                </svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCreateContract(offer)}
+                                                                className="text-slate-400 hover:text-accent transition-colors mr-1"
+                                                                title="Generuj Umowę"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                </svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCreateInstallation(offer)}
+                                                                className="text-purple-600 hover:text-purple-900"
+                                                                title="Utwórz Montaż"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                                </svg>
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
-                                        )}
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-slate-700">{offer.product.width}x{offer.product.projection} mm</div>
-                                            <div className="text-xs text-slate-500">{offer.product.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <span className="text-sm font-medium text-slate-900">
-                                                {priceGross.toLocaleString('de-DE', {
-                                                    style: 'currency',
-                                                    currency: 'EUR',
-                                                    maximumFractionDigits: 0
-                                                })}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <span className="text-sm font-medium text-green-600">
-                                                {commission.toLocaleString('de-DE', {
-                                                    style: 'currency',
-                                                    currency: 'EUR',
-                                                    maximumFractionDigits: 0
-                                                })}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <select
-                                                value={offer.status}
-                                                onChange={(e) => handleStatusChange(offer.id, e.target.value as OfferStatus)}
-                                                className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(offer.status)} border-0 cursor-pointer`}
-                                            >
-                                                <option value="draft">Utworzona</option>
-                                                <option value="sent">Wysłana</option>
-                                                <option value="sold">Sprzedana</option>
-                                                <option value="rejected">Odrzucona</option>
-                                            </select>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            {(() => {
-                                                const contract = contracts.find(c => c.offerId === offer.id);
-                                                if (!contract) return <span className="text-slate-300">-</span>;
-                                                const color = contract.status === 'signed' ? 'bg-green-100 text-green-700' :
-                                                    contract.status === 'completed' ? 'bg-accent-soft text-accent-dark' :
-                                                        'bg-yellow-100 text-yellow-700';
-                                                const label = contract.status === 'signed' ? 'Podpisana' :
-                                                    contract.status === 'completed' ? 'Zakończona' : 'W trakcie';
-                                                return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
-                                            })()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            {(() => {
-                                                const installation = installations.find(i => i.offerId === offer.id);
-                                                if (!installation) return <span className="text-slate-300">-</span>;
-                                                const color = installation.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                    installation.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
-                                                        'bg-yellow-100 text-yellow-700';
-                                                const label = installation.status === 'completed' ? 'Zakończony' :
-                                                    installation.status === 'scheduled' ? 'Zaplanowany' : 'Oczekuje';
-                                                return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
-                                            })()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => setPreviewOffer(offer)}
-                                                    className="text-slate-400 hover:text-accent transition-colors"
-                                                    title="Podgląd"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(offer.id)}
-                                                    className="text-red-600 hover:text-red-900"
-                                                    title="Usuń"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
-                                                {offer.status === 'sold' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handlePriceUpdate(offer.id, offer.pricing?.sellingPriceNet || 0)}
-                                                            className="text-accent hover:text-accent-dark"
-                                                            title="Zmień Cenę Umowy"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                            </svg>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleCreateContract(offer)}
-                                                            className="text-slate-400 hover:text-accent transition-colors mr-1"
-                                                            title="Generuj Umowę"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                            </svg>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleCreateInstallation(offer)}
-                                                            className="text-purple-600 hover:text-purple-900"
-                                                            title="Utwórz Montaż"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                            </svg>
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
                                         </tr>
                                     );
                                 })}

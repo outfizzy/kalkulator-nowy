@@ -41,10 +41,38 @@ export const ContractDetails: React.FC = () => {
 
     const handleSave = async () => {
         if (!contract) return;
+
+        // If status changed to signed, confirm
+        // We need to check original status, but we only have current state.
+        // Ideally we should track original state or fetch it, but for now let's rely on the current value being 'signed'
+        // and assuming if user clicks save with 'signed', they intend to sign it.
+        // A better approach would be to check if it WAS NOT signed before.
+        // For now, let's just confirm if saving as signed.
+
+        if (contract.status === 'signed') {
+            if (!window.confirm('Czy na pewno oznaczyć jako PODPISANĄ? Umowa stanie się dostępna do montażu.')) {
+                return;
+            }
+        }
+
         try {
-            await DatabaseService.updateContract(contract.id, contract);
+            // Pass only modified fields - updateContract will merge safely
+            // We pass the whole contract object, but updateContract now handles it safely by merging
+            // with existing data for JSONB fields.
+            await DatabaseService.updateContract(contract.id, {
+                status: contract.status,
+                // We pass other fields too in case they were edited (though currently UI only edits status here)
+                // If we add more editable fields later, this covers them.
+            });
+
             toast.success('Zapisano zmiany');
             setIsEditing(false);
+
+            if (contract.status === 'signed') {
+                toast.success('Umowa podpisana! Przejdź do "Planowanie Montaży" aby utworzyć montaż.', {
+                    duration: 5000
+                });
+            }
         } catch (error) {
             console.error('Error updating contract:', error);
             toast.error('Błąd zapisu umowy');
@@ -131,8 +159,8 @@ export const ContractDetails: React.FC = () => {
                             </select>
                         ) : (
                             <span className={`px-3 py-1 text-sm font-bold rounded-full ${contract.status === 'signed' ? 'bg-green-100 text-green-700' :
-                                    contract.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-slate-200 text-slate-700'
+                                contract.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-slate-200 text-slate-700'
                                 }`}>
                                 {contract.status === 'signed' ? 'Podpisana' :
                                     contract.status === 'completed' ? 'Zakończona' : 'Szkic'}

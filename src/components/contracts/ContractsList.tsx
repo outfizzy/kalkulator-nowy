@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Contract } from '../../types';
 import { DatabaseService } from '../../services/database';
+import { toast } from 'react-hot-toast';
 
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
@@ -22,12 +23,27 @@ export const ContractsList: React.FC = () => {
     }, []);
 
     const handleStatusChange = async (contractId: string, currentContract: Contract, newStatus: Contract['status']) => {
+        // Confirm signing
+        if (newStatus === 'signed' && currentContract.status !== 'signed') {
+            if (!window.confirm('Czy na pewno chcesz oznaczyć tę umowę jako PODPISANĄ? Ta umowa będzie dostępna do utworzenia montażu.')) {
+                return;
+            }
+        }
+
         try {
-            await DatabaseService.updateContract(contractId, { ...currentContract, status: newStatus });
-            await loadContracts(); // Reload to show updated status
+            // Pass ONLY status, updateContract will handle the rest safely now
+            await DatabaseService.updateContract(contractId, { status: newStatus });
+
+            if (newStatus === 'signed') {
+                toast.success('Umowa podpisana! Możesz teraz utworzyć montaż w sekcji "Planowanie Montaży"');
+            } else {
+                toast.success('Status umowy zaktualizowany');
+            }
+
+            await loadContracts(); // Reload to show updated data
         } catch (error) {
             console.error('Error updating contract status:', error);
-            alert('Błąd przy zmianie statusu umowy');
+            toast.error('Błąd przy zmianie statusu umowy');
         }
     };
 

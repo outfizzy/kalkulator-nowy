@@ -286,28 +286,52 @@ export const DatabaseService = {
     },
 
     async updateContract(id: string, contract: Partial<Contract>): Promise<void> {
-        const updates: Record<string, unknown> = {};
-        if (contract.status) updates.status = contract.status;
-        if (contract.signedAt) updates.signed_at = contract.signedAt.toISOString();
+        // 1. Fetch existing contract to enable safe merging
+        const existing = await this.getContracts();
+        const current = existing.find(c => c.id === id);
+        if (!current) throw new Error('Contract not found');
 
-        if (contract.client || contract.product || contract.pricing || contract.comments) {
-            // Fetch existing to merge? Or assume full update?
-            // For now, let's assume we need to pass full data for JSON fields update
-            // This is a limitation of this simple implementation
-            const contractData = {
-                contractNumber: contract.contractNumber, // Might be undefined if partial
-                client: contract.client,
-                product: contract.product,
-                pricing: contract.pricing,
-                commission: contract.commission,
-                requirements: contract.requirements,
-                comments: contract.comments,
-                attachments: contract.attachments
+        const updates: Record<string, unknown> = {};
+
+        // 2. Handle status updates with auto-sign logic
+        if (contract.status && contract.status !== current.status) {
+            updates.status = contract.status;
+
+            // Auto-set signed_at when status changes to 'signed'
+            if (contract.status === 'signed' && !current.signedAt) {
+                updates.signed_at = new Date().toISOString();
+            }
+        }
+
+        // 3. Handle explicit signed_at override
+        if (contract.signedAt) {
+            updates.signed_at = contract.signedAt.toISOString();
+        }
+
+        // 4. Handle contract_data updates with safe JSONB merge
+        const needsDataUpdate = contract.client || contract.product ||
+            contract.pricing || contract.comments ||
+            contract.requirements || contract.attachments ||
+            contract.contractNumber || contract.commission !== undefined;
+
+        if (needsDataUpdate) {
+            // Merge with existing data to prevent undefined overwrites
+            const updatedData = {
+                contractNumber: contract.contractNumber ?? current.contractNumber,
+                client: contract.client ?? current.client,
+                product: contract.product ?? current.product,
+                pricing: contract.pricing ?? current.pricing,
+                commission: contract.commission ?? current.commission,
+                requirements: contract.requirements ?? current.requirements,
+                comments: contract.comments ?? current.comments,
+                attachments: contract.attachments ?? current.attachments
             };
-            // Filter out undefined
-            // A proper implementation would fetch current data, merge, and save.
-            // Let's leave it as is for now, assuming the caller handles it or we improve later.
-            updates.contract_data = contractData;
+            updates.contract_data = updatedData;
+        }
+
+        // 5. Execute update only if there are changes
+        if (Object.keys(updates).length === 0) {
+            return; // Nothing to update
         }
 
         const { error } = await supabase
