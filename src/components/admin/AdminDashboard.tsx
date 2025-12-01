@@ -2,9 +2,21 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { SalesTeamStats } from './SalesTeamStats';
 import { PartnerOffersList } from './PartnerOffersList';
+import { DatabaseService } from '../../services/database';
 
 
 export const AdminDashboard: React.FC = () => {
+    const [stats, setStats] = React.useState({
+        totalRevenue: 0,
+        activeUsers: 0,
+        pendingOffers: 0,
+        completedInstallations: 0
+    });
+
+    React.useEffect(() => {
+        DatabaseService.getSystemStats().then(setStats).catch(console.error);
+    }, []);
+
     const quickActions = [
         {
             title: 'Nowa Oferta',
@@ -13,9 +25,10 @@ export const AdminDashboard: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
             ),
-            path: '/kreator',
-            color: 'bg-accent',
-            textColor: 'text-white'
+            path: '/new-offer',
+            color: 'bg-gradient-to-br from-accent to-accent-dark',
+            textColor: 'text-white',
+            description: 'Utwórz nową ofertę dla klienta'
         },
         {
             title: 'Użytkownicy',
@@ -24,10 +37,37 @@ export const AdminDashboard: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
             ),
-            path: '/users',
+            path: '/admin/users',
             color: 'bg-white',
             textColor: 'text-slate-700',
-            border: 'border-slate-200'
+            border: 'border-slate-200',
+            description: 'Zarządzaj zespołem i rolami'
+        },
+        {
+            title: 'Montażyści',
+            icon: (
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            path: '/admin/installers',
+            color: 'bg-white',
+            textColor: 'text-slate-700',
+            border: 'border-slate-200',
+            description: 'Podgląd montażystów i zleceń'
+        },
+        {
+            title: 'Zarządzanie Ekipami',
+            icon: (
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            ),
+            path: '/admin/teams',
+            color: 'bg-white',
+            textColor: 'text-slate-700',
+            border: 'border-slate-200',
+            description: 'Twórz i edytuj zespoły'
         },
         {
             title: 'Raporty',
@@ -39,7 +79,8 @@ export const AdminDashboard: React.FC = () => {
             path: '/reports',
             color: 'bg-white',
             textColor: 'text-slate-700',
-            border: 'border-slate-200'
+            border: 'border-slate-200',
+            description: 'Przeglądaj raporty sprzedażowe'
         },
         {
             title: 'Baza Ofert',
@@ -48,12 +89,11 @@ export const AdminDashboard: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
             ),
-            path: '/admin/offers', // Assuming this route exists or will exist, otherwise maybe just scroll to list?
-            // Actually let's point to dashboard for now or maybe we should add a route for full list?
-            // For now let's keep it simple.
+            path: '/offers',
             color: 'bg-white',
             textColor: 'text-slate-700',
-            border: 'border-slate-200'
+            border: 'border-slate-200',
+            description: 'Wszystkie oferty w systemie'
         }
     ];
 
@@ -65,13 +105,78 @@ export const AdminDashboard: React.FC = () => {
                     <h1 className="text-3xl font-bold text-slate-800">Panel Administratora</h1>
                     <p className="text-slate-500 mt-1">Przegląd wyników i zarządzanie systemem</p>
                 </div>
-                <div className="text-sm text-slate-400">
+                <div className="text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
                     {new Date().toLocaleDateString('pl-PL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
             </div>
 
+            {/* System Overview Stats */}
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-500/20 relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <p className="text-blue-100 text-sm font-medium mb-1">Całkowity Przychód</p>
+                        <h3 className="text-3xl font-bold">{Number(stats.totalRevenue || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</h3>
+                        <div className="mt-4 flex items-center gap-2 text-xs text-blue-100 bg-blue-600/30 w-fit px-2 py-1 rounded-lg">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                            <span>Aktualizacja na żywo</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-emerald-600 font-bold text-xl">{stats.activeUsers}</span>
+                        </div>
+                        <p className="text-slate-500 text-sm">Aktywni Użytkownicy</p>
+                        <p className="text-slate-400 text-xs mt-1">Pracownicy i Partnerzy</p>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-amber-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                            </div>
+                            <span className="text-amber-600 font-bold text-xl">{stats.pendingOffers}</span>
+                        </div>
+                        <p className="text-slate-500 text-sm">Oczekujące Oferty</p>
+                        <p className="text-slate-400 text-xs mt-1">Wymagają uwagi</p>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-purple-600 font-bold text-xl">{stats.completedInstallations}</span>
+                        </div>
+                        <p className="text-slate-500 text-sm">Zakończone Montaże</p>
+                        <p className="text-slate-400 text-xs mt-1">W tym miesiącu</p>
+                    </div>
+                </div>
+            </section>
+
             {/* Quick Actions */}
-            <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {quickActions.map((action, index) => (
                     <Link
                         key={index}
@@ -82,14 +187,17 @@ export const AdminDashboard: React.FC = () => {
                             hover:-translate-y-1 hover:shadow-xl
                         `}
                     >
-                        <div className="relative z-10 flex flex-col items-start gap-4">
-                            <div className={`p-3 rounded-lg ${action.color === 'bg-accent' ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-accent/10 group-hover:text-accent transition-colors'}`}>
+                        <div className="relative z-10 flex flex-col items-start gap-3">
+                            <div className={`p-3 rounded-lg ${action.color.includes('gradient') ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-accent/10 group-hover:text-accent transition-colors'}`}>
                                 {action.icon}
                             </div>
-                            <span className="font-bold text-lg">{action.title}</span>
+                            <div>
+                                <span className="font-bold text-lg block">{action.title}</span>
+                                <span className={`text-xs ${action.color.includes('gradient') ? 'text-white/80' : 'text-slate-400'}`}>{action.description}</span>
+                            </div>
                         </div>
                         {/* Decorative circle */}
-                        <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full opacity-10 ${action.color === 'bg-accent' ? 'bg-white' : 'bg-accent'}`} />
+                        <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full opacity-10 ${action.color.includes('gradient') ? 'bg-white' : 'bg-accent'}`} />
                     </Link>
                 ))}
             </section>

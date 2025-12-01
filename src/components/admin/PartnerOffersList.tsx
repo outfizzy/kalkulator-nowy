@@ -83,9 +83,9 @@ export const PartnerOffersList: React.FC = () => {
     };
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('pl-PL', {
+        return new Intl.NumberFormat('de-DE', {
             style: 'currency',
-            currency: 'PLN'
+            currency: 'EUR'
         }).format(amount);
     };
 
@@ -100,9 +100,15 @@ export const PartnerOffersList: React.FC = () => {
     // Calculate statistics
     const stats = {
         totalOffers: filteredOffers.length,
-        totalRevenue: filteredOffers.reduce((sum, offer) => sum + (offer.pricing.sellingPriceNet || 0), 0),
+        totalRevenue: filteredOffers.reduce((sum, offer) => {
+            const pricing = offer.pricing || ({} as any);
+            return sum + (typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0);
+        }, 0),
         avgMargin: filteredOffers.length > 0
-            ? (filteredOffers.reduce((sum, offer) => sum + (offer.pricing.marginPercentage || 0), 0) / filteredOffers.length)
+            ? (filteredOffers.reduce((sum, offer) => {
+                const pricing = offer.pricing || ({} as any);
+                return sum + (typeof pricing.marginPercentage === 'number' ? pricing.marginPercentage : 0);
+            }, 0) / filteredOffers.length)
             : 0,
         pendingCount: filteredOffers.filter(offer => offer.status === 'draft').length
     };

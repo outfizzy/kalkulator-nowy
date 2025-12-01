@@ -331,19 +331,19 @@ export const ContractDetails: React.FC = () => {
                             <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                 <span className="text-slate-600">Wartość Netto</span>
                                 <span className="font-bold text-slate-800">
-                                    {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} PLN
+                                    {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
                                 </span>
                             </div>
                             <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                 <span className="text-slate-600">Wartość Brutto</span>
                                 <span className="font-bold text-slate-800">
-                                    {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23} PLN
+                                    {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23} EUR
                                 </span>
                             </div>
                             <div className="flex justify-between items-center py-3 bg-green-50 px-3 rounded-lg mt-2">
                                 <span className="text-green-800 font-medium">Prowizja (5%)</span>
                                 <span className="font-bold text-green-700 text-lg">
-                                    {contract.commission.toFixed(2)} PLN
+                                    {contract.commission.toFixed(2)} EUR
                                 </span>
                             </div>
                         </div>

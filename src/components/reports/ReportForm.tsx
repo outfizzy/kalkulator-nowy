@@ -47,11 +47,18 @@ export const ReportForm: React.FC = () => {
 
     // Filter offers for autocomplete
     const filteredOffers = searchQuery.length > 1
-        ? offers.filter(o =>
-            o.customer.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            o.id.includes(searchQuery) ||
-            o.customer.city.toLowerCase().includes(searchQuery.toLowerCase())
-        ).slice(0, 5)
+        ? offers
+            .filter(o => {
+                const query = searchQuery.toLowerCase();
+                const lastName = (o.customer.lastName || '').toString().toLowerCase();
+                const city = (o.customer.city || '').toString().toLowerCase();
+                return (
+                    lastName.includes(query) ||
+                    o.id.includes(searchQuery) ||
+                    city.includes(query)
+                );
+            })
+            .slice(0, 5)
         : [];
 
     const handleSelectOffer = (offer: Offer) => {

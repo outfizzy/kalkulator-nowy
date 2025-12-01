@@ -37,13 +37,13 @@ export const MarginControl: React.FC<MarginControlProps> = ({ value, onChange, p
                 <div>
                     <p className="text-xs text-slate-500 uppercase tracking-wider">Koszt zakupu (Netto)</p>
                     <p className="text-lg font-medium text-slate-700">
-                        {purchasePrice.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        {Number(purchasePrice || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                     </p>
                 </div>
                 <div className="text-right">
                     <p className="text-xs text-slate-500 uppercase tracking-wider">Cena sprzedaży (Netto)</p>
                     <p className="text-xl font-bold text-green-600">
-                        {sellingPrice.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        {Number(sellingPrice || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                     </p>
                 </div>
             </div>

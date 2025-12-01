@@ -83,8 +83,14 @@ export const SalesDashboard: React.FC = () => {
     });
 
     // Calculate stats for the selected month
-    const monthlyRevenue = monthlySoldOffers.reduce((sum, o) => sum + (o.pricing.finalPriceNet || o.pricing.sellingPriceNet), 0); // Use Net for settlement
-    const monthlyCommission = monthlySoldOffers.reduce((sum, o) => sum + o.commission, 0);
+    const monthlyRevenue = monthlySoldOffers.reduce((sum, o) => {
+        const pricing = o.pricing || ({} as any);
+        const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
+        const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
+        return sum + (finalNet ?? baseNet);
+    }, 0); // Use Net for settlement
+
+    const monthlyCommission = monthlySoldOffers.reduce((sum, o) => sum + (o.commission || 0), 0);
 
     // Monthly Revenue Data for Chart (Last 6 months)
     const monthlyData = [];
@@ -99,8 +105,14 @@ export const SalesDashboard: React.FC = () => {
             return od.getMonth() === d.getMonth() && od.getFullYear() === year;
         });
 
-        const rev = monthOffers.reduce((sum, o) => sum + (o.pricing.finalPriceNet || o.pricing.sellingPriceNet), 0);
-        const comm = monthOffers.reduce((sum, o) => sum + o.commission, 0);
+        const rev = monthOffers.reduce((sum, o) => {
+            const pricing = o.pricing || ({} as any);
+            const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
+            const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
+            return sum + (finalNet ?? baseNet);
+        }, 0);
+
+        const comm = monthOffers.reduce((sum, o) => sum + (o.commission || 0), 0);
 
         monthlyData.push({ name: `${monthName}`, revenue: rev, commission: comm });
     }
@@ -219,14 +231,20 @@ export const SalesDashboard: React.FC = () => {
                     <div>
                         <h3 className="text-lg font-medium text-slate-300">Rozliczenie: {months[selectedMonth]} {selectedYear}</h3>
                         <div className="text-4xl font-bold mt-2 text-white">
-                            {monthlyCommission.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                            {Number(monthlyCommission || 0).toLocaleString('de-DE', {
+                                style: 'currency',
+                                currency: 'EUR'
+                            })}
                         </div>
                         <p className="text-sm text-slate-400 mt-1">Twoja Prowizja w tym miesiącu</p>
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-slate-400">Przychód Netto</p>
                         <p className="text-2xl font-bold text-emerald-400">
-                            {monthlyRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                            {Number(monthlyRevenue || 0).toLocaleString('de-DE', {
+                                style: 'currency',
+                                currency: 'EUR'
+                            })}
                         </p>
                     </div>
                 </div>
@@ -234,7 +252,9 @@ export const SalesDashboard: React.FC = () => {
                 {/* Progress Bar */}
                 <div className="mt-6">
                     <div className="flex justify-between mb-2 text-sm">
-                        <span className="text-slate-300">Realizacja Celu ({target.toLocaleString()} EUR)</span>
+                        <span className="text-slate-300">
+                            Realizacja Celu ({Number(target || 0).toLocaleString()} EUR)
+                        </span>
                         <span className="font-bold text-emerald-400">{progressPercent.toFixed(1)}%</span>
                     </div>
                     <div className="w-full bg-slate-700/50 rounded-full h-3 overflow-hidden">
@@ -251,14 +271,20 @@ export const SalesDashboard: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Całkowity Przychód (YTD)</div>
                     <div className="text-3xl font-bold text-slate-900">
-                        {stats.totalRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        {Number(stats.totalRevenue || 0).toLocaleString('de-DE', {
+                            style: 'currency',
+                            currency: 'EUR'
+                        })}
                     </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Całkowita Prowizja (YTD)</div>
                     <div className="text-3xl font-bold text-green-600">
-                        {stats.totalCommission.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        {Number(stats.totalCommission || 0).toLocaleString('de-DE', {
+                            style: 'currency',
+                            currency: 'EUR'
+                        })}
                     </div>
                 </div>
 
@@ -272,7 +298,10 @@ export const SalesDashboard: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Lejek (Otwarte)</div>
                     <div className="text-3xl font-bold text-orange-500">
-                        {stats.projectedCommission.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        {Number(stats.projectedCommission || 0).toLocaleString('de-DE', {
+                            style: 'currency',
+                            currency: 'EUR'
+                        })}
                     </div>
                 </div>
             </div>
@@ -290,7 +319,12 @@ export const SalesDashboard: React.FC = () => {
                                     <XAxis dataKey="name" />
                                     <YAxis />
                                     <Tooltip
-                                        formatter={(value: number) => value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                        formatter={(value: number) =>
+                                            Number(value || 0).toLocaleString('de-DE', {
+                                                style: 'currency',
+                                                currency: 'EUR'
+                                            })
+                                        }
                                     />
                                     <Bar dataKey="revenue" fill="#3b82f6" name="Przychód" radius={[4, 4, 0, 0]} />
                                     <Bar dataKey="commission" fill="#22c55e" name="Prowizja" radius={[4, 4, 0, 0]} />
@@ -365,11 +399,15 @@ export const SalesDashboard: React.FC = () => {
                                         {offer.customer.firstName} {offer.customer.lastName}
                                     </td>
                                     <td className="px-6 py-4 text-right text-slate-600">
-                                        {(offer.pricing.finalPriceNet || offer.pricing.sellingPriceNet).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        {offer.pricing.finalPriceNet && <span className="ml-2 text-xs text-blue-500 font-bold">(Umowa)</span>}
+                                        {Number(
+                                            offer.pricing?.finalPriceNet ??
+                                            offer.pricing?.sellingPriceNet ??
+                                            0
+                                        ).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                        {offer.pricing?.finalPriceNet && <span className="ml-2 text-xs text-blue-500 font-bold">(Umowa)</span>}
                                     </td>
                                     <td className="px-6 py-4 text-right font-bold text-green-600">
-                                        +{offer.commission.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                        +{Number(offer.commission || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">
@@ -424,13 +462,19 @@ export const SalesDashboard: React.FC = () => {
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-slate-600">Przychód:</span>
                                             <span className="font-bold text-slate-900">
-                                                {stat.revenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                                {Number(stat.revenue || 0).toLocaleString('de-DE', {
+                                                    style: 'currency',
+                                                    currency: 'EUR'
+                                                })}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center mt-2">
                                             <span className="text-sm text-slate-600">Prowizja:</span>
                                             <span className="font-bold text-green-600">
-                                                {stat.commission.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                                {Number(stat.commission || 0).toLocaleString('de-DE', {
+                                                    style: 'currency',
+                                                    currency: 'EUR'
+                                                })}
                                             </span>
                                         </div>
                                     </div>

@@ -63,6 +63,76 @@ export const UserManagementPage: React.FC = () => {
         }
     };
 
+    const handleDelete = async (user: User) => {
+        const confirmed = window.confirm(`Czy na pewno chcesz trwale usunąć użytkownika ${user.firstName} ${user.lastName}?`);
+        if (!confirmed) return;
+
+        try {
+            await DatabaseService.deleteUser(user.id);
+            toast.success('Użytkownik został usunięty');
+            await loadUsers();
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            toast.error('Błąd usuwania użytkownika');
+        }
+    };
+
+    const handleSetInstallerRole = async (user: User) => {
+        try {
+            await DatabaseService.updateUserRole(user.id, 'installer');
+            toast.success(`Ustawiono rolę MONTER dla ${user.firstName} ${user.lastName}`);
+            await loadUsers();
+        } catch (error) {
+            console.error('Error updating user role:', error);
+            toast.error('Błąd zmiany roli użytkownika');
+        }
+    };
+
+    const handleChangeRole = async (userId: string, newRole: User['role']) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+
+        const oldRole = user.role;
+        const oldRoleName = getRoleName(oldRole);
+        const newRoleName = getRoleName(newRole);
+
+        // Special warning for critical roles
+        if (newRole === 'admin' || newRole === 'manager' || oldRole === 'admin' || oldRole === 'manager') {
+            const confirmed = window.confirm(
+                `⚠️ UWAGA: Zmiana krytycznej roli!\n\n` +
+                `Użytkownik: ${user.firstName} ${user.lastName}\n` +
+                `Zmiana: ${oldRoleName} → ${newRoleName}\n\n` +
+                `Czy na pewno chcesz kontynuować?`
+            );
+            if (!confirmed) {
+                // Reset the select to the old value
+                await loadUsers();
+                return;
+            }
+        } else {
+            // Regular confirmation for other role changes
+            const confirmed = window.confirm(
+                `Zmienić rolę użytkownika?\n\n` +
+                `${user.firstName} ${user.lastName}\n` +
+                `${oldRoleName} → ${newRoleName}`
+            );
+            if (!confirmed) {
+                await loadUsers();
+                return;
+            }
+        }
+
+        try {
+            await DatabaseService.updateUserRole(userId, newRole);
+            toast.success('Rola użytkownika została zmieniona');
+            await loadUsers();
+        } catch (error) {
+            console.error('Error changing user role:', error);
+            toast.error('Błąd zmiany roli użytkownika');
+            await loadUsers();
+        }
+    };
+
     const handleSetPartnerMargin = async (user: User) => {
         try {
             const defaultMargin = user.partnerMargin ? Math.round(user.partnerMargin * 100) : 25;
@@ -104,7 +174,8 @@ export const UserManagementPage: React.FC = () => {
             admin: 'Administrator',
             manager: 'Manager',
             sales_rep: 'Przedstawiciel Handlowy',
-            partner: 'Partner B2B'
+            partner: 'Partner B2B',
+            installer: 'Monter'
         };
         return roleMap[role as keyof typeof roleMap] || role;
     };
@@ -249,136 +320,174 @@ export const UserManagementPage: React.FC = () => {
             </div>
 
             <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
-                <table className="w-full">
-                    <thead className="bg-slate-900">
-                        <tr>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                Użytkownik
-                            </th>
-                            {activeTab === 'partners' && (
-                                <>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                        Firma
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                        NIP
-                                    </th>
-                                </>
-                            )}
-                            <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                Rola
-                            </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                Telefon
-                            </th>
-                            {activeTab === 'partners' && (
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-slate-900">
+                            <tr>
                                 <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Marża B2B
+                                    Użytkownik
                                 </th>
-                            )}
-                            <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                Data rejestracji
-                            </th>
-                            <th className="px-6 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                Akcje
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700 bg-slate-800/50">
-                        {filteredUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-slate-900/40 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.role === 'partner' ? 'bg-emerald-600' : 'bg-accent'}`}>
-                                            {user.firstName?.[0]}{user.lastName?.[0]}
-                                        </div>
-                                        <div className="ml-4">
-                                            <div className="text-sm font-medium text-white">
-                                                {user.firstName} {user.lastName}
-                                            </div>
-                                            <div className="text-sm text-slate-400">
-                                                {user.email}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
                                 {activeTab === 'partners' && (
                                     <>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-white">{user.companyName || '-'}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-slate-400">{user.nip || '-'}</div>
-                                        </td>
+                                        <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                            Firma
+                                        </th>
+                                        <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                            NIP
+                                        </th>
                                     </>
                                 )}
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-white">{getRoleName(user.role)}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-slate-400">{user.phone || '-'}</div>
-                                </td>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Rola
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Telefon
+                                </th>
                                 {activeTab === 'partners' && (
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-sm text-emerald-300 font-semibold">
-                                            {user.partnerMargin !== undefined ? `${Math.round(user.partnerMargin * 100)}%` : '—'}
-                                        </span>
-                                    </td>
+                                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                        Marża B2B
+                                    </th>
                                 )}
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    {getStatusBadge(user.status)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                                    {new Date(user.createdAt).toLocaleDateString('pl-PL')}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                    {user.status === 'pending' && (
-                                        <button
-                                            onClick={() => handleApprove(user.id)}
-                                            className="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                                        >
-                                            Zaakceptuj
-                                        </button>
-                                    )}
-                                    {user.status === 'active' && (
-                                        <button
-                                            onClick={() => handleBlock(user.id)}
-                                            className="inline-flex items-center px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                                        >
-                                            Zablokuj
-                                        </button>
-                                    )}
-                                    {user.role === 'partner' && (
-                                        <button
-                                            onClick={() => handleSetPartnerMargin(user)}
-                                            className="inline-flex items-center px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
-                                        >
-                                            Ustaw marżę
-                                        </button>
-                                    )}
-                                    {user.status === 'blocked' && (
-                                        <button
-                                            onClick={() => handleApprove(user.id)}
-                                            className="inline-flex items-center px-3 py-1 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors"
-                                        >
-                                            Odblokuj
-                                        </button>
-                                    )}
-                                </td>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Data rejestracji
+                                </th>
+                                <th className="px-6 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Akcje
+                                </th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                {filteredUsers.length === 0 && (
-                    <div className="px-6 py-12 text-center text-slate-400">
-                        Brak użytkowników w tej kategorii
-                    </div>
-                )}
+                        </thead>
+                        <tbody className="divide-y divide-slate-700 bg-slate-800/50">
+                            {filteredUsers.map((user) => (
+                                <tr key={user.id} className="hover:bg-slate-900/40 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="flex items-center">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.role === 'partner' ? 'bg-emerald-600' : 'bg-accent'}`}>
+                                                {user.firstName?.[0]}{user.lastName?.[0]}
+                                            </div>
+                                            <div className="ml-4">
+                                                <div className="text-sm font-medium text-white">
+                                                    {user.firstName} {user.lastName}
+                                                </div>
+                                                <div className="text-sm text-slate-400">
+                                                    {user.email}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {activeTab === 'partners' && (
+                                        <>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                                {user.companyName || '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                                {user.nip || '-'}
+                                            </td>
+                                        </>
+                                    )}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                        <select
+                                            value={user.role}
+                                            onChange={(e) => handleChangeRole(user.id, e.target.value as User['role'])}
+                                            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:bg-slate-600 transition-colors cursor-pointer"
+                                        >
+                                            <option value="admin">Administrator</option>
+                                            <option value="manager">Manager</option>
+                                            <option value="sales_rep">Przedstawiciel Handlowy</option>
+                                            <option value="partner">Partner B2B</option>
+                                            <option value="installer">Monter</option>
+                                        </select>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                        {user.phone || '-'}
+                                    </td>
+                                    {activeTab === 'partners' && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                            <button
+                                                onClick={() => handleSetPartnerMargin(user)}
+                                                className="hover:text-accent transition-colors flex items-center gap-1"
+                                                title="Kliknij aby zmienić"
+                                            >
+                                                {user.partnerMargin ? `${Math.round(user.partnerMargin * 100)}%` : '25%'}
+                                                <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    )}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {getStatusBadge(user.status)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                                        {new Date(user.createdAt).toLocaleDateString('pl-PL')}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                        {user.status === 'pending' && (
+                                            <button
+                                                onClick={() => handleApprove(user.id)}
+                                                className="text-green-400 hover:text-green-300 transition-colors"
+                                                title="Zatwierdź"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                        {activeTab === 'internal' && user.role !== 'installer' && (
+                                            <button
+                                                onClick={() => handleSetInstallerRole(user)}
+                                                className="text-accent hover:text-accent/80 transition-colors"
+                                                title="Ustaw jako montera"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                        {user.status !== 'blocked' ? (
+                                            <button
+                                                onClick={() => handleBlock(user.id)}
+                                                className="text-red-400 hover:text-red-300 transition-colors"
+                                                title="Zablokuj"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                </svg>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleApprove(user.id)}
+                                                className="text-green-400 hover:text-green-300 transition-colors"
+                                                title="Odblokuj"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleDelete(user)}
+                                            className="text-red-500 hover:text-red-300 transition-colors"
+                                            title="Usuń użytkownika"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" />
+                                            </svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
+            {filteredUsers.length === 0 && (
+                <div className="px-6 py-12 text-center text-slate-400">
+                    Brak użytkowników w tej kategorii
+                </div>
+            )}
         </div>
     );
 };

@@ -8,19 +8,29 @@ interface CustomerFormProps {
     initialData?: Customer;
 }
 
+const normalizeCustomer = (raw: Partial<Customer> | any): Customer => {
+    const salutation = raw.salutation;
+    const validSalutation =
+        salutation === 'Herr' || salutation === 'Frau' || salutation === 'Firma'
+            ? salutation
+            : 'Herr';
+
+    return {
+        salutation: validSalutation,
+        firstName: (raw.firstName || '').toString(),
+        lastName: (raw.lastName || '').toString(),
+        street: (raw.street || '').toString(),
+        houseNumber: (raw.houseNumber || '').toString(),
+        postalCode: (raw.postalCode || '').toString(),
+        city: (raw.city || '').toString(),
+        phone: (raw.phone || '').toString(),
+        email: (raw.email || '').toString(),
+        country: (raw.country || 'Deutschland').toString(),
+    };
+};
+
 export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialData }) => {
-    const [customer, setCustomer] = useState<Customer>(initialData || {
-        salutation: 'Herr',
-        firstName: '',
-        lastName: '',
-        street: '',
-        houseNumber: '',
-        postalCode: '',
-        city: '',
-        phone: '',
-        email: '',
-        country: 'Deutschland'
-    });
+    const [customer, setCustomer] = useState<Customer>(normalizeCustomer(initialData || {}));
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [previousCustomers, setPreviousCustomers] = useState<any[]>([]);
@@ -54,8 +64,9 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
     }, []);
 
     const snowZone = React.useMemo(() => {
-        if (customer.postalCode.length === 5) {
-            return getSnowZone(customer.postalCode);
+        const postalCode = (customer.postalCode || '').toString();
+        if (postalCode.length === 5) {
+            return getSnowZone(postalCode);
         }
         return null;
     }, [customer.postalCode]);
@@ -74,36 +85,35 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
     };
 
     const handleSelectCustomer = (selectedCustomer: any) => {
-        setCustomer(selectedCustomer.customer);
-        setSearchQuery(`${selectedCustomer.customer.firstName} ${selectedCustomer.customer.lastName}`);
+        const normalized = normalizeCustomer(selectedCustomer.customer || {});
+        setCustomer(normalized);
+        setSearchQuery(`${normalized.firstName} ${normalized.lastName}`.trim());
         setShowDropdown(false);
     };
 
     const handleClearSelection = () => {
-        setCustomer({
-            salutation: 'Herr',
-            firstName: '',
-            lastName: '',
-            street: '',
-            houseNumber: '',
-            postalCode: '',
-            city: '',
-            phone: '',
-            email: '',
-            country: 'Deutschland'
-        });
+        setCustomer(normalizeCustomer({}));
         setSearchQuery('');
         setShowDropdown(false);
     };
 
     // Filter customers based on search query
     const filteredCustomers = previousCustomers.filter(item => {
+        if (!item || !item.customer) return false;
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
-        const fullName = `${item.customer.firstName} ${item.customer.lastName}`.toLowerCase();
-        const postal = item.customer.postalCode;
-        const city = item.customer.city.toLowerCase();
-        return fullName.includes(query) || postal.includes(query) || city.includes(query);
+
+        const firstName = (item.customer.firstName || '').toString().toLowerCase();
+        const lastName = (item.customer.lastName || '').toString().toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        const postal = (item.customer.postalCode || '').toString();
+        const city = (item.customer.city || '').toString().toLowerCase();
+
+        return (
+            fullName.includes(query) ||
+            postal.includes(query) ||
+            city.includes(query)
+        );
     });
 
     const handleSubmit = (e: React.FormEvent) => {

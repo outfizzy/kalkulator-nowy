@@ -1,6 +1,22 @@
 import { supabase } from '../lib/supabase';
 import type { Offer, MeasurementReport, Installation, Contract, User } from '../types';
 
+// Normalize pricing object to avoid undefined values in UI (e.g. toLocaleString on undefined)
+const normalizePricing = (pricing: any): any => {
+    const p = pricing || {};
+    return {
+        ...p,
+        basePrice: Number(p.basePrice ?? 0),
+        addonsPrice: Number(p.addonsPrice ?? 0),
+        totalCost: Number(p.totalCost ?? 0),
+        sellingPriceNet: Number(p.sellingPriceNet ?? 0),
+        sellingPriceGross: Number(p.sellingPriceGross ?? 0),
+        finalPriceNet: typeof p.finalPriceNet === 'number' ? p.finalPriceNet : undefined,
+        marginPercentage: typeof p.marginPercentage === 'number' ? p.marginPercentage : 0,
+        marginValue: Number(p.marginValue ?? 0),
+    };
+};
+
 // Helper: generate sequential contract number PL/1100/MM/RRRR for current month/year
 const generateContractNumberFromList = (contracts: Contract[]): string => {
     const now = new Date();
@@ -39,7 +55,7 @@ export const DatabaseService = {
             offerNumber: row.offer_number,
             customer: row.customer_data,
             product: row.product_config,
-            pricing: row.pricing,
+            pricing: normalizePricing(row.pricing),
             status: row.status as Offer['status'],
             snowZone: row.snow_zone,
             commission: row.commission,
@@ -63,7 +79,7 @@ export const DatabaseService = {
             offerNumber: data.offer_number,
             customer: data.customer_data,
             product: data.product_config,
-            pricing: data.pricing,
+            pricing: normalizePricing(data.pricing),
             status: data.status as Offer['status'],
             snowZone: data.snow_zone,
             commission: data.commission,
@@ -100,7 +116,7 @@ export const DatabaseService = {
             offerNumber: data.offer_number,
             customer: data.customer_data,
             product: data.product_config,
-            pricing: data.pricing,
+            pricing: normalizePricing(data.pricing),
             status: data.status as Offer['status'],
             snowZone: data.snow_zone,
             commission: data.commission,
@@ -111,7 +127,7 @@ export const DatabaseService = {
     },
 
     async updateOffer(id: string, updates: Partial<Offer>): Promise<void> {
-        const dbUpdates: any = {
+        const dbUpdates: Record<string, unknown> = {
             updated_at: new Date().toISOString()
         };
 
@@ -144,7 +160,20 @@ export const DatabaseService = {
 
     // --- Customers ---
     // Replaced getCustomers with getUniqueCustomers to match storage.ts behavior
-    async getUniqueCustomers(): Promise<any[]> {
+    async getUniqueCustomers(): Promise<{ customer: any; lastOfferDate: Date; offerCount: number }[]> {
+        const normalizeCustomer = (raw: any = {}) => ({
+            salutation: ['Herr', 'Frau', 'Firma'].includes(raw.salutation) ? raw.salutation : 'Herr',
+            firstName: (raw.firstName || '').toString(),
+            lastName: (raw.lastName || '').toString(),
+            street: (raw.street || '').toString(),
+            houseNumber: (raw.houseNumber || '').toString(),
+            postalCode: (raw.postalCode || '').toString(),
+            city: (raw.city || '').toString(),
+            phone: (raw.phone || '').toString(),
+            email: (raw.email || '').toString(),
+            country: (raw.country || 'Deutschland').toString(),
+        });
+
         const { data, error } = await supabase
             .from('offers')
             .select('customer_data, created_at')
@@ -152,25 +181,41 @@ export const DatabaseService = {
 
         if (error) throw error;
 
-        const customerMap = new Map<string, any>();
+        const customerMap = new Map<string, { customer: any; lastOfferDate: Date; offerCount: number }>();
 
-        data.forEach(row => {
-            const customer = row.customer_data;
-            const key = customer.email || `${customer.firstName}_${customer.lastName}_${customer.city}`.toLowerCase();
+        (data || []).forEach(row => {
+            const customer = normalizeCustomer(row.customer_data);
+            const email = customer.email.toLowerCase();
+            const firstName = customer.firstName;
+            const lastName = customer.lastName;
+            const city = customer.city;
 
-            if (!customerMap.has(key)) {
+            // Unikalny klucz oparty o email lub kombinację imię+nazwisko+miasto (spójne z utils/storage.ts)
+            const key = email || `${firstName}_${lastName}_${city}`.toLowerCase();
+            const createdAt = new Date(row.created_at);
+
+            const existing = customerMap.get(key);
+
+            if (!existing) {
                 customerMap.set(key, {
                     customer,
-                    lastOfferDate: new Date(row.created_at),
+                    lastOfferDate: createdAt,
                     offerCount: 1
                 });
             } else {
-                const existing = customerMap.get(key);
-                existing.offerCount++;
+                // Aktualizujemy dane klienta, jeśli ta oferta jest nowsza
+                if (createdAt > existing.lastOfferDate) {
+                    existing.customer = customer;
+                    existing.lastOfferDate = createdAt;
+                }
+                existing.offerCount += 1;
             }
         });
 
-        return Array.from(customerMap.values());
+        // Zwracamy posortowaną listę – najnowsze oferty na górze
+        return Array.from(customerMap.values()).sort(
+            (a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime()
+        );
     },
 
     // --- Contracts ---
@@ -241,7 +286,7 @@ export const DatabaseService = {
     },
 
     async updateContract(id: string, contract: Partial<Contract>): Promise<void> {
-        const updates: any = {};
+        const updates: Record<string, unknown> = {};
         if (contract.status) updates.status = contract.status;
         if (contract.signedAt) updates.signed_at = contract.signedAt.toISOString();
 
@@ -277,21 +322,40 @@ export const DatabaseService = {
     async getInstallations(): Promise<Installation[]> {
         const { data, error } = await supabase
             .from('installations')
-            .select('*');
+            .select('*')
+            .order('scheduled_date', { ascending: true });
 
         if (error) throw error;
 
-        return data.map(row => ({
-            id: row.id,
-            offerId: row.offer_id,
-            client: row.installation_data.client,
-            productSummary: row.installation_data.productSummary,
-            status: row.status as Installation['status'],
-            scheduledDate: row.scheduled_date, // Keep as string (ISO)
-            teamId: row.installation_data.teamId,
-            notes: row.installation_data.notes,
-            createdAt: new Date(row.created_at)
-        }));
+        return (data || []).map(row => {
+            const installationData = (row as any).installation_data || {};
+            const clientData = installationData.client || {};
+
+            const client = {
+                firstName: clientData.firstName || '',
+                lastName: clientData.lastName || '',
+                city: clientData.city || '',
+                address: clientData.address || '',
+                phone: clientData.phone || '',
+                coordinates: clientData.coordinates
+            };
+
+            const scheduledRaw = (row as any).scheduled_date as string | null;
+            const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
+
+            return {
+                id: row.id,
+                offerId: row.offer_id,
+                client,
+                productSummary: installationData.productSummary || '',
+                status: row.status as Installation['status'],
+                scheduledDate,
+                teamId: installationData.teamId || (row as any).team_id,
+                notes: installationData.notes,
+                acceptance: installationData.acceptance,
+                createdAt: new Date(row.created_at)
+            };
+        });
     },
 
     async createInstallation(installation: Omit<Installation, 'id' | 'createdAt'>): Promise<Installation> {
@@ -327,7 +391,7 @@ export const DatabaseService = {
     },
 
     async updateInstallation(id: string, updates: Partial<Installation>): Promise<void> {
-        const dbUpdates: any = {};
+        const dbUpdates: Record<string, unknown> = {};
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
 
@@ -348,8 +412,6 @@ export const DatabaseService = {
 
         if (error) throw error;
     },
-
-
 
     // --- Users ---
     async getSalesReps(): Promise<User[]> {
@@ -406,7 +468,7 @@ export const DatabaseService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             updated_at: new Date().toISOString()
         };
         if (profile.firstName || profile.lastName) {
@@ -469,6 +531,15 @@ export const DatabaseService = {
         if (error) throw error;
     },
 
+    async updateUserRole(userId: string, role: User['role']): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ role, updated_at: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
     async updatePartnerMargin(userId: string, margin: number): Promise<void> {
         const { error } = await supabase
             .from('profiles')
@@ -476,6 +547,180 @@ export const DatabaseService = {
             .eq('id', userId);
 
         if (error) throw error;
+    },
+
+    async verifyCurrentPassword(email: string, password: string): Promise<{ error: any }> {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+        return { error };
+    },
+
+    async updatePassword(password: string): Promise<void> {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+    },
+
+    async deleteUser(userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
+    async getInstallers(): Promise<User[]> {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('role', 'installer');
+
+        if (error) throw error;
+
+        return (data || []).map(row => ({
+            id: row.id,
+            username: row.full_name?.split(' ')[0].toLowerCase() || '',
+            firstName: row.full_name?.split(' ')[0] || '',
+            lastName: row.full_name?.split(' ').slice(1).join(' ') || '',
+            email: '',
+            role: row.role as User['role'],
+            createdAt: new Date(row.created_at),
+            phone: row.phone,
+            monthlyTarget: row.monthly_target,
+            status: row.status as 'pending' | 'active' | 'blocked'
+        }));
+    },
+
+    async getInstallationsForInstaller(userId: string): Promise<Installation[]> {
+        const { data: assignments, error: assignError } = await supabase
+            .from('installation_assignments')
+            .select('installation_id')
+            .eq('user_id', userId);
+
+        if (assignError) throw assignError;
+        if (!assignments || assignments.length === 0) return [];
+
+        const ids = assignments.map((a: any) => a.installation_id);
+
+        const { data, error } = await supabase
+            .from('installations')
+            .select('*')
+            .in('id', ids);
+
+        if (error) throw error;
+
+        return (data || []).map(row => {
+            const installationData = (row as any).installation_data || {};
+            const clientData = installationData.client || {};
+
+            const client = {
+                firstName: clientData.firstName || '',
+                lastName: clientData.lastName || '',
+                city: clientData.city || installationData.city || '',
+                address: clientData.address || installationData.address || '',
+                phone: clientData.phone || installationData.phone || '',
+                coordinates: clientData.coordinates
+            };
+
+            const scheduledRaw = (row as any).scheduled_date as string | null;
+            const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
+
+            return {
+                id: row.id,
+                offerId: row.offer_id,
+                client,
+                productSummary: installationData.productSummary || '',
+                status: row.status as Installation['status'],
+                scheduledDate,
+                teamId: installationData.teamId,
+                notes: installationData.notes,
+                acceptance: installationData.acceptance,
+                createdAt: new Date(row.created_at)
+            } as Installation;
+        });
+    },
+
+    async assignInstaller(installationId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('installation_assignments')
+            .insert({ installation_id: installationId, user_id: userId });
+
+        if (error) throw error;
+    },
+
+    async unassignInstaller(installationId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('installation_assignments')
+            .delete()
+            .eq('installation_id', installationId)
+            .eq('user_id', userId);
+
+        if (error) throw error;
+    },
+
+    async getAssignmentsForInstallation(installationId: string): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('installation_assignments')
+            .select('user_id')
+            .eq('installation_id', installationId);
+
+        if (error) throw error;
+
+        return (data || []).map(row => (row as any).user_id as string);
+    },
+
+    async saveInstallationAcceptance(installationId: string, acceptance: any): Promise<void> {
+        // Merge acceptance into existing installation_data and mark as completed
+        const { data, error: fetchError } = await supabase
+            .from('installations')
+            .select('installation_data')
+            .eq('id', installationId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const existing = (data?.installation_data as any) || {};
+        const merged = {
+            ...existing,
+            acceptance
+        };
+
+        const { error } = await supabase
+            .from('installations')
+            .update({
+                status: 'completed',
+                installation_data: merged
+            })
+            .eq('id', installationId);
+
+        if (error) throw error;
+    },
+
+    async getInstallerStats(userId: string): Promise<{ completedCount: number }> {
+        // Count completed installations assigned to this installer
+        // First get assignments
+        const { data: assignments, error: assignError } = await supabase
+            .from('installation_assignments')
+            .select('installation_id')
+            .eq('user_id', userId);
+
+        if (assignError) throw assignError;
+        if (!assignments || assignments.length === 0) return { completedCount: 0 };
+
+        const ids = assignments.map((a: any) => a.installation_id);
+
+        // Count how many of these are completed
+        const { count, error } = await supabase
+            .from('installations')
+            .select('*', { count: 'exact', head: true })
+            .in('id', ids)
+            .eq('status', 'completed');
+
+        if (error) throw error;
+
+        return { completedCount: count || 0 };
     },
 
     // --- Stats ---
@@ -654,6 +899,44 @@ export const DatabaseService = {
         };
     },
 
+    async getSystemStats(): Promise<{
+        totalRevenue: number;
+        activeUsers: number;
+        pendingOffers: number;
+        completedInstallations: number;
+    }> {
+        const { data: offers } = await supabase
+            .from('offers')
+            .select('pricing, status');
+
+        const { count: activeUsers } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'active');
+
+        const { count: completedInstallations } = await supabase
+            .from('installations')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'completed');
+
+        const totalRevenue = offers?.reduce((sum, offer) => {
+            if (offer.status === 'accepted' || offer.status === 'completed') {
+                const pricing = normalizePricing(offer.pricing);
+                return sum + (pricing.totalCost || 0); // Using totalCost as revenue proxy for now
+            }
+            return sum;
+        }, 0) || 0;
+
+        const pendingOffers = offers?.filter(o => o.status === 'pending').length || 0;
+
+        return {
+            totalRevenue,
+            activeUsers: activeUsers || 0,
+            pendingOffers,
+            completedInstallations: completedInstallations || 0
+        };
+    },
+
     async deleteReport(id: string): Promise<void> {
         const { error } = await supabase
             .from('reports')
@@ -665,122 +948,574 @@ export const DatabaseService = {
 
     // --- Admin Offer Tracking ---
     async getPartnerOffers(): Promise<Offer[]> {
-        const { data, error } = await supabase
+        // 1) Pobierz wszystkie oferty (bez joinów – unikamy błędu 400)
+        const { data: offers, error: offersError } = await supabase
             .from('offers')
-            .select(`
-                *,
-                profiles!offers_user_id_fkey (
-                    id,
-                    full_name,
-                    role,
-                    company_name,
-                    nip
-                )
-            `)
+            .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (offersError) throw offersError;
 
-        return data
-            .filter(row => row.profiles?.role === 'partner')
-            .map(row => ({
-                id: row.id,
-                offerNumber: row.offer_number,
-                customer: row.customer_data,
-                product: row.product_config,
-                pricing: row.pricing,
-                status: row.status as Offer['status'],
-                snowZone: row.snow_zone,
-                commission: row.commission,
-                createdAt: new Date(row.created_at),
-                updatedAt: new Date(row.updated_at),
-                createdBy: row.user_id,
-                // Add company info from joined profile
-                companyName: row.profiles?.company_name,
-                createdByName: row.profiles?.full_name
-            }));
+        if (!offers || offers.length === 0) return [];
+
+        // 2) Pobierz profile partnerów B2B
+        const partners = (await this.getAllUsers()).filter(u => u.role === 'partner');
+        if (partners.length === 0) return [];
+
+        const partnerMap = new Map(partners.map(p => [p.id, p]));
+
+        // 3) Zbuduj wynik tylko dla ofert, których user_id jest partnerem
+        return offers
+            .filter(row => partnerMap.has(row.user_id))
+            .map(row => {
+                const profile = partnerMap.get(row.user_id);
+                const createdByName = profile
+                    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+                    : undefined;
+
+                return {
+                    id: row.id,
+                    offerNumber: row.offer_number,
+                    customer: row.customer_data,
+                    product: row.product_config,
+                    pricing: normalizePricing(row.pricing),
+                    status: row.status as Offer['status'],
+                    snowZone: row.snow_zone,
+                    commission: row.commission,
+                    createdAt: new Date(row.created_at),
+                    updatedAt: new Date(row.updated_at),
+                    createdBy: row.user_id,
+                    // dodatkowe pola używane w UI admina
+                    companyName: profile?.companyName,
+                    createdByName: createdByName || undefined
+                };
+            });
     },
 
     async getOffersByRole(role: string): Promise<Offer[]> {
-        const { data, error } = await supabase
+        // Prosta implementacja: filtrujemy po roli profilu
+        const { data: offers, error: offersError } = await supabase
             .from('offers')
-            .select(`
-                *,
-                profiles!offers_user_id_fkey (
-                    id,
-                    full_name,
-                    role,
-                    company_name
-                )
-            `)
+            .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (offersError) throw offersError;
 
-        return data
-            .filter(row => row.profiles?.role === role)
-            .map(row => ({
-                id: row.id,
-                offerNumber: row.offer_number,
-                customer: row.customer_data,
-                product: row.product_config,
-                pricing: row.pricing,
-                status: row.status as Offer['status'],
-                snowZone: row.snow_zone,
-                commission: row.commission,
-                createdAt: new Date(row.created_at),
-                updatedAt: new Date(row.updated_at),
-                createdBy: row.user_id,
-                companyName: row.profiles?.company_name,
-                createdByName: row.profiles?.full_name
-            }));
+        if (!offers || offers.length === 0) return [];
+
+        const users = await this.getAllUsers();
+        const filteredUsers = users.filter(u => u.role === role);
+        if (filteredUsers.length === 0) return [];
+
+        const userMap = new Map(filteredUsers.map(u => [u.id, u]));
+
+        return offers
+            .filter(row => userMap.has(row.user_id))
+            .map(row => {
+                const profile = userMap.get(row.user_id);
+                const createdByName = profile
+                    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+                    : undefined;
+
+                return {
+                    id: row.id,
+                    offerNumber: row.offer_number,
+                    customer: row.customer_data,
+                    product: row.product_config,
+                    pricing: normalizePricing(row.pricing),
+                    status: row.status as Offer['status'],
+                    snowZone: row.snow_zone,
+                    commission: row.commission,
+                    createdAt: new Date(row.created_at),
+                    updatedAt: new Date(row.updated_at),
+                    createdBy: row.user_id,
+                    companyName: profile?.companyName,
+                    createdByName: createdByName || undefined
+                };
+            });
     },
 
     async searchOffers(query: string): Promise<Offer[]> {
-        const { data, error } = await supabase
-            .from('offers')
-            .select(`
-                *,
-                profiles!offers_user_id_fkey (
-                    id,
-                    full_name,
-                    role,
-                    company_name
-                )
-            `)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
         const lowerQuery = query.toLowerCase();
 
-        return data
-            .filter(row => {
-                const offerNumber = row.offer_number?.toLowerCase() || '';
-                const customerName = `${row.customer_data?.firstName || ''} ${row.customer_data?.lastName || ''}`.toLowerCase();
-                const companyName = row.profiles?.company_name?.toLowerCase() || '';
-                const createdByName = row.profiles?.full_name?.toLowerCase() || '';
+        // 1) Oferty
+        const { data: offers, error: offersError } = await supabase
+            .from('offers')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (offersError) throw offersError;
+
+        if (!offers || offers.length === 0) return [];
+
+        // 2) Profile użytkowników
+        const users = await this.getAllUsers();
+        const userMap = new Map(users.map(u => [u.id, u]));
+
+        // 3) Filtrowanie po numerze oferty / kliencie / firmie / autorze
+        return offers
+            .map(row => {
+                const profile = userMap.get(row.user_id);
+                const createdByName = profile
+                    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+                    : undefined;
+
+                return {
+                    raw: row,
+                    profile,
+                    createdByName: createdByName || ''
+                };
+            })
+            .filter(({ raw, profile, createdByName }) => {
+                const offerNumber = raw.offer_number?.toLowerCase() || '';
+                const customerName = `${raw.customer_data?.firstName || ''} ${raw.customer_data?.lastName || ''}`.toLowerCase();
+                const companyName = profile?.companyName?.toLowerCase() || '';
+                const createdByLower = createdByName.toLowerCase();
 
                 return offerNumber.includes(lowerQuery) ||
                     customerName.includes(lowerQuery) ||
                     companyName.includes(lowerQuery) ||
-                    createdByName.includes(lowerQuery);
+                    createdByLower.includes(lowerQuery);
             })
-            .map(row => ({
-                id: row.id,
-                offerNumber: row.offer_number,
-                customer: row.customer_data,
-                product: row.product_config,
-                pricing: row.pricing,
-                status: row.status as Offer['status'],
-                snowZone: row.snow_zone,
-                commission: row.commission,
-                createdAt: new Date(row.created_at),
-                updatedAt: new Date(row.updated_at),
-                createdBy: row.user_id,
-                companyName: row.profiles?.company_name,
-                createdByName: row.profiles?.full_name
+            .map(({ raw, profile, createdByName }) => ({
+                id: raw.id,
+                offerNumber: raw.offer_number,
+                customer: raw.customer_data,
+                product: raw.product_config,
+                pricing: normalizePricing(raw.pricing),
+                status: raw.status as Offer['status'],
+                snowZone: raw.snow_zone,
+                commission: raw.commission,
+                createdAt: new Date(raw.created_at),
+                updatedAt: new Date(raw.updated_at),
+                createdBy: raw.user_id,
+                companyName: profile?.companyName,
+                createdByName: createdByName || undefined
             }));
+    },
+
+    // --- Installer Management ---
+    async getInstallerManagementStats(): Promise<{
+        installer: User;
+        totalAssignments: number;
+        completedInstallations: number;
+        inProgressInstallations: number;
+        nextScheduledInstallation?: Installation;
+    }[]> {
+        // Get all installers
+        const installers = await this.getInstallers();
+
+        // Get all installations
+        const allInstallations = await this.getInstallations();
+
+        // Get all assignments
+        const { data: allAssignments, error: assignError } = await supabase
+            .from('installation_assignments')
+            .select('*');
+
+        if (assignError) throw assignError;
+
+        // Build stats for each installer
+        const stats = await Promise.all(installers.map(async (installer) => {
+            // Get assignments for this installer
+            const assignments = (allAssignments || []).filter((a: any) => a.user_id === installer.id);
+            const assignedInstallationIds = assignments.map((a: any) => a.installation_id);
+
+            // Filter installations for this installer
+            const installerInstallations = allInstallations.filter(inst =>
+                assignedInstallationIds.includes(inst.id)
+            );
+
+            const completedCount = installerInstallations.filter(i => i.status === 'completed').length;
+            const inProgressCount = installerInstallations.filter(i =>
+                i.status === 'scheduled' || i.status === 'pending'
+            ).length;
+
+            // Find next scheduled installation
+            const upcomingInstallations = installerInstallations
+                .filter(i => i.scheduledDate && i.status !== 'completed')
+                .sort((a, b) => {
+                    const dateA = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0;
+                    const dateB = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0;
+                    return dateA - dateB;
+                });
+
+            return {
+                installer,
+                totalAssignments: assignments.length,
+                completedInstallations: completedCount,
+                inProgressInstallations: inProgressCount,
+                nextScheduledInstallation: upcomingInstallations[0]
+            };
+        }));
+
+        return stats;
+    },
+
+    // Find contract by offer ID
+    async findContractByOfferId(offerId: string): Promise<Contract | null> {
+        const { data, error } = await supabase
+            .from('contracts')
+            .select('*')
+            .eq('offer_id', offerId)
+            .single();
+
+        if (error || !data) return null;
+
+        return {
+            id: data.id,
+            offerId: data.offer_id,
+            contractNumber: data.contract_data.contractNumber,
+            status: data.status as Contract['status'],
+            client: data.contract_data.client,
+            product: data.contract_data.product,
+            pricing: data.contract_data.pricing,
+            commission: data.contract_data.commission,
+            requirements: data.contract_data.requirements,
+            comments: data.contract_data.comments?.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            attachments: data.contract_data.attachments || [],
+            createdAt: new Date(data.created_at),
+            signedAt: data.signed_at ? new Date(data.signed_at) : undefined
+        };
+    },
+
+    // Add protocol PDF to contract attachments
+    async addProtocolToContract(contractId: string, protocolBlob: Blob, installationId: string): Promise<void> {
+        // Convert Blob to base64
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                resolve(result);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(protocolBlob);
+        });
+
+        const base64Data = await base64Promise;
+
+        // Fetch current contract
+        const { data: currentData, error: fetchError } = await supabase
+            .from('contracts')
+            .select('contract_data')
+            .eq('id', contractId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const contractData = currentData?.contract_data || {};
+        const existingAttachments = contractData.attachments || [];
+
+        // Create new attachment
+        const newAttachment = {
+            id: crypto.randomUUID(),
+            name: `Protokół Montażowy ${installationId.substring(0, 8)}.pdf`,
+            url: base64Data,
+            type: 'document' as const,
+            createdAt: new Date()
+        };
+
+        // Update contract with new attachment
+        const updatedContractData = {
+            ...contractData,
+            attachments: [...existingAttachments, newAttachment]
+        };
+
+        const { error: updateError } = await supabase
+            .from('contracts')
+            .update({ contract_data: updatedContractData })
+            .eq('id', contractId);
+
+        if (updateError) throw updateError;
+    },
+
+    // --- Team Management ---
+
+    async createTeam(name: string, color: string, memberIds: string[]): Promise<void> {
+        // 1. Create team
+        const { data: team, error: teamError } = await supabase
+            .from('teams')
+            .insert({ name, color })
+            .select()
+            .single();
+
+        if (teamError) throw teamError;
+
+        // 2. Add members
+        if (memberIds.length > 0) {
+            const membersData = memberIds.map(userId => ({
+                team_id: team.id,
+                user_id: userId
+            }));
+
+            const { error: membersError } = await supabase
+                .from('team_members')
+                .insert(membersData);
+
+            if (membersError) throw membersError;
+        }
+    },
+
+    async getTeams(): Promise<import('../types').InstallationTeam[]> {
+        // Fetch teams
+        const { data: teams, error: teamsError } = await supabase
+            .from('teams')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (teamsError) throw teamsError;
+
+        // Fetch members for all teams
+        const { data: members, error: membersError } = await supabase
+            .from('team_members')
+            .select(`
+                team_id,
+                user_id,
+                profiles:user_id (
+                    id,
+                    full_name
+                )
+            `);
+
+        if (membersError) throw membersError;
+
+        // Map members to teams
+        return teams.map(team => {
+            const teamMembers = members
+                .filter((m: any) => m.team_id === team.id)
+                .map((m: any) => {
+                    // Handle potential missing profile or name split
+                    const fullName = m.profiles?.full_name || 'Unknown User';
+                    const [firstName, ...rest] = fullName.split(' ');
+                    const lastName = rest.join(' ');
+
+                    return {
+                        id: m.user_id,
+                        firstName: firstName || '',
+                        lastName: lastName || ''
+                    };
+                });
+
+            return {
+                id: team.id,
+                name: team.name,
+                color: team.color,
+                members: teamMembers
+            };
+        });
+    },
+
+    async updateTeam(id: string, name: string, color: string, memberIds: string[]): Promise<void> {
+        // 1. Update team details
+        const { error: teamError } = await supabase
+            .from('teams')
+            .update({ name, color })
+            .eq('id', id);
+
+        if (teamError) throw teamError;
+
+        // 2. Update members (delete all and re-insert)
+        // Transaction would be better but simple approach for now
+        const { error: deleteError } = await supabase
+            .from('team_members')
+            .delete()
+            .eq('team_id', id);
+
+        if (deleteError) throw deleteError;
+
+        if (memberIds.length > 0) {
+            const membersData = memberIds.map(userId => ({
+                team_id: id,
+                user_id: userId
+            }));
+
+            const { error: insertError } = await supabase
+                .from('team_members')
+                .insert(membersData);
+
+            if (insertError) throw insertError;
+        }
+    },
+
+    async deleteTeam(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('teams')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async assignTeamToInstallation(installationId: string, teamId: string): Promise<void> {
+        // 1. Update installation with team_id
+        const { error: updateError } = await supabase
+            .from('installations')
+            .update({ team_id: teamId })
+            .eq('id', installationId);
+
+        if (updateError) throw updateError;
+
+        // 2. Get team members
+        const { data: members, error: membersError } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', teamId);
+
+        if (membersError) throw membersError;
+
+        // 3. Sync installation_assignments
+        // First, remove existing assignments for this installation
+        const { error: deleteError } = await supabase
+            .from('installation_assignments')
+            .delete()
+            .eq('installation_id', installationId);
+
+        if (deleteError) throw deleteError;
+
+        // Then add new assignments for all team members
+        if (members && members.length > 0) {
+            const assignments = members.map((m: any) => ({
+                installation_id: installationId,
+                user_id: m.user_id
+            }))
+
+                ;
+
+            const { error: insertError } = await supabase
+                .from('installation_assignments')
+                .insert(assignments);
+
+            if (insertError) throw insertError;
+        }
+    },
+
+    // --- Bulk Installation Management ---
+
+    // Get signed contracts that don't have an installation yet
+    async getUnassignedContracts(): Promise<Contract[]> {
+        // Get all signed contracts
+        const { data: contracts, error: contractsError } = await supabase
+            .from('contracts')
+            .select('*')
+            .eq('status', 'signed')
+            .order('created_at', { ascending: false });
+
+        if (contractsError) throw contractsError;
+
+        // Get all installations to check which contracts already have them
+        const { data: installations, error: installError } = await supabase
+            .from('installations')
+            .select('offer_id');
+
+        if (installError) throw installError;
+
+        const installationOfferIds = new Set((installations || []).map(i => i.offer_id));
+
+        // Filter contracts that don't have installations
+        const unassignedContracts = (contracts || []).filter(
+            row => !installationOfferIds.has(row.offer_id)
+        );
+
+        return unassignedContracts.map(row => ({
+            id: row.id,
+            offerId: row.offer_id,
+            contractNumber: row.contract_data.contractNumber,
+            status: row.status as Contract['status'],
+            client: row.contract_data.client,
+            product: row.contract_data.product,
+            pricing: row.contract_data.pricing,
+            commission: row.contract_data.commission,
+            requirements: row.contract_data.requirements,
+            comments: row.contract_data.comments?.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            attachments: row.contract_data.attachments || [],
+            createdAt: new Date(row.created_at),
+            signedAt: row.signed_at ? new Date(row.signed_at) : undefined
+        }));
+    },
+
+    // Check if installation exists for contract
+    async checkInstallationForContract(offerId: string): Promise<boolean> {
+        const { data, error } = await supabase
+            .from('installations')
+            .select('id')
+            .eq('offer_id', offerId)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = not found
+        return !!data;
+    },
+
+    // Bulk create installations from contracts
+    async bulkCreateInstallations(contractIds: string[]): Promise<Installation[]> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Fetch contracts
+        const { data: contracts, error: contractsError } = await supabase
+            .from('contracts')
+            .select('*')
+            .in('id', contractIds);
+
+        if (contractsError) throw contractsError;
+        if (!contracts || contracts.length === 0) return [];
+
+        const createdInstallations: Installation[] = [];
+
+        for (const contractRow of contracts) {
+            const contract = contractRow as any;
+
+            // Check if installation already exists
+            const exists = await DatabaseService.checkInstallationForContract(contract.offer_id);
+            if (exists) {
+                console.warn(`Installation already exists for offer ${contract.offer_id}, skipping`);
+                continue;
+            }
+
+            const contractData = contract.contract_data;
+            const client = contractData.client;
+
+            const installationData = {
+                client: {
+                    firstName: client.firstName || '',
+                    lastName: client.lastName || '',
+                    city: client.city || '',
+                    address: `${client.street || ''} ${client.houseNumber || ''}`.trim(),
+                    phone: client.phone || '',
+                    coordinates: undefined // Will be geocoded later if needed
+                },
+                productSummary: `${contractData.product.modelId} ${contractData.product.width}x${contractData.product.projection}mm`
+            };
+
+            const { data: newInstallation, error: insertError } = await supabase
+                .from('installations')
+                .insert({
+                    offer_id: contract.offer_id,
+                    user_id: user.id,
+                    status: 'pending',
+                    installation_data: installationData
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error(`Error creating installation for contract ${contract.id}:`, insertError);
+                continue;
+            }
+
+            createdInstallations.push({
+                id: newInstallation.id,
+                offerId: contract.offer_id,
+                client: installationData.client,
+                productSummary: installationData.productSummary,
+                status: 'pending' as Installation['status'],
+                scheduledDate: undefined,
+                teamId: undefined,
+                notes: '',
+                createdAt: new Date(newInstallation.created_at)
+            });
+        }
+
+        return createdInstallations;
     }
 
 };

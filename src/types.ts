@@ -7,7 +7,7 @@ export interface SnowZoneInfo {
 }
 
 // User Roles
-export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner';
+export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner' | 'installer';
 
 export interface User {
     id: string;
@@ -219,7 +219,11 @@ export interface InstallationTeam {
     id: string;
     name: string;
     color: string; // Hex color for map markers
-    members: string[]; // List of names
+    members: {
+        id: string;
+        firstName: string;
+        lastName: string;
+    }[];
 }
 
 export interface Installation {
@@ -239,9 +243,16 @@ export interface Installation {
     productSummary: string; // e.g., "Trendstyle 4000x3000"
     status: InstallationStatus;
     scheduledDate?: string; // ISO Date string
-    teamId?: string; // Assigned team
+    teamId?: string; // Assigned team ID
+    team?: InstallationTeam; // Assigned team details
     notes?: string;
     createdAt: Date;
+    acceptance?: {
+        acceptedAt: string;
+        clientName: string;
+        signature?: string;
+        notes?: string;
+    };
 }
 
 // --- Contracts Module Types ---

@@ -61,6 +61,8 @@ export function translate(key: string, category?: keyof typeof translations): st
     return (translations as Record<string, any>)[key] || key;
 }
 
-export function formatCurrency(amount: number): string {
-    return amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+export function formatCurrency(amount: number | undefined | null): string {
+    const safe = Number(amount ?? 0);
+    if (Number.isNaN(safe)) return '0,00 €';
+    return safe.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 }

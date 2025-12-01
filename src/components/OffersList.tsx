@@ -219,12 +219,19 @@ export const OffersList: React.FC = () => {
         .filter(o => {
             if (!searchQuery) return true;
             const query = searchQuery.toLowerCase();
+
+            const firstName = (o.customer.firstName || '').toString().toLowerCase();
+            const lastName = (o.customer.lastName || '').toString().toLowerCase();
+            const city = (o.customer.city || '').toString().toLowerCase();
+            const offerNumber = (o.offerNumber || '').toString().toLowerCase();
+            const id = o.id.toLowerCase();
+
             return (
-                o.customer.firstName.toLowerCase().includes(query) ||
-                o.customer.lastName.toLowerCase().includes(query) ||
-                o.customer.city.toLowerCase().includes(query) ||
-                (o.offerNumber && o.offerNumber.toLowerCase().includes(query)) ||
-                o.id.toLowerCase().includes(query)
+                firstName.includes(query) ||
+                lastName.includes(query) ||
+                city.includes(query) ||
+                offerNumber.includes(query) ||
+                id.includes(query)
             );
         });
 
@@ -345,13 +352,19 @@ export const OffersList: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {filteredOffers.map((offer) => (
-                                    <tr key={offer.id} className="hover:bg-slate-50 transition-colors">
+                                {filteredOffers.map((offer) => {
+                                    const pricing = offer.pricing || ({} as any);
+                                    const priceGross = Number(pricing.sellingPriceGross ?? pricing.sellingPriceNet ?? 0);
+                                    const commission = Number(offer.commission ?? 0);
+                                    const createdDate = offer.createdAt ? new Date(offer.createdAt) : null;
+
+                                    return (
+                                        <tr key={offer.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-sm font-mono text-slate-500">{offer.offerNumber || offer.id.substring(0, 8)}</span>
+                                            </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm font-mono text-slate-500">{offer.offerNumber || offer.id.substring(0, 8)}</span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm text-slate-700">{offer.createdAt.toLocaleDateString('pl-PL')}</span>
+                                            <span className="text-sm text-slate-700">{createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -380,12 +393,20 @@ export const OffersList: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <span className="text-sm font-medium text-slate-900">
-                                                {offer.pricing.sellingPriceGross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                                                {priceGross.toLocaleString('de-DE', {
+                                                    style: 'currency',
+                                                    currency: 'EUR',
+                                                    maximumFractionDigits: 0
+                                                })}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <span className="text-sm font-medium text-green-600">
-                                                {offer.commission.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                                                {commission.toLocaleString('de-DE', {
+                                                    style: 'currency',
+                                                    currency: 'EUR',
+                                                    maximumFractionDigits: 0
+                                                })}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -448,7 +469,7 @@ export const OffersList: React.FC = () => {
                                                 {offer.status === 'sold' && (
                                                     <>
                                                         <button
-                                                            onClick={() => handlePriceUpdate(offer.id, offer.pricing.sellingPriceNet)}
+                                                            onClick={() => handlePriceUpdate(offer.id, offer.pricing?.sellingPriceNet || 0)}
                                                             className="text-accent hover:text-accent-dark"
                                                             title="Zmień Cenę Umowy"
                                                         >
@@ -478,8 +499,9 @@ export const OffersList: React.FC = () => {
                                                 )}
                                             </div>
                                         </td>
-                                    </tr>
-                                ))}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

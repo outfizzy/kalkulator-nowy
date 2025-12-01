@@ -18,9 +18,10 @@ export const LoginPage: React.FC = () => {
             const { error } = await login(email, password);
             if (error) throw error;
             navigate('/dashboard');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Login error:', error);
-            toast.error(error.message || 'Błąd logowania. Sprawdź email i hasło.');
+            const message = error instanceof Error ? error.message : 'Błąd logowania. Sprawdź email i hasło.';
+            toast.error(message);
         } finally {
             setLoading(false);
         }

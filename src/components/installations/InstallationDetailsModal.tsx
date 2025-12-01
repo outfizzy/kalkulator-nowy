@@ -1,43 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { updateInstallation, getTeams } from '../../utils/storage';
+import { getTeams } from '../../utils/storage';
 import { geocodeAddress } from '../../utils/geocoding';
-import { generateInstallationProtocolPDF } from '../../utils/installationProtocolPDF';
+import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
-import type { Installation, InstallationTeam, InstallationStatus } from '../../types';
+import { DatabaseService } from '../../services/database';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
 
 interface InstallationDetailsModalProps {
     installation: Installation;
     isOpen: boolean;
     onClose: () => void;
     onUpdate: () => void;
+    onSave: (installation: Installation) => Promise<void>;
+    readOnly?: boolean;
 }
 
-export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> = ({ installation, isOpen, onClose, onUpdate }) => {
+export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> = ({
+    installation,
+    isOpen,
+    onClose,
+    onUpdate,
+    onSave,
+    readOnly = false
+}) => {
+    const { currentUser } = useAuth();
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [formData, setFormData] = useState<Partial<Installation>>({});
     const [isGeocoding, setIsGeocoding] = useState(false);
     const [photos, setPhotos] = useState<string[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [assignedInstallerIds, setAssignedInstallerIds] = useState<string[]>([]);
+    const [installers, setInstallers] = useState<User[]>([]);
+
+    const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
     useEffect(() => {
         if (isOpen) {
             setTeams(getTeams());
             setFormData({
                 ...installation,
-                client: { ...installation.client } // Deep copy client to avoid mutation issues
+                client: { ...installation.client }
             });
             setPhotos(getOfferPhotos(installation.offerId));
+
+            // Load assignments for the specific installation when modal opens
+            void (async () => {
+                try {
+                    const assignedIds = await DatabaseService.getAssignmentsForInstallation(installation.id);
+                    setAssignedInstallerIds(assignedIds);
+                    const allInstallers = await DatabaseService.getInstallers();
+                    setInstallers(allInstallers);
+                } catch (error) {
+                    console.error('Error loading assignments:', error);
+                }
+            })();
         }
     }, [isOpen, installation]);
 
     if (!isOpen) return null;
 
     const handleChange = (field: keyof Installation, value: any) => {
+        if (readOnly && field !== 'status' && field !== 'notes') return;
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
     const handleClientChange = (field: string, value: string) => {
+        if (readOnly) return;
         setFormData(prev => ({
             ...prev,
             client: {
@@ -49,38 +80,47 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
 
     const handleSave = async () => {
         if (!formData.id) return;
+        setSaving(true);
 
-        // Check if address changed, if so, re-geocode
-        if (
-            formData.client?.address !== installation.client.address ||
-            formData.client?.city !== installation.client.city
-        ) {
-            setIsGeocoding(true);
-            const coords = await geocodeAddress(formData.client!.address, formData.client!.city);
-            if (coords) {
-                setFormData(prev => ({
-                    ...prev,
-                    client: {
-                        ...prev.client!,
-                        coordinates: coords
-                    }
-                }));
-                toast.success('Zaktualizowano współrzędne GPS');
-            } else {
-                toast.error('Nie udało się znaleźć współrzędnych dla nowego adresu');
+        try {
+            // Check if address changed, if so, re-geocode
+            if (
+                !readOnly &&
+                (formData.client?.address !== installation.client.address ||
+                    formData.client?.city !== installation.client.city)
+            ) {
+                setIsGeocoding(true);
+                const coords = await geocodeAddress(formData.client!.address, formData.client!.city);
+                if (coords) {
+                    setFormData(prev => ({
+                        ...prev,
+                        client: {
+                            ...prev.client!,
+                            coordinates: coords
+                        }
+                    }));
+                    toast.success('Zaktualizowano współrzędne GPS');
+                } else {
+                    toast.error('Nie udało się znaleźć współrzędnych dla nowego adresu');
+                }
+                setIsGeocoding(false);
             }
-            setIsGeocoding(false);
-        }
 
-        updateInstallation(formData as Installation);
-        toast.success('Zapisano zmiany');
-        onUpdate();
-        onClose();
+            await onSave(formData as Installation);
+            toast.success('Zapisano zmiany');
+            onUpdate();
+            onClose();
+        } catch (error) {
+            console.error('Error saving installation:', error);
+            toast.error('Błąd zapisu');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
+            <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:rounded-xl shadow-xl overflow-y-auto animate-scale-in flex flex-col md:block">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                     <h2 className="text-xl font-bold text-slate-800">Szczegóły Montażu</h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
@@ -128,6 +168,78 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                 className="w-full p-2 border border-slate-300 rounded-lg"
                             />
                         </div>
+                    </div>
+
+                    {/* Installer Assignments */}
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Przypisani monterzy</label>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {assignedInstallerIds.length === 0 && (
+                                <span className="text-xs text-slate-400">Brak przypisanych monterów</span>
+                            )}
+                            {assignedInstallerIds.map(id => {
+                                const installer = installers.find(i => i.id === id);
+                                if (!installer) return null;
+                                return (
+                                    <span
+                                        key={id}
+                                        className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-slate-200 rounded-full text-xs text-slate-700"
+                                    >
+                                        {installer.firstName} {installer.lastName}
+                                        {canManageAssignments && (
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await DatabaseService.unassignInstaller(installation.id, id);
+                                                        setAssignedInstallerIds(prev => prev.filter(x => x !== id));
+                                                        toast.success('Usunięto montera z montażu');
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                        toast.error('Błąd usuwania montera');
+                                                    }
+                                                }}
+                                                className="text-slate-400 hover:text-red-500"
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                        {canManageAssignments && installers.length > 0 && (
+                            <select
+                                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                defaultValue=""
+                                onChange={async (e) => {
+                                    const installerId = e.target.value;
+                                    if (!installerId) return;
+                                    if (assignedInstallerIds.includes(installerId)) {
+                                        toast('Ten monter jest już przypisany');
+                                        e.target.value = '';
+                                        return;
+                                    }
+                                    try {
+                                        await DatabaseService.assignInstaller(installation.id, installerId);
+                                        setAssignedInstallerIds(prev => [...prev, installerId]);
+                                        toast.success('Przypisano montera');
+                                    } catch (error) {
+                                        console.error(error);
+                                        toast.error('Błąd przypisywania montera');
+                                    } finally {
+                                        e.target.value = '';
+                                    }
+                                }}
+                            >
+                                <option value="">+ Dodaj montera</option>
+                                {installers.map(inst => (
+                                    <option key={inst.id} value={inst.id}>
+                                        {inst.firstName} {inst.lastName}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {/* Client Details */}
@@ -236,9 +348,108 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             }}
                         />
                     </div>
+
+                    {/* Client Acceptance Section */}
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Odbiór przez Klienta
+                        </h3>
+
+                        {formData.acceptance ? (
+                            <div className="bg-green-50 text-green-800 p-3 rounded border border-green-200 text-sm">
+                                <p className="font-bold">✅ Montaż odebrany</p>
+                                <p>Przez: {formData.acceptance.clientName}</p>
+                                <p>Data: {new Date(formData.acceptance.acceptedAt).toLocaleString()}</p>
+                                {formData.acceptance.notes && <p className="italic mt-1">"{formData.acceptance.notes}"</p>}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <p className="text-sm text-slate-600">
+                                    Potwierdź odbiór prac przez klienta. Status montażu zostanie zmieniony na "Zakończony".
+                                </p>
+                                {!readOnly || (readOnly && formData.status !== 'completed') ? (
+                                    <button
+                                        onClick={async () => {
+                                            if (!window.confirm('Czy na pewno chcesz potwierdzić odbiór prac przez klienta?')) return;
+
+                                            // Check if there are photos for protocol
+                                            const offerPhotos = getOfferPhotos(installation.offerId);
+                                            if (!offerPhotos || offerPhotos.length === 0) {
+                                                if (!window.confirm('Brak zdjęć montażu. Czy chcesz kontynuować bez protokołu?')) {
+                                                    return;
+                                                }
+                                            }
+
+                                            const acceptanceData = {
+                                                acceptedAt: new Date().toISOString(),
+                                                clientName: `${formData.client?.firstName} ${formData.client?.lastName}`,
+                                                notes: 'Potwierdzono w aplikacji montera'
+                                            };
+
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                status: 'completed',
+                                                acceptance: acceptanceData
+                                            }));
+
+                                            // Save immediately
+                                            try {
+                                                setSaving(true);
+                                                await DatabaseService.saveInstallationAcceptance(installation.id, acceptanceData);
+
+                                                // Try to find and save protocol to CRM
+                                                if (offerPhotos && offerPhotos.length > 0) {
+                                                    try {
+                                                        toast.loading('Generowanie protokołu...', { id: 'protocol' });
+
+                                                        // Generate protocol PDF
+                                                        const protocolBlob = await generateInstallationProtocolPDFAsBlob(formData as Installation);
+
+                                                        // Find contract by offer ID
+                                                        const contract = await DatabaseService.findContractByOfferId(installation.offerId);
+
+                                                        if (contract) {
+                                                            // Save protocol to contract attachments
+                                                            await DatabaseService.addProtocolToContract(contract.id, protocolBlob, installation.id);
+                                                            toast.success('Protokół zapisany w CRM!', { id: 'protocol' });
+                                                        } else {
+                                                            toast('Montaż ukończony. Brak powiązanego kontraktu - protokół nie został zapisany w CRM.', {
+                                                                id: 'protocol',
+                                                                icon: '⚠️',
+                                                                duration: 5000
+                                                            });
+                                                        }
+                                                    } catch (protocolError) {
+                                                        console.error('Error saving protocol to CRM:', protocolError);
+                                                        toast.error('Błąd zapisu protokołu w CRM (montaż ukończony)', { id: 'protocol' });
+                                                    }
+                                                }
+
+                                                await onUpdate();
+                                                onClose();
+                                                toast.success('Potwierdzono odbiór!');
+                                            } catch (e) {
+                                                console.error(e);
+                                                toast.error('Błąd zapisu odbioru');
+                                            } finally {
+                                                setSaving(false);
+                                            }
+                                        }}
+                                        disabled={saving}
+                                        className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {saving ? 'Zapisywanie...' : 'Potwierdź Odbiór Prac'}
+                                    </button>
+                                ) : null}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <div className="p-6 border-t border-slate-100 flex justify-between items-center">
+                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white md:rounded-b-xl sticky bottom-0 z-10">
                     {/* Download Protocol PDF Button */}
                     <button
                         onClick={() => {
@@ -267,10 +478,10 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={isGeocoding}
+                            disabled={isGeocoding || saving}
                             className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50"
                         >
-                            {isGeocoding ? 'Zapisywanie...' : 'Zapisz Zmiany'}
+                            {isGeocoding ? 'Geokodowanie...' : saving ? 'Zapisywanie...' : 'Zapisz Zmiany'}
                         </button>
                     </div>
                 </div>

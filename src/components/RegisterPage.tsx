@@ -188,6 +188,7 @@ export const RegisterPage: React.FC = () => {
                                 disabled={loading}
                             >
                                 <option value="sales_rep">Przedstawiciel Handlowy</option>
+                                <option value="installer">Monter</option>
                                 <option value="manager">Menedżer</option>
                                 <option value="admin">Administrator</option>
                             </select>

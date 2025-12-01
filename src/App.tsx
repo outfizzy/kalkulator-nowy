@@ -15,6 +15,8 @@ import { UserManagementPage } from './components/UserManagementPage';
 import { SalesTeamDashboard } from './components/admin/SalesTeamDashboard';
 import { PartnerOffersPage } from './components/admin/PartnerOffersPage';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { InstallerManagementPanel } from './components/admin/InstallerManagementPanel';
+import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
 import { calculatePrice } from './utils/pricing';
 import { calculateCommission } from './utils/commission';
 import { DatabaseService } from './services/database';
@@ -24,6 +26,7 @@ import { ReportForm } from './components/reports/ReportForm';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
+import { InstallationCalendar } from './components/installations/InstallationCalendar';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
 
@@ -33,7 +36,7 @@ import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
 import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
 import { PartnerLayout } from './components/partner/PartnerLayout';
 
-import type { Customer, ProductConfig, Offer, SnowZoneInfo } from './types';
+import type { Customer, ProductConfig, Offer, SnowZoneInfo, Installation } from './types';
 
 type Step = 'customer' | 'product' | 'summary';
 
@@ -238,6 +241,56 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
   );
 }
 
+function InstallerInstallationsPage() {
+  const { currentUser } = useAuth();
+  const [installations, setInstallations] = useState<Installation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!currentUser) return;
+      setLoading(true);
+      try {
+        const data = await DatabaseService.getInstallationsForInstaller(currentUser.id);
+        setInstallations(data);
+      } catch (e) {
+        console.error('Error loading installer installations:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [currentUser]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[calc(100vh-100px)] flex flex-col gap-4 p-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Mój kalendarz montaży</h1>
+          <p className="text-slate-500 text-sm">
+            Wszystkie montaże przypisane do Twojego konta
+          </p>
+        </div>
+      </div>
+      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <InstallationCalendar
+          installations={installations}
+          teams={[]}
+          onEdit={() => { }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -267,6 +320,8 @@ function App() {
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/stats" element={<SalesTeamDashboard />} />
               <Route path="/admin/partner-offers" element={<PartnerOffersPage />} />
+              <Route path="/admin/installers" element={<InstallerManagementPanel />} />
+              <Route path="/admin/teams" element={<TeamManagementPanel />} />
               <Route path="/reports" element={<ReportsList />} />
               <Route path="/reports/new" element={<ReportForm />} />
               <Route path="/installations" element={<InstallationDashboard />} />
@@ -287,6 +342,16 @@ function App() {
               <Route path="offers" element={<OffersList />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route index element={<Navigate to="/partner/dashboard" replace />} />
+            </Route>
+
+            {/* Installer Protected Routes */}
+            <Route path="/installer" element={
+              <ProtectedRoute allowedRoles={['installer']}>
+                <Layout />
+              </ProtectedRoute>
+            }>
+              <Route path="calendar" element={<InstallerInstallationsPage />} />
+              <Route index element={<Navigate to="/installer/calendar" replace />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

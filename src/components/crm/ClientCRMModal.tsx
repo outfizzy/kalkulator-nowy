@@ -25,16 +25,17 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                 ]);
 
                 // Filter logic: Match by Email OR (FirstName + LastName + City)
-                const normalize = (str: string) => str.toLowerCase().trim();
+                const normalize = (str: string | undefined | null) =>
+                    (str || '').toString().toLowerCase().trim();
                 const customerKey = customer.email
                     ? normalize(customer.email)
                     : `${normalize(customer.firstName)}_${normalize(customer.lastName)}_${normalize(customer.city)}`;
 
-                const isMatch = (c: Partial<Customer> & { firstName: string; lastName: string; city?: string; email?: string }) => {
+                const isMatch = (c: Partial<Customer> & { firstName?: string; lastName?: string; city?: string; email?: string }) => {
                     if (customer.email && c.email) {
                         return normalize(c.email) === normalize(customer.email);
                     }
-                    const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city || '')}`;
+                    const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city)}`;
                     return key === customerKey;
                 };
 
@@ -60,7 +61,12 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
     // Stats
     const totalRevenue = clientOffers
         .filter(o => o.status === 'sold')
-        .reduce((sum, o) => sum + (o.pricing.finalPriceNet || o.pricing.sellingPriceNet), 0);
+        .reduce((sum, o) => {
+            const pricing = o.pricing || ({} as any);
+            const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
+            const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
+            return sum + (finalNet ?? baseNet);
+        }, 0);
 
     const soldCount = clientOffers.filter(o => o.status === 'sold').length;
 
@@ -178,7 +184,10 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                                     </div>
                                     <div className="text-right">
                                         <div className="font-bold text-slate-800">
-                                            {offer.pricing.sellingPriceGross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                            {(offer.pricing?.sellingPriceGross ?? 0).toLocaleString('de-DE', {
+                                                style: 'currency',
+                                                currency: 'EUR'
+                                            })}
                                         </div>
                                         <div className={`text-xs font-medium uppercase mt-1 ${offer.status === 'sold' ? 'text-green-600' : 'text-accent-dark'
                                             }`}>

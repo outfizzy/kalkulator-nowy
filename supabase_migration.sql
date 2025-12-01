@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS public.installations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     offer_id UUID REFERENCES public.offers(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    scheduled_date DATE NOT NULL,
+    scheduled_date DATE,
     installer_name TEXT,
     status TEXT NOT NULL DEFAULT 'scheduled',
     installation_data JSONB,
@@ -277,3 +277,52 @@ CREATE TRIGGER set_updated_at
     BEFORE UPDATE ON public.offers
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
+
+-- Extend roles to include installer & partner
+ALTER TABLE public.profiles 
+DROP CONSTRAINT IF EXISTS profiles_role_check;
+
+ALTER TABLE public.profiles 
+ADD CONSTRAINT profiles_role_check 
+CHECK (role IN ('admin', 'user', 'sales_rep', 'manager', 'partner', 'installer'));
+
+-- Installer assignments table for installations
+CREATE TABLE IF NOT EXISTS public.installation_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  installation_id UUID REFERENCES public.installations(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.installation_assignments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Installers can view own assignments"
+ON public.installation_assignments
+FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins and managers can view all assignments"
+ON public.installation_assignments
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('admin','manager')
+  )
+);
+
+CREATE POLICY "Admins and managers manage assignments"
+ON public.installation_assignments
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('admin','manager')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('admin','manager')
+  )
+);

@@ -65,13 +65,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (error) throw error;
 
             if (data) {
+                console.log('Fetched profile data:', data);
+                const rawRole = data.role as string | null;
+
+                const normalizedRole = ((): UserRole => {
+                    if (rawRole === 'admin' || rawRole === 'sales_rep' || rawRole === 'manager' || rawRole === 'partner' || rawRole === 'installer') {
+                        return rawRole;
+                    }
+                    return 'sales_rep';
+                })();
+
                 const profile: User = {
                     id: data.id,
                     username: email.split('@')[0], // Fallback username
                     firstName: data.full_name?.split(' ')[0] || '',
                     lastName: data.full_name?.split(' ').slice(1).join(' ') || '',
                     email: email,
-                    role: (['admin', 'sales_rep', 'manager', 'partner'].includes(data.role) ? data.role : 'sales_rep') as UserRole,
+                    role: normalizedRole,
                     createdAt: new Date(data.created_at),
                     phone: data.phone,
                     monthlyTarget: data.monthly_target,

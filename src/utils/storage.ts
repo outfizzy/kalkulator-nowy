@@ -399,9 +399,33 @@ export function getTeams(): InstallationTeam[] {
 
     // Default teams if none exist
     const defaultTeams: InstallationTeam[] = [
-        { id: 'team1', name: 'Ekipa 1 (Północ)', color: '#ef4444', members: ['Marek', 'Tomek'] },
-        { id: 'team2', name: 'Ekipa 2 (Południe)', color: '#3b82f6', members: ['Jacek', 'Piotr'] },
-        { id: 'team3', name: 'Ekipa 3 (Zachód)', color: '#22c55e', members: ['Adam', 'Krzysztof'] }
+        {
+            id: 'team1',
+            name: 'Ekipa 1 (Północ)',
+            color: '#ef4444',
+            members: [
+                { id: 'installer-1', firstName: 'Marek', lastName: '' },
+                { id: 'installer-2', firstName: 'Tomek', lastName: '' }
+            ]
+        },
+        {
+            id: 'team2',
+            name: 'Ekipa 2 (Południe)',
+            color: '#3b82f6',
+            members: [
+                { id: 'installer-3', firstName: 'Jacek', lastName: '' },
+                { id: 'installer-4', firstName: 'Piotr', lastName: '' }
+            ]
+        },
+        {
+            id: 'team3',
+            name: 'Ekipa 3 (Zachód)',
+            color: '#22c55e',
+            members: [
+                { id: 'installer-5', firstName: 'Adam', lastName: '' },
+                { id: 'installer-6', firstName: 'Krzysztof', lastName: '' }
+            ]
+        }
     ];
     localStorage.setItem(TEAMS_KEY, JSON.stringify(defaultTeams));
     return defaultTeams;

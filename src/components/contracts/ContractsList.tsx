@@ -23,9 +23,15 @@ export const ContractsList: React.FC = () => {
 
     const filteredContracts = contracts.filter(c => {
         const term = searchTerm.toLowerCase();
-        return c.contractNumber.toLowerCase().includes(term) ||
-            c.client.lastName.toLowerCase().includes(term) ||
-            c.client.city.toLowerCase().includes(term);
+        const contractNumber = c.contractNumber.toLowerCase();
+        const lastName = (c.client.lastName || '').toString().toLowerCase();
+        const city = (c.client.city || '').toString().toLowerCase();
+
+        return (
+            contractNumber.includes(term) ||
+            lastName.includes(term) ||
+            city.includes(term)
+        );
     });
 
     const getStatusColor = (status: string) => {
@@ -113,10 +119,10 @@ export const ContractsList: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-900">
-                                                {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} PLN
+                                                {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">
-                                                {contract.commission.toFixed(2)} PLN
+                                                {contract.commission.toFixed(2)} EUR
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <button

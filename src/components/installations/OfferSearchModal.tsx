@@ -69,12 +69,17 @@ export const OfferSearchModal: React.FC<OfferSearchModalProps> = ({ isOpen, onCl
 
         const term = searchTerm.toLowerCase();
         const filtered = eligibleOffers.filter(offer => {
-            const fullName = `${offer.customer.firstName} ${offer.customer.lastName}`.toLowerCase();
+            const firstName = (offer.customer.firstName || '').toString().toLowerCase();
+            const lastName = (offer.customer.lastName || '').toString().toLowerCase();
+            const city = (offer.customer.city || '').toString().toLowerCase();
+            const fullName = `${firstName} ${lastName}`.trim();
+            const offerNumber = (offer.offerNumber || '').toString().toLowerCase();
+
             return (
                 fullName.includes(term) ||
-                offer.customer.lastName.toLowerCase().includes(term) ||
-                offer.customer.city.toLowerCase().includes(term) ||
-                (offer.offerNumber || '').toLowerCase().includes(term)
+                lastName.includes(term) ||
+                city.includes(term) ||
+                offerNumber.includes(term)
             );
         });
 
@@ -112,8 +117,8 @@ export const OfferSearchModal: React.FC<OfferSearchModalProps> = ({ isOpen, onCl
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg animate-scale-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
+            <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:rounded-xl shadow-xl overflow-y-auto animate-scale-in flex flex-col md:block max-w-lg">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center">
                     <h2 className="text-lg font-bold text-slate-800">Znajdź klienta z podpisaną umową</h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
@@ -165,7 +170,11 @@ export const OfferSearchModal: React.FC<OfferSearchModalProps> = ({ isOpen, onCl
                                             </div>
                                         )}
                                         <div className="text-xs font-medium text-slate-600 mt-1">
-                                            {offer.product.modelId} • {offer.pricing.finalPriceNet?.toFixed(2) ?? offer.pricing.sellingPriceNet.toFixed(2)} €
+                                            {offer.product.modelId} • {(
+                                                offer.pricing?.finalPriceNet ??
+                                                offer.pricing?.sellingPriceNet ??
+                                                0
+                                            ).toFixed(2)} €
                                         </div>
                                     </div>
                                     <button

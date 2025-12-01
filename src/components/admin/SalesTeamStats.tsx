@@ -170,7 +170,7 @@ export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title 
                         </div>
                     </div>
                     <div className="text-3xl font-bold text-green-600 mb-2">
-                        {(totalStats.value / 1000).toFixed(1)}k PLN
+                        {(totalStats.value / 1000).toFixed(1)}k EUR
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                         <span className="text-slate-500">Conversion:</span>
@@ -190,7 +190,7 @@ export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title 
                         </div>
                     </div>
                     <div className="text-3xl font-bold text-orange-600 mb-2">
-                        {(totalStats.margin / 1000).toFixed(1)}k PLN
+                        {(totalStats.margin / 1000).toFixed(1)}k EUR
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                         <span className="text-slate-500">Średnio:</span>
@@ -313,12 +313,12 @@ export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title 
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm text-slate-300">
-                                            {(stat.totalValue / 1000).toFixed(1)}k PLN
+                                            {(stat.totalValue / 1000).toFixed(1)}k EUR
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm text-accent">
-                                            {(stat.totalMarginValue / 1000).toFixed(1)}k PLN
+                                            {(stat.totalMarginValue / 1000).toFixed(1)}k EUR
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">

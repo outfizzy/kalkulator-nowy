@@ -185,7 +185,7 @@ export async function generateOfferPDF(offer: Offer) {
                     </div>
                     <div class="flex justify-between mb-4 text-sm">
                         <span class="text-slate-500">${translations.vat} (19%):</span>
-                        <span class="font-medium text-slate-900">${formatCurrency(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet)}</span>
+                        <span class="font-medium text-slate-900">${formatCurrency((offer.pricing?.sellingPriceGross ?? 0) - (offer.pricing?.sellingPriceNet ?? 0))}</span>
                     </div>
                     <div class="border-t border-slate-200 pt-4 flex justify-between items-end">
                         <span class="font-bold text-slate-700">${translations.grossPrice}:</span>

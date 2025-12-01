@@ -2,7 +2,21 @@ import jsPDF from 'jspdf';
 import type { Installation } from '../types';
 import { getOfferPhotos } from './offerPhotos';
 
+// Generate installation protocol PDF and download it
 export async function generateInstallationProtocolPDF(installation: Installation): Promise<void> {
+    const doc = await buildProtocolPDF(installation);
+    const fileName = `Protokol_Montazowy_${installation.client.lastName}_${installation.id.substring(0, 8)}.pdf`;
+    doc.save(fileName);
+}
+
+// Generate installation protocol PDF and return as Blob (for uploading to database)
+export async function generateInstallationProtocolPDFAsBlob(installation: Installation): Promise<Blob> {
+    const doc = await buildProtocolPDF(installation);
+    return doc.output('blob');
+}
+
+// Internal helper to build the PDF document
+async function buildProtocolPDF(installation: Installation): Promise<jsPDF> {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -125,9 +139,7 @@ export async function generateInstallationProtocolPDF(installation: Installation
         }
     }
 
-    // Save PDF
-    const fileName = `Protokol_Montazowy_${installation.client.lastName}_${installation.id.substring(0, 8)}.pdf`;
-    doc.save(fileName);
+    return doc;
 }
 
 // Helper: Get status label in Polish
