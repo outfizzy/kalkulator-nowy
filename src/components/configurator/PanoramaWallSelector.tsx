@@ -247,42 +247,103 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({ onAd
                     </div>
                 </div>
 
-                {/* Summary */}
-                <div className="bg-slate-50 rounded-xl p-6 border border-slate-100 h-fit">
-                    <h5 className="font-bold text-slate-800 mb-4">Kalkulacja Kosztów</h5>
-                    <div className="space-y-3 text-sm mb-6">
-                        {breakdown.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-slate-600">
-                                <span>{item.name}</span>
-                                <span className="font-medium">{formatCurrency(item.price)}</span>
+                {/* Visualization & Summary */}
+                <div className="space-y-6">
+                    {/* Visualization */}
+                    <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 flex flex-col">
+                        <h5 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <span className="text-xl">👁️</span> Podgląd konfiguracji
+                        </h5>
+
+                        <div className="flex-1 flex items-center justify-center min-h-[200px] bg-white rounded-xl border border-slate-200 p-8 relative overflow-hidden">
+                            {/* Frame */}
+                            <div
+                                className="relative border-t-4 border-b-4 border-slate-700 bg-slate-50 shadow-inner"
+                                style={{
+                                    width: '100%',
+                                    maxWidth: '500px',
+                                    aspectRatio: `${width / (height || 2500)}`,
+                                    maxHeight: '250px'
+                                }}
+                            >
+                                {/* Panels */}
+                                <div className="absolute inset-0 flex items-end">
+                                    {Array.from({ length: parseInt(numTracks) || 0 }).map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="h-full border-r border-l border-slate-300 relative bg-blue-50/30 backdrop-blur-sm transition-all hover:bg-blue-100/40"
+                                            style={{
+                                                width: `${100 / (parseInt(numTracks) || 1)}%`,
+                                                // Simulate track offset slightly for visual depth
+                                                transform: `translateY(${i % 2 === 0 ? '0' : '-2px'})`,
+                                                zIndex: i
+                                            }}
+                                        >
+                                            {/* Handle/Glass edge detail */}
+                                            <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-slate-400 opacity-30" />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Dimensions Label */}
+                                <div className="absolute -bottom-6 left-0 right-0 text-center text-xs font-mono text-slate-500">
+                                    ↔ {width} mm
+                                </div>
+                                <div className="absolute top-0 bottom-0 -left-6 flex items-center text-xs font-mono text-slate-500 [writing-mode:vertical-lr] rotate-180">
+                                    ↕ {height} mm
+                                </div>
                             </div>
-                        ))}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-4 text-xs text-slate-500">
+                            <div className="bg-white p-2 rounded border border-slate-100 text-center">
+                                <span className="block font-bold text-slate-700">{numTracks}</span>
+                                Tory / Panele
+                            </div>
+                            <div className="bg-white p-2 rounded border border-slate-100 text-center">
+                                <span className="block font-bold text-slate-700">{Math.round(width / (parseInt(numTracks) || 1))} mm</span>
+                                Szer. panelu
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-200 flex justify-between items-end mb-6">
-                        <span className="font-bold text-slate-700">Razem Netto:</span>
-                        <span className="text-2xl font-bold text-accent">{formatCurrency(totalPrice)}</span>
-                    </div>
+                    {/* Summary */}
+                    <div className="bg-slate-50 rounded-xl p-6 border border-slate-100 h-fit">
+                        <h5 className="font-bold text-slate-800 mb-4">Kalkulacja Kosztów</h5>
+                        <div className="space-y-3 text-sm mb-6">
+                            {breakdown.map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-slate-600">
+                                    <span>{item.name}</span>
+                                    <span className="font-medium">{formatCurrency(item.price)}</span>
+                                </div>
+                            ))}
+                        </div>
 
-                    <button
-                        onClick={handleAdd}
-                        disabled={validTrackOptions.length === 0}
-                        className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all ${validTrackOptions.length === 0
-                            ? 'bg-slate-300 cursor-not-allowed'
-                            : 'bg-accent hover:bg-accent/90 shadow-accent/20 hover:scale-[1.02]'
-                            }`}
-                    >
-                        {existing ? 'Zaktualizuj Konfigurację' : 'Dodaj do Oferty'}
-                    </button>
+                        <div className="pt-4 border-t border-slate-200 flex justify-between items-end mb-6">
+                            <span className="font-bold text-slate-700">Razem Netto:</span>
+                            <span className="text-2xl font-bold text-accent">{formatCurrency(totalPrice)}</span>
+                        </div>
 
-                    {existing && (
                         <button
-                            onClick={() => onRemove(existing.id)}
-                            className="w-full mt-3 py-2 text-red-500 font-medium hover:bg-red-50 rounded-lg transition-colors"
+                            onClick={handleAdd}
+                            disabled={validTrackOptions.length === 0}
+                            className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all ${validTrackOptions.length === 0
+                                ? 'bg-slate-300 cursor-not-allowed'
+                                : 'bg-accent hover:bg-accent/90 shadow-accent/20 hover:scale-[1.02]'
+                                }`}
                         >
-                            Usuń z oferty
+                            {existing ? 'Zaktualizuj Konfigurację' : 'Dodaj do Oferty'}
                         </button>
-                    )}
+
+                        {existing && (
+                            <button
+                                onClick={() => onRemove(existing.id)}
+                                className="w-full mt-3 py-2 text-red-500 font-medium hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                                Usuń z oferty
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
