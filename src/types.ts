@@ -348,3 +348,30 @@ export interface Measurement {
     locationLng?: number;
     distanceFromPrevious?: number; // in kilometers
 }
+
+// --- Virtual Wallet Types ---
+
+export interface WalletTransaction {
+    id: string;
+    type: 'income' | 'expense';
+    amount: number;
+    category: string;
+    description?: string;
+    date: string; // ISO Date string
+
+    // Income specific
+    customerId?: string; // ID of the offer/customer
+    customerName?: string;
+    contractNumber?: string;
+
+    processedBy: string; // User ID
+    createdAt: Date;
+}
+
+export interface WalletStats {
+    currentBalance: number;
+    totalIncome: number;
+    totalExpense: number;
+    monthlyIncome: number;
+    monthlyExpense: number;
+}

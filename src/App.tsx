@@ -26,6 +26,8 @@ import { ReportForm } from './components/reports/ReportForm';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
+import { InstallerInstallationsPage } from './components/installations/InstallerInstallationsPage';
+import { WalletPage } from './components/admin/WalletPage';
 import { InstallationCalendar } from './components/installations/InstallationCalendar';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
 import { ContractsList } from './components/contracts/ContractsList';
@@ -325,6 +327,7 @@ function App() {
               <Route path="/admin/partner-offers" element={<PartnerOffersPage />} />
               <Route path="/admin/installers" element={<InstallerManagementPanel />} />
               <Route path="/admin/teams" element={<TeamManagementPanel />} />
+              <Route path="/admin/wallet" element={<WalletPage />} />
               <Route path="/reports" element={<ReportsList />} />
               <Route path="/reports/new" element={<ReportForm />} />
               <Route path="/measurements" element={<MeasurementDashboard />} />

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement } from '../types';
+import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats } from '../types';
 import type { AuthError } from '@supabase/supabase-js';
 
 interface InstallationData {
@@ -810,6 +810,8 @@ export const DatabaseService = {
             .eq('user_id', userId);
 
         if (assignError) throw assignError;
+
+        // If no assignments, return 0
         if (!assignments || assignments.length === 0) return { completedCount: 0 };
 
         const ids = assignments.map((a: { installation_id: string }) => a.installation_id);
@@ -1836,6 +1838,120 @@ export const DatabaseService = {
             .eq('id', id);
 
         if (error) throw error;
-    }
+    },
 
+    // --- Virtual Wallet ---
+
+    async getWalletTransactions(filters?: { type?: 'income' | 'expense'; startDate?: Date; endDate?: Date }): Promise<WalletTransaction[]> {
+        let query = supabase
+            .from('wallet_transactions')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (filters?.type) {
+            query = query.eq('type', filters.type);
+        }
+
+        if (filters?.startDate) {
+            query = query.gte('date', filters.startDate.toISOString());
+        }
+
+        if (filters?.endDate) {
+            query = query.lte('date', filters.endDate.toISOString());
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            type: row.type,
+            amount: Number(row.amount),
+            category: row.category,
+            description: row.description,
+            date: row.date,
+            customerId: row.customer_id,
+            customerName: row.customer_name,
+            contractNumber: row.contract_number,
+            processedBy: row.processed_by,
+            createdAt: new Date(row.created_at)
+        }));
+    },
+
+    async createWalletTransaction(transaction: Omit<WalletTransaction, 'id' | 'createdAt' | 'processedBy'>): Promise<WalletTransaction> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('wallet_transactions')
+            .insert({
+                type: transaction.type,
+                amount: transaction.amount,
+                category: transaction.category,
+                description: transaction.description,
+                date: transaction.date,
+                customer_id: transaction.customerId,
+                customer_name: transaction.customerName,
+                contract_number: transaction.contractNumber,
+                processed_by: user.id
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            type: data.type,
+            amount: Number(data.amount),
+            category: data.category,
+            description: data.description,
+            date: data.date,
+            customerId: data.customer_id,
+            customerName: data.customer_name,
+            contractNumber: data.contract_number,
+            processedBy: data.processed_by,
+            createdAt: new Date(data.created_at)
+        };
+    },
+
+    async getWalletStats(): Promise<WalletStats> {
+        const { data, error } = await supabase
+            .from('wallet_transactions')
+            .select('type, amount, date');
+
+        if (error) throw error;
+
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        let totalIncome = 0;
+        let totalExpense = 0;
+        let monthlyIncome = 0;
+        let monthlyExpense = 0;
+
+        data.forEach(t => {
+            const amount = Number(t.amount);
+            const date = new Date(t.date);
+            const isCurrentMonth = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+
+            if (t.type === 'income') {
+                totalIncome += amount;
+                if (isCurrentMonth) monthlyIncome += amount;
+            } else {
+                totalExpense += amount;
+                if (isCurrentMonth) monthlyExpense += amount;
+            }
+        });
+
+        return {
+            currentBalance: totalIncome - totalExpense,
+            totalIncome,
+            totalExpense,
+            monthlyIncome,
+            monthlyExpense
+        };
+    }
 };
