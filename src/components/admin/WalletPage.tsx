@@ -3,6 +3,9 @@ import { DatabaseService } from '../../services/database';
 import type { WalletTransaction, WalletStats } from '../../types';
 import { AddTransactionModal } from './AddTransactionModal';
 import { ExchangeRateModal } from './ExchangeRateModal';
+import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subMonths } from 'date-fns';
+
+type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'custom';
 
 export const WalletPage: React.FC = () => {
     const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -11,6 +14,12 @@ export const WalletPage: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [modalType, setModalType] = useState<'income' | 'expense'>('income');
     const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+
+    // Date filtering
+    const [datePreset, setDatePreset] = useState<DateRangePreset>('thisMonth');
+    const [customStartDate, setCustomStartDate] = useState<string>('');
+    const [customEndDate, setCustomEndDate] = useState<string>('');
+    const [allTransactions, setAllTransactions] = useState<WalletTransaction[]>([]);
 
     // Exchange Modal State
     const [showExchangeModal, setShowExchangeModal] = useState(false);
@@ -24,11 +33,9 @@ export const WalletPage: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [txs, statsData] = await Promise.all([
-                DatabaseService.getWalletTransactions(),
-                DatabaseService.getWalletStats()
-            ]);
-            setTransactions(txs);
+            const txs = await DatabaseService.getWalletTransactions();
+            setAllTransactions(txs);
+            const statsData = await DatabaseService.getWalletStats();
             setStats(statsData);
         } catch (error) {
             console.error('Error loading wallet data:', error);
@@ -36,6 +43,39 @@ export const WalletPage: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // Apply date filtering
+    useEffect(() => {
+        const now = new Date();
+        let start: Date, end: Date;
+
+        switch (datePreset) {
+            case 'thisMonth':
+                start = startOfMonth(now);
+                end = endOfMonth(now);
+                break;
+            case 'lastMonth': {
+                const lastMonth = subMonths(now, 1);
+                start = startOfMonth(lastMonth);
+                end = endOfMonth(lastMonth);
+                break;
+            }
+            case 'thisQuarter':
+                start = startOfQuarter(now);
+                end = endOfQuarter(now);
+                break;
+            case 'custom':
+                start = customStartDate ? new Date(customStartDate) : startOfMonth(now);
+                end = customEndDate ? new Date(customEndDate) : endOfMonth(now);
+                break;
+        }
+
+        const filtered = allTransactions.filter(tx => {
+            const txDate = new Date(tx.date);
+            return txDate >= start && txDate <= end;
+        });
+        setTransactions(filtered);
+    }, [allTransactions, datePreset, customStartDate, customEndDate]);
 
     const handleExchange = async (rate: number) => {
         if (!exchangeTransactionId) return;
@@ -148,6 +188,71 @@ export const WalletPage: React.FC = () => {
                         </h3>
                     </div>
                 </div>
+            </div>
+
+            {/* Date Range Selector */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Zakres Dat</h3>
+                <div className="flex flex-wrap gap-3 mb-4">
+                    <button
+                        onClick={() => setDatePreset('thisMonth')}
+                        className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'thisMonth'
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                    >
+                        Ten Miesiąc
+                    </button>
+                    <button
+                        onClick={() => setDatePreset('lastMonth')}
+                        className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'lastMonth'
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                    >
+                        Poprzedni Miesiąc
+                    </button>
+                    <button
+                        onClick={() => setDatePreset('thisQuarter')}
+                        className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'thisQuarter'
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                    >
+                        Ten Kwartał
+                    </button>
+                    <button
+                        onClick={() => setDatePreset('custom')}
+                        className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'custom'
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                    >
+                        Własny Zakres
+                    </button>
+                </div>
+                {datePreset === 'custom' && (
+                    <div className="flex gap-4">
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-slate-600 mb-2">Od</label>
+                            <input
+                                type="date"
+                                value={customStartDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-slate-600 mb-2">Do</label>
+                            <input
+                                type="date"
+                                value={customEndDate}
+                                onChange={(e) => setCustomEndDate(e.target.value)}
+                                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Transactions List */}
