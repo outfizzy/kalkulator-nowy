@@ -3,6 +3,7 @@ import { DatabaseService } from '../../services/database';
 import type { WalletTransaction, WalletStats } from '../../types';
 import { AddTransactionModal } from './AddTransactionModal';
 import { ExchangeRateModal } from './ExchangeRateModal';
+import { DeleteTransactionModal } from './DeleteTransactionModal';
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subMonths } from 'date-fns';
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'custom';
@@ -25,6 +26,14 @@ export const WalletPage: React.FC = () => {
     const [showExchangeModal, setShowExchangeModal] = useState(false);
     const [exchangeTransactionId, setExchangeTransactionId] = useState<string | null>(null);
     const [exchangeAmount, setExchangeAmount] = useState<number>(0);
+
+    // Delete Modal State
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteTransaction, setDeleteTransaction] = useState<WalletTransaction | null>(null);
+
+    // TODO: Implement deleted transactions view in next iteration
+    // const [showDeleted, setShowDeleted] = useState(false);
+    // const [deletedTransactions, setDeletedTransactions] = useState<DeletedWalletTransaction[]>([]);
 
     useEffect(() => {
         loadData();
@@ -95,6 +104,35 @@ export const WalletPage: React.FC = () => {
         setExchangeAmount(transaction.amount);
         setShowExchangeModal(true);
     };
+
+    const handleDelete = async (reason: string) => {
+        if (!deleteTransaction) return;
+        await DatabaseService.deleteWalletTransaction(deleteTransaction.id, reason);
+        await loadData(); // Reload data
+        setDeleteTransaction(null);
+        setShowDeleteModal(false);
+    };
+
+    const openDeleteModal = (transaction: WalletTransaction) => {
+        setDeleteTransaction(transaction);
+        setShowDeleteModal(true);
+    };
+
+    // TODO: Implement deleted transactions loading in next iteration
+    // const loadDeletedTransactions = async () => {
+    //     try {
+    //         const deleted = await DatabaseService.getDeletedWalletTransactions();
+    //         setDeletedTransactions(deleted);
+    //     } catch (error) {
+    //         console.error('Error loading deleted transactions:', error);
+    //     }
+    // };
+
+    // useEffect(() => {
+    //     if (showDeleted) {
+    //         loadDeletedTransactions();
+    //     }
+    // }, [showDeleted]);
 
     const filteredTransactions = transactions.filter(t => {
         if (filterType === 'all') return true;
@@ -197,8 +235,8 @@ export const WalletPage: React.FC = () => {
                     <button
                         onClick={() => setDatePreset('thisMonth')}
                         className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'thisMonth'
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                     >
                         Ten Miesiąc
@@ -206,8 +244,8 @@ export const WalletPage: React.FC = () => {
                     <button
                         onClick={() => setDatePreset('lastMonth')}
                         className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'lastMonth'
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                     >
                         Poprzedni Miesiąc
@@ -215,8 +253,8 @@ export const WalletPage: React.FC = () => {
                     <button
                         onClick={() => setDatePreset('thisQuarter')}
                         className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'thisQuarter'
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                     >
                         Ten Kwartał
@@ -224,8 +262,8 @@ export const WalletPage: React.FC = () => {
                     <button
                         onClick={() => setDatePreset('custom')}
                         className={`px-4 py-2 rounded-xl font-medium transition-all ${datePreset === 'custom'
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                     >
                         Własny Zakres
@@ -364,6 +402,17 @@ export const WalletPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={() => openDeleteModal(tx)}
+                                                className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                                                title="Usuń transakcję"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))
                             )}
@@ -384,6 +433,13 @@ export const WalletPage: React.FC = () => {
                 onClose={() => setShowExchangeModal(false)}
                 onExchange={handleExchange}
                 currentAmount={exchangeAmount}
+            />
+
+            <DeleteTransactionModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onDelete={handleDelete}
+                transaction={deleteTransaction}
             />
         </div>
     );

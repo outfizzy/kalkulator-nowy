@@ -2018,5 +2018,91 @@ export const DatabaseService = {
             originalCurrency: data.original_currency,
             originalAmount: data.original_amount ? Number(data.original_amount) : undefined
         };
+    },
+
+    async deleteWalletTransaction(transactionId: string, reason: string): Promise<void> {
+        // First, get the transaction to delete
+        const { data: transaction, error: fetchError } = await supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('id', transactionId)
+            .single();
+
+        if (fetchError) throw fetchError;
+        if (!transaction) throw new Error('Transaction not found');
+
+        // Get current user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Insert into deleted_wallet_transactions
+        const { error: insertError } = await supabase
+            .from('deleted_wallet_transactions')
+            .insert({
+                original_transaction_id: transaction.id,
+                type: transaction.type,
+                amount: transaction.amount,
+                currency: transaction.currency,
+                category: transaction.category,
+                description: transaction.description,
+                date: transaction.date,
+                customer_id: transaction.customer_id,
+                customer_name: transaction.customer_name,
+                contract_number: transaction.contract_number,
+                exchange_rate: transaction.exchange_rate,
+                original_currency: transaction.original_currency,
+                original_amount: transaction.original_amount,
+                deletion_reason: reason,
+                deleted_by: user.id,
+                processed_by: transaction.processed_by,
+                created_at: transaction.created_at
+            });
+
+        if (insertError) throw insertError;
+
+        // Delete from wallet_transactions
+        const { error: deleteError } = await supabase
+            .from('wallet_transactions')
+            .delete()
+            .eq('id', transactionId);
+
+        if (deleteError) throw deleteError;
+    },
+
+    async getDeletedWalletTransactions(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('deleted_wallet_transactions')
+            .select(`
+                *,
+                deleted_by_profile:profiles!deleted_by(full_name),
+                processed_by_profile:profiles!processed_by(full_name)
+            `)
+            .order('deleted_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data?.map(tx => ({
+            id: tx.id,
+            originalTransactionId: tx.original_transaction_id,
+            type: tx.type,
+            amount: Number(tx.amount),
+            currency: tx.currency,
+            category: tx.category,
+            description: tx.description,
+            date: tx.date,
+            customerId: tx.customer_id,
+            customerName: tx.customer_name,
+            contractNumber: tx.contract_number,
+            exchangeRate: tx.exchange_rate,
+            originalCurrency: tx.original_currency,
+            originalAmount: tx.original_amount ? Number(tx.original_amount) : undefined,
+            processedBy: tx.processed_by,
+            createdAt: new Date(tx.created_at),
+            deletionReason: tx.deletion_reason,
+            deletedBy: tx.deleted_by,
+            deletedAt: new Date(tx.deleted_at),
+            deletedByName: tx.deleted_by_profile?.full_name,
+            processedByName: tx.processed_by_profile?.full_name
+        })) || [];
     }
 };

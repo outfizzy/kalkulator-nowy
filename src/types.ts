@@ -385,3 +385,11 @@ export interface WalletStats {
     pln: CurrencyStats;
     eur: CurrencyStats;
 }
+
+export interface DeletedWalletTransaction extends WalletTransaction {
+    originalTransactionId: string;
+    deletionReason: string;
+    deletedBy: string;
+    deletedAt: Date;
+}
+
