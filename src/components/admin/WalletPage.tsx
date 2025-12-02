@@ -3,7 +3,6 @@ import { DatabaseService } from '../../services/database';
 import type { WalletTransaction, WalletStats } from '../../types';
 import { AddTransactionModal } from './AddTransactionModal';
 import { ExchangeRateModal } from './ExchangeRateModal';
-import { toast } from 'react-hot-toast';
 
 export const WalletPage: React.FC = () => {
     const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
