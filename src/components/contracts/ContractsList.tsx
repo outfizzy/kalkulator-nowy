@@ -105,7 +105,7 @@ export const ContractsList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Data Utworzenia</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Wartość Netto</th>
-                                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Prowizja (5%)</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Prowizja</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Akcje</th>
                                 </tr>
                             </thead>

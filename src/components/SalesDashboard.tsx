@@ -170,7 +170,7 @@ export const SalesDashboard: React.FC = () => {
             </div>
 
             {/* Quick Action Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                 <Link
                     to="/new-offer"
                     className="group bg-gradient-to-br from-accent to-orange-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
@@ -221,6 +221,38 @@ export const SalesDashboard: React.FC = () => {
                         </div>
                         <h3 className="text-xl font-bold text-slate-900 mb-2">Raporty</h3>
                         <p className="text-slate-600 text-sm">Dodawaj i przeglądaj raporty</p>
+                    </div>
+                </Link>
+
+                <Link
+                    to="/measurements"
+                    className="group bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Kalendarz Pomiarowy</h3>
+                        <p className="text-white/80 text-sm">Planuj pomiary dla klientów</p>
+                    </div>
+                </Link>
+
+                <Link
+                    to="/installations"
+                    className="group bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Kalendarz Montażowy</h3>
+                        <p className="text-white/80 text-sm">Zobacz harmonogram montaży</p>
                     </div>
                 </Link>
             </div>

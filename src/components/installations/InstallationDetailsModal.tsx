@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { getTeams } from '../../utils/storage';
 import { geocodeAddress } from '../../utils/geocoding';
 import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
@@ -39,24 +38,26 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
 
     useEffect(() => {
         if (isOpen) {
-            setTeams(getTeams());
+            void (async () => {
+                try {
+                    const [dbTeams, assignedIds, allInstallers] = await Promise.all([
+                        DatabaseService.getTeams(),
+                        DatabaseService.getAssignmentsForInstallation(installation.id),
+                        DatabaseService.getInstallers()
+                    ]);
+                    setTeams(dbTeams);
+                    setAssignedInstallerIds(assignedIds);
+                    setInstallers(allInstallers);
+                } catch (error) {
+                    console.error('Error loading teams/assignments/installers:', error);
+                }
+            })();
+
             setFormData({
                 ...installation,
                 client: { ...installation.client }
             });
             setPhotos(getOfferPhotos(installation.offerId));
-
-            // Load assignments for the specific installation when modal opens
-            void (async () => {
-                try {
-                    const assignedIds = await DatabaseService.getAssignmentsForInstallation(installation.id);
-                    setAssignedInstallerIds(assignedIds);
-                    const allInstallers = await DatabaseService.getInstallers();
-                    setInstallers(allInstallers);
-                } catch (error) {
-                    console.error('Error loading assignments:', error);
-                }
-            })();
         }
     }, [isOpen, installation]);
 

@@ -101,13 +101,13 @@ export const PartnerOffersList: React.FC = () => {
     const stats = {
         totalOffers: filteredOffers.length,
         totalRevenue: filteredOffers.reduce((sum, offer) => {
-            const pricing = offer.pricing || ({} as any);
-            return sum + (typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0);
+            const pricing = offer.pricing;
+            return sum + (pricing && typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0);
         }, 0),
         avgMargin: filteredOffers.length > 0
             ? (filteredOffers.reduce((sum, offer) => {
-                const pricing = offer.pricing || ({} as any);
-                return sum + (typeof pricing.marginPercentage === 'number' ? pricing.marginPercentage : 0);
+                const pricing = offer.pricing;
+                return sum + (pricing && typeof pricing.marginPercentage === 'number' ? pricing.marginPercentage : 0);
             }, 0) / filteredOffers.length)
             : 0,
         pendingCount: filteredOffers.filter(offer => offer.status === 'draft').length
@@ -230,8 +230,54 @@ export const PartnerOffersList: React.FC = () => {
                 </div>
             </div>
 
-            {/* Offers Table */}
-            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
+            {/* Mobile/Tablet Card View */}
+            <div className="lg:hidden space-y-4">
+                {filteredOffers.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">
+                        {searchQuery || statusFilter !== 'all'
+                            ? 'Brak ofert spełniających kryteria wyszukiwania'
+                            : 'Brak ofert od partnerów'}
+                    </div>
+                ) : (
+                    filteredOffers.map((offer) => (
+                        <div key={offer.id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <div className="font-bold text-slate-900">{offer.offerNumber}</div>
+                                    <div className="text-xs text-slate-500">{formatDate(offer.createdAt)}</div>
+                                </div>
+                                <div>{getStatusBadge(offer.status)}</div>
+                            </div>
+                            <div className="mb-3">
+                                <div className="text-sm font-medium text-slate-800">{offer.companyName || '-'}</div>
+                                <div className="text-xs text-slate-500">{offer.customer.firstName} {offer.customer.lastName}</div>
+                            </div>
+                            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <div>
+                                    <div className="text-xs text-slate-500">Wartość netto</div>
+                                    <div className="font-bold text-emerald-600">{formatCurrency(offer.pricing.sellingPriceNet)}</div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="p-2 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+                                    <button className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-slate-900">

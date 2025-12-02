@@ -1,8 +1,24 @@
 import { supabase } from '../lib/supabase';
-import type { Offer, MeasurementReport, Installation, Contract, User } from '../types';
+import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement } from '../types';
+import type { AuthError } from '@supabase/supabase-js';
+
+interface InstallationData {
+    client?: Installation['client'];
+    productSummary?: string;
+    teamId?: string;
+    notes?: string;
+    acceptance?: Installation['acceptance'];
+    // Legacy flat fields that might exist in old data
+    firstName?: string;
+    lastName?: string;
+    city?: string;
+    address?: string;
+    phone?: string;
+    coordinates?: { lat: number; lng: number };
+}
 
 // Normalize pricing object to avoid undefined values in UI (e.g. toLocaleString on undefined)
-const normalizePricing = (pricing: any): any => {
+const normalizePricing = (pricing: Partial<PricingResult> | null | undefined): PricingResult => {
     const p = pricing || {};
     return {
         ...p,
@@ -46,6 +62,30 @@ export const DatabaseService = {
         const { data, error } = await supabase
             .from('offers')
             .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            offerNumber: row.offer_number,
+            customer: row.customer_data,
+            product: row.product_config,
+            pricing: normalizePricing(row.pricing),
+            status: row.status as Offer['status'],
+            snowZone: row.snow_zone,
+            commission: row.commission,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            createdBy: row.user_id
+        }));
+    },
+
+    async getOffersForMeasurement(): Promise<Offer[]> {
+        const { data, error } = await supabase
+            .from('offers')
+            .select('*')
+            .in('status', ['draft', 'sent'])
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -160,9 +200,9 @@ export const DatabaseService = {
 
     // --- Customers ---
     // Replaced getCustomers with getUniqueCustomers to match storage.ts behavior
-    async getUniqueCustomers(): Promise<{ customer: any; lastOfferDate: Date; offerCount: number }[]> {
-        const normalizeCustomer = (raw: any = {}) => ({
-            salutation: ['Herr', 'Frau', 'Firma'].includes(raw.salutation) ? raw.salutation : 'Herr',
+    async getUniqueCustomers(): Promise<{ customer: Customer; lastOfferDate: Date; offerCount: number }[]> {
+        const normalizeCustomer = (raw: Record<string, unknown> = {}): Customer => ({
+            salutation: (['Herr', 'Frau', 'Firma'].includes(raw.salutation as string) ? raw.salutation : 'Herr') as Customer['salutation'],
             firstName: (raw.firstName || '').toString(),
             lastName: (raw.lastName || '').toString(),
             street: (raw.street || '').toString(),
@@ -181,7 +221,7 @@ export const DatabaseService = {
 
         if (error) throw error;
 
-        const customerMap = new Map<string, { customer: any; lastOfferDate: Date; offerCount: number }>();
+        const customerMap = new Map<string, { customer: Customer; lastOfferDate: Date; offerCount: number }>();
 
         (data || []).forEach(row => {
             const customer = normalizeCustomer(row.customer_data);
@@ -237,7 +277,7 @@ export const DatabaseService = {
             pricing: row.contract_data.pricing,
             commission: row.contract_data.commission,
             requirements: row.contract_data.requirements,
-            comments: row.contract_data.comments?.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: row.contract_data.attachments || [],
             createdAt: new Date(row.created_at),
             signedAt: row.signed_at ? new Date(row.signed_at) : undefined
@@ -352,8 +392,8 @@ export const DatabaseService = {
         if (error) throw error;
 
         return (data || []).map(row => {
-            const installationData = (row as any).installation_data || {};
-            const clientData = installationData.client || {};
+            const installationData = (row as { installation_data: Partial<InstallationData> }).installation_data || {};
+            const clientData: Partial<Installation['client']> = installationData.client || {};
 
             const client = {
                 firstName: clientData.firstName || '',
@@ -364,7 +404,7 @@ export const DatabaseService = {
                 coordinates: clientData.coordinates
             };
 
-            const scheduledRaw = (row as any).scheduled_date as string | null;
+            const scheduledRaw = (row as { scheduled_date: string | null }).scheduled_date;
             const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
 
             return {
@@ -374,7 +414,7 @@ export const DatabaseService = {
                 productSummary: installationData.productSummary || '',
                 status: row.status as Installation['status'],
                 scheduledDate,
-                teamId: installationData.teamId || (row as any).team_id,
+                teamId: installationData.teamId || (row as { team_id?: string }).team_id,
                 notes: installationData.notes,
                 acceptance: installationData.acceptance,
                 createdAt: new Date(row.created_at)
@@ -415,17 +455,39 @@ export const DatabaseService = {
     },
 
     async updateInstallation(id: string, updates: Partial<Installation>): Promise<void> {
+        // First fetch current data to ensure we don't lose fields in JSONB
+        const { data: current, error: fetchError } = await supabase
+            .from('installations')
+            .select('installation_data')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const currentData = (current?.installation_data as Partial<InstallationData>) || {};
+
         const dbUpdates: Record<string, unknown> = {};
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
 
-        if (updates.client || updates.productSummary || updates.teamId || updates.notes) {
+        // Merge installation_data
+        if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance) {
             const installationData = {
-                client: updates.client,
-                productSummary: updates.productSummary,
-                teamId: updates.teamId,
-                notes: updates.notes
+                ...currentData, // Keep existing fields
+                ...(updates.client && { client: updates.client }),
+                ...(updates.productSummary && { productSummary: updates.productSummary }),
+                ...(updates.teamId !== undefined && { teamId: updates.teamId }), // Allow setting to null/undefined if passed explicitly?
+                // Actually updates.teamId can be undefined if we want to clear it? 
+                // But Partial<Installation> makes everything optional.
+                // If we want to clear it, we might need to pass null.
+                // For now, let's assume if it's in updates, we update it.
+                ...(updates.notes && { notes: updates.notes }),
+                ...(updates.acceptance && { acceptance: updates.acceptance })
             };
+
+            // specific check for teamId clearing if needed, but usually we just overwrite.
+            if (updates.teamId) installationData.teamId = updates.teamId;
+
             dbUpdates.installation_data = installationData;
         }
 
@@ -459,7 +521,8 @@ export const DatabaseService = {
             status: row.status as 'pending' | 'active' | 'blocked',
             companyName: row.company_name || undefined,
             nip: row.nip || undefined,
-            partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined
+            partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined,
+            commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined
         }));
     },
 
@@ -485,7 +548,8 @@ export const DatabaseService = {
             status: data.status as 'pending' | 'active' | 'blocked',
             companyName: data.company_name || undefined,
             nip: data.nip || undefined,
-            partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined
+            partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined,
+            commissionRate: typeof data.commission_rate === 'number' ? data.commission_rate : undefined
         };
     },
     async updateUserProfile(profile: Partial<User>): Promise<void> {
@@ -542,7 +606,8 @@ export const DatabaseService = {
             status: row.status as 'pending' | 'active' | 'blocked',
             companyName: row.company_name || undefined,
             nip: row.nip || undefined,
-            partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined
+            partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined,
+            commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined
         }));
     },
 
@@ -573,7 +638,21 @@ export const DatabaseService = {
         if (error) throw error;
     },
 
-    async verifyCurrentPassword(email: string, password: string): Promise<{ error: any }> {
+    async updateCommissionRate(userId: string, rate: number): Promise<void> {
+        // Validate rate is between 0 and 1
+        if (rate < 0 || rate > 1) {
+            throw new Error('Commission rate must be between 0 and 1 (0% to 100%)');
+        }
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ commission_rate: rate, updated_at: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
+    async verifyCurrentPassword(email: string, password: string): Promise<{ error: AuthError | null }> {
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password
@@ -626,7 +705,7 @@ export const DatabaseService = {
         if (assignError) throw assignError;
         if (!assignments || assignments.length === 0) return [];
 
-        const ids = assignments.map((a: any) => a.installation_id);
+        const ids = assignments.map((a: { installation_id: string }) => a.installation_id);
 
         const { data, error } = await supabase
             .from('installations')
@@ -636,8 +715,8 @@ export const DatabaseService = {
         if (error) throw error;
 
         return (data || []).map(row => {
-            const installationData = (row as any).installation_data || {};
-            const clientData = installationData.client || {};
+            const installationData = (row as { installation_data: Partial<InstallationData> }).installation_data || {};
+            const clientData: Partial<Installation['client']> = installationData.client || {};
 
             const client = {
                 firstName: clientData.firstName || '',
@@ -648,7 +727,7 @@ export const DatabaseService = {
                 coordinates: clientData.coordinates
             };
 
-            const scheduledRaw = (row as any).scheduled_date as string | null;
+            const scheduledRaw = (row as { scheduled_date: string | null }).scheduled_date;
             const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
 
             return {
@@ -692,10 +771,10 @@ export const DatabaseService = {
 
         if (error) throw error;
 
-        return (data || []).map(row => (row as any).user_id as string);
+        return (data || []).map(row => (row as { user_id: string }).user_id);
     },
 
-    async saveInstallationAcceptance(installationId: string, acceptance: any): Promise<void> {
+    async saveInstallationAcceptance(installationId: string, acceptance: Installation['acceptance']): Promise<void> {
         // Merge acceptance into existing installation_data and mark as completed
         const { data, error: fetchError } = await supabase
             .from('installations')
@@ -705,7 +784,7 @@ export const DatabaseService = {
 
         if (fetchError) throw fetchError;
 
-        const existing = (data?.installation_data as any) || {};
+        const existing = (data?.installation_data as Partial<InstallationData>) || {};
         const merged = {
             ...existing,
             acceptance
@@ -733,7 +812,7 @@ export const DatabaseService = {
         if (assignError) throw assignError;
         if (!assignments || assignments.length === 0) return { completedCount: 0 };
 
-        const ids = assignments.map((a: any) => a.installation_id);
+        const ids = assignments.map((a: { installation_id: string }) => a.installation_id);
 
         // Count how many of these are completed
         const { count, error } = await supabase
@@ -777,7 +856,7 @@ export const DatabaseService = {
         const userMap = new Map(users.map(u => [u.id, u]));
 
         // Aggregate stats per user
-        const statsMap = new Map<string, any>();
+        const statsMap = new Map<string, SalesRepStat>();
 
         // Process offers
         offers.forEach(offer => {
@@ -794,20 +873,37 @@ export const DatabaseService = {
                     totalMarginValue: 0,
                     totalDistance: 0,
                     avgMarginPercent: 0,
-                    marginSum: 0
-                });
+                    conversionRate: 0,
+                    lastActivityDate: undefined,
+                    pendingOffersCount: 0
+                } as SalesRepStat & { marginSum: number });
             }
 
             const stats = statsMap.get(userId);
-            stats.totalOffers++;
-            if (offer.status === 'sold') {
-                stats.soldOffers++;
-                stats.totalValue += offer.pricing.sellingPriceNet || 0;
-                stats.totalMarginValue += offer.pricing.marginValue || 0;
-            }
+            if (stats) {
+                stats.totalOffers++;
 
-            const margin = offer.pricing.marginPercentage || 0;
-            stats.marginSum += margin;
+                // Track last activity
+                const offerDate = new Date(offer.created_at);
+                if (!stats.lastActivityDate || offerDate > stats.lastActivityDate) {
+                    stats.lastActivityDate = offerDate;
+                }
+
+                // Track pending offers
+                if (offer.status === 'draft') {
+                    stats.pendingOffersCount = (stats.pendingOffersCount || 0) + 1;
+                }
+
+                if (offer.status === 'sold') {
+                    stats.soldOffers++;
+                    stats.totalValue += offer.pricing.sellingPriceNet || 0;
+                    stats.totalMarginValue += offer.pricing.marginValue || 0;
+                }
+
+                const margin = offer.pricing.marginPercentage || 0;
+                const marginSum = (stats as { marginSum?: number }).marginSum || 0;
+                (stats as { marginSum?: number }).marginSum = marginSum + margin;
+            }
         });
 
         // Process reports for mileage
@@ -834,20 +930,38 @@ export const DatabaseService = {
                     totalMarginValue: 0,
                     totalDistance: 0,
                     avgMarginPercent: 0,
-                    marginSum: 0
-                });
+                    conversionRate: 0,
+                    lastActivityDate: undefined,
+                    pendingOffersCount: 0
+                } as SalesRepStat & { marginSum: number });
             }
 
             const stats = statsMap.get(userId);
-            stats.totalDistance += reportData.totalKm || 0;
+            if (stats) {
+                // Track last activity from reports too
+                const reportDate = new Date(reportData.date);
+                if (!stats.lastActivityDate || reportDate > stats.lastActivityDate) {
+                    stats.lastActivityDate = reportDate;
+                }
+                stats.totalDistance += reportData.totalKm || 0;
+            }
         });
 
-        // Finalize averages
-        return Array.from(statsMap.values()).map(stats => ({
-            ...stats,
-            avgMarginPercent: stats.totalOffers > 0 ? stats.marginSum / stats.totalOffers : 0,
-            conversionRate: stats.totalOffers > 0 ? (stats.soldOffers / stats.totalOffers) * 100 : 0
-        }));
+        return Array.from(statsMap.values()).map(stats => {
+            const marginSum = (stats as { marginSum?: number }).marginSum || 0;
+            return {
+                userId: stats.userId,
+                userName: stats.userName,
+                role: stats.role,
+                totalOffers: stats.totalOffers,
+                soldOffers: stats.soldOffers,
+                totalValue: stats.totalValue,
+                totalMarginValue: stats.totalMarginValue,
+                totalDistance: stats.totalDistance,
+                avgMarginPercent: stats.totalOffers > 0 ? marginSum / stats.totalOffers : 0,
+                conversionRate: stats.totalOffers > 0 ? (stats.soldOffers / stats.totalOffers) * 100 : 0
+            };
+        });
     },
 
     // --- Reports ---
@@ -1142,8 +1256,8 @@ export const DatabaseService = {
         // Build stats for each installer
         const stats = await Promise.all(installers.map(async (installer) => {
             // Get assignments for this installer
-            const assignments = (allAssignments || []).filter((a: any) => a.user_id === installer.id);
-            const assignedInstallationIds = assignments.map((a: any) => a.installation_id);
+            const assignments = (allAssignments || []).filter((a: { user_id: string }) => a.user_id === installer.id);
+            const assignedInstallationIds = assignments.map((a: { installation_id: string }) => a.installation_id);
 
             // Filter installations for this installer
             const installerInstallations = allInstallations.filter(inst =>
@@ -1196,7 +1310,7 @@ export const DatabaseService = {
             pricing: data.contract_data.pricing,
             commission: data.contract_data.commission,
             requirements: data.contract_data.requirements,
-            comments: data.contract_data.comments?.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            comments: data.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: data.contract_data.attachments || [],
             createdAt: new Date(data.created_at),
             signedAt: data.signed_at ? new Date(data.signed_at) : undefined
@@ -1305,11 +1419,12 @@ export const DatabaseService = {
 
         // Map members to teams
         return teams.map(team => {
-            const teamMembers = members
+            const teamMembers = (members || [])
                 .filter((m: any) => m.team_id === team.id)
                 .map((m: any) => {
-                    // Handle potential missing profile or name split
-                    const fullName = m.profiles?.full_name || 'Unknown User';
+                    // The Supabase query returns profiles as an array, we need to handle this
+                    const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+                    const fullName = profile?.full_name || 'Unknown User';
                     const [firstName, ...rest] = fullName.split(' ');
                     const lastName = rest.join(' ');
 
@@ -1398,7 +1513,7 @@ export const DatabaseService = {
 
         // Then add new assignments for all team members
         if (members && members.length > 0) {
-            const assignments = members.map((m: any) => ({
+            const assignments = members.map((m: { user_id: string }) => ({
                 installation_id: installationId,
                 user_id: m.user_id
             }))
@@ -1450,7 +1565,7 @@ export const DatabaseService = {
             pricing: row.contract_data.pricing,
             commission: row.contract_data.commission,
             requirements: row.contract_data.requirements,
-            comments: row.contract_data.comments?.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: row.contract_data.attachments || [],
             createdAt: new Date(row.created_at),
             signedAt: row.signed_at ? new Date(row.signed_at) : undefined
@@ -1486,7 +1601,7 @@ export const DatabaseService = {
         const createdInstallations: Installation[] = [];
 
         for (const contractRow of contracts) {
-            const contract = contractRow as any;
+            const contract = contractRow as { id: string; offer_id: string; contract_data: { client: Customer; product: { modelId: string; width: number; projection: number } } };
 
             // Check if installation already exists
             const exists = await DatabaseService.checkInstallationForContract(contract.offer_id);
@@ -1540,6 +1655,187 @@ export const DatabaseService = {
         }
 
         return createdInstallations;
+    },
+
+    // ==================== Measurement Management ====================
+
+    async getMeasurements(): Promise<Measurement[]> {
+        const { data, error } = await supabase
+            .from('measurements')
+            .select(`
+                *,
+                sales_rep:profiles!sales_rep_id(first_name, last_name)
+            `)
+            .order('scheduled_date', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map((m: any) => ({
+            id: m.id,
+            offerId: m.offer_id,
+            scheduledDate: new Date(m.scheduled_date),
+            salesRepId: m.sales_rep_id,
+            salesRepName: `${m.sales_rep?.first_name || ''} ${m.sales_rep?.last_name || ''}`.trim(),
+            customerName: m.customer_name,
+            customerAddress: m.customer_address,
+            customerPhone: m.customer_phone,
+            status: m.status,
+            notes: m.notes,
+            createdAt: new Date(m.created_at),
+            updatedAt: new Date(m.updated_at),
+            estimatedDuration: m.estimated_duration,
+            orderInRoute: m.order_in_route,
+            locationLat: m.location_lat,
+            locationLng: m.location_lng,
+            distanceFromPrevious: m.distance_from_previous
+        }));
+    },
+
+    async getMeasurementsBySalesRep(userId: string): Promise<Measurement[]> {
+        const { data, error } = await supabase
+            .from('measurements')
+            .select(`
+                *,
+                sales_rep:profiles!sales_rep_id(first_name, last_name)
+            `)
+            .eq('sales_rep_id', userId)
+            .order('scheduled_date', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map((m: any) => ({
+            id: m.id,
+            offerId: m.offer_id,
+            scheduledDate: new Date(m.scheduled_date),
+            salesRepId: m.sales_rep_id,
+            salesRepName: `${m.sales_rep?.first_name || ''} ${m.sales_rep?.last_name || ''}`.trim(),
+            customerName: m.customer_name,
+            customerAddress: m.customer_address,
+            customerPhone: m.customer_phone,
+            status: m.status,
+            notes: m.notes,
+            createdAt: new Date(m.created_at),
+            updatedAt: new Date(m.updated_at),
+            estimatedDuration: m.estimated_duration,
+            orderInRoute: m.order_in_route,
+            locationLat: m.location_lat,
+            locationLng: m.location_lng,
+            distanceFromPrevious: m.distance_from_previous
+        }));
+    },
+
+    async createMeasurement(measurement: {
+        offerId?: string;
+        scheduledDate: Date;
+        salesRepId: string;
+        customerName: string;
+        customerAddress: string;
+        customerPhone?: string;
+        notes?: string;
+        estimatedDuration?: number;
+        locationLat?: number;
+        locationLng?: number;
+    }): Promise<Measurement> {
+        const { data, error } = await supabase
+            .from('measurements')
+            .insert({
+                offer_id: measurement.offerId,
+                scheduled_date: measurement.scheduledDate.toISOString(),
+                sales_rep_id: measurement.salesRepId,
+                customer_name: measurement.customerName,
+                customer_address: measurement.customerAddress,
+                customer_phone: measurement.customerPhone,
+                status: 'scheduled',
+                notes: measurement.notes,
+                estimated_duration: measurement.estimatedDuration,
+                location_lat: measurement.locationLat,
+                location_lng: measurement.locationLng
+            })
+            .select(`
+                *,
+                sales_rep:profiles!sales_rep_id(first_name, last_name)
+            `)
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            offerId: data.offer_id,
+            scheduledDate: new Date(data.scheduled_date),
+            salesRepId: data.sales_rep_id,
+            salesRepName: `${data.sales_rep?.first_name || ''} ${data.sales_rep?.last_name || ''}`.trim(),
+            customerName: data.customer_name,
+            customerAddress: data.customer_address,
+            customerPhone: data.customer_phone,
+            status: data.status,
+            notes: data.notes,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at)
+        };
+    },
+
+    async updateMeasurement(id: string, updates: {
+        scheduledDate?: Date;
+        customerName?: string;
+        customerAddress?: string;
+        customerPhone?: string;
+        status?: 'scheduled' | 'completed' | 'cancelled';
+        notes?: string;
+        estimatedDuration?: number;
+        orderInRoute?: number;
+        locationLat?: number;
+        locationLng?: number;
+        distanceFromPrevious?: number;
+    }): Promise<Measurement> {
+        const updateData: any = {};
+        if (updates.scheduledDate) updateData.scheduled_date = updates.scheduledDate.toISOString();
+        if (updates.customerName) updateData.customer_name = updates.customerName;
+        if (updates.customerAddress) updateData.customer_address = updates.customerAddress;
+        if (updates.customerPhone !== undefined) updateData.customer_phone = updates.customerPhone;
+        if (updates.status) updateData.status = updates.status;
+        if (updates.notes !== undefined) updateData.notes = updates.notes;
+        if (updates.estimatedDuration !== undefined) updateData.estimated_duration = updates.estimatedDuration;
+        if (updates.orderInRoute !== undefined) updateData.order_in_route = updates.orderInRoute;
+        if (updates.locationLat !== undefined) updateData.location_lat = updates.locationLat;
+        if (updates.locationLng !== undefined) updateData.location_lng = updates.locationLng;
+        if (updates.distanceFromPrevious !== undefined) updateData.distance_from_previous = updates.distanceFromPrevious;
+
+        const { data, error } = await supabase
+            .from('measurements')
+            .update(updateData)
+            .eq('id', id)
+            .select(`
+                *,
+                sales_rep:profiles!sales_rep_id(first_name, last_name)
+            `)
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            offerId: data.offer_id,
+            scheduledDate: new Date(data.scheduled_date),
+            salesRepId: data.sales_rep_id,
+            salesRepName: `${data.sales_rep?.first_name || ''} ${data.sales_rep?.last_name || ''}`.trim(),
+            customerName: data.customer_name,
+            customerAddress: data.customer_address,
+            customerPhone: data.customer_phone,
+            status: data.status,
+            notes: data.notes,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at)
+        };
+    },
+
+    async deleteMeasurement(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('measurements')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     }
 
 };

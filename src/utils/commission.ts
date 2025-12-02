@@ -31,10 +31,9 @@ function getVolumeBonus(soldOffersCount: number): number {
 export function calculateCommissionDetailed(
     netPrice: number,
     marginPercentage: number,
-    soldOffersCount: number
+    soldOffersCount: number,
+    baseCommissionRate: number = 0.05 // Default 5%, can be customized per user
 ): CommissionBreakdown {
-    const BASE_RATE = 0.05; // 5% od kwoty netto sprzedaży (wraz z montażem)
-
     // Bonus za marżę: Jeśli marża > 30%, dodajemy 1% do prowizji za każde 10% powyżej
     // Przykładowa nowa logika bonusowa, bo poprzednia (margin/10) była dla marży kwotowej
     let marginBonus = 0;
@@ -46,13 +45,13 @@ export function calculateCommissionDetailed(
     const volumeBonus = getVolumeBonus(soldOffersCount);
 
     // Łączna stawka
-    const totalRate = BASE_RATE + marginBonus + volumeBonus;
+    const totalRate = baseCommissionRate + marginBonus + volumeBonus;
 
     // Kwota prowizji
     const commission = netPrice * totalRate;
 
     return {
-        baseRate: BASE_RATE,
+        baseRate: baseCommissionRate,
         marginBonus,
         volumeBonus,
         totalRate,
@@ -66,9 +65,10 @@ export function calculateCommissionDetailed(
 export function calculateCommission(
     netPrice: number,
     marginPercentage: number,
-    soldOffersCount: number = 0
+    soldOffersCount: number = 0,
+    baseCommissionRate: number = 0.05
 ): number {
-    return calculateCommissionDetailed(netPrice, marginPercentage, soldOffersCount).commission;
+    return calculateCommissionDetailed(netPrice, marginPercentage, soldOffersCount, baseCommissionRate).commission;
 }
 
 /**

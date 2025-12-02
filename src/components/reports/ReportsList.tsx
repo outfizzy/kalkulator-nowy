@@ -4,6 +4,7 @@ import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import type { MeasurementReport, User } from '../../types';
 import { toast } from 'react-hot-toast';
+import { generateMeasurementReportPDF } from '../../utils/measurementReportPDF';
 
 export const ReportsList: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
@@ -75,6 +76,12 @@ export const ReportsList: React.FC = () => {
                 toast.error('Błąd podczas usuwania raportu');
             }
         }
+    };
+
+    const handleGeneratePDF = (report: MeasurementReport) => {
+        const userName = getUserName(report.salesRepId);
+        generateMeasurementReportPDF(report, userName);
+        toast.success('Generowanie PDF...');
     };
 
     const getUserName = (userId: string): string => {
@@ -170,8 +177,8 @@ export const ReportsList: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium ${!report.offerIds || report.offerIds.length === 0
-                                                ? 'bg-slate-800 text-slate-500'
-                                                : 'bg-purple-500/20 text-purple-400'
+                                            ? 'bg-slate-800 text-slate-500'
+                                            : 'bg-purple-500/20 text-purple-400'
                                             }`}>
                                             {report.offerIds ? report.offerIds.length : 0}
                                         </span>
@@ -186,15 +193,26 @@ export const ReportsList: React.FC = () => {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleDelete(report.id)}
-                                            className="text-red-400 hover:text-red-300 transition-colors"
-                                            title="Usuń raport"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => handleGeneratePDF(report)}
+                                                className="text-blue-400 hover:text-blue-300 transition-colors"
+                                                title="Pobierz PDF"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(report.id)}
+                                                className="text-red-400 hover:text-red-300 transition-colors"
+                                                title="Usuń raport"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))

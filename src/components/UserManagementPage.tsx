@@ -151,6 +151,27 @@ export const UserManagementPage: React.FC = () => {
             console.error('Error updating partner margin:', error);
             toast.error('Błąd aktualizacji marży partnera');
         }
+    }
+
+
+    const handleSetCommissionRate = async (user: User) => {
+        try {
+            const currentRate = user.commissionRate ? (user.commissionRate * 100) : 5;
+            const input = window.prompt(`Prowizja podstawowa dla ${user.firstName} ${user.lastName} (%):`, currentRate.toString());
+            if (input === null) return;
+            const normalized = input.replace(',', '.');
+            const value = parseFloat(normalized);
+            if (isNaN(value) || value < 0 || value > 100) {
+                toast.error('Nieprawidłowa prowizja. Podaj wartość od 0 do 100.');
+                return;
+            }
+            await DatabaseService.updateCommissionRate(user.id, value / 100);
+            toast.success('Zaktualizowano prowizję');
+            await loadUsers();
+        } catch (error) {
+            console.error('Error updating commission rate:', error);
+            toast.error('Błąd aktualizacji prowizji');
+        }
     };
 
     const getStatusBadge = (status?: string) => {
@@ -206,70 +227,86 @@ export const UserManagementPage: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-20">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-slate-700 mb-2">Zarządzanie Użytkownikami</h1>
-                <p className="text-slate-500">Zatwierdzaj, blokuj i zarządzaj kontami użytkowników</p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Zarządzanie Użytkownikami</h1>
+                    <p className="text-slate-400 mt-1">Zatwierdzaj, blokuj i zarządzaj kontami użytkowników</p>
+                </div>
             </div>
 
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-accent transition-all duration-300 hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-slate-600 text-sm font-medium">Wszyscy użytkownicy</span>
-                        <div className="p-2 bg-accent-soft rounded-lg">
-                            <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-purple-600 font-bold text-xl">{stats.total}</span>
                         </div>
+                        <p className="text-slate-500 text-sm">Wszyscy Użytkownicy</p>
+                        <p className="text-slate-400 text-xs mt-1">Pracowników: {stats.internal} | Partnerów: {stats.partners}</p>
                     </div>
-                    <p className="text-3xl font-bold text-slate-900">{stats.total}</p>
-                    <p className="text-xs text-slate-500 mt-1">Pracowników: {stats.internal} | Partnerów: {stats.partners}</p>
                 </div>
 
-                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-yellow-400 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-100/50 hover:-translate-y-0.5">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-slate-600 text-sm font-medium">Oczekujący</span>
-                        <div className="p-2 bg-yellow-50 rounded-lg">
-                            <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-amber-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-amber-600 font-bold text-xl">{stats.pending}</span>
                         </div>
+                        <p className="text-slate-500 text-sm">Oczekujący</p>
+                        {stats.pending > 0 && (
+                            <p className="text-xs text-amber-600 mt-1">Wymaga zatwierdzenia</p>
+                        )}
                     </div>
-                    <p className="text-3xl font-bold text-slate-900">{stats.pending}</p>
-                    {stats.pending > 0 && (
-                        <p className="text-xs text-yellow-600 mt-1">Wymaga zatwierdzenia</p>
-                    )}
                 </div>
 
-                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-green-400 transition-all duration-300 hover:shadow-lg hover:shadow-green-100/50 hover:-translate-y-0.5">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-slate-600 text-sm font-medium">Aktywni</span>
-                        <div className="p-2 bg-green-50 rounded-lg">
-                            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-green-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-green-600 font-bold text-xl">{stats.active}</span>
                         </div>
+                        <p className="text-slate-500 text-sm">Aktywni Użytkownicy</p>
+                        <p className="text-slate-400 text-xs mt-1">System operational</p>
                     </div>
-                    <p className="text-3xl font-bold text-slate-900">{stats.active}</p>
                 </div>
 
-                <div className="group relative bg-white rounded-xl p-6 border-2 border-slate-200 hover:border-red-400 transition-all duration-300 hover:shadow-lg hover:shadow-red-100/50 hover:-translate-y-0.5">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-slate-600 text-sm font-medium">Zablokowani</span>
-                        <div className="p-2 bg-red-50 rounded-lg">
-                            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-24 h-24 bg-red-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 bg-red-100 text-red-600 rounded-lg">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                            </div>
+                            <span className="text-red-600 font-bold text-xl">{stats.blocked}</span>
                         </div>
+                        <p className="text-slate-500 text-sm">Zablokowani</p>
+                        <p className="text-slate-400 text-xs mt-1">Ograniczony dostęp</p>
                     </div>
-                    <p className="text-3xl font-bold text-slate-900">{stats.blocked}</p>
                 </div>
             </div>
 
             {/* Search and Filter */}
-            <div className="bg-slate-800/50 backdrop-blur-xl rounded-xl p-6 border border-slate-700/50">
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-4">
                     <div className="flex-1">
                         <div className="relative">
@@ -279,11 +316,11 @@ export const UserManagementPage: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Szukaj po nazwisku, emailu..."
-                                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent-dark transition-all"
                             />
                         </div>
                     </div>
-                    <button className="px-4 py-2.5 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors flex items-center gap-2">
+                    <button onClick={loadUsers} className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
@@ -293,43 +330,186 @@ export const UserManagementPage: React.FC = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-xl w-fit">
+            <div className="flex space-x-1 bg-slate-100 p-1 rounded-full w-fit">
                 <button
                     onClick={() => setActiveTab('internal')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'internal'
-                        ? 'bg-accent text-white shadow-lg'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${activeTab === 'internal'
+                        ? 'bg-white shadow-md text-slate-900'
+                        : 'text-slate-500 hover:text-slate-700'
                         }`}
                 >
                     Pracownicy
                 </button>
                 <button
                     onClick={() => setActiveTab('partners')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'partners'
-                        ? 'bg-emerald-600 text-white shadow-lg'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${activeTab === 'partners'
+                        ? 'bg-white shadow-md text-slate-900'
+                        : 'text-slate-500 hover:text-slate-700'
                         }`}
                 >
                     Partnerzy B2B
                     {users.filter(u => u.role === 'partner' && u.status === 'pending').length > 0 && (
-                        <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                        <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold">
                             {users.filter(u => u.role === 'partner' && u.status === 'pending').length}
                         </span>
                     )}
                 </button>
             </div>
 
-            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {filteredUsers.map((user) => (
+                    <div key={user.id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.role === 'partner' ? 'bg-emerald-600' : 'bg-accent'}`}>
+                                    {user.firstName?.[0]}{user.lastName?.[0]}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900">{user.firstName} {user.lastName}</div>
+                                    <div className="text-xs text-slate-500">{user.email}</div>
+                                </div>
+                            </div>
+                            {getStatusBadge(user.status)}
+                        </div>
+
+                        <div className="space-y-3 text-sm">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="text-slate-500">Rola:</div>
+                                <div className="font-medium text-slate-900 text-right">
+                                    <select
+                                        value={user.role}
+                                        onChange={(e) => handleChangeRole(user.id, e.target.value as User['role'])}
+                                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-accent"
+                                    >
+                                        <option value="admin">Admin</option>
+                                        <option value="manager">Manager</option>
+                                        <option value="sales_rep">Handlowiec</option>
+                                        <option value="partner">Partner</option>
+                                        <option value="installer">Monter</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {activeTab === 'partners' && (
+                                <>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-slate-500">Firma:</div>
+                                        <div className="font-medium text-slate-900 text-right">{user.companyName || '-'}</div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-slate-500">NIP:</div>
+                                        <div className="font-medium text-slate-900 text-right">{user.nip || '-'}</div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-slate-500">Marża B2B:</div>
+                                        <div className="font-medium text-slate-900 text-right">
+                                            <button
+                                                onClick={() => handleSetPartnerMargin(user)}
+                                                className="text-accent font-bold"
+                                            >
+                                                {user.partnerMargin ? `${Math.round(user.partnerMargin * 100)}%` : '25%'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {activeTab === 'internal' && user.role === 'sales_rep' && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-slate-500">Prowizja:</div>
+                                    <div className="font-medium text-slate-900 text-right">
+                                        <button
+                                            onClick={() => handleSetCommissionRate(user)}
+                                            className="text-accent font-bold"
+                                        >
+                                            {user.commissionRate ? `${(user.commissionRate * 100).toFixed(1)}%` : '5.0%'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="text-slate-500">Telefon:</div>
+                                <div className="font-medium text-slate-900 text-right">{user.phone || '-'}</div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="text-slate-500">Rejestracja:</div>
+                                <div className="font-medium text-slate-900 text-right">{new Date(user.createdAt).toLocaleDateString('pl-PL')}</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2">
+                            {user.status === 'pending' && (
+                                <button
+                                    onClick={() => handleApprove(user.id)}
+                                    className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                                    title="Zatwierdź"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </button>
+                            )}
+                            {activeTab === 'internal' && user.role !== 'installer' && (
+                                <button
+                                    onClick={() => handleSetInstallerRole(user)}
+                                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                                    title="Ustaw jako montera"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                            )}
+                            {user.status !== 'blocked' ? (
+                                <button
+                                    onClick={() => handleBlock(user.id)}
+                                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                                    title="Zablokuj"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleApprove(user.id)}
+                                    className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                                    title="Odblokuj"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => handleDelete(user)}
+                                className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors"
+                                title="Usuń"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-slate-900">
+                        <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                                     Użytkownik
                                 </th>
                                 {activeTab === 'partners' && (
                                     <>
-                                        <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                                             Firma
                                         </th>
                                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -343,6 +523,11 @@ export const UserManagementPage: React.FC = () => {
                                 <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Telefon
                                 </th>
+                                {activeTab === 'internal' && (
+                                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                        Prowizja
+                                    </th>
+                                )}
                                 {activeTab === 'partners' && (
                                     <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                         Marża B2B
@@ -359,19 +544,19 @@ export const UserManagementPage: React.FC = () => {
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-700 bg-slate-800/50">
+                        <tbody className="divide-y divide-slate-100 bg-white">
                             {filteredUsers.map((user) => (
-                                <tr key={user.id} className="hover:bg-slate-900/40 transition-colors">
+                                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.role === 'partner' ? 'bg-emerald-600' : 'bg-accent'}`}>
                                                 {user.firstName?.[0]}{user.lastName?.[0]}
                                             </div>
                                             <div className="ml-4">
-                                                <div className="text-sm font-medium text-white">
+                                                <div className="text-sm font-semibold text-slate-900">
                                                     {user.firstName} {user.lastName}
                                                 </div>
-                                                <div className="text-sm text-slate-400">
+                                                <div className="text-sm text-slate-500">
                                                     {user.email}
                                                 </div>
                                             </div>
@@ -379,7 +564,7 @@ export const UserManagementPage: React.FC = () => {
                                     </td>
                                     {activeTab === 'partners' && (
                                         <>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                                                 {user.companyName || '-'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
@@ -387,11 +572,11 @@ export const UserManagementPage: React.FC = () => {
                                             </td>
                                         </>
                                     )}
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                                         <select
                                             value={user.role}
                                             onChange={(e) => handleChangeRole(user.id, e.target.value as User['role'])}
-                                            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:bg-slate-600 transition-colors cursor-pointer"
+                                            className="bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-900 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 hover:bg-slate-200 transition-colors cursor-pointer"
                                         >
                                             <option value="admin">Administrator</option>
                                             <option value="manager">Manager</option>
@@ -400,11 +585,29 @@ export const UserManagementPage: React.FC = () => {
                                             <option value="installer">Monter</option>
                                         </select>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                                         {user.phone || '-'}
                                     </td>
+                                    {activeTab === 'internal' && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                            {user.role === 'sales_rep' ? (
+                                                <button
+                                                    onClick={() => handleSetCommissionRate(user)}
+                                                    className="hover:text-accent transition-colors flex items-center gap-1"
+                                                    title="Kliknij aby zmienić"
+                                                >
+                                                    {user.commissionRate ? `${(user.commissionRate * 100).toFixed(1)}%` : '5.0%'}
+                                                    <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
+                                                </button>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
+                                        </td>
+                                    )}
                                     {activeTab === 'partners' && (
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                                             <button
                                                 onClick={() => handleSetPartnerMargin(user)}
                                                 className="hover:text-accent transition-colors flex items-center gap-1"
@@ -420,7 +623,7 @@ export const UserManagementPage: React.FC = () => {
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {getStatusBadge(user.status)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {new Date(user.createdAt).toLocaleDateString('pl-PL')}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">

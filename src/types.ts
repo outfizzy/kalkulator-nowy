@@ -24,6 +24,8 @@ export interface User {
     companyName?: string;
     nip?: string;
     partnerMargin?: number; // e.g. 0.25 = 25%
+    // Commission rate for sales reps (e.g. 0.05 = 5%)
+    commissionRate?: number;
 }
 
 export interface Customer {
@@ -322,4 +324,27 @@ export interface SalesRepStat {
     totalDistance: number;
     avgMarginPercent: number;
     conversionRate: number;
+    lastActivityDate?: Date;
+    pendingOffersCount?: number;
+}
+
+export interface Measurement {
+    id: string;
+    offerId?: string;
+    scheduledDate: Date;
+    salesRepId: string;
+    salesRepName: string;
+    customerName: string;
+    customerAddress: string;
+    customerPhone?: string;
+    status: 'scheduled' | 'completed' | 'cancelled';
+    notes?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    // Route planning fields
+    estimatedDuration?: number; // in minutes
+    orderInRoute?: number; // order in the day's route
+    locationLat?: number;
+    locationLng?: number;
+    distanceFromPrevious?: number; // in kilometers
 }

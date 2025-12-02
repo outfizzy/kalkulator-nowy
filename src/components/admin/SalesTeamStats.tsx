@@ -262,8 +262,65 @@ export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title 
                 </ResponsiveContainer>
             </div>
 
-            {/* Detailed Table */}
-            <div className="bg-surface rounded-xl border border-slate-800 overflow-hidden">
+            {/* Mobile/Tablet Card View */}
+            <div className="lg:hidden space-y-4">
+                {filteredStats.map((stat) => (
+                    <div key={stat.userId} className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-sm">
+                        <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-700">
+                            <div>
+                                <div className="font-bold text-white text-lg">{stat.userName}</div>
+                                <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {stat.lastActivityDate ? new Date(stat.lastActivityDate).toLocaleDateString('pl-PL') : 'Brak aktywności'}
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-bold text-green-400">{stat.soldOffers}</div>
+                                <div className="text-xs text-slate-500">Sprzedane</div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <div className="text-slate-400 text-xs mb-1">Wartość</div>
+                                <div className="font-medium text-slate-200">{(stat.totalValue / 1000).toFixed(1)}k EUR</div>
+                            </div>
+                            <div>
+                                <div className="text-slate-400 text-xs mb-1">Marża</div>
+                                <div className="font-medium text-accent">{(stat.totalMarginValue / 1000).toFixed(1)}k EUR</div>
+                            </div>
+                            <div>
+                                <div className="text-slate-400 text-xs mb-1">Conversion</div>
+                                <div className="font-medium text-slate-200">{stat.conversionRate.toFixed(1)}%</div>
+                            </div>
+                            <div>
+                                <div className="text-slate-400 text-xs mb-1">Śr. marża %</div>
+                                <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-12 bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="h-full bg-accent" style={{ width: `${Math.min(stat.avgMarginPercent, 100)}%` }} />
+                                    </div>
+                                    <span className="font-medium text-slate-200">{stat.avgMarginPercent.toFixed(1)}%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-slate-400 text-xs mb-1">Oferty (Szkice)</div>
+                                <div className="font-medium text-slate-200">
+                                    {stat.totalOffers} <span className="text-yellow-500 text-xs">({stat.pendingOffersCount || 0})</span>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-slate-400 text-xs mb-1">Dystans</div>
+                                <div className="font-medium text-blue-400">{stat.totalDistance.toLocaleString()} km</div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-surface rounded-xl border border-slate-800 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-slate-800">
@@ -272,7 +329,10 @@ export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title 
                                     {showPartners ? 'Partner' : 'Przedstawiciel'}
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Oferty
+                                    Ost. Aktywność
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Oferty (Szkice)
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Sprzedane
@@ -301,7 +361,19 @@ export const SalesTeamStats: React.FC<SalesTeamStatsProps> = ({ viewMode, title 
                                         <div className="text-sm font-medium text-white">{stat.userName}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-slate-300">{stat.totalOffers}</div>
+                                        <div className="text-xs text-slate-400">
+                                            {stat.lastActivityDate ? new Date(stat.lastActivityDate).toLocaleDateString('pl-PL') : '-'}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-slate-300">
+                                            {stat.totalOffers}
+                                            {stat.pendingOffersCount ? (
+                                                <span className="ml-2 text-xs text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded-full">
+                                                    {stat.pendingOffersCount}
+                                                </span>
+                                            ) : null}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm text-green-400">{stat.soldOffers}</div>

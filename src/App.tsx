@@ -27,6 +27,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
 import { InstallationCalendar } from './components/installations/InstallationCalendar';
+import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
 
@@ -109,8 +110,9 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
         // Partners might not have soldOffersCount logic or it might be different
         const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
 
-        // Commission: 5% of Net Selling Price (including installation)
-        const commission = calculateCommission(pricing.sellingPriceNet, pricing.marginPercentage, soldOffersCount);
+        // Commission: Use user's individual rate or default 5%
+        const userCommissionRate = currentUser.commissionRate ?? 0.05;
+        const commission = calculateCommission(pricing.sellingPriceNet, pricing.marginPercentage, soldOffersCount, userCommissionRate);
 
         const newOffer: Omit<Offer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
           offerNumber: `OFF/${new Date().getFullYear()}/${Math.floor(Math.random() * 10000)}`, // Temp number generation
@@ -140,7 +142,8 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
 
       try {
         const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
-        const newCommission = calculateCommission(newPricing.sellingPriceNet, newPricing.marginPercentage, soldOffersCount);
+        const userCommissionRate = currentUser.commissionRate ?? 0.05;
+        const newCommission = calculateCommission(newPricing.sellingPriceNet, newPricing.marginPercentage, soldOffersCount, userCommissionRate);
 
         const updatedOffer = {
           ...offer,
@@ -324,6 +327,7 @@ function App() {
               <Route path="/admin/teams" element={<TeamManagementPanel />} />
               <Route path="/reports" element={<ReportsList />} />
               <Route path="/reports/new" element={<ReportForm />} />
+              <Route path="/measurements" element={<MeasurementDashboard />} />
               <Route path="/installations" element={<InstallationDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />

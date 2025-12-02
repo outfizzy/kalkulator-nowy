@@ -3,8 +3,6 @@ import type { ProductConfig, SelectedAddon } from '../types';
 import { orangestyleAccessories } from '../data/orangestyle_accessories';
 import { trendstyleAccessories } from '../data/trendstyle_accessories';
 import { LightingSelector } from './configurator/LightingSelector';
-import { SlidingDoorSelector } from './configurator/SlidingDoorSelector';
-import { AluminumWallSelector } from './configurator/AluminumWallSelector';
 import { KeilfensterSelector } from './configurator/KeilfensterSelector';
 import { PanoramaWallSelector } from './configurator/PanoramaWallSelector';
 import { AwningSelector } from './configurator/AwningSelector';
@@ -586,43 +584,45 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                             {/* Main Tabs */}
                             <div className="flex border-b border-slate-200">
                                 {[
-                                    { id: 'walls', label: 'Zabudowa i Ściany', icon: '🏗️' },
-                                    { id: 'lighting', label: 'Oświetlenie i Komfort', icon: '💡' },
-                                    { id: 'accessories', label: 'Pozostałe Akcesoria', icon: '✨' }
+                                    { id: 'enclosure', label: 'Zabudowa (Ściany)', icon: '🏗️' },
+                                    { id: 'comfort', label: 'Komfort (Markizy, LED)', icon: '☀️' },
+                                    { id: 'extras', label: 'Pozostałe Dodatki', icon: '✨' }
                                 ].map(tab => (
                                     <button
                                         key={tab.id}
-                                        onClick={() => setActiveWallTab(tab.id === 'walls' ? 'sliding' : tab.id as any)}
-                                        className={`px-4 py-3 text-sm font-bold transition-all flex items-center gap-2 ${(tab.id === 'walls' && ['sliding', 'walls', 'keil'].includes(activeWallTab)) || activeWallTab === tab.id
-                                            ? 'text-accent border-b-2 border-accent bg-accent/5'
-                                            : 'text-slate-500 hover:text-slate-700'
+                                        onClick={() => setActiveWallTab(tab.id === 'enclosure' ? 'sliding' : tab.id === 'comfort' ? 'awning' : 'accessories')}
+                                        className={`flex-1 px-4 py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 border-b-2 ${(tab.id === 'enclosure' && ['sliding', 'panorama', 'walls', 'keil'].includes(activeWallTab)) ||
+                                            (tab.id === 'comfort' && ['awning', 'lighting'].includes(activeWallTab)) ||
+                                            (tab.id === 'extras' && activeWallTab === 'accessories')
+                                            ? 'text-accent border-accent bg-accent/5'
+                                            : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50'
                                             }`}
                                     >
-                                        {tab.icon} {tab.label}
+                                        <span className="text-xl">{tab.icon}</span>
+                                        {tab.label}
                                     </button>
                                 ))}
                             </div>
 
                             {/* Content */}
                             <div className="p-6">
-                                {/* Walls & Enclosure Content */}
-                                {['sliding', 'panorama', 'walls', 'keil', 'awning'].includes(activeWallTab) && (
+                                {/* ENCLOSURE CONTENT (Zabudowa) */}
+                                {['sliding', 'panorama', 'walls', 'keil'].includes(activeWallTab) && (
                                     <div>
-                                        {/* Sub-tabs for Walls */}
-                                        <div className="flex gap-2 mb-6 border-b border-slate-100 pb-1">
+                                        {/* Sub-tabs for Enclosure */}
+                                        <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-100 pb-2">
                                             {[
                                                 { id: 'sliding', label: 'Szyby Przesuwne' },
-                                                { id: 'panorama', label: 'Panorama' },
                                                 { id: 'walls', label: 'Ściany Aluminiowe' },
-                                                { id: 'keil', label: 'Keilfenster' },
-                                                { id: 'awning', label: 'Markizy' }
+                                                { id: 'panorama', label: 'Panorama' },
+                                                { id: 'keil', label: 'Keilfenster (Trójkąty)' },
                                             ].map(subTab => (
                                                 <button
                                                     key={subTab.id}
                                                     onClick={() => setActiveWallTab(subTab.id as any)}
-                                                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all ${activeWallTab === subTab.id
-                                                        ? 'text-accent border-b-2 border-accent bg-accent/5'
-                                                        : 'text-slate-500 hover:text-slate-700'
+                                                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeWallTab === subTab.id
+                                                        ? 'bg-slate-800 text-white shadow-md'
+                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                                         }`}
                                                 >
                                                     {subTab.label}
@@ -632,12 +632,13 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
 
                                         <div className="min-h-[300px]">
                                             {activeWallTab === 'sliding' && (
-                                                <SlidingDoorSelector
+                                                <div>Sliding Doors Temporarily Disabled</div>
+                                                /*<SlidingDoorSelector
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
-                                                />
+                                                />*/
                                             )}
                                             {activeWallTab === 'panorama' && (
                                                 <PanoramaWallSelector
@@ -647,13 +648,14 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                                 />
                                             )}
                                             {activeWallTab === 'walls' && (
-                                                <AluminumWallSelector
+                                                <div>Aluminum Walls Temporarily Disabled</div>
+                                                /*<AluminumWallSelector
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
-                                                />
+                                                />*/
                                             )}
                                             {activeWallTab === 'keil' && (
                                                 <KeilfensterSelector
@@ -663,6 +665,33 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                                     maxRoofDepth={config.projection}
                                                 />
                                             )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* COMFORT CONTENT (Komfort) */}
+                                {['awning', 'lighting'].includes(activeWallTab) && (
+                                    <div>
+                                        {/* Sub-tabs for Comfort */}
+                                        <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-100 pb-2">
+                                            {[
+                                                { id: 'awning', label: 'Markizy (Ochrona przed słońcem)' },
+                                                { id: 'lighting', label: 'Oświetlenie LED' },
+                                            ].map(subTab => (
+                                                <button
+                                                    key={subTab.id}
+                                                    onClick={() => setActiveWallTab(subTab.id as any)}
+                                                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeWallTab === subTab.id
+                                                        ? 'bg-orange-500 text-white shadow-md'
+                                                        : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                                        }`}
+                                                >
+                                                    {subTab.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="min-h-[300px]">
                                             {activeWallTab === 'awning' && (
                                                 <AwningSelector
                                                     currentAddons={config.addons}
@@ -672,45 +701,49 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                                     maxRoofDepth={config.projection}
                                                 />
                                             )}
+                                            {activeWallTab === 'lighting' && (
+                                                <LightingSelector
+                                                    currentAddons={config.addons}
+                                                    onAdd={handleAddonAdd}
+                                                    onRemove={handleAddonRemove}
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Lighting & Comfort Content */}
-                                {activeWallTab === 'lighting' && (
-                                    <LightingSelector
-                                        currentAddons={config.addons}
-                                        onAdd={handleAddonAdd}
-                                        onRemove={handleAddonRemove}
-                                    />
-                                )}
-
-                                {/* Additional Accessories Content */}
+                                {/* EXTRAS CONTENT (Dodatki) */}
                                 {activeWallTab === 'accessories' && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {accessoryPool.map((acc, idx) => {
-                                            const selected = config.selectedAccessories?.find(a => a.name === acc.description);
-                                            const qty = selected?.quantity || 0;
-                                            return (
-                                                <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={acc.description}>{acc.description}</div>
-                                                        <div className="font-bold text-accent text-sm whitespace-nowrap">{acc.price_net} €</div>
+                                    <div>
+                                        <div className="mb-6">
+                                            <h4 className="text-lg font-bold text-slate-800 mb-2">Pozostałe akcesoria</h4>
+                                            <p className="text-slate-500 text-sm">Dodatkowe elementy wyposażenia i montażu.</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {accessoryPool.map((acc, idx) => {
+                                                const selected = config.selectedAccessories?.find(a => a.name === acc.description);
+                                                const qty = selected?.quantity || 0;
+                                                return (
+                                                    <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={acc.description}>{acc.description}</div>
+                                                            <div className="font-bold text-accent text-sm whitespace-nowrap">{acc.price_net} €</div>
+                                                        </div>
+                                                        <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
+                                                            <button
+                                                                onClick={() => toggleAccessory(acc, false)}
+                                                                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+                                                            >-</button>
+                                                            <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
+                                                            <button
+                                                                onClick={() => toggleAccessory(acc, true)}
+                                                                className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
+                                                            >+</button>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
-                                                        <button
-                                                            onClick={() => toggleAccessory(acc, false)}
-                                                            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                                                        >-</button>
-                                                        <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
-                                                        <button
-                                                            onClick={() => toggleAccessory(acc, true)}
-                                                            className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
-                                                        >+</button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 )}
                             </div>

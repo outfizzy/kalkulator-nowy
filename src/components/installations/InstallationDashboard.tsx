@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { getTeams } from '../../utils/storage';
 import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
@@ -29,19 +28,23 @@ export const InstallationDashboard: React.FC = () => {
     const [groupBy, setGroupBy] = useState<'none' | 'region' | 'status' | 'team'>('none');
     const [sortBy, setSortBy] = useState<'date' | 'city' | 'status'>('city');
     const [assignDate, setAssignDate] = useState('');
+    const [assignTargetId, setAssignTargetId] = useState('');
 
     const [installers, setInstallers] = useState<import('../../types').User[]>([]);
+    const [salesReps, setSalesReps] = useState<import('../../types').User[]>([]);
 
     const loadData = async () => {
         try {
-            const [dbInstallations, localTeams, dbInstallers] = await Promise.all([
+            const [dbInstallations, dbTeams, dbInstallers, dbSalesReps] = await Promise.all([
                 DatabaseService.getInstallations(),
-                Promise.resolve(getTeams()),
-                DatabaseService.getInstallers()
+                DatabaseService.getTeams(),
+                DatabaseService.getInstallers(),
+                DatabaseService.getSalesReps()
             ]);
             setInstallations(dbInstallations);
-            setTeams(localTeams);
+            setTeams(dbTeams);
             setInstallers(dbInstallers);
+            setSalesReps(dbSalesReps);
         } catch (error) {
             console.error('Error loading installations:', error);
             toast.error('Błąd ładowania montaży');
@@ -93,29 +96,59 @@ export const InstallationDashboard: React.FC = () => {
     const handleAssignTeam = async (teamId: string, date: string) => {
         if (selectedIds.length === 0 || !date) return;
 
-        // Check if teamId is actually an installer ID (user ID)
+        // Check if teamId is actually an installer ID or Sales Rep ID (user ID)
         const isInstaller = installers.some(u => u.id === teamId);
+        const isSalesRep = salesReps.some(u => u.id === teamId);
+        const isUser = isInstaller || isSalesRep;
 
         for (const id of selectedIds) {
             const inst = installations.find(i => i.id === id);
             if (inst) {
                 // Update basic info
                 await DatabaseService.updateInstallation(inst.id, {
-                    teamId: isInstaller ? undefined : teamId, // Clear teamId if assigning to specific installer, or keep it? 
-                    // Let's say teamId is for "Teams" and we also have assignments.
-                    // For now, if it's an installer, we assign via assignInstaller.
+                    teamId: isUser ? undefined : teamId, // Clear teamId if assigning to specific installer (legacy logic?)
+                    // Actually, for Sales Reps we WANT to set teamId to their ID so they show up in the calendar lane.
+                    // For Installers, we used assignInstaller.
+                    // Let's refine:
+                    // If it's a Team -> teamId = teamId
+                    // If it's a Sales Rep -> teamId = teamId (Rep ID)
+                    // If it's an Installer -> teamId = undefined (assigned via assignInstaller)
+
+                    // Wait, if we set teamId to Rep ID, it works for calendar.
+                    // If we set teamId to undefined for Installer, they WON'T show in calendar unless we have a lane for them?
+                    // But currently Installers are NOT in the calendar lanes unless they are in a Team?
+                    // No, wait. Installers are fetched separately.
+                    // Let's check if Installers are added to 'teams' prop in original code?
+                    // Original code passed 'teams' (InstallationTeam[]).
+                    // It did NOT pass installers as teams.
+                    // So Installers were NOT visible in the calendar lanes unless they were members of a team!
+
+                    // So for Sales Reps, we MUST set teamId = Rep ID.
+                    ...(isSalesRep ? { teamId: teamId } : {}),
+                    ...(isInstaller ? { teamId: undefined } : {}), // Clear teamId for installers as they are assigned differently?
+                    // Actually, if we want Sales Reps to see it, we must set teamId.
+
                     scheduledDate: date,
                     status: 'scheduled'
                 });
 
+                // If it's a Sales Rep, we just set teamId (above).
+                // If it's an Installer, we use assignInstaller.
                 if (isInstaller) {
                     await DatabaseService.assignInstaller(inst.id, teamId);
+                }
+                // If it's a Sales Rep, we might want to assign them too?
+                // But we don't have assignSalesRep.
+                // Using teamId field for Sales Rep ID is the hack we are using for Calendar visibility.
+                if (isSalesRep) {
+                    // Ensure teamId is set (done in updateInstallation)
                 }
             }
         }
 
         toast.success(`Przypisano ${selectedIds.length} montaży`);
         setSelectedIds([]);
+        setAssignTargetId('');
         await loadData();
     };
 
@@ -160,63 +193,121 @@ export const InstallationDashboard: React.FC = () => {
     const sortedInstallations = sortInstallations(filteredInstallations, sortBy);
     const groupedInstallations = groupInstallations(sortedInstallations, groupBy, teams);
 
-    return (
-        <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Planowanie Montaży</h1>
-                    <p className="text-slate-500 text-sm">Zarządzaj logistyką i ekipami montażowymi</p>
-                </div>
-                <div className="flex gap-2">
-                    <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mr-2">
-                        <button
-                            onClick={() => setView('list')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'list' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            Mapa i Lista
-                        </button>
-                        <button
-                            onClick={() => setView('calendar')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'calendar' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            Kalendarz
-                        </button>
-                        <button
-                            onClick={() => setView('contracts')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'contracts' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            Umowy
-                        </button>
-                    </div>
+    const stats = {
+        total: installations.length,
+        scheduled: installations.filter(i => i.status === 'scheduled').length,
+        completed: installations.filter(i => i.status === 'completed').length,
+        unassigned: installations.filter(i => !i.teamId).length
+    };
 
+    // Combine Teams and Sales Reps for Calendar View
+    const calendarResources: InstallationTeam[] = [
+        ...teams,
+        ...salesReps.map(rep => ({
+            id: rep.id,
+            name: `${rep.firstName} ${rep.lastName}`,
+            color: '#8b5cf6', // Violet for Sales Reps
+            members: [rep]
+        }))
+    ];
+
+    return (
+        <div className="space-y-6 pb-20">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Planowanie Montaży</h1>
+                    <p className="text-slate-400 mt-1">Zarządzaj harmonogramem i zespołami montażowymi</p>
+                </div>
+                <div className="flex gap-3">
                     <button
                         onClick={() => setIsSearchModalOpen(true)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 flex items-center gap-2"
+                        className="px-4 py-2 bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-2"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
-                        Dodaj z Oferty
+                        Szukaj Oferty
                     </button>
+
+                    <a
+                        href={`/reports/new?date=${new Date().toISOString().split('T')[0]}`}
+                        className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-500 transition-colors flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Generuj Raport
+                    </a>
 
                     <button
                         onClick={handleGeocodeMissing}
                         disabled={isGeocoding}
-                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                        className={`px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-500 transition-colors flex items-center gap-2 ${isGeocoding ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        {isGeocoding ? 'Pobieranie współrzędnych...' : 'Pobierz Współrzędne GPS'}
+                        {isGeocoding ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        )}
+                        {isGeocoding ? 'Geokodowanie...' : 'Uzupełnij Mapę'}
                     </button>
                 </div>
+            </div>
+
+            {/* View Tabs */}
+            <div className="bg-slate-100 p-1 rounded-full flex gap-1 self-start">
+                {[
+                    { id: 'list', label: 'Mapa/Lista' },
+                    { id: 'calendar', label: 'Kalendarz' },
+                    { id: 'contracts', label: 'Umowy' }
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setView(tab.id as typeof view)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${view === tab.id
+                            ? 'bg-white shadow text-slate-900'
+                            : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                    { label: 'Wszystkie', value: stats.total, tone: 'slate' },
+                    { label: 'Zaplanowane', value: stats.scheduled, tone: 'blue' },
+                    { label: 'Zakończone', value: stats.completed, tone: 'green' },
+                    { label: 'Nieprzypisane', value: stats.unassigned, tone: 'amber' }
+                ].map(card => (
+                    <div
+                        key={card.label}
+                        className={`bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col gap-1`}
+                    >
+                        <span className="text-xs uppercase tracking-wide text-slate-500">{card.label}</span>
+                        <span className="text-2xl font-bold text-slate-900">{card.value}</span>
+                        <div className={`h-1 rounded-full ${card.tone === 'blue'
+                            ? 'bg-blue-200'
+                            : card.tone === 'green'
+                                ? 'bg-green-200'
+                                : card.tone === 'amber'
+                                    ? 'bg-amber-200'
+                                    : 'bg-slate-200'
+                            }`} />
+                    </div>
+                ))}
             </div>
 
             <div className="flex-1 flex gap-4 min-h-0">
                 {view === 'list' ? (
                     <>
                         {/* Left Panel: List */}
-                        <div className="w-1/3 bg-white rounded-xl border border-slate-200 flex flex-col">
+                        <div className="w-full lg:w-1/3 bg-white rounded-xl border border-slate-200 flex flex-col shadow-sm">
                             <div className="p-4 border-b border-slate-100 space-y-3">
                                 <GroupingControls
                                     groupBy={groupBy}
@@ -289,8 +380,8 @@ export const InstallationDashboard: React.FC = () => {
                                                         {inst.teamId && (
                                                             <span
                                                                 className="w-3 h-3 rounded-full"
-                                                                style={{ backgroundColor: teams.find(t => t.id === inst.teamId)?.color }}
-                                                                title={teams.find(t => t.id === inst.teamId)?.name}
+                                                                style={{ backgroundColor: teams.find(t => t.id === inst.teamId)?.color || (salesReps.find(r => r.id === inst.teamId) ? '#8b5cf6' : '#cbd5e1') }}
+                                                                title={teams.find(t => t.id === inst.teamId)?.name || salesReps.find(r => r.id === inst.teamId)?.firstName}
                                                             />
                                                         )}
                                                     </div>
@@ -300,7 +391,11 @@ export const InstallationDashboard: React.FC = () => {
                                                             <p className="text-xs text-slate-400 mt-1">{inst.productSummary}</p>
                                                             {inst.scheduledDate && (
                                                                 <p className="text-xs font-medium text-blue-600 mt-1">
-                                                                    📅 {new Date(inst.scheduledDate).toLocaleDateString()}
+                                                                    📅 {new Date(inst.scheduledDate).toLocaleDateString('pl-PL', {
+                                                                        day: '2-digit',
+                                                                        month: 'short',
+                                                                        year: 'numeric'
+                                                                    })}
                                                                 </p>
                                                             )}
                                                         </div>
@@ -339,7 +434,7 @@ export const InstallationDashboard: React.FC = () => {
                         </div>
 
                         {/* Right Panel: Map */}
-                        <div className="flex-1 bg-white rounded-xl border border-slate-200 p-1">
+                        <div className="hidden lg:block flex-1 bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
                             <InstallationMap
                                 installations={filteredInstallations}
                                 teams={teams}
@@ -350,10 +445,10 @@ export const InstallationDashboard: React.FC = () => {
                         </div>
                     </>
                 ) : view === 'calendar' ? (
-                    <div className="w-full h-full">
+                    <div className="h-[calc(100vh-300px)] w-full">
                         <InstallationCalendar
                             installations={filteredInstallations}
-                            teams={teams}
+                            teams={calendarResources}
                             onEdit={handleEdit}
                             onDragDrop={handleDragDrop}
                         />
@@ -367,10 +462,10 @@ export const InstallationDashboard: React.FC = () => {
 
             {/* Bottom Panel: Assignment */}
             {selectedIds.length > 0 && (
-                <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex items-center justify-between animate-slide-up sticky bottom-4 z-20 mx-4">
-                    <div className="flex items-center gap-4">
+                <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between animate-slide-up sticky bottom-4 z-20 mx-4">
+                    <div className="flex flex-wrap items-center gap-3">
                         <span className="font-bold">Wybrano: {selectedIds.length}</span>
-                        <div className="h-8 w-px bg-slate-600" />
+                        <div className="hidden md:block h-8 w-px bg-slate-600" />
                         <div className="flex items-center gap-2">
                             <label className="text-sm text-slate-300">Data:</label>
                             <input
@@ -381,18 +476,19 @@ export const InstallationDashboard: React.FC = () => {
                             />
                         </div>
                         <div className="flex items-center gap-2">
-                            <label className="text-sm text-slate-300">Ekipa:</label>
+                            <label className="text-sm text-slate-300">Ekipa/Monter:</label>
                             <select
-                                id="assign-team"
-                                className="bg-slate-700 border-none rounded px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent min-w-[200px]"
+                                value={assignTargetId}
+                                onChange={(e) => setAssignTargetId(e.target.value)}
+                                className="bg-slate-700 border-none rounded px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent min-w-[220px]"
                             >
-                                <option value="">Wybierz ekipę...</option>
+                                <option value="">Wybierz...</option>
                                 <optgroup label="Ekipy">
                                     {teams.map(t => {
                                         const availability = assignDate ? getTeamAvailability(t.id, assignDate, installations) : null;
                                         let label = t.name;
                                         if (availability) {
-                                            label += ` (${availability.count} montaży)`;
+                                            label += ` (${availability.count})`;
                                             if (availability.status === 'busy') label += ' ⚠️';
                                         }
                                         return (
@@ -401,6 +497,11 @@ export const InstallationDashboard: React.FC = () => {
                                             </option>
                                         );
                                     })}
+                                </optgroup>
+                                <optgroup label="Przedstawiciele">
+                                    {salesReps.map(r => (
+                                        <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>
+                                    ))}
                                 </optgroup>
                                 <optgroup label="Monterzy">
                                     {installers.map(i => (
@@ -412,16 +513,15 @@ export const InstallationDashboard: React.FC = () => {
                     </div>
                     <button
                         onClick={() => {
-                            const team = (document.getElementById('assign-team') as HTMLSelectElement).value;
                             if (!assignDate) {
                                 toast.error('Wybierz datę');
                                 return;
                             }
-                            if (!team) {
-                                toast.error('Wybierz ekipę');
+                            if (!assignTargetId) {
+                                toast.error('Wybierz ekipę lub montera');
                                 return;
                             }
-                            void handleAssignTeam(team, assignDate);
+                            void handleAssignTeam(assignTargetId, assignDate);
                         }}
                         className="bg-accent hover:bg-accent-dark px-6 py-2 rounded-lg font-bold transition-colors"
                     >

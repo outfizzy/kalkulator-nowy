@@ -91,10 +91,10 @@ export const InstallerManagementPanel: React.FC = () => {
                             {/* Installer Header */}
                             <button
                                 onClick={() => toggleExpand(installerStat.installer.id)}
-                                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                                className="w-full p-4 flex flex-col md:flex-row items-start md:items-center justify-between hover:bg-slate-50 transition-colors text-left gap-4"
                             >
-                                <div className="flex items-center gap-4 flex-1">
-                                    <div className="w-10 h-10 bg-accent text-white rounded-full flex items-center justify-center font-bold">
+                                <div className="flex items-center gap-4 w-full md:w-auto">
+                                    <div className="w-10 h-10 bg-accent text-white rounded-full flex items-center justify-center font-bold shrink-0">
                                         {installerStat.installer.firstName[0]}{installerStat.installer.lastName[0]}
                                     </div>
                                     <div className="flex-1">
@@ -105,9 +105,20 @@ export const InstallerManagementPanel: React.FC = () => {
                                             <div className="text-sm text-slate-500">{installerStat.installer.phone}</div>
                                         )}
                                     </div>
+                                    {/* Mobile expand icon */}
+                                    <div className="md:hidden">
+                                        <svg
+                                            className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center gap-8 mr-4">
+                                <div className="flex flex-wrap items-center gap-4 md:gap-8 w-full md:w-auto justify-between md:justify-end md:mr-4">
                                     <div className="text-center">
                                         <div className="text-xs text-slate-500 uppercase">Przypisane</div>
                                         <div className="text-lg font-bold text-slate-800">{installerStat.totalAssignments}</div>
@@ -121,7 +132,7 @@ export const InstallerManagementPanel: React.FC = () => {
                                         <div className="text-lg font-bold text-blue-600">{installerStat.inProgressInstallations}</div>
                                     </div>
                                     {installerStat.nextScheduledInstallation && (
-                                        <div className="text-center">
+                                        <div className="text-center hidden sm:block">
                                             <div className="text-xs text-slate-500 uppercase">Następny</div>
                                             <div className="text-sm font-medium text-slate-700">
                                                 {new Date(installerStat.nextScheduledInstallation.scheduledDate!).toLocaleDateString('pl-PL')}
@@ -131,7 +142,7 @@ export const InstallerManagementPanel: React.FC = () => {
                                 </div>
 
                                 <svg
-                                    className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                    className={`hidden md:block w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -173,9 +184,9 @@ export const InstallerManagementPanel: React.FC = () => {
                                                             </div>
                                                         )}
                                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${installation.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                                installation.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                                                                    installation.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                                        'bg-red-100 text-red-700'
+                                                            installation.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                                                installation.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                                    'bg-red-100 text-red-700'
                                                             }`}>
                                                             {installation.status === 'completed' ? 'Ukończony' :
                                                                 installation.status === 'scheduled' ? 'Zaplanowany' :

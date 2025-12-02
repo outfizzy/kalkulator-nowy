@@ -38,6 +38,8 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
 
     const existingAddon = currentAddons.find(a => a.id === 'alu-schiebetuer');
 
+    const panelCount = width < 3000 ? 3 : width < 4000 ? 4 : 5;
+
     return (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
             <div className="flex justify-between items-start mb-4">
@@ -50,35 +52,44 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Controls */}
+                <div className="lg:col-span-1 space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Szerokość (mm)</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Szerokość (mm)</label>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                value={width}
+                                min={2000}
+                                max={Math.min(6000, maxRoofWidth)}
+                                step={100}
+                                onChange={(e) => setWidth(Number(e.target.value))}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 pl-4 font-bold text-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">mm</span>
+                        </div>
                         <input
-                            type="number"
-                            value={width}
+                            type="range"
                             min={2000}
                             max={Math.min(6000, maxRoofWidth)}
                             step={100}
+                            value={width}
                             onChange={(e) => setWidth(Number(e.target.value))}
-                            className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-accent focus:border-accent"
+                            className="w-full mt-3 accent-accent h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
                         />
-                        <div className="flex justify-between text-xs text-slate-400 mt-1">
-                            <span>2000 mm</span>
-                            <span>{Math.min(6000, maxRoofWidth)} mm</span>
-                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Wariant szkła</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Wariant szkła</label>
                         <div className="flex gap-2">
                             {(['klar', 'matt', 'ig'] as GlassVariant[]).map(opt => (
                                 <button
                                     key={opt}
                                     onClick={() => setGlass(opt)}
-                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold border transition-all ${glass === opt
-                                        ? 'border-accent bg-accent text-white'
-                                        : 'border-slate-200 text-slate-600 hover:border-accent/50'
+                                    className={`flex-1 py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all ${glass === opt
+                                        ? 'border-accent bg-accent text-white shadow-md'
+                                        : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                                         }`}
                                 >
                                     {opt === 'klar' ? 'Klar' : opt === 'matt' ? 'Mat' : 'IG'}
@@ -88,62 +99,94 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Ilość</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Ilość zestawów</label>
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setQuantity(Math.max(0, quantity - 1))}
-                                className="w-10 h-10 rounded-lg border border-slate-300 flex items-center justify-center hover:bg-slate-50"
+                                className="w-12 h-12 rounded-xl border-2 border-slate-200 flex items-center justify-center hover:bg-slate-50 text-xl font-bold text-slate-500"
                             >-</button>
-                            <input
-                                type="number"
-                                value={quantity}
-                                onChange={(e) => setQuantity(Math.max(0, Number(e.target.value)))}
-                                className="w-20 text-center border border-slate-300 rounded-lg p-2.5 font-bold"
-                            />
+                            <div className="flex-1 text-center font-bold text-xl bg-slate-50 py-2.5 rounded-xl border border-slate-200">
+                                {quantity}
+                            </div>
                             <button
                                 onClick={() => setQuantity(quantity + 1)}
-                                className="w-10 h-10 rounded-lg border border-slate-300 flex items-center justify-center hover:bg-slate-50"
+                                className="w-12 h-12 rounded-xl border-2 border-slate-200 flex items-center justify-center hover:bg-slate-50 text-xl font-bold text-slate-500"
                             >+</button>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col justify-between">
-                    <div>
-                        <h5 className="font-bold text-slate-700 mb-2">Szczegóły konfiguracji</h5>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Konfiguracja:</span>
-                                <span className="font-medium">{config}</span>
+                {/* Middle Column: Visual Representation */}
+                <div className="lg:col-span-2 bg-slate-50 rounded-2xl p-6 border border-slate-200 flex flex-col">
+                    <h5 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <span className="text-xl">👁️</span> Podgląd konfiguracji
+                    </h5>
+
+                    <div className="flex-1 flex items-center justify-center min-h-[200px] bg-white rounded-xl border border-slate-200 p-8 relative overflow-hidden">
+                        {/* Frame */}
+                        <div
+                            className="relative border-4 border-slate-700 bg-slate-100 shadow-inner"
+                            style={{
+                                width: '100%',
+                                maxWidth: '500px',
+                                aspectRatio: `${width / 2200}`, // Approximate aspect ratio
+                                maxHeight: '250px'
+                            }}
+                        >
+                            {/* Panels */}
+                            <div className="absolute inset-0 flex">
+                                {Array.from({ length: panelCount }).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className={`h-full border-r border-slate-400 relative ${glass === 'matt' ? 'bg-white/80 backdrop-blur-sm' :
+                                                glass === 'ig' ? 'bg-blue-50/30' :
+                                                    'bg-blue-100/20'
+                                            }`}
+                                        style={{ width: `${100 / panelCount}%` }}
+                                    >
+                                        {/* Handle/Frame detail */}
+                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-12 bg-slate-400 rounded-full mr-1 opacity-50" />
+                                    </div>
+                                ))}
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Cena jedn.:</span>
-                                <span className="font-medium">{formatCurrency(price)}</span>
+
+                            {/* Dimensions Label */}
+                            <div className="absolute -bottom-8 left-0 right-0 text-center text-xs font-mono text-slate-500">
+                                ↔ {width} mm
                             </div>
-                            <div className="flex justify-between pt-2 border-t border-slate-200 mt-2">
-                                <span className="font-bold text-slate-700">Razem:</span>
-                                <span className="font-bold text-accent text-lg">{formatCurrency(totalPrice)}</span>
-                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-xl border border-slate-100">
+                            <div className="text-xs text-slate-500 mb-1">Konfiguracja</div>
+                            <div className="font-bold text-slate-800">{config}</div>
+                            <div className="text-xs text-slate-400 mt-1">{panelCount} panele</div>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border border-slate-100">
+                            <div className="text-xs text-slate-500 mb-1">Cena jednostkowa</div>
+                            <div className="font-bold text-accent text-lg">{formatCurrency(price)}</div>
                         </div>
                     </div>
 
                     <button
                         onClick={handleSave}
-                        className={`w-full mt-4 py-3 rounded-xl font-bold text-white transition-all ${quantity > 0
-                            ? 'bg-accent hover:bg-accent/90 shadow-md hover:shadow-lg'
-                            : 'bg-slate-300 cursor-not-allowed'}`}
+                        className={`w-full mt-6 py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg ${quantity > 0
+                            ? 'bg-accent hover:bg-accent/90 hover:shadow-accent/30 hover:scale-[1.02]'
+                            : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
                         disabled={quantity === 0}
                     >
-                        {existingAddon ? 'Zaktualizuj' : 'Dodaj do oferty'}
+                        {existingAddon ? 'Zaktualizuj Ofertę' : `Dodaj do Oferty (+${formatCurrency(totalPrice)})`}
                     </button>
                 </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 mb-2 font-semibold">Dostępne konfiguracje:</p>
+            <div className="mt-6 pt-4 border-t border-slate-100">
+                <p className="text-xs text-slate-500 mb-2 font-semibold">Dostępne warianty:</p>
                 <div className="flex flex-wrap gap-2">
                     {aluminiumWallsData.aluminium_schiebetueren.products.map(p => (
-                        <span key={p.width_mm} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">
+                        <span key={p.width_mm} className={`text-[10px] px-2 py-1 rounded border transition-colors ${width === p.width_mm ? 'bg-accent text-white border-accent' : 'bg-slate-50 text-slate-500 border-slate-200'
+                            }`}>
                             {p.width_mm}mm ({p.configuration})
                         </span>
                     ))}

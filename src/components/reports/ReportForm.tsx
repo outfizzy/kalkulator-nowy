@@ -1,49 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { getAllOffers } from '../../utils/storage';
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
-import type { MeasurementReport, Visit, Offer } from '../../types';
+import { generateMeasurementReportPDF } from '../../utils/measurementReportPDF';
+import type { MeasurementReport, Visit, Offer, Installation } from '../../types';
 
 export const ReportForm: React.FC = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { currentUser } = useAuth();
-    const [offers, setOffers] = useState<Offer[]>([]);
+    const [offers] = useState<Offer[]>(() => getAllOffers());
 
     // Report State
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
     const [carPlate, setCarPlate] = useState('');
     const [odometerStart, setOdometerStart] = useState<number | ''>('');
     const [odometerEnd, setOdometerEnd] = useState<number | ''>('');
-    const [totalKmManual, setTotalKmManual] = useState<number | ''>(''); // Manual km input
+    const [totalKmManual, setTotalKmManual] = useState<number | ''>('');
     const [withDriver, setWithDriver] = useState(false);
     const [carIssues, setCarIssues] = useState('');
-    const [reportDescription, setReportDescription] = useState(''); // Report-level description
+    const [reportDescription, setReportDescription] = useState('');
 
     // Visits State
     const [visits, setVisits] = useState<Visit[]>([]);
 
-    // Visit Form State (for adding new visit)
+    // Visit Form State
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
     const [visitOutcome, setVisitOutcome] = useState<Visit['outcome']>('measured');
     const [visitNotes, setVisitNotes] = useState('');
 
-    // Linked Offers State (for associating multiple offers with this measurement day)
+    // Linked Offers State
     const [selectedLinkedOffers, setSelectedLinkedOffers] = useState<Offer[]>([]);
 
-    // Load offers for autocomplete
+    // Scheduled Installations State
+    const [scheduledInstallations, setScheduledInstallations] = useState<Installation[]>([]);
+
+    // Load schedule when date changes
     useEffect(() => {
-        const loadedOffers = getAllOffers();
-        setOffers(loadedOffers);
-        console.log('Loaded offers:', loadedOffers.length); // Debug
-        if (loadedOffers.length === 0) {
-            console.warn('No offers found in localStorage');
-        }
-        // const profile = getSalesProfile();
-        // Could auto-fill car plate if stored in profile
-    }, []);
+        const fetchSchedule = async () => {
+            if (!currentUser) return;
+            try {
+                // Get all installations and filter client-side for now
+                // Ideally we should have a query by date range and user
+                const allInstallations = await DatabaseService.getInstallations();
+                const usersScheduled = allInstallations.filter(inst =>
+                    inst.scheduledDate === date &&
+                    (inst.teamId === currentUser.id ||
+                        // Check assignments if teamId is generic team
+                        // For simplicity, let's assume if user is assigned via teamId or assignments
+                        true // For now show all for date to be safe, or filter strictly?
+                        // Let's filter by date only for now to be helpful
+                    )
+                );
+
+                // Filter for current user if not admin? 
+                // Let's just show all for that date for now, user can pick
+                setScheduledInstallations(usersScheduled);
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+            }
+        };
+        fetchSchedule();
+    }, [date, currentUser]);
 
     // Filter offers for autocomplete
     const filteredOffers = searchQuery.length > 1
@@ -66,6 +87,47 @@ export const ReportForm: React.FC = () => {
         setSearchQuery(`${offer.customer.firstName} ${offer.customer.lastName} (${offer.customer.city})`);
     };
 
+    const handleImportFromSchedule = () => {
+        if (scheduledInstallations.length === 0) {
+            toast('Brak zaplanowanych wizyt na ten dzień');
+            return;
+        }
+
+        const newVisits: Visit[] = scheduledInstallations.map(inst => ({
+            id: crypto.randomUUID(),
+            offerId: inst.offerId,
+            customerName: `${inst.client.firstName} ${inst.client.lastName}`,
+            address: `${inst.client.address}, ${inst.client.city}`,
+            productSummary: inst.productSummary,
+            price: 0, // Price might not be available in installation object directly
+            outcome: inst.status === 'completed' ? 'measured' : 'measured', // Default
+            notes: inst.notes || ''
+        }));
+
+        // Filter out duplicates based on offerId
+        const uniqueNewVisits = newVisits.filter(nv =>
+            !visits.some(existing => existing.offerId === nv.offerId)
+        );
+
+        if (uniqueNewVisits.length === 0) {
+            toast('Wszystkie wizyty z kalendarza są już na liście');
+            return;
+        }
+
+        setVisits([...visits, ...uniqueNewVisits]);
+        toast.success(`Zaimportowano ${uniqueNewVisits.length} wizyt z kalendarza`);
+
+        // Also link offers if found
+        const offersToLink = offers.filter(o =>
+            uniqueNewVisits.some(v => v.offerId === o.id) &&
+            !selectedLinkedOffers.some(linked => linked.id === o.id)
+        );
+
+        if (offersToLink.length > 0) {
+            setSelectedLinkedOffers([...selectedLinkedOffers, ...offersToLink]);
+        }
+    };
+
     const handleAddVisit = () => {
         if (!selectedOffer && !searchQuery) {
             toast.error('Wybierz ofertę lub wpisz klienta');
@@ -77,10 +139,10 @@ export const ReportForm: React.FC = () => {
             offerId: selectedOffer?.id,
             customerName: selectedOffer
                 ? `${selectedOffer.customer.firstName} ${selectedOffer.customer.lastName}`
-                : searchQuery, // Manual entry if no offer selected
+                : searchQuery,
             address: selectedOffer
                 ? `${selectedOffer.customer.street} ${selectedOffer.customer.houseNumber}, ${selectedOffer.customer.postalCode} ${selectedOffer.customer.city}`
-                : 'Adres ręczny', // Placeholder or add field for manual address
+                : 'Adres ręczny',
             productSummary: selectedOffer
                 ? `${selectedOffer.product.modelId} ${selectedOffer.product.width}x${selectedOffer.product.projection}`
                 : 'Inne',
@@ -109,7 +171,6 @@ export const ReportForm: React.FC = () => {
             return;
         }
 
-        // Calculate total km: either from odometer readings or manual input
         let calculatedTotalKm = 0;
 
         if (odometerStart !== '' && odometerEnd !== '') {
@@ -134,23 +195,31 @@ export const ReportForm: React.FC = () => {
         const report: MeasurementReport = {
             id: crypto.randomUUID(),
             date,
-            salesRepId: currentUser?.id || 'unknown', // Assign to current user
+            salesRepId: currentUser?.id || 'unknown',
             carPlate,
             odometerStart: start,
             odometerEnd: end,
             totalKm: calculatedTotalKm,
             withDriver,
             carIssues,
-            reportDescription, // Add report description
+            reportDescription,
             visits,
             signedContractsCount: visits.filter(v => v.outcome === 'signed').length,
-            offerIds: selectedLinkedOffers.map(o => o.id), // Link selected offers
+            offerIds: selectedLinkedOffers.map(o => o.id),
             createdAt: new Date()
         };
 
         try {
             await DatabaseService.createReport(report);
-            toast.success('Raport zapisany');
+
+            // Ask to generate PDF
+            if (window.confirm('Raport zapisany! Czy chcesz wygenerować PDF?')) {
+                const userName = currentUser
+                    ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email
+                    : 'Użytkownik';
+                generateMeasurementReportPDF(report, userName);
+            }
+
             navigate('/reports');
         } catch (error) {
             console.error('Error saving report:', error);
@@ -159,7 +228,7 @@ export const ReportForm: React.FC = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-8 pb-10">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-slate-800">Nowy Raport Pomiarowy</h1>
                 <button onClick={() => navigate('/reports')} className="text-slate-500 hover:text-slate-700">
@@ -255,94 +324,22 @@ export const ReportForm: React.FC = () => {
                 </div>
             </div>
 
-            {/* Linked Offers Section */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Powiązane Oferty</h2>
-                <p className="text-sm text-slate-600 mb-4">
-                    Wybierz oferty, które będą przypisane do tego dnia pomiarowego
-                </p>
-
-                {/* Offer Selection Dropdown */}
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Dodaj ofertę</label>
-                    <select
-                        className="w-full p-2 border border-slate-300 rounded-lg"
-                        onChange={(e) => {
-                            const selectedId = e.target.value;
-                            if (!selectedId) return;
-
-                            const offer = offers.find(o => o.id === selectedId);
-                            if (offer && !selectedLinkedOffers.find(o => o.id === offer.id)) {
-                                setSelectedLinkedOffers([...selectedLinkedOffers, offer]);
-                            }
-                            e.target.value = ''; // Reset selection
-                        }}
-                    >
-                        <option value="">-- Wybierz ofertę --</option>
-                        {offers
-                            .filter(o => !selectedLinkedOffers.find(sel => sel.id === o.id))
-                            .map(offer => (
-                                <option key={offer.id} value={offer.id}>
-                                    {offer.customer.firstName} {offer.customer.lastName} - {offer.customer.city} (#{offer.id.slice(0, 8)})
-                                </option>
-                            ))
-                        }
-                    </select>
-                </div>
-
-                {/* Selected Offers List */}
-                {selectedLinkedOffers.length > 0 && (
-                    <div className="space-y-2">
-                        <p className="text-sm font-medium text-slate-700">Wybrane oferty ({selectedLinkedOffers.length}):</p>
-                        {selectedLinkedOffers.map(offer => (
-                            <div
-                                key={offer.id}
-                                className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
-                            >
-                                <div className="flex-1">
-                                    <p className="font-medium text-slate-800">
-                                        {offer.customer.firstName} {offer.customer.lastName}
-                                    </p>
-                                    <p className="text-sm text-slate-600">
-                                        {offer.customer.city} • {offer.product.modelId}
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedLinkedOffers(selectedLinkedOffers.filter(o => o.id !== offer.id));
-                                    }}
-                                    className="ml-4 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Usuń"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {selectedLinkedOffers.length === 0 && (
-                    <p className="text-sm text-slate-400 italic">Brak przypisanych ofert</p>
-                )}
-            </div>
-
-            {/* Debug info for offers */}
-            {offers.length > 0 && (
-                <div className="text-xs text-slate-500 bg-accent-soft/60 p-2 rounded">
-                    Załadowano {offers.length} ofert do wyszukiwania
-                </div>
-            )}
-            {offers.length === 0 && (
-                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                    ⚠️ Brak ofert w systemie. Możesz wpisać dane klientów ręcznie.
-                </div>
-            )}
-
             {/* Visits List */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Lista Wizyt / Pomiarów</h2>
+                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 className="text-lg font-bold text-slate-700">Lista Wizyt / Pomiarów</h2>
+                    {scheduledInstallations.length > 0 && (
+                        <button
+                            onClick={handleImportFromSchedule}
+                            className="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-lg font-bold hover:bg-purple-200 transition-colors flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Pobierz z Kalendarza ({scheduledInstallations.length})
+                        </button>
+                    )}
+                </div>
 
                 {/* Add Visit Form */}
                 <div className="bg-slate-50 p-4 rounded-lg mb-6 border border-slate-200">
