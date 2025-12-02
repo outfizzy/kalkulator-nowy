@@ -5,6 +5,8 @@ import { trendstyleAccessories } from '../data/trendstyle_accessories';
 import { LightingSelector } from './configurator/LightingSelector';
 import { KeilfensterSelector } from './configurator/KeilfensterSelector';
 import { PanoramaWallSelector } from './configurator/PanoramaWallSelector';
+import { SlidingDoorSelector } from './configurator/SlidingDoorSelector';
+import { AluminumWallSelector } from './configurator/AluminumWallSelector';
 import { AwningSelector } from './configurator/AwningSelector';
 import trendstyleData from '../data/trendstyle_full.json';
 import orangelineData from '../data/orangeline_full.json';
@@ -632,13 +634,12 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
 
                                         <div className="min-h-[300px]">
                                             {activeWallTab === 'sliding' && (
-                                                <div>Sliding Doors Temporarily Disabled</div>
-                                                /*<SlidingDoorSelector
+                                                <SlidingDoorSelector
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
-                                                />*/
+                                                />
                                             )}
                                             {activeWallTab === 'panorama' && (
                                                 <PanoramaWallSelector
@@ -648,14 +649,13 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                                 />
                                             )}
                                             {activeWallTab === 'walls' && (
-                                                <div>Aluminum Walls Temporarily Disabled</div>
-                                                /*<AluminumWallSelector
+                                                <AluminumWallSelector
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
-                                                />*/
+                                                />
                                             )}
                                             {activeWallTab === 'keil' && (
                                                 <KeilfensterSelector
