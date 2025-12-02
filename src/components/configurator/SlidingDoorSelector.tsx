@@ -14,6 +14,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
     const existing = currentAddons.find(a => a.id === 'alu-schiebetuer');
 
     const [width, setWidth] = useState<number>(existing?.width || 3000);
+    const [height, setHeight] = useState<number>(2200); // Default height
     const [glass, setGlass] = useState<GlassVariant>(existing?.variant?.includes('Mat') ? 'matt' : existing?.variant?.includes('IG') ? 'ig' : 'klar');
     const [quantity, setQuantity] = useState<number>(existing?.quantity || 0);
 
@@ -29,7 +30,8 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                 variant: `${glass === 'klar' ? 'Klar' : glass === 'matt' ? 'Mat' : 'IG'} (${config})`,
                 width,
                 quantity,
-                price: totalPrice
+                price: totalPrice,
+                description: `Wymiary: ${width}mm x ${height}mm`
             });
         } else {
             onRemove('alu-schiebetuer');
@@ -55,9 +57,9 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Controls */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Szerokość (mm)</label>
-                        <div className="relative">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Szerokość (mm)</label>
                             <input
                                 type="number"
                                 value={width}
@@ -65,10 +67,24 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                                 max={Math.min(6000, maxRoofWidth)}
                                 step={100}
                                 onChange={(e) => setWidth(Number(e.target.value))}
-                                className="w-full border-2 border-slate-200 rounded-xl p-3 pl-4 font-bold text-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
                             />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">mm</span>
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Wysokość (mm)</label>
+                            <input
+                                type="number"
+                                value={height}
+                                min={1800}
+                                max={2600}
+                                step={10}
+                                onChange={(e) => setHeight(Number(e.target.value))}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
                         <input
                             type="range"
                             min={2000}
@@ -76,8 +92,12 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                             step={100}
                             value={width}
                             onChange={(e) => setWidth(Number(e.target.value))}
-                            className="w-full mt-3 accent-accent h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                            className="w-full accent-accent h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
                         />
+                        <div className="flex justify-between text-xs text-slate-400 mt-1">
+                            <span>2000mm</span>
+                            <span>{Math.min(6000, maxRoofWidth)}mm</span>
+                        </div>
                     </div>
 
                     <div>
@@ -129,7 +149,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                             style={{
                                 width: '100%',
                                 maxWidth: '500px',
-                                aspectRatio: `${width / 2200}`, // Approximate aspect ratio
+                                aspectRatio: `${width / height}`,
                                 maxHeight: '250px'
                             }}
                         >
@@ -139,8 +159,8 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                                     <div
                                         key={i}
                                         className={`h-full border-r border-slate-400 relative ${glass === 'matt' ? 'bg-white/80 backdrop-blur-sm' :
-                                                glass === 'ig' ? 'bg-blue-50/30' :
-                                                    'bg-blue-100/20'
+                                            glass === 'ig' ? 'bg-blue-50/30' :
+                                                'bg-blue-100/20'
                                             }`}
                                         style={{ width: `${100 / panelCount}%` }}
                                     >
@@ -153,6 +173,9 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                             {/* Dimensions Label */}
                             <div className="absolute -bottom-8 left-0 right-0 text-center text-xs font-mono text-slate-500">
                                 ↔ {width} mm
+                            </div>
+                            <div className="absolute top-0 bottom-0 -left-8 flex items-center text-xs font-mono text-slate-500 [writing-mode:vertical-lr] rotate-180">
+                                ↕ {height} mm
                             </div>
                         </div>
                     </div>
