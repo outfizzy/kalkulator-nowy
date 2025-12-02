@@ -1868,6 +1868,7 @@ export const DatabaseService = {
             id: row.id,
             type: row.type,
             amount: Number(row.amount),
+            currency: row.currency || 'EUR',
             category: row.category,
             description: row.description,
             date: row.date,
@@ -1888,6 +1889,7 @@ export const DatabaseService = {
             .insert({
                 type: transaction.type,
                 amount: transaction.amount,
+                currency: transaction.currency,
                 category: transaction.category,
                 description: transaction.description,
                 date: transaction.date,
@@ -1905,6 +1907,7 @@ export const DatabaseService = {
             id: data.id,
             type: data.type,
             amount: Number(data.amount),
+            currency: data.currency || 'EUR',
             category: data.category,
             description: data.description,
             date: data.date,

@@ -13,6 +13,7 @@ interface AddTransactionModalProps {
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen, onClose, onSuccess, initialType = 'income' }) => {
     const [type, setType] = useState<'income' | 'expense'>(initialType);
     const [amount, setAmount] = useState('');
+    const [currency, setCurrency] = useState<'EUR' | 'PLN'>('EUR');
     const [category, setCategory] = useState('');
     const [description, setDescription] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -77,12 +78,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
             await DatabaseService.createWalletTransaction({
                 type,
                 amount: Number(amount),
+                currency,
                 category: type === 'income' ? 'Wpłata od klienta' : category,
                 description,
                 date: new Date(date).toISOString(),
-                customerId: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined, // Using name as ID for now as we don't have direct customer ID in types easily
+                customerId: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
                 customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
-                contractNumber: undefined // Could be added if we link to specific contract
+                contractNumber: undefined
             });
 
             toast.success('Transakcja dodana pomyślnie');
@@ -153,10 +155,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                         </button>
                     </div>
 
-                    {/* Amount & Date */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Amount, Currency & Date */}
+                    <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Kwota (PLN)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Kwota</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -166,6 +168,17 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                                 placeholder="0.00"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Waluta</label>
+                            <select
+                                value={currency}
+                                onChange={(e) => setCurrency(e.target.value as 'EUR' | 'PLN')}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+                            >
+                                <option value="EUR">EUR (€)</option>
+                                <option value="PLN">PLN (zł)</option>
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>

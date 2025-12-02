@@ -355,6 +355,7 @@ export interface WalletTransaction {
     id: string;
     type: 'income' | 'expense';
     amount: number;
+    currency: 'EUR' | 'PLN';
     category: string;
     description?: string;
     date: string; // ISO Date string

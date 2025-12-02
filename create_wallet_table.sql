@@ -3,6 +3,7 @@ create table if not exists public.wallet_transactions (
     id uuid default gen_random_uuid() primary key,
     type text not null check (type in ('income', 'expense')),
     amount decimal(10, 2) not null,
+    currency text not null default 'EUR' check (currency in ('EUR', 'PLN')),
     category text not null,
     description text,
     date timestamp with time zone default timezone('utc'::text, now()) not null,

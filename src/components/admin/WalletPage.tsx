@@ -36,10 +36,10 @@ export const WalletPage: React.FC = () => {
         return t.type === filterType;
     });
 
-    const formatCurrency = (amount: number) => {
+    const formatCurrency = (amount: number, currency: 'EUR' | 'PLN' = 'EUR') => {
         return new Intl.NumberFormat('pl-PL', {
             style: 'currency',
-            currency: 'PLN'
+            currency: currency
         }).format(amount);
     };
 
@@ -200,7 +200,7 @@ export const WalletPage: React.FC = () => {
                                         </td>
                                         <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
                                             }`}>
-                                            {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                                            {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
                                         </td>
                                     </tr>
                                 ))
