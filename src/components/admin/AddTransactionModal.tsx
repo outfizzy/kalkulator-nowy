@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DatabaseService } from '../../services/database';
-import type { Customer, WalletTransaction } from '../../types';
+import type { Customer } from '../../types';
 import { toast } from 'react-hot-toast';
 
 interface AddTransactionModalProps {

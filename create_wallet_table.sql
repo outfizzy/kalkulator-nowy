@@ -25,9 +25,9 @@ create policy "Admins can view all transactions"
     on public.wallet_transactions for select
     using (
         exists (
-            select 1 from public.users
-            where users.id = auth.uid()
-            and users.role in ('admin', 'manager')
+            select 1 from public.profiles
+            where profiles.id = auth.uid()
+            and profiles.role in ('admin', 'manager')
         )
     );
 
@@ -35,9 +35,9 @@ create policy "Admins can insert transactions"
     on public.wallet_transactions for insert
     with check (
         exists (
-            select 1 from public.users
-            where users.id = auth.uid()
-            and users.role in ('admin', 'manager')
+            select 1 from public.profiles
+            where profiles.id = auth.uid()
+            and profiles.role in ('admin', 'manager')
         )
     );
 
@@ -45,9 +45,9 @@ create policy "Admins can update transactions"
     on public.wallet_transactions for update
     using (
         exists (
-            select 1 from public.users
-            where users.id = auth.uid()
-            and users.role in ('admin', 'manager')
+            select 1 from public.profiles
+            where profiles.id = auth.uid()
+            and profiles.role in ('admin', 'manager')
         )
     );
 
@@ -55,8 +55,8 @@ create policy "Admins can delete transactions"
     on public.wallet_transactions for delete
     using (
         exists (
-            select 1 from public.users
-            where users.id = auth.uid()
-            and users.role in ('admin', 'manager')
+            select 1 from public.profiles
+            where profiles.id = auth.uid()
+            and profiles.role in ('admin', 'manager')
         )
     );

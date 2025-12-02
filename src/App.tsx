@@ -26,7 +26,6 @@ import { ReportForm } from './components/reports/ReportForm';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
-import { InstallerInstallationsPage } from './components/installations/InstallerInstallationsPage';
 import { WalletPage } from './components/admin/WalletPage';
 import { InstallationCalendar } from './components/installations/InstallationCalendar';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
