@@ -31,9 +31,9 @@ export const WalletPage: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteTransaction, setDeleteTransaction] = useState<WalletTransaction | null>(null);
 
-    // TODO: Implement deleted transactions view in next iteration
-    // const [showDeleted, setShowDeleted] = useState(false);
-    // const [deletedTransactions, setDeletedTransactions] = useState<DeletedWalletTransaction[]>([]);
+    // Deleted transactions view
+    const [showDeleted, setShowDeleted] = useState(false);
+    const [deletedTransactions, setDeletedTransactions] = useState<any[]>([]);
 
     useEffect(() => {
         loadData();
@@ -118,21 +118,20 @@ export const WalletPage: React.FC = () => {
         setShowDeleteModal(true);
     };
 
-    // TODO: Implement deleted transactions loading in next iteration
-    // const loadDeletedTransactions = async () => {
-    //     try {
-    //         const deleted = await DatabaseService.getDeletedWalletTransactions();
-    //         setDeletedTransactions(deleted);
-    //     } catch (error) {
-    //         console.error('Error loading deleted transactions:', error);
-    //     }
-    // };
+    const loadDeletedTransactions = async () => {
+        try {
+            const deleted = await DatabaseService.getDeletedWalletTransactions();
+            setDeletedTransactions(deleted);
+        } catch (error) {
+            console.error('Error loading deleted transactions:', error);
+        }
+    };
 
-    // useEffect(() => {
-    //     if (showDeleted) {
-    //         loadDeletedTransactions();
-    //     }
-    // }, [showDeleted]);
+    useEffect(() => {
+        if (showDeleted) {
+            loadDeletedTransactions();
+        }
+    }, [showDeleted]);
 
     const filteredTransactions = transactions.filter(t => {
         if (filterType === 'all') return true;
@@ -295,129 +294,239 @@ export const WalletPage: React.FC = () => {
 
             {/* Transactions List */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="text-xl font-bold text-slate-800">Historia Transakcji</h2>
-
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                <div className="p-6 border-b border-slate-200">
+                    {/* Tab Switcher */}
+                    <div className="flex gap-4 mb-6">
                         <button
-                            onClick={() => setFilterType('all')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            onClick={() => setShowDeleted(false)}
+                            className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${!showDeleted
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                         >
-                            Wszystkie
+                            <div className="flex items-center justify-center gap-2">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                Aktywne Transakcje ({transactions.length})
+                            </div>
                         </button>
                         <button
-                            onClick={() => setFilterType('income')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            onClick={() => setShowDeleted(true)}
+                            className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${showDeleted
+                                ? 'bg-red-600 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                         >
-                            Wpływy
-                        </button>
-                        <button
-                            onClick={() => setFilterType('expense')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            Wydatki
+                            <div className="flex items-center justify-center gap-2">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Usunięte Transakcje ({deletedTransactions.length})
+                            </div>
                         </button>
                     </div>
+
+                    {!showDeleted && (
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h2 className="text-xl font-bold text-slate-800">Historia Transakcji</h2>
+
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => setFilterType('all')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Wszystkie
+                                </button>
+                                <button
+                                    onClick={() => setFilterType('income')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Wpływy
+                                </button>
+                                <button
+                                    onClick={() => setFilterType('expense')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Wydatki
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
-                            <tr>
-                                <th className="px-6 py-4">Data</th>
-                                <th className="px-6 py-4">Typ / Kategoria</th>
-                                <th className="px-6 py-4">Opis / Klient</th>
-                                <th className="px-6 py-4 text-right">Kwota</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
+                    {!showDeleted ? (
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                                        Ładowanie transakcji...
-                                    </td>
+                                    <th className="px-6 py-4">Data</th>
+                                    <th className="px-6 py-4">Typ / Kategoria</th>
+                                    <th className="px-6 py-4">Opis / Klient</th>
+                                    <th className="px-6 py-4 text-right">Kwota</th>
+                                    <th className="px-6 py-4 text-right">Akcje</th>
                                 </tr>
-                            ) : filteredTransactions.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                                        Brak transakcji w historii
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredTransactions.map((tx) => (
-                                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                                            {formatDate(tx.date)}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${tx.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
-                                                    }`}>
-                                                    {tx.type === 'income' ? (
-                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-                                                        </svg>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-slate-800">{tx.category}</p>
-                                                    <p className="text-xs text-slate-400 uppercase">{tx.type === 'income' ? 'Wpływ' : 'Wydatek'}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {tx.type === 'income' && tx.customerName ? (
-                                                <div>
-                                                    <p className="font-medium text-slate-800">{tx.customerName}</p>
-                                                    {tx.description && <p className="text-sm text-slate-500">{tx.description}</p>}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-slate-600">{tx.description || '-'}</p>
-                                            )}
-                                        </td>
-                                        <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
-                                            }`}>
-                                            {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
-
-                                            {tx.currency === 'EUR' && tx.type === 'income' && (
-                                                <button
-                                                    onClick={() => openExchangeModal(tx)}
-                                                    className="ml-3 text-xs font-normal text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
-                                                >
-                                                    Wymień na PLN
-                                                </button>
-                                            )}
-
-                                            {tx.originalCurrency && (
-                                                <div className="text-xs font-normal text-slate-400 mt-1">
-                                                    z {formatCurrency(tx.originalAmount || 0, tx.originalCurrency)}
-                                                    <span className="ml-1">(kurs: {tx.exchangeRate})</span>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => openDeleteModal(tx)}
-                                                className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                                                title="Usuń transakcję"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                            Ładowanie transakcji...
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : filteredTransactions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                            Brak transakcji w historii
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredTransactions.map((tx) => (
+                                        <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                                                {formatDate(tx.date)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-lg ${tx.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                                                        }`}>
+                                                        {tx.type === 'income' ? (
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-slate-800">{tx.category}</p>
+                                                        <p className="text-xs text-slate-400 uppercase">{tx.type === 'income' ? 'Wpływ' : 'Wydatek'}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {tx.type === 'income' && tx.customerName ? (
+                                                    <div>
+                                                        <p className="font-medium text-slate-800">{tx.customerName}</p>
+                                                        {tx.description && <p className="text-sm text-slate-500">{tx.description}</p>}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-slate-600">{tx.description || '-'}</p>
+                                                )}
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+                                                }`}>
+                                                {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+
+                                                {tx.currency === 'EUR' && tx.type === 'income' && (
+                                                    <button
+                                                        onClick={() => openExchangeModal(tx)}
+                                                        className="ml-3 text-xs font-normal text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
+                                                    >
+                                                        Wymień na PLN
+                                                    </button>
+                                                )}
+
+                                                {tx.originalCurrency && (
+                                                    <div className="text-xs font-normal text-slate-400 mt-1">
+                                                        z {formatCurrency(tx.originalAmount || 0, tx.originalCurrency)}
+                                                        <span className="ml-1">(kurs: {tx.exchangeRate})</span>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => openDeleteModal(tx)}
+                                                    className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                                                    title="Usuń transakcję"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <table className="w-full text-left">
+                            <thead className="bg-red-50 text-red-900 text-xs uppercase font-semibold">
+                                <tr>
+                                    <th className="px-6 py-4">Usunięto</th>
+                                    <th className="px-6 py-4">Powód usunięcia</th>
+                                    <th className="px-6 py-4">Oryginalna Data</th>
+                                    <th className="px-6 py-4">Typ / Kategoria</th>
+                                    <th className="px-6 py-4">Opis / Klient</th>
+                                    <th className="px-6 py-4 text-right">Kwota</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-red-100 bg-red-50/30">
+                                {deletedTransactions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                            Brak usuniętych transakcji
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    deletedTransactions.map((tx) => (
+                                        <tr key={tx.id} className="hover:bg-red-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                <div className="font-medium text-slate-800">{formatDate(tx.deletedAt)}</div>
+                                                <div className="text-xs text-slate-500">przez {tx.deletedByName || 'Nieznany'}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-red-600 font-medium">
+                                                {tx.deletionReason}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                                                {formatDate(tx.date)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-lg ${tx.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                                                        }`}>
+                                                        {tx.type === 'income' ? (
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-slate-800">{tx.category}</p>
+                                                        <p className="text-xs text-slate-400 uppercase">{tx.type === 'income' ? 'Wpływ' : 'Wydatek'}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {tx.type === 'income' && tx.customerName ? (
+                                                    <div>
+                                                        <p className="font-medium text-slate-800">{tx.customerName}</p>
+                                                        {tx.description && <p className="text-sm text-slate-500">{tx.description}</p>}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-slate-600">{tx.description || '-'}</p>
+                                                )}
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+                                                }`}>
+                                                {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
 
