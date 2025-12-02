@@ -70,7 +70,7 @@ export interface SlidingWallModel {
 
 export interface SelectedAddon {
     id: string;
-    type: 'lighting' | 'slidingWall' | 'awning' | 'zipScreen' | 'heater' | 'panorama' | 'other';
+    type: 'lighting' | 'slidingWall' | 'fixedWall' | 'awning' | 'zipScreen' | 'heater' | 'panorama' | 'other';
     name: string;
     variant?: string; // e.g., "AL23" or "Spots"
     quantity?: number; // for heaters, spots
