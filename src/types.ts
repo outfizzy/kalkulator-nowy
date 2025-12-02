@@ -367,6 +367,10 @@ export interface WalletTransaction {
 
     processedBy: string; // User ID
     createdAt: Date;
+    // Exchange rate tracking
+    exchangeRate?: number;
+    originalCurrency?: 'EUR' | 'PLN';
+    originalAmount?: number;
 }
 
 export interface WalletStats {

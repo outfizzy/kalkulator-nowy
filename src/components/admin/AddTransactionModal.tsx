@@ -75,7 +75,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
         }
 
         try {
-            await DatabaseService.createWalletTransaction({
+            const transactionData = {
                 type,
                 amount: Number(amount),
                 currency,
@@ -85,7 +85,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                 customerId: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
                 customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
                 contractNumber: undefined
-            });
+            };
+
+            console.log('Attempting to create transaction:', transactionData);
+
+            const result = await DatabaseService.createWalletTransaction(transactionData);
+
+            console.log('Transaction created successfully:', result);
 
             toast.success('Transakcja dodana pomyślnie');
             onSuccess();
@@ -93,7 +99,11 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
             resetForm();
         } catch (error) {
             console.error('Error creating transaction:', error);
-            toast.error('Błąd podczas dodawania transakcji');
+            console.error('Error details:', JSON.stringify(error, null, 2));
+
+            // Show more specific error message
+            const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
+            toast.error(`Błąd podczas dodawania transakcji: ${errorMessage}`);
         }
     };
 

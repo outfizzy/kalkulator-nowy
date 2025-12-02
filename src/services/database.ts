@@ -1956,5 +1956,55 @@ export const DatabaseService = {
             monthlyIncome,
             monthlyExpense
         };
+    },
+
+    async exchangeWalletTransaction(transactionId: string, exchangeRate: number): Promise<WalletTransaction> {
+        // First get the current transaction
+        const { data: currentTx, error: fetchError } = await supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('id', transactionId)
+            .single();
+
+        if (fetchError) throw fetchError;
+        if (!currentTx) throw new Error('Transaction not found');
+        if (currentTx.currency !== 'EUR') throw new Error('Can only exchange EUR transactions');
+
+        const originalAmount = Number(currentTx.amount);
+        const convertedAmount = originalAmount * exchangeRate;
+
+        // Update the transaction with new currency and exchange info
+        const { data, error } = await supabase
+            .from('wallet_transactions')
+            .update({
+                currency: 'PLN',
+                amount: convertedAmount,
+                exchange_rate: exchangeRate,
+                original_currency: 'EUR',
+                original_amount: originalAmount
+            })
+            .eq('id', transactionId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            type: data.type,
+            amount: Number(data.amount),
+            currency: data.currency,
+            category: data.category,
+            description: data.description,
+            date: data.date,
+            customerId: data.customer_id,
+            customerName: data.customer_name,
+            contractNumber: data.contract_number,
+            processedBy: data.processed_by,
+            createdAt: new Date(data.created_at),
+            exchangeRate: data.exchange_rate,
+            originalCurrency: data.original_currency,
+            originalAmount: data.original_amount ? Number(data.original_amount) : undefined
+        };
     }
 };

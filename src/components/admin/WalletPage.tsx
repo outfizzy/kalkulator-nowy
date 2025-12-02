@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../../services/database';
 import type { WalletTransaction, WalletStats } from '../../types';
 import { AddTransactionModal } from './AddTransactionModal';
+import { ExchangeRateModal } from './ExchangeRateModal';
+import { toast } from 'react-hot-toast';
 
 export const WalletPage: React.FC = () => {
     const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -10,6 +12,11 @@ export const WalletPage: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [modalType, setModalType] = useState<'income' | 'expense'>('income');
     const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+
+    // Exchange Modal State
+    const [showExchangeModal, setShowExchangeModal] = useState(false);
+    const [exchangeTransactionId, setExchangeTransactionId] = useState<string | null>(null);
+    const [exchangeAmount, setExchangeAmount] = useState<number>(0);
 
     useEffect(() => {
         loadData();
@@ -29,6 +36,25 @@ export const WalletPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleExchange = async (rate: number) => {
+        if (!exchangeTransactionId) return;
+        try {
+            await DatabaseService.exchangeWalletTransaction(exchangeTransactionId, rate);
+            await loadData(); // Reload data to reflect changes
+            setShowExchangeModal(false);
+            setExchangeTransactionId(null);
+        } catch (error) {
+            console.error('Error exchanging currency:', error);
+            throw error; // Re-throw to be handled by the modal
+        }
+    };
+
+    const openExchangeModal = (transaction: WalletTransaction) => {
+        setExchangeTransactionId(transaction.id);
+        setExchangeAmount(transaction.amount);
+        setShowExchangeModal(true);
     };
 
     const filteredTransactions = transactions.filter(t => {
@@ -201,6 +227,22 @@ export const WalletPage: React.FC = () => {
                                         <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
                                             }`}>
                                             {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+
+                                            {tx.currency === 'EUR' && tx.type === 'income' && (
+                                                <button
+                                                    onClick={() => openExchangeModal(tx)}
+                                                    className="ml-3 text-xs font-normal text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
+                                                >
+                                                    Wymień na PLN
+                                                </button>
+                                            )}
+
+                                            {tx.originalCurrency && (
+                                                <div className="text-xs font-normal text-slate-400 mt-1">
+                                                    z {formatCurrency(tx.originalAmount || 0, tx.originalCurrency)}
+                                                    <span className="ml-1">(kurs: {tx.exchangeRate})</span>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -215,6 +257,13 @@ export const WalletPage: React.FC = () => {
                 onClose={() => setShowAddModal(false)}
                 onSuccess={loadData}
                 initialType={modalType}
+            />
+
+            <ExchangeRateModal
+                isOpen={showExchangeModal}
+                onClose={() => setShowExchangeModal(false)}
+                onExchange={handleExchange}
+                currentAmount={exchangeAmount}
             />
         </div>
     );
