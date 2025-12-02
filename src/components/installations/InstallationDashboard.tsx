@@ -202,13 +202,8 @@ export const InstallationDashboard: React.FC = () => {
 
     // Combine Teams and Sales Reps for Calendar View
     const calendarResources: InstallationTeam[] = [
-        ...teams,
-        ...salesReps.map(rep => ({
-            id: rep.id,
-            name: `${rep.firstName} ${rep.lastName}`,
-            color: '#8b5cf6', // Violet for Sales Reps
-            members: [rep]
-        }))
+        ...teams
+        // Sales Reps removed from calendar view as requested
     ];
 
     return (
