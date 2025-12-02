@@ -1,22 +1,152 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 import type { Offer } from '../types';
 import { getSalesProfile } from './storage';
-import { translations, translate, formatCurrency } from './translations';
+import { translate, formatCurrency } from './translations';
+
+// Helper to add logo and header to each page
+function addHeader(doc: jsPDF, pageNumber: number) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Add logo
+    try {
+        const logoImg = new Image();
+        logoImg.src = '/logo.png';
+        // Logo dimensions: width 60mm, height auto (maintaining aspect ratio)
+        doc.addImage(logoImg, 'PNG', 15, 10, 60, 15);
+    } catch (e) {
+        // If logo fails, add text header
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PolenDach24', 15, 20);
+    }
+
+    // Add page number in top right
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(`Seite ${pageNumber}`, pageWidth - 15, 15, { align: 'right' });
+
+    // Reset text color
+    doc.setTextColor(0);
+}
+
+// Helper to check if we need a new page
+function checkAndAddPage(doc: jsPDF, currentY: number, requiredSpace: number, pageNumber: number): { y: number; page: number } {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const bottomMargin = 20;
+
+    if (currentY + requiredSpace > pageHeight - bottomMargin) {
+        doc.addPage();
+        pageNumber++;
+        addHeader(doc, pageNumber);
+        return { y: 35, page: pageNumber }; // Start below header
+    }
+    return { y: currentY, page: pageNumber };
+}
 
 export async function generateOfferPDF(offer: Offer) {
     const profile = getSalesProfile();
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let currentY = 35; // Start position after header
+    let pageNumber = 1;
 
-    // Create a temporary container for the PDF content
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '794px'; // A4 width at 96 DPI (approx)
-    container.style.backgroundColor = '#ffffff';
-    container.style.fontFamily = 'Inter, sans-serif';
+    // Add header to first page
+    addHeader(doc, pageNumber);
 
+    // Date formatting
     const dateStr = new Date(offer.createdAt).toLocaleDateString('de-DE');
+
+    // Offer title and number
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ANGEBOT', pageWidth - 15, currentY, { align: 'right' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    currentY += 6;
+    doc.text(`Nr: #${offer.id.substring(0, 8)}`, pageWidth - 15, currentY, { align: 'right' });
+    currentY += 5;
+    doc.text(`Datum: ${dateStr}`, pageWidth - 15, currentY, { align: 'right' });
+
+    currentY += 10;
+
+    // Customer and Seller addresses (side by side)
+    const leftCol = 15;
+    const rightCol = pageWidth / 2 + 5;
+
+    // Customer
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100);
+    doc.text('KUNDE', leftCol, currentY);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    currentY += 6;
+    doc.text(`${offer.customer.salutation} ${offer.customer.firstName} ${offer.customer.lastName}`, leftCol, currentY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    currentY += 5;
+    doc.text(`${offer.customer.street} ${offer.customer.houseNumber}`, leftCol, currentY);
+    currentY += 4;
+    doc.text(`${offer.customer.postalCode} ${offer.customer.city}`, leftCol, currentY);
+    currentY += 4;
+    doc.text(offer.customer.country, leftCol, currentY);
+    currentY += 5;
+    doc.setTextColor(100);
+    doc.text(offer.customer.email, leftCol, currentY);
+    currentY += 4;
+    doc.text(offer.customer.phone, leftCol, currentY);
+    doc.setTextColor(0);
+
+    // Seller (on the right side, aligned top)
+    let sellerY = currentY - 33; // Reset to customer start position
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100);
+    doc.text('VERKÄUFER', rightCol, sellerY);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    sellerY += 6;
+
+    if (profile) {
+        doc.text(`${profile.firstName} ${profile.lastName}`, rightCol, sellerY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        sellerY += 5;
+        doc.text('PolenDach24 Vertreter', rightCol, sellerY);
+        sellerY += 5;
+        doc.setTextColor(100);
+        doc.text(profile.email, rightCol, sellerY);
+        sellerY += 4;
+        doc.text(profile.phone || '', rightCol, sellerY);
+    } else {
+        doc.text('PolenDach24', rightCol, sellerY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        sellerY += 5;
+        doc.text('Kundenservice', rightCol, sellerY);
+        sellerY += 5;
+        doc.setTextColor(100);
+        doc.text('kontakt@polendach24.de', rightCol, sellerY);
+    }
+    doc.setTextColor(0);
+
+    currentY += 15;
+
+    // Check if we need a new page
+    const check1 = checkAndAddPage(doc, currentY, 50, pageNumber);
+    currentY = check1.y;
+    pageNumber = check1.page;
+
+    // Product Specification Section
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PRODUKTSPEZIFIKATION', leftCol, currentY);
+    currentY += 7;
 
     // Prepare product details
     const modelName = translate(offer.product.modelId, 'models');
@@ -32,197 +162,175 @@ export async function generateOfferPDF(offer: Offer) {
 
     const installationType = translate(offer.product.installationType, 'installationTypes');
 
-    const addonsHtml = (offer.product.addons.length > 0 || (offer.product.selectedAccessories && offer.product.selectedAccessories.length > 0))
-        ? `
-        <div class="mb-6">
-            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">${translations.addons}</h3>
-            <table class="w-full text-sm border-collapse">
-                <thead class="bg-slate-100 text-slate-600">
-                    <tr>
-                        <th class="p-2 text-left">Position</th>
-                        <th class="p-2 text-right">Preis</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    ${offer.product.addons.map(addon => `
-                        <tr>
-                            <td class="p-2 text-slate-800">
-                                <span class="font-medium">${addon.name}</span>
-                                ${addon.variant ? `<span class="text-slate-500 text-xs ml-1">(${addon.variant})</span>` : ''}
-                            </td>
-                            <td class="p-2 text-right text-slate-800 font-medium">${formatCurrency(addon.price)}</td>
-                        </tr>
-                    `).join('')}
-                    ${offer.product.selectedAccessories ? offer.product.selectedAccessories.map(acc => `
-                        <tr>
-                            <td class="p-2 text-slate-800">
-                                <span class="font-medium">${acc.quantity}x ${acc.name}</span>
-                            </td>
-                            <td class="p-2 text-right text-slate-800 font-medium">${formatCurrency(acc.price * acc.quantity)}</td>
-                        </tr>
-                    `).join('') : ''}
-                </tbody>
-            </table>
-        </div>
-        `
-        : '';
+    // Specification table
+    const specData = [
+        ['Modell:', modelName.toUpperCase()],
+        ['Abmessungen:', `${offer.product.width} mm × ${offer.product.projection} mm`],
+    ];
 
-    const installationHtml = offer.pricing.installationCosts
-        ? `
-        <div class="mb-6">
-            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">${translations.installation}</h3>
-            <div class="bg-slate-50 rounded-lg p-4 border border-slate-100 text-sm">
-                <div class="flex justify-between mb-1">
-                    <span>Montage (${offer.product.installationDays} Tage)</span>
-                    <span class="font-medium">${formatCurrency(offer.pricing.installationCosts.dailyTotal)}</span>
-                </div>
-                <div class="flex justify-between mb-1 text-slate-500 text-xs">
-                    <span>Anfahrt (${offer.pricing.installationCosts.travelDistance} km)</span>
-                    <span>${formatCurrency(offer.pricing.installationCosts.travelCost)}</span>
-                </div>
-                <div class="flex justify-between font-bold border-t border-slate-200 pt-2 mt-2">
-                    <span>Gesamt Montage</span>
-                    <span>${formatCurrency(offer.pricing.installationCosts.totalInstallation)}</span>
-                </div>
-            </div>
-        </div>
-        `
-        : '';
+    if (offer.product.postsHeight) {
+        specData.push(['Pfostenhöhe:', `${offer.product.postsHeight} mm`]);
+    }
 
-    container.innerHTML = `
-        <div class="p-10 bg-white text-slate-900">
-            <!-- Header -->
-            <div class="flex justify-between items-start mb-10 border-b border-slate-200 pb-6">
-                <div>
-                    <h1 class="text-3xl font-bold text-slate-900">PolenDach 24</h1>
-                    <p class="text-sm text-slate-500 mt-1">Profesjonalne Systemy Zadaszeń</p>
-                </div>
-                <div class="text-right">
-                    <h2 class="text-xl font-bold text-slate-800">${translations.offer}</h2>
-                    <p class="text-slate-500 text-sm">Nr: #${offer.id}</p>
-                    <p class="text-slate-500 text-sm">${translations.date}: ${dateStr}</p>
-                </div>
-            </div>
+    specData.push(
+        ['Farbe:', colorName],
+        ['Dachtyp:', `${roofName}${roofDetail ? ' - ' + roofDetail : ''}`],
+        ['Montageart:', installationType],
+        ['Schneelastzone:', `Zone ${offer.snowZone.id} (${offer.snowZone.value} kN/m²)`]
+    );
 
-            <!-- Addresses -->
-            <div class="grid grid-cols-2 gap-10 mb-10">
-                <div>
-                    <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">${translations.customer}</h3>
-                    <div class="text-sm text-slate-800 leading-relaxed">
-                        <p class="font-bold text-base">${offer.customer.salutation} ${offer.customer.firstName} ${offer.customer.lastName}</p>
-                        <p>${offer.customer.street} ${offer.customer.houseNumber}</p>
-                        <p>${offer.customer.postalCode} ${offer.customer.city}</p>
-                        <p>${offer.customer.country}</p>
-                        <p class="mt-2 text-slate-500">${offer.customer.email}</p>
-                        <p class="text-slate-500">${offer.customer.phone}</p>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">${translations.seller}</h3>
-                    <div class="text-sm text-slate-800 leading-relaxed">
-                        ${profile ? `
-                            <p class="font-bold text-base">${profile.firstName} ${profile.lastName}</p>
-                            <p>PolenDach 24 Representative</p>
-                            <p class="mt-2">${profile.email}</p>
-                            <p>${profile.phone}</p>
-                        ` : `
-                            <p class="font-bold text-base">PolenDach 24</p>
-                            <p>Kundenservice</p>
-                            <p>kontakt@polendach24.de</p>
-                        `}
-                    </div>
-                </div>
-            </div>
+    autoTable(doc, {
+        startY: currentY,
+        head: [],
+        body: specData,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 2 },
+        columnStyles: {
+            0: { fontStyle: 'normal', textColor: [100, 100, 100], cellWidth: 50 },
+            1: { fontStyle: 'bold', textColor: [0, 0, 0] }
+        },
+        margin: { left: leftCol }
+    });
 
-            <!-- Product Specs -->
-            <div class="mb-8">
-                <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">${translations.specification}</h3>
-                <div class="bg-slate-50 rounded-lg p-6 border border-slate-100">
-                    <div class="grid grid-cols-2 gap-y-4 text-sm">
-                        <div class="text-slate-500">${translations.model}:</div>
-                        <div class="font-bold text-slate-900 uppercase">${modelName}</div>
-                        
-                        <div class="text-slate-500">${translations.dimensions}:</div>
-                        <div class="font-bold text-slate-900">${offer.product.width} mm x ${offer.product.projection} mm</div>
-                        
-                        ${offer.product.postsHeight ? `
-                        <div class="text-slate-500">Pfostenhöhe:</div>
-                        <div class="font-bold text-slate-900">${offer.product.postsHeight} mm</div>
-                        ` : ''}
+    currentY = (doc as any).lastAutoTable.finalY + 10;
 
-                        <div class="text-slate-500">${translations.color}:</div>
-                        <div class="font-bold text-slate-900">${colorName}</div>
-                        
-                        <div class="text-slate-500">${translations.roofType}:</div>
-                        <div class="font-bold text-slate-900">
-                            ${roofName} <br/>
-                            <span class="text-xs font-normal text-slate-600">${roofDetail}</span>
-                        </div>
+    // Check if we need a new page
+    const check2 = checkAndAddPage(doc, currentY, 40, pageNumber);
+    currentY = check2.y;
+    pageNumber = check2.page;
 
-                        <div class="text-slate-500">Montagetyp:</div>
-                        <div class="font-bold text-slate-900">${installationType}</div>
+    // Addons Section (if any)
+    if (offer.product.addons.length > 0 || (offer.product.selectedAccessories && offer.product.selectedAccessories.length > 0)) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ZUSATZAUSSTATTUNG', leftCol, currentY);
+        currentY += 7;
 
-                        <div class="text-slate-500">${translations.snowZone}:</div>
-                        <div class="font-bold text-accent-dark">
-                            Zone ${offer.snowZone.id} (${offer.snowZone.value} kN/m²)
-                        </div>
-                    </div>
-                </div>
-            </div>
+        const addonsData: any[] = [];
 
-            <!-- Addons -->
-            ${addonsHtml}
-
-            <!-- Installation -->
-            ${installationHtml}
-
-            <!-- Pricing Summary -->
-            <div class="flex justify-end mt-10">
-                <div class="w-1/2 bg-slate-50 p-6 rounded-lg border border-slate-200">
-                    <div class="flex justify-between mb-2 text-sm">
-                        <span class="text-slate-500">${translations.netPrice}:</span>
-                        <span class="font-medium text-slate-900">${formatCurrency(offer.pricing.sellingPriceNet)}</span>
-                    </div>
-                    <div class="flex justify-between mb-4 text-sm">
-                        <span class="text-slate-500">${translations.vat} (19%):</span>
-                        <span class="font-medium text-slate-900">${formatCurrency((offer.pricing?.sellingPriceGross ?? 0) - (offer.pricing?.sellingPriceNet ?? 0))}</span>
-                    </div>
-                    <div class="border-t border-slate-200 pt-4 flex justify-between items-end">
-                        <span class="font-bold text-slate-700">${translations.grossPrice}:</span>
-                        <span class="text-3xl font-bold text-primary">${formatCurrency(offer.pricing.sellingPriceGross)}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Footer / Terms -->
-            <div class="mt-16 pt-8 border-t border-slate-200 text-xs text-slate-400 text-center">
-                <p class="mb-2">${translations.validity} ${translations.paymentTerms}</p>
-                <p>${translations.contact}</p>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(container);
-
-    try {
-        const canvas = await html2canvas(container, {
-            scale: 2,
-            useCORS: true,
-            logging: false
+        offer.product.addons.forEach(addon => {
+            const name = addon.variant ? `${addon.name} (${addon.variant})` : addon.name;
+            addonsData.push([name, formatCurrency(addon.price)]);
         });
 
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        if (offer.product.selectedAccessories) {
+            offer.product.selectedAccessories.forEach(acc => {
+                addonsData.push([`${acc.quantity}× ${acc.name}`, formatCurrency(acc.price * acc.quantity)]);
+            });
+        }
 
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`Angebot_Polendach24_${offer.id}.pdf`);
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Position', 'Preis']],
+            body: addonsData,
+            theme: 'striped',
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+            columnStyles: {
+                0: { cellWidth: pageWidth - 70 },
+                1: { halign: 'right', cellWidth: 40 }
+            },
+            margin: { left: leftCol, right: 15 }
+        });
 
-    } catch (err) {
-        console.error("Error generating PDF:", err);
-        throw err;
-    } finally {
-        document.body.removeChild(container);
+        currentY = (doc as any).lastAutoTable.finalY + 10;
     }
+
+    // Installation Section (if any)
+    if (offer.pricing.installationCosts) {
+        const check3 = checkAndAddPage(doc, currentY, 35, pageNumber);
+        currentY = check3.y;
+        pageNumber = check3.page;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MONTAGE', leftCol, currentY);
+        currentY += 7;
+
+        const installData = [
+            [`Montage (${offer.product.installationDays} Tage)`, formatCurrency(offer.pricing.installationCosts.dailyTotal)],
+            [`Anfahrt (${offer.pricing.installationCosts.travelDistance} km)`, formatCurrency(offer.pricing.installationCosts.travelCost)],
+            ['Gesamt Montage:', formatCurrency(offer.pricing.installationCosts.totalInstallation)]
+        ];
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [],
+            body: installData,
+            theme: 'plain',
+            styles: { fontSize: 9, cellPadding: 2 },
+            columnStyles: {
+                0: { cellWidth: pageWidth - 70 },
+                1: { halign: 'right', fontStyle: 'bold', cellWidth: 40 }
+            },
+            margin: { left: leftCol, right: 15 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Pricing Summary
+    const check4 = checkAndAddPage(doc, currentY, 50, pageNumber);
+    currentY = check4.y;
+    pageNumber = check4.page;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PREISZUSAMMENFASSUNG', leftCol, currentY);
+    currentY += 10;
+
+    const vatAmount = (offer.pricing?.sellingPriceGross ?? 0) - (offer.pricing?.sellingPriceNet ?? 0);
+
+    const pricingData = [
+        ['Nettopreis:', formatCurrency(offer.pricing.sellingPriceNet)],
+        ['MwSt. (19%):', formatCurrency(vatAmount)],
+    ];
+
+    autoTable(doc, {
+        startY: currentY,
+        head: [],
+        body: pricingData,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 3 },
+        columnStyles: {
+            0: { textColor: [100, 100, 100], cellWidth: pageWidth - 70 },
+            1: { halign: 'right', fontStyle: 'bold', cellWidth: 40 }
+        },
+        margin: { left: leftCol, right: 15 }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 2;
+
+    // Grand Total with background
+    doc.setFillColor(241, 245, 249);
+    doc.rect(leftCol, currentY, pageWidth - 30, 12, 'F');
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GESAMTPREIS (BRUTTO):', leftCol + 3, currentY + 8);
+    doc.setTextColor(0, 102, 204);
+    doc.text(formatCurrency(offer.pricing.sellingPriceGross), pageWidth - 18, currentY + 8, { align: 'right' });
+    doc.setTextColor(0);
+
+    currentY += 20;
+
+    // Footer / Terms
+    const check5 = checkAndAddPage(doc, currentY, 25, pageNumber);
+    currentY = check5.y;
+    pageNumber = check5.page;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    const footerText = [
+        'Dieses Angebot ist 30 Tage gültig.',
+        'Zahlungsbedingungen: 30% Anzahlung, 70% bei Lieferung.',
+        'Bei Fragen kontaktieren Sie uns gerne.'
+    ];
+
+    footerText.forEach((line, i) => {
+        doc.text(line, pageWidth / 2, currentY + (i * 5), { align: 'center' });
+    });
+
+    // Save the PDF
+    doc.save(`Angebot_Polendach24_${offer.id.substring(0, 8)}.pdf`);
 }
