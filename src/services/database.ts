@@ -1920,9 +1920,9 @@ export const DatabaseService = {
     },
 
     async getWalletStats(): Promise<WalletStats> {
-        const { data, error } = await supabase
+        const { data: transactions, error } = await supabase
             .from('wallet_transactions')
-            .select('type, amount, date');
+            .select('*');
 
         if (error) throw error;
 
@@ -1930,32 +1930,44 @@ export const DatabaseService = {
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        let totalIncome = 0;
-        let totalExpense = 0;
-        let monthlyIncome = 0;
-        let monthlyExpense = 0;
+        const initialStats = {
+            currentBalance: 0,
+            totalIncome: 0,
+            totalExpense: 0,
+            monthlyIncome: 0,
+            monthlyExpense: 0
+        };
 
-        data.forEach(t => {
-            const amount = Number(t.amount);
-            const date = new Date(t.date);
+        const stats = {
+            pln: { ...initialStats },
+            eur: { ...initialStats }
+        };
+
+        transactions?.forEach(tx => {
+            const amount = Number(tx.amount);
+            const date = new Date(tx.date);
             const isCurrentMonth = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+            const currency = tx.currency as 'PLN' | 'EUR' || 'EUR'; // Default to EUR if missing
 
-            if (t.type === 'income') {
-                totalIncome += amount;
-                if (isCurrentMonth) monthlyIncome += amount;
+            const targetStats = currency === 'PLN' ? stats.pln : stats.eur;
+
+            if (tx.type === 'income') {
+                targetStats.totalIncome += amount;
+                if (isCurrentMonth) {
+                    targetStats.monthlyIncome += amount;
+                }
             } else {
-                totalExpense += amount;
-                if (isCurrentMonth) monthlyExpense += amount;
+                targetStats.totalExpense += amount;
+                if (isCurrentMonth) {
+                    targetStats.monthlyExpense += amount;
+                }
             }
         });
 
-        return {
-            currentBalance: totalIncome - totalExpense,
-            totalIncome,
-            totalExpense,
-            monthlyIncome,
-            monthlyExpense
-        };
+        stats.pln.currentBalance = stats.pln.totalIncome - stats.pln.totalExpense;
+        stats.eur.currentBalance = stats.eur.totalIncome - stats.eur.totalExpense;
+
+        return stats;
     },
 
     async exchangeWalletTransaction(transactionId: string, exchangeRate: number): Promise<WalletTransaction> {

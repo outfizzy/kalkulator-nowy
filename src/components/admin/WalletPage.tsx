@@ -113,24 +113,40 @@ export const WalletPage: React.FC = () => {
             </div>
 
             {/* Stats Cards */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                     <p className="text-slate-500 text-sm font-medium mb-2">Aktualne Saldo</p>
-                    <h3 className={`text-3xl font-bold ${stats && stats.currentBalance >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
-                        {stats ? formatCurrency(stats.currentBalance) : '0,00 zł'}
-                    </h3>
+                    <div className="space-y-1">
+                        <h3 className={`text-2xl font-bold ${stats && stats.pln.currentBalance >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
+                            {stats ? formatCurrency(stats.pln.currentBalance, 'PLN') : '0,00 zł'}
+                        </h3>
+                        <h3 className={`text-xl font-semibold ${stats && stats.eur.currentBalance >= 0 ? 'text-slate-600' : 'text-red-500'}`}>
+                            {stats ? formatCurrency(stats.eur.currentBalance, 'EUR') : '0,00 €'}
+                        </h3>
+                    </div>
                 </div>
                 <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-sm">
                     <p className="text-emerald-600 text-sm font-medium mb-2">Wpływy (Miesiąc)</p>
-                    <h3 className="text-3xl font-bold text-emerald-700">
-                        +{stats ? formatCurrency(stats.monthlyIncome) : '0,00 zł'}
-                    </h3>
+                    <div className="space-y-1">
+                        <h3 className="text-2xl font-bold text-emerald-700">
+                            +{stats ? formatCurrency(stats.pln.monthlyIncome, 'PLN') : '0,00 zł'}
+                        </h3>
+                        <h3 className="text-xl font-semibold text-emerald-600/80">
+                            +{stats ? formatCurrency(stats.eur.monthlyIncome, 'EUR') : '0,00 €'}
+                        </h3>
+                    </div>
                 </div>
                 <div className="bg-red-50 p-6 rounded-2xl border border-red-100 shadow-sm">
                     <p className="text-red-600 text-sm font-medium mb-2">Wydatki (Miesiąc)</p>
-                    <h3 className="text-3xl font-bold text-red-700">
-                        -{stats ? formatCurrency(stats.monthlyExpense) : '0,00 zł'}
-                    </h3>
+                    <div className="space-y-1">
+                        <h3 className="text-2xl font-bold text-red-700">
+                            -{stats ? formatCurrency(stats.pln.monthlyExpense, 'PLN') : '0,00 zł'}
+                        </h3>
+                        <h3 className="text-xl font-semibold text-red-600/80">
+                            -{stats ? formatCurrency(stats.eur.monthlyExpense, 'EUR') : '0,00 €'}
+                        </h3>
+                    </div>
                 </div>
             </div>
 

@@ -373,10 +373,15 @@ export interface WalletTransaction {
     originalAmount?: number;
 }
 
-export interface WalletStats {
+export interface CurrencyStats {
     currentBalance: number;
     totalIncome: number;
     totalExpense: number;
     monthlyIncome: number;
     monthlyExpense: number;
+}
+
+export interface WalletStats {
+    pln: CurrencyStats;
+    eur: CurrencyStats;
 }
