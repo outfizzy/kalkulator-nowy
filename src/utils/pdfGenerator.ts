@@ -15,6 +15,35 @@ const COLORS = {
     border: [226, 232, 240] as [number, number, number], // Border gray
 };
 
+// Helper to load fonts
+async function loadFonts(doc: jsPDF) {
+    const loadFont = async (path: string, name: string, style: string) => {
+        try {
+            const response = await fetch(path);
+            const blob = await response.blob();
+            const reader = new FileReader();
+
+            return new Promise<void>((resolve) => {
+                reader.onloadend = () => {
+                    const base64data = (reader.result as string).split(',')[1];
+                    doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
+                    doc.addFont(`${name}-${style}.ttf`, name, style);
+                    resolve();
+                };
+                reader.readAsDataURL(blob);
+            });
+        } catch (error) {
+            console.error(`Failed to load font ${path}:`, error);
+            // Fallback to helvetica if font loading fails
+        }
+    };
+
+    await Promise.all([
+        loadFont('/fonts/Roboto-Regular.ttf', 'Roboto', 'normal'),
+        loadFont('/fonts/Roboto-Bold.ttf', 'Roboto', 'bold')
+    ]);
+}
+
 // Helper to add logo and header to each page
 function addHeader(doc: jsPDF, pageNumber: number) {
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -31,14 +60,14 @@ function addHeader(doc: jsPDF, pageNumber: number) {
     } catch (e) {
         // If logo fails, add text header with better styling
         doc.setFontSize(20);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('Roboto', 'bold');
         doc.setTextColor(...COLORS.primary);
         doc.text('PolenDach24', 15, 18);
     }
 
     // Add page number in top right with styling
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('Roboto', 'normal');
     doc.setTextColor(...COLORS.textLight);
     doc.text(`Seite ${pageNumber}`, pageWidth - 15, 18, { align: 'right' });
 
@@ -69,7 +98,7 @@ function checkAndAddPage(doc: jsPDF, currentY: number, requiredSpace: number, pa
 // Helper to add a section title with styling
 function addSectionTitle(doc: jsPDF, title: string, y: number, leftMargin: number = 15): number {
     doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setTextColor(...COLORS.secondary);
     doc.text(title, leftMargin, y);
     doc.setTextColor(0, 0, 0);
@@ -79,6 +108,11 @@ function addSectionTitle(doc: jsPDF, title: string, y: number, leftMargin: numbe
 export async function generateOfferPDF(offer: Offer) {
     const profile = getSalesProfile();
     const doc = new jsPDF('p', 'mm', 'a4');
+
+    // Load fonts first
+    await loadFonts(doc);
+    doc.setFont('Roboto'); // Set default font
+
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = 40; // Start position after header
     let pageNumber = 1;
@@ -95,12 +129,12 @@ export async function generateOfferPDF(offer: Offer) {
     doc.roundedRect(pageWidth - 80, currentY - 5, 65, titleBoxHeight, 3, 3, 'F');
 
     doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text('ANGEBOT', pageWidth - 47.5, currentY + 3, { align: 'center' });
 
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('Roboto', 'normal');
     doc.text(`Nr: #${offer.id.substring(0, 8)}`, pageWidth - 47.5, currentY + 10, { align: 'center' });
     doc.text(`Datum: ${dateStr}`, pageWidth - 47.5, currentY + 16, { align: 'center' });
     doc.setTextColor(0, 0, 0);
@@ -124,15 +158,15 @@ export async function generateOfferPDF(offer: Offer) {
 
     // Customer
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setTextColor(...COLORS.textLight);
     doc.text('KUNDE', leftCol + 3, boxY);
     doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setFontSize(10);
     boxY += 5;
     doc.text(`${offer.customer.salutation} ${offer.customer.firstName} ${offer.customer.lastName}`, leftCol + 3, boxY);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('Roboto', 'normal');
     doc.setFontSize(8);
     boxY += 4;
     doc.text(`${offer.customer.street} ${offer.customer.houseNumber}`, leftCol + 3, boxY);
@@ -151,17 +185,17 @@ export async function generateOfferPDF(offer: Offer) {
     // Seller
     let sellerBoxY = currentY + 5;
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setTextColor(...COLORS.textLight);
     doc.text('VERKÄUFER', rightCol + 3, sellerBoxY);
     doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setFontSize(10);
     sellerBoxY += 5;
 
     if (profile) {
         doc.text(`${profile.firstName} ${profile.lastName}`, rightCol + 3, sellerBoxY);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('Roboto', 'normal');
         doc.setFontSize(8);
         sellerBoxY += 4;
         doc.text('PolenDach24 Vertreter', rightCol + 3, sellerBoxY);
@@ -173,7 +207,7 @@ export async function generateOfferPDF(offer: Offer) {
         doc.text(profile.phone || '', rightCol + 3, sellerBoxY);
     } else {
         doc.text('PolenDach24', rightCol + 3, sellerBoxY);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('Roboto', 'normal');
         doc.setFontSize(8);
         sellerBoxY += 4;
         doc.text('Kundenservice', rightCol + 3, sellerBoxY);
@@ -231,6 +265,7 @@ export async function generateOfferPDF(offer: Offer) {
         body: specData,
         theme: 'plain',
         styles: {
+            font: 'Roboto',
             fontSize: 9,
             cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
             lineColor: COLORS.border,
@@ -274,6 +309,7 @@ export async function generateOfferPDF(offer: Offer) {
             body: addonsData,
             theme: 'grid',
             styles: {
+                font: 'Roboto',
                 fontSize: 9,
                 cellPadding: 3,
                 lineColor: COLORS.border,
@@ -316,6 +352,7 @@ export async function generateOfferPDF(offer: Offer) {
             body: installData,
             theme: 'plain',
             styles: {
+                font: 'Roboto',
                 fontSize: 9,
                 cellPadding: 3,
                 lineColor: COLORS.border,
@@ -352,6 +389,7 @@ export async function generateOfferPDF(offer: Offer) {
         body: pricingData,
         theme: 'plain',
         styles: {
+            font: 'Roboto',
             fontSize: 10,
             cellPadding: 4,
             lineColor: COLORS.border,
@@ -372,7 +410,7 @@ export async function generateOfferPDF(offer: Offer) {
     doc.roundedRect(leftCol, currentY, pageWidth - 30, totalBoxHeight, 2, 2, 'F');
 
     doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Roboto', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text('GESAMTPREIS (BRUTTO):', leftCol + 4, currentY + 9);
 
@@ -394,7 +432,7 @@ export async function generateOfferPDF(offer: Offer) {
     currentY += 5;
 
     doc.setFontSize(7);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('Roboto', 'normal');
     doc.setTextColor(...COLORS.textLight);
     const footerText = [
         'Dieses Angebot ist 30 Tage gültig.',
