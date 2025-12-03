@@ -20,9 +20,10 @@ export const PartnerLoginPage: React.FC = () => {
             // Redirect will be handled by AuthContext or App.tsx logic based on role
             // For now, we can force navigation if needed, but App.tsx usually handles it
             navigate('/partner/dashboard');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Login error:', error);
-            toast.error(error.message || 'Błąd logowania. Sprawdź email i hasło.');
+            const message = error instanceof Error ? error.message : 'Błąd logowania. Sprawdź email i hasło.';
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -39,7 +40,7 @@ export const PartnerLoginPage: React.FC = () => {
                         <img
                             src="/logo.png"
                             alt="PolenDach 24"
-                            className="h-16 w-auto"
+                            className="h-16 w-auto brightness-0 invert"
                         />
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2">

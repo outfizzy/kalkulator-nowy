@@ -43,9 +43,10 @@ export const RegisterPage: React.FC = () => {
             setTimeout(() => {
                 navigate('/login');
             }, 5000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Registration error:', error);
-            toast.error(error.message || 'Błąd rejestracji. Spróbuj ponownie.');
+            const message = error instanceof Error ? error.message : 'Błąd rejestracji. Spróbuj ponownie.';
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -95,7 +96,7 @@ export const RegisterPage: React.FC = () => {
                         <img
                             src="/logo.png"
                             alt="PolenDach 24"
-                            className="h-16 w-auto"
+                            className="h-16 w-auto brightness-0 invert"
                         />
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2">

@@ -49,9 +49,10 @@ export const PartnerRegisterPage: React.FC = () => {
             setTimeout(() => {
                 navigate('/partner/login');
             }, 8000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Registration error:', error);
-            toast.error(error.message || 'Błąd rejestracji. Spróbuj ponownie.');
+            const message = error instanceof Error ? error.message : 'Błąd rejestracji. Spróbuj ponownie.';
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -101,7 +102,7 @@ export const PartnerRegisterPage: React.FC = () => {
                 {/* Left Side - Info */}
                 <div className="hidden lg:block space-y-8">
                     <div>
-                        <img src="/logo.png" alt="PolenDach 24" className="h-16 w-auto mb-8" />
+                        <img src="/logo.png" alt="PolenDach 24" className="h-16 w-auto mb-8 brightness-0 invert" />
                         <h1 className="text-4xl font-bold text-white mb-4">
                             Zostań Partnerem B2B
                         </h1>

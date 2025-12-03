@@ -20,7 +20,7 @@ export const PartnerLayout: React.FC = () => {
             {/* Sidebar */}
             <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col shadow-xl z-20">
                 <div className="p-6 border-b border-slate-700/50 flex flex-col items-center">
-                    <img src="/logo.png" alt="PolenDach 24" className="h-12 w-auto mb-3" />
+                    <img src="/logo.png" alt="PolenDach 24" className="h-12 w-auto mb-3 brightness-0 invert" />
                     <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-1 rounded-full">
                         Strefa Partnera
                     </span>

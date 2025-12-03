@@ -26,7 +26,7 @@ export const Layout: React.FC = () => {
                     <img
                         src="/logo.png"
                         alt="PolenDach 24"
-                        className="w-full h-auto max-w-[200px]"
+                        className="w-full h-auto max-w-[200px] brightness-0 invert"
                     />
                 </div>
                 <nav className="flex-1 px-4 py-4 space-y-2">
@@ -79,7 +79,7 @@ export const Layout: React.FC = () => {
                             <img
                                 src="/logo.png"
                                 alt="PolenDach 24"
-                                className="h-12 w-auto"
+                                className="h-12 w-auto brightness-0 invert"
                             />
                             <button
                                 onClick={() => setMobileMenuOpen(false)}

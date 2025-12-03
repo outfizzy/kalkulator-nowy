@@ -15,7 +15,7 @@ export const LandingPage: React.FC = () => {
                         <img
                             src="/logo.png"
                             alt="PolenDach 24"
-                            className="h-24 w-auto"
+                            className="h-24 w-auto brightness-0 invert"
                         />
                     </div>
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">

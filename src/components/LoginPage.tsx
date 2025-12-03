@@ -39,7 +39,7 @@ export const LoginPage: React.FC = () => {
                         <img
                             src="/logo.png"
                             alt="PolenDach 24"
-                            className="h-16 w-auto"
+                            className="h-16 w-auto brightness-0 invert"
                         />
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2">
