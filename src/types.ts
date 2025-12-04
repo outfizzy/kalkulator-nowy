@@ -71,7 +71,7 @@ export interface SlidingWallModel {
 
 export interface SelectedAddon {
     id: string;
-    type: 'lighting' | 'slidingWall' | 'fixedWall' | 'awning' | 'zipScreen' | 'heater' | 'panorama' | 'other';
+    type: 'lighting' | 'slidingWall' | 'fixedWall' | 'awning' | 'zipScreen' | 'heater' | 'panorama' | 'wpc-floor' | 'other';
     name: string;
     variant?: string; // e.g., "AL23" or "Spots"
     quantity?: number; // for heaters, spots
@@ -82,6 +82,10 @@ export interface SelectedAddon {
     depth?: number; // for awnings (alternative to projection)
     price: number;
     description?: string;
+    // WPC Flooring specific
+    flooringColor?: string;
+    flooringType?: string;
+    installationOption?: 'with-foundation' | 'without-foundation';
 }
 
 export interface ProductConfig {

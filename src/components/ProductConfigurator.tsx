@@ -8,6 +8,7 @@ import { PanoramaWallSelector } from './configurator/PanoramaWallSelector';
 import { SlidingDoorSelector } from './configurator/SlidingDoorSelector';
 import { AluminumWallSelector } from './configurator/AluminumWallSelector';
 import { AwningSelector } from './configurator/AwningSelector';
+import { WPCFlooringSelector } from './configurator/WPCFlooringSelector';
 import trendstyleData from '../data/trendstyle_full.json';
 import orangelineData from '../data/orangeline_full.json';
 import topstyleData from '../data/topstyle_full.json';
@@ -44,7 +45,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
         selectedAccessories: []
     });
 
-    const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories'>('sliding');
+    const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories' | 'floor'>('sliding');
 
     const totalPrice = useMemo(() => {
         const addonsTotal = config.addons.reduce((sum, a) => sum + a.price, 0);
@@ -588,13 +589,15 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                 {[
                                     { id: 'enclosure', label: 'Zabudowa (Ściany)', icon: '🏗️' },
                                     { id: 'comfort', label: 'Komfort (Markizy, LED)', icon: '☀️' },
+                                    { id: 'floor', label: 'Podłoga', icon: '🪵' },
                                     { id: 'extras', label: 'Pozostałe Dodatki', icon: '✨' }
                                 ].map(tab => (
                                     <button
                                         key={tab.id}
-                                        onClick={() => setActiveWallTab(tab.id === 'enclosure' ? 'sliding' : tab.id === 'comfort' ? 'awning' : 'accessories')}
+                                        onClick={() => setActiveWallTab(tab.id === 'enclosure' ? 'sliding' : tab.id === 'comfort' ? 'awning' : tab.id === 'floor' ? 'floor' : 'accessories')}
                                         className={`flex-1 px-4 py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 border-b-2 ${(tab.id === 'enclosure' && ['sliding', 'panorama', 'walls', 'keil'].includes(activeWallTab)) ||
                                             (tab.id === 'comfort' && ['awning', 'lighting'].includes(activeWallTab)) ||
+                                            (tab.id === 'floor' && activeWallTab === 'floor') ||
                                             (tab.id === 'extras' && activeWallTab === 'accessories')
                                             ? 'text-accent border-accent bg-accent/5'
                                             : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50'
@@ -710,6 +713,17 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                             )}
                                         </div>
                                     </div>
+                                )}
+
+                                {/* FLOOR CONTENT (Podłoga) */}
+                                {activeWallTab === 'floor' && (
+                                    <WPCFlooringSelector
+                                        currentAddons={config.addons}
+                                        onAdd={handleAddonAdd}
+                                        onRemove={handleAddonRemove}
+                                        roofWidth={config.width}
+                                        roofDepth={config.projection}
+                                    />
                                 )}
 
                                 {/* EXTRAS CONTENT (Dodatki) */}
