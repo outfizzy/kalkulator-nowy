@@ -37,9 +37,16 @@ export const DeliveryCalendar: React.FC = () => {
     // Extract all deliveries from all contracts
     const allDeliveries = useMemo((): DeliveryItem[] => {
         const deliveries: DeliveryItem[] = [];
+        console.log('Processing contracts for deliveries:', contracts.length);
+
         contracts.forEach(contract => {
-            contract.orderedItems?.forEach(item => {
+            if (!contract.orderedItems || contract.orderedItems.length === 0) {
+                return;
+            }
+
+            contract.orderedItems.forEach(item => {
                 if (item.plannedDeliveryDate) {
+                    console.log('Found delivery:', item.name, item.plannedDeliveryDate);
                     deliveries.push({
                         ...item,
                         contractId: contract.id,
@@ -49,6 +56,8 @@ export const DeliveryCalendar: React.FC = () => {
                 }
             });
         });
+
+        console.log('Total deliveries found:', deliveries.length);
         return deliveries.sort((a, b) =>
             new Date(a.plannedDeliveryDate!).getTime() - new Date(b.plannedDeliveryDate!).getTime()
         );
@@ -59,9 +68,15 @@ export const DeliveryCalendar: React.FC = () => {
     const weekDays = eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
 
     const getDeliveriesForDay = (date: Date) => {
-        return allDeliveries.filter(d =>
-            d.plannedDeliveryDate && isSameDay(parseISO(d.plannedDeliveryDate), date)
-        );
+        return allDeliveries.filter(d => {
+            if (!d.plannedDeliveryDate) return false;
+            try {
+                return isSameDay(parseISO(d.plannedDeliveryDate), date);
+            } catch (e) {
+                console.error('Invalid date format:', d.plannedDeliveryDate);
+                return false;
+            }
+        });
     };
 
     const getStatusColor = (status: string) => {
