@@ -1766,7 +1766,7 @@ export const DatabaseService = {
             })
             .select(`
                 *,
-                sales_rep:profiles!sales_rep_id(first_name, last_name)
+                sales_rep:profiles!sales_rep_id(full_name)
             `)
             .single();
 
@@ -1777,7 +1777,7 @@ export const DatabaseService = {
             offerId: data.offer_id,
             scheduledDate: new Date(data.scheduled_date),
             salesRepId: data.sales_rep_id,
-            salesRepName: `${data.sales_rep?.first_name || ''} ${data.sales_rep?.last_name || ''}`.trim(),
+            salesRepName: data.sales_rep?.full_name || '',
             customerName: data.customer_name,
             customerAddress: data.customer_address,
             customerPhone: data.customer_phone,
@@ -1820,7 +1820,7 @@ export const DatabaseService = {
             .eq('id', id)
             .select(`
                 *,
-                sales_rep:profiles!sales_rep_id(first_name, last_name)
+                sales_rep:profiles!sales_rep_id(full_name)
             `)
             .single();
 
@@ -1831,7 +1831,7 @@ export const DatabaseService = {
             offerId: data.offer_id,
             scheduledDate: new Date(data.scheduled_date),
             salesRepId: data.sales_rep_id,
-            salesRepName: `${data.sales_rep?.first_name || ''} ${data.sales_rep?.last_name || ''}`.trim(),
+            salesRepName: data.sales_rep?.full_name || '',
             customerName: data.customer_name,
             customerAddress: data.customer_address,
             customerPhone: data.customer_phone,
