@@ -306,10 +306,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                                 }
                                             }}
                                             className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${model.comingSoon
-                                                    ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
-                                                    : config.modelId === model.id
-                                                        ? 'border-accent bg-accent/5 shadow-md'
-                                                        : 'border-slate-100 hover:border-accent/30'
+                                                ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
+                                                : config.modelId === model.id
+                                                    ? 'border-accent bg-accent/5 shadow-md'
+                                                    : 'border-slate-100 hover:border-accent/30'
                                                 }`}
                                         >
                                             {model.comingSoon && (
@@ -355,8 +355,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                                 handleBasicConfigChange('modelId', product.id);
                                             }}
                                             className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === product.id
-                                                    ? 'border-purple-500 bg-purple-50 shadow-sm'
-                                                    : 'border-slate-100 hover:border-purple-300 bg-slate-50'
+                                                ? 'border-purple-500 bg-purple-50 shadow-sm'
+                                                : 'border-slate-100 hover:border-purple-300 bg-slate-50'
                                                 }`}
                                         >
                                             <span className="font-bold text-sm text-slate-800">{product.name}</span>
@@ -366,6 +366,102 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                 <p className="text-xs text-slate-400 mt-3 italic">
                                     💡 Wybierz produkt Deponti, a następnie przejdź dalej do konfiguracji wymiarów i dodatków.
                                 </p>
+                            </div>
+
+                            {/* Selt / Aliplast - External Suppliers */}
+                            <div className="border-t border-slate-200 pt-6 mt-6">
+                                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                                    Zewnętrzni Dostawcy (Selt, Aliplast)
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Selt */}
+                                    <div className="border-2 border-slate-100 rounded-xl p-4 bg-gradient-to-br from-blue-50 to-blue-100/50">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                                                    S
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-bold text-slate-800">Selt</h5>
+                                                    <p className="text-xs text-slate-500">Pergole i zadaszenia</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <a
+                                            href="https://www.sfrpolska.pl/"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block w-full text-center py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors"
+                                        >
+                                            Otwórz Konfigurator Selt ↗
+                                        </a>
+                                        <p className="text-[10px] text-slate-400 mt-2 text-center">
+                                            Skonfiguruj produkt na stronie Selt, następnie wpisz dane do oferty
+                                        </p>
+                                    </div>
+
+                                    {/* Aliplast */}
+                                    <div className="border-2 border-slate-100 rounded-xl p-4 bg-gradient-to-br from-green-50 to-green-100/50">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                                                    A
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-bold text-slate-800">Aliplast</h5>
+                                                    <p className="text-xs text-slate-500">Systemy aluminiowe</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <a
+                                            href="https://aliplast.com.pl/"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block w-full text-center py-2 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
+                                        >
+                                            Otwórz Konfigurator Aliplast ↗
+                                        </a>
+                                        <p className="text-[10px] text-slate-400 mt-2 text-center">
+                                            Skonfiguruj produkt na stronie Aliplast, następnie wpisz dane do oferty
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Manual entry hint */}
+                                <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                    <p className="text-xs text-slate-600">
+                                        <span className="font-bold">💡 Jak dodać produkt Selt/Aliplast do oferty:</span>
+                                        <br />
+                                        1. Otwórz konfigurator dostawcy i skonfiguruj produkt
+                                        <br />
+                                        2. Wróć tutaj i wybierz odpowiedni kafelek dostawcy poniżej
+                                        <br />
+                                        3. Wpisz dane produktu ręcznie w kolejnych krokach
+                                    </p>
+                                </div>
+
+                                {/* Selt/Aliplast as selectable options */}
+                                <div className="grid grid-cols-2 gap-3 mt-4">
+                                    <div
+                                        onClick={() => handleBasicConfigChange('modelId', 'selt_external')}
+                                        className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === 'selt_external'
+                                                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                                : 'border-slate-100 hover:border-blue-300 bg-white'
+                                            }`}
+                                    >
+                                        <span className="font-bold text-sm text-slate-800">Produkt Selt (ręczny)</span>
+                                    </div>
+                                    <div
+                                        onClick={() => handleBasicConfigChange('modelId', 'aliplast_external')}
+                                        className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === 'aliplast_external'
+                                                ? 'border-green-500 bg-green-50 shadow-sm'
+                                                : 'border-slate-100 hover:border-green-300 bg-white'
+                                            }`}
+                                    >
+                                        <span className="font-bold text-sm text-slate-800">Produkt Aliplast (ręczny)</span>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     )}
