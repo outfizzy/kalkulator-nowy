@@ -308,6 +308,8 @@ export interface OrderedItem {
     name: string;
     details?: string;
     status: 'pending' | 'ordered' | 'delivered';
+    plannedDeliveryDate?: string; // ISO date string
+    purchaseCost?: number; // Cost in EUR, visible only to admin
 }
 
 export interface Contract {

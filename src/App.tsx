@@ -42,6 +42,7 @@ import { WalletPage } from './components/admin/WalletPage';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
+import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 
 // Partner Components
 import { LandingPage } from './components/LandingPage';
@@ -303,6 +304,7 @@ function App() {
               <Route path="/installations" element={<InstallationDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
+              <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/requests" element={<OrderRequestManager />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />

@@ -36,6 +36,7 @@ export const Layout: React.FC = () => {
                     <NavLink to="/reports" label="Raporty" icon="reports" />
                     <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
                     <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
+                    <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
                     {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" />}
                     {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" />}
                     <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />
@@ -99,6 +100,7 @@ export const Layout: React.FC = () => {
                             <NavLink to="/reports" label="Raporty" icon="reports" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
                             {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
                             {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                             <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
@@ -163,7 +165,7 @@ export const Layout: React.FC = () => {
 interface NavLinkProps {
     to: string;
     label: string;
-    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard';
+    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar';
     onClick?: () => void;
 }
 
@@ -205,6 +207,11 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
         clipboard: (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+        ),
+        calendar: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
         ),
         settings: (
