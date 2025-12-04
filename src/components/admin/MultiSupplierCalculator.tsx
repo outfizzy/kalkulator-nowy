@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { calculatePrice } from '../../utils/pricing';
+import type { ProductConfig, SnowZoneInfo } from '../../types';
 
 // Deponti Products Database
 const DEPONTI_ZADASZENIA = [
@@ -22,10 +24,29 @@ const DEPONTI_PINELA = [
     { id: 'pinela-deluxe-plus', name: 'Pinela Deluxe Plus', category: 'pinela' },
 ];
 
+const ALUXE_MODELS = [
+    { id: 'orangestyle', name: 'Orangestyle' },
+    { id: 'trendstyle', name: 'Trendstyle' },
+    { id: 'trendstyle_plus', name: 'Trendstyle Plus' },
+    { id: 'topstyle', name: 'Topstyle' },
+    { id: 'topstyle_xl', name: 'Topstyle XL' },
+    { id: 'skystyle', name: 'Skystyle' },
+];
+
+const ROOF_TYPES = [
+    { id: 'polycarbonate', name: 'Poliwęglan' },
+    { id: 'glass', name: 'Szkło' },
+];
+
+const SNOW_ZONES: SnowZoneInfo[] = [
+    { id: '1', value: 75, description: 'Strefa 1 (75 kg/m²)' },
+    { id: '2', value: 90, description: 'Strefa 2 (90 kg/m²)' },
+    { id: '3', value: 120, description: 'Strefa 3 (120 kg/m²)' },
+];
+
 const EXTERNAL_SUPPLIERS = [
     { id: 'selt', name: 'Selt', url: 'https://www.sfrpolska.pl/', color: 'bg-blue-500' },
     { id: 'aliplast', name: 'Aliplast', url: 'https://aliplast.com.pl/', color: 'bg-green-500' },
-    { id: 'aluxe', name: 'Aluxe (Istniejący konfigurator)', url: '/new-offer', color: 'bg-orange-500', internal: true },
 ];
 
 interface OfferItem {
@@ -53,7 +74,7 @@ interface CustomerData {
 
 export const MultiSupplierCalculator: React.FC = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'deponti' | 'external' | 'summary'>('deponti');
+    const [activeTab, setActiveTab] = useState<'aluxe' | 'deponti' | 'external' | 'summary'>('aluxe');
     const [items, setItems] = useState<OfferItem[]>([]);
     const [customer, setCustomer] = useState<CustomerData>({
         firstName: '',
@@ -65,7 +86,34 @@ export const MultiSupplierCalculator: React.FC = () => {
         postalCode: ''
     });
 
-    // Form state for adding new item
+    // Aluxe configurator state
+    const [aluxeModel, setAluxeModel] = useState('orangestyle');
+    const [aluxeWidth, setAluxeWidth] = useState(4000);
+    const [aluxeDepth, setAluxeDepth] = useState(3000);
+    const [aluxeRoofType, setAluxeRoofType] = useState<'polycarbonate' | 'glass'>('polycarbonate');
+    const [aluxeSnowZone, setAluxeSnowZone] = useState<SnowZoneInfo>(SNOW_ZONES[1]);
+    const [aluxeMargin, setAluxeMargin] = useState(0.35);
+    const [aluxeColor, setAluxeColor] = useState('RAL 7016');
+
+    // Calculate Aluxe price
+    const aluxePricing = useMemo(() => {
+        const config: ProductConfig = {
+            modelId: aluxeModel,
+            width: aluxeWidth,
+            projection: aluxeDepth,
+            roofType: aluxeRoofType,
+            polycarbonateType: 'standard',
+            glassType: 'standard',
+            installationType: 'wall-mounted',
+            color: 'ral7016',
+            customColor: false,
+            addons: [],
+            selectedAccessories: [],
+        };
+        return calculatePrice(config, aluxeMargin, aluxeSnowZone);
+    }, [aluxeModel, aluxeWidth, aluxeDepth, aluxeRoofType, aluxeSnowZone, aluxeMargin]);
+
+    // Form state for adding new item (Deponti / External)
     const [newItem, setNewItem] = useState<Partial<OfferItem>>({
         supplier: 'deponti',
         productName: '',
@@ -75,6 +123,26 @@ export const MultiSupplierCalculator: React.FC = () => {
     });
 
     const [depontiCategory, setDepontiCategory] = useState<'zadaszenie' | 'pinela'>('zadaszenie');
+
+    const addAluxeItem = () => {
+        const modelName = ALUXE_MODELS.find(m => m.id === aluxeModel)?.name || aluxeModel;
+        const roofName = ROOF_TYPES.find(r => r.id === aluxeRoofType)?.name || aluxeRoofType;
+
+        const item: OfferItem = {
+            id: crypto.randomUUID(),
+            supplier: 'aluxe',
+            productName: `${modelName}`,
+            description: `${aluxeWidth}x${aluxeDepth}mm, ${roofName}, ${aluxeColor}, ${aluxeSnowZone.description}`,
+            width: aluxeWidth,
+            depth: aluxeDepth,
+            color: aluxeColor,
+            purchasePrice: Math.round(aluxePricing.totalCost),
+            sellingPrice: Math.round(aluxePricing.sellingPriceNet),
+        };
+
+        setItems([...items, item]);
+        toast.success(`Dodano ${modelName} do oferty`);
+    };
 
     const addItem = () => {
         if (!newItem.productName || !newItem.sellingPrice) {
@@ -144,18 +212,19 @@ export const MultiSupplierCalculator: React.FC = () => {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 mb-6">
+                <div className="flex gap-2 mb-6 flex-wrap">
                     {[
-                        { id: 'deponti', label: 'Deponti (Produkty)', icon: '🏠' },
-                        { id: 'external', label: 'Zewnętrzni (Selt, Aliplast)', icon: '🔗' },
-                        { id: 'summary', label: 'Podsumowanie', icon: '📋' },
+                        { id: 'aluxe', label: 'Aluxe (Konfigurator)', icon: '🏠', color: 'orange' },
+                        { id: 'deponti', label: 'Deponti', icon: '🏡', color: 'purple' },
+                        { id: 'external', label: 'Selt / Aliplast', icon: '🔗', color: 'blue' },
+                        { id: 'summary', label: 'Podsumowanie', icon: '📋', color: 'green' },
                     ].map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                            className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id
-                                    ? 'bg-accent text-white shadow-lg'
-                                    : 'bg-white text-slate-600 hover:bg-slate-100'
+                            className={`flex-1 min-w-[150px] px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id
+                                ? 'bg-accent text-white shadow-lg'
+                                : 'bg-white text-slate-600 hover:bg-slate-100'
                                 }`}
                         >
                             <span className="text-xl">{tab.icon}</span>
@@ -168,11 +237,152 @@ export const MultiSupplierCalculator: React.FC = () => {
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
 
+                        {/* ALUXE TAB */}
+                        {activeTab === 'aluxe' && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                    <span className="text-2xl">🏠</span> Konfigurator Aluxe
+                                </h2>
+
+                                <div className="space-y-6">
+                                    {/* Model Selection */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Model</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {ALUXE_MODELS.map(model => (
+                                                <button
+                                                    key={model.id}
+                                                    onClick={() => setAluxeModel(model.id)}
+                                                    className={`p-4 rounded-xl border-2 transition-all text-left ${aluxeModel === model.id
+                                                        ? 'border-orange-500 bg-orange-50'
+                                                        : 'border-slate-200 hover:border-orange-300'
+                                                        }`}
+                                                >
+                                                    <div className="font-bold text-slate-800">{model.name}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Dimensions */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Szerokość (mm)</label>
+                                            <input
+                                                type="number"
+                                                value={aluxeWidth}
+                                                onChange={e => setAluxeWidth(Number(e.target.value))}
+                                                className="w-full p-3 border rounded-lg text-lg font-bold"
+                                                step={100}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Głębokość (mm)</label>
+                                            <input
+                                                type="number"
+                                                value={aluxeDepth}
+                                                onChange={e => setAluxeDepth(Number(e.target.value))}
+                                                className="w-full p-3 border rounded-lg text-lg font-bold"
+                                                step={100}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Roof Type */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Typ Dachu</label>
+                                        <div className="flex gap-3">
+                                            {ROOF_TYPES.map(roof => (
+                                                <button
+                                                    key={roof.id}
+                                                    onClick={() => setAluxeRoofType(roof.id as 'polycarbonate' | 'glass')}
+                                                    className={`flex-1 p-3 rounded-lg border-2 font-bold ${aluxeRoofType === roof.id
+                                                        ? 'border-orange-500 bg-orange-50 text-orange-700'
+                                                        : 'border-slate-200 text-slate-600'
+                                                        }`}
+                                                >
+                                                    {roof.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Snow Zone */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Strefa Śniegowa</label>
+                                        <div className="flex gap-3">
+                                            {SNOW_ZONES.map(zone => (
+                                                <button
+                                                    key={zone.id}
+                                                    onClick={() => setAluxeSnowZone(zone)}
+                                                    className={`flex-1 p-3 rounded-lg border-2 font-bold ${aluxeSnowZone.id === zone.id
+                                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                                        : 'border-slate-200 text-slate-600'
+                                                        }`}
+                                                >
+                                                    {zone.description}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Color */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Kolor</label>
+                                        <input
+                                            type="text"
+                                            value={aluxeColor}
+                                            onChange={e => setAluxeColor(e.target.value)}
+                                            className="w-full p-2 border rounded-lg"
+                                            placeholder="np. RAL 7016"
+                                        />
+                                    </div>
+
+                                    {/* Margin */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Marża: {Math.round(aluxeMargin * 100)}%</label>
+                                        <input
+                                            type="range"
+                                            min="0.15"
+                                            max="0.50"
+                                            step="0.01"
+                                            value={aluxeMargin}
+                                            onChange={e => setAluxeMargin(Number(e.target.value))}
+                                            className="w-full"
+                                        />
+                                    </div>
+
+                                    {/* Price Preview */}
+                                    <div className="bg-slate-50 rounded-xl p-4 grid grid-cols-3 gap-4 text-center">
+                                        <div>
+                                            <div className="text-xs text-slate-500">Koszt zakupu</div>
+                                            <div className="font-bold text-lg">{Math.round(aluxePricing.totalCost).toLocaleString()} €</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-slate-500">Twoja marża</div>
+                                            <div className="font-bold text-lg text-green-600">+{Math.round(aluxePricing.marginValue).toLocaleString()} €</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-slate-500">Cena sprzedaży (netto)</div>
+                                            <div className="font-bold text-xl text-accent">{Math.round(aluxePricing.sellingPriceNet).toLocaleString()} €</div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={addAluxeItem}
+                                        className="w-full py-4 bg-orange-500 text-white rounded-xl font-bold text-lg hover:bg-orange-600"
+                                    >
+                                        ➕ Dodaj Aluxe do Oferty
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* DEPONTI TAB */}
                         {activeTab === 'deponti' && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">🏠</span> Produkty Deponti
+                                    <span className="text-2xl">🏡</span> Produkty Deponti
                                 </h2>
 
                                 {/* Category selector */}
@@ -180,8 +390,8 @@ export const MultiSupplierCalculator: React.FC = () => {
                                     <button
                                         onClick={() => setDepontiCategory('zadaszenie')}
                                         className={`px-4 py-2 rounded-lg font-bold ${depontiCategory === 'zadaszenie'
-                                                ? 'bg-purple-500 text-white'
-                                                : 'bg-slate-100 text-slate-600'
+                                            ? 'bg-purple-500 text-white'
+                                            : 'bg-slate-100 text-slate-600'
                                             }`}
                                     >
                                         Zadaszenia Aluminiowe
@@ -189,8 +399,8 @@ export const MultiSupplierCalculator: React.FC = () => {
                                     <button
                                         onClick={() => setDepontiCategory('pinela')}
                                         className={`px-4 py-2 rounded-lg font-bold ${depontiCategory === 'pinela'
-                                                ? 'bg-purple-500 text-white'
-                                                : 'bg-slate-100 text-slate-600'
+                                            ? 'bg-purple-500 text-white'
+                                            : 'bg-slate-100 text-slate-600'
                                             }`}
                                     >
                                         Pinela
@@ -204,8 +414,8 @@ export const MultiSupplierCalculator: React.FC = () => {
                                             key={product.id}
                                             onClick={() => setNewItem({ ...newItem, supplier: 'deponti', productName: product.name })}
                                             className={`p-4 rounded-xl border-2 transition-all text-left ${newItem.productName === product.name
-                                                    ? 'border-purple-500 bg-purple-50'
-                                                    : 'border-slate-200 hover:border-purple-300'
+                                                ? 'border-purple-500 bg-purple-50'
+                                                : 'border-slate-200 hover:border-purple-300'
                                                 }`}
                                         >
                                             <div className="font-bold text-slate-800">{product.name}</div>
@@ -289,7 +499,7 @@ export const MultiSupplierCalculator: React.FC = () => {
 
                                         <button
                                             onClick={addItem}
-                                            className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700"
+                                            className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700"
                                         >
                                             ➕ Dodaj do Oferty
                                         </button>
@@ -302,7 +512,7 @@ export const MultiSupplierCalculator: React.FC = () => {
                         {activeTab === 'external' && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">🔗</span> Dostawcy Zewnętrzni
+                                    <span className="text-2xl">🔗</span> Selt / Aliplast
                                 </h2>
 
                                 <div className="space-y-4 mb-8">
@@ -319,13 +529,12 @@ export const MultiSupplierCalculator: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 <a
-                                                    href={supplier.internal ? undefined : supplier.url}
-                                                    onClick={supplier.internal ? () => navigate(supplier.url) : undefined}
-                                                    target={supplier.internal ? undefined : "_blank"}
+                                                    href={supplier.url}
+                                                    target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-bold"
                                                 >
-                                                    {supplier.internal ? 'Otwórz Konfigurator' : 'Otwórz Stronę ↗'}
+                                                    Otwórz Stronę ↗
                                                 </a>
                                             </div>
                                         </div>
@@ -347,7 +556,6 @@ export const MultiSupplierCalculator: React.FC = () => {
                                             >
                                                 <option value="selt">Selt</option>
                                                 <option value="aliplast">Aliplast</option>
-                                                <option value="aluxe">Aluxe</option>
                                                 <option value="other">Inny</option>
                                             </select>
                                         </div>
@@ -399,7 +607,7 @@ export const MultiSupplierCalculator: React.FC = () => {
 
                                     <button
                                         onClick={addItem}
-                                        className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700"
+                                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
                                     >
                                         ➕ Dodaj do Oferty
                                     </button>
@@ -490,7 +698,7 @@ export const MultiSupplierCalculator: React.FC = () => {
 
                                     {items.length === 0 ? (
                                         <div className="text-center py-12 text-slate-400">
-                                            Brak pozycji. Dodaj produkty z zakładek "Deponti" lub "Zewnętrzni".
+                                            Brak pozycji. Dodaj produkty z zakładek "Aluxe", "Deponti" lub "Selt/Aliplast".
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
@@ -502,17 +710,18 @@ export const MultiSupplierCalculator: React.FC = () => {
                                                     <div className="flex-1">
                                                         <div className="font-bold">{item.productName}</div>
                                                         <div className="text-sm text-slate-500">
-                                                            <span className="inline-block px-2 py-0.5 bg-slate-200 rounded text-xs mr-2">
+                                                            <span className={`inline-block px-2 py-0.5 rounded text-xs mr-2 ${item.supplier === 'aluxe' ? 'bg-orange-100 text-orange-700' :
+                                                                item.supplier === 'deponti' ? 'bg-purple-100 text-purple-700' :
+                                                                    'bg-blue-100 text-blue-700'
+                                                                }`}>
                                                                 {item.supplier.toUpperCase()}
                                                             </span>
                                                             {item.description}
-                                                            {item.width && item.depth && ` | ${item.width}x${item.depth}mm`}
-                                                            {item.color && ` | ${item.color}`}
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <div className="text-xs text-slate-400">Zakup: {item.purchasePrice} €</div>
-                                                        <div className="font-bold text-lg text-accent">{item.sellingPrice} €</div>
+                                                        <div className="text-xs text-slate-400">Zakup: {item.purchasePrice.toLocaleString()} €</div>
+                                                        <div className="font-bold text-lg text-accent">{item.sellingPrice.toLocaleString()} €</div>
                                                     </div>
                                                     <button
                                                         onClick={() => removeItem(item.id)}
@@ -549,7 +758,7 @@ export const MultiSupplierCalculator: React.FC = () => {
                     <div className="space-y-6">
                         {/* Quick Summary */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-6">
-                            <h3 className="font-bold text-lg mb-4">📊 Podsumowanie</h3>
+                            <h3 className="font-bold text-lg mb-4">📊 Podsumowanie Oferty</h3>
 
                             <div className="space-y-3 mb-6">
                                 <div className="flex justify-between text-sm">
@@ -558,17 +767,17 @@ export const MultiSupplierCalculator: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Suma Zakupu:</span>
-                                    <span className="font-bold">{totalPurchase.toFixed(2)} €</span>
+                                    <span className="font-bold">{totalPurchase.toLocaleString()} €</span>
                                 </div>
                                 <hr />
                                 <div className="flex justify-between">
                                     <span className="font-bold text-slate-700">Suma Sprzedaży:</span>
-                                    <span className="font-bold text-xl text-accent">{totalSelling.toFixed(2)} €</span>
+                                    <span className="font-bold text-xl text-accent">{totalSelling.toLocaleString()} €</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-slate-500">Marża:</span>
                                     <span className={`font-bold ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {margin.toFixed(2)} € ({marginPercent}%)
+                                        {margin.toLocaleString()} € ({marginPercent}%)
                                     </span>
                                 </div>
                             </div>
@@ -577,16 +786,32 @@ export const MultiSupplierCalculator: React.FC = () => {
                             {items.length > 0 && (
                                 <div className="border-t pt-4">
                                     <div className="text-xs font-bold text-slate-500 mb-2">POZYCJE:</div>
-                                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                                    <div className="space-y-1 max-h-60 overflow-y-auto">
                                         {items.map(item => (
-                                            <div key={item.id} className="text-xs flex justify-between">
-                                                <span className="truncate flex-1">{item.productName}</span>
-                                                <span className="font-bold ml-2">{item.sellingPrice} €</span>
+                                            <div key={item.id} className="text-xs flex justify-between items-center">
+                                                <div className="flex items-center gap-1 truncate flex-1">
+                                                    <span className={`w-2 h-2 rounded-full ${item.supplier === 'aluxe' ? 'bg-orange-500' :
+                                                        item.supplier === 'deponti' ? 'bg-purple-500' :
+                                                            'bg-blue-500'
+                                                        }`}></span>
+                                                    <span className="truncate">{item.productName}</span>
+                                                </div>
+                                                <span className="font-bold ml-2">{item.sellingPrice.toLocaleString()} €</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
+
+                            {/* Quick action buttons */}
+                            <div className="mt-6 pt-4 border-t space-y-2">
+                                <button
+                                    onClick={() => setActiveTab('summary')}
+                                    className="w-full py-2 bg-accent text-white rounded-lg font-bold text-sm"
+                                >
+                                    Przejdź do Podsumowania
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
