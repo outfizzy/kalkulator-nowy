@@ -79,11 +79,17 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactEleme
 
 
 
+import { ManagerDashboard } from './components/admin/ManagerDashboard';
+
 function DashboardRouter() {
   const { currentUser } = useAuth();
 
-  if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
+  if (currentUser?.role === 'admin') {
     return <AdminDashboard />;
+  }
+
+  if (currentUser?.role === 'manager') {
+    return <ManagerDashboard />;
   }
 
   return <SalesDashboard />;
