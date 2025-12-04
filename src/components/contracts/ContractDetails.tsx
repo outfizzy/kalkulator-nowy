@@ -57,14 +57,8 @@ export const ContractDetails: React.FC = () => {
         }
 
         try {
-            // Pass only modified fields - updateContract will merge safely
-            // We pass the whole contract object, but updateContract now handles it safely by merging
-            // with existing data for JSONB fields.
-            await DatabaseService.updateContract(contract.id, {
-                status: contract.status,
-                // We pass other fields too in case they were edited (though currently UI only edits status here)
-                // If we add more editable fields later, this covers them.
-            });
+            // Pass the full contract object to ensure all edited fields (orderedItems, client, requirements) are saved
+            await DatabaseService.updateContract(contract.id, contract);
 
             toast.success('Zapisano zmiany');
             setIsEditing(false);
