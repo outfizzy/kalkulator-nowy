@@ -334,6 +334,7 @@ export const DatabaseService = {
         const needsDataUpdate = contract.client || contract.product ||
             contract.pricing || contract.comments ||
             contract.requirements || contract.attachments ||
+            contract.orderedItems ||
             contract.contractNumber || contract.commission !== undefined;
 
         if (needsDataUpdate) {
@@ -345,6 +346,7 @@ export const DatabaseService = {
                 pricing: contract.pricing ?? current.pricing,
                 commission: contract.commission ?? current.commission,
                 requirements: contract.requirements ?? current.requirements,
+                orderedItems: contract.orderedItems ?? current.orderedItems ?? [],
                 comments: contract.comments ?? current.comments,
                 attachments: contract.attachments ?? current.attachments
             };
