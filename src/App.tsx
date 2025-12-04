@@ -17,6 +17,17 @@ import { PartnerOffersPage } from './components/admin/PartnerOffersPage';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { InstallerManagementPanel } from './components/admin/InstallerManagementPanel';
 import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
+import { OrderRequestManager } from './components/admin/OrderRequestManager';
+import { FuelLogManager } from './components/admin/FuelLogManager';
+import { FailureReportManager } from './components/admin/FailureReportManager';
+import { InstallerRequestsPage } from './components/installer/InstallerRequestsPage';
+import { InstallerDashboard } from './components/installer/InstallerDashboard';
+import { InstallationAcceptance } from './components/installer/InstallationAcceptance';
+import { InstallerLayout } from './components/installer/InstallerLayout';
+import { InstallerCalendarPage } from './components/installer/InstallerCalendarPage';
+import { FailureReportForm } from './components/installer/FailureReportForm';
+import { InstallerSettingsPage } from './components/installer/InstallerSettingsPage';
+import { FuelPage } from './components/fuel/FuelPage';
 import { calculatePrice } from './utils/pricing';
 import { calculateCommission } from './utils/commission';
 import { DatabaseService } from './services/database';
@@ -26,8 +37,8 @@ import { ReportForm } from './components/reports/ReportForm';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
+
 import { WalletPage } from './components/admin/WalletPage';
-import { InstallationCalendar } from './components/installations/InstallationCalendar';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
@@ -38,7 +49,7 @@ import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
 import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
 import { PartnerLayout } from './components/partner/PartnerLayout';
 
-import type { Customer, ProductConfig, Offer, SnowZoneInfo, Installation } from './types';
+import type { Customer, ProductConfig, Offer, SnowZoneInfo } from './types';
 
 type Step = 'customer' | 'product' | 'summary';
 
@@ -59,6 +70,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactEleme
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     // Redirect based on role if trying to access unauthorized area
     if (currentUser.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
+    if (currentUser.role === 'installer') return <Navigate to="/installer" replace />;
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -245,55 +257,7 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
   );
 }
 
-function InstallerInstallationsPage() {
-  const { currentUser } = useAuth();
-  const [installations, setInstallations] = useState<Installation[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      if (!currentUser) return;
-      setLoading(true);
-      try {
-        const data = await DatabaseService.getInstallationsForInstaller(currentUser.id);
-        setInstallations(data);
-      } catch (e) {
-        console.error('Error loading installer installations:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [currentUser]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-[calc(100vh-100px)] flex flex-col gap-4 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Mój kalendarz montaży</h1>
-          <p className="text-slate-500 text-sm">
-            Wszystkie montaże przypisane do Twojego konta
-          </p>
-        </div>
-      </div>
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <InstallationCalendar
-          installations={installations}
-          teams={[]}
-          onEdit={() => { }}
-        />
-      </div>
-    </div>
-  );
-}
 
 function App() {
   return (
@@ -333,6 +297,10 @@ function App() {
               <Route path="/installations" element={<InstallationDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
+              <Route path="/admin/requests" element={<OrderRequestManager />} />
+              <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
+              <Route path="/admin/failures" element={<FailureReportManager />} />
+              <Route path="/fuel-logs" element={<FuelPage />} />
             </Route>
 
 
@@ -353,11 +321,16 @@ function App() {
             {/* Installer Protected Routes */}
             <Route path="/installer" element={
               <ProtectedRoute allowedRoles={['installer']}>
-                <Layout />
+                <InstallerLayout />
               </ProtectedRoute>
             }>
-              <Route path="calendar" element={<InstallerInstallationsPage />} />
-              <Route index element={<Navigate to="/installer/calendar" replace />} />
+              <Route path="calendar" element={<InstallerCalendarPage />} />
+              <Route path="requests" element={<InstallerRequestsPage />} />
+              <Route path="fuel" element={<FuelPage />} />
+              <Route path="failure-report" element={<FailureReportForm />} />
+              <Route path="settings" element={<InstallerSettingsPage />} />
+              <Route path="acceptance/:installationId" element={<InstallationAcceptance />} />
+              <Route index element={<InstallerDashboard />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

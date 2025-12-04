@@ -1,0 +1,158 @@
+{
+    "nav": {
+        "dashboard": "Panou de bord",
+        "calendar": "Calendar",
+        "requests": "Cereri",
+        "fuel": "Alimentare",
+        "settings": "Setări",
+        "logout": "Deconectare"
+    },
+    "dashboard": {
+        "welcome": "Bun venit",
+        "todayInstallation": "Instalarea de astăzi",
+        "noInstallation": "Nicio instalare astăzi",
+        "acceptance": "Acceptarea instalării",
+        "acceptanceDesc": "Verifică și semnează",
+        "viewFullCalendar": "Vezi calendarul complet al instalărilor",
+        "installer": "Montator"
+    },
+    "tiles": {
+        "requests": {
+            "title": "Cerere",
+            "desc": "Comandă unelte și materiale"
+        },
+        "fuel": {
+            "title": "Alimentare",
+            "desc": "Adaugă alimentare nouă"
+        },
+        "failure": {
+            "title": "Defecțiune",
+            "desc": "Raportează unealtă defectă"
+        }
+    },
+    "settings": {
+        "title": "Setări",
+        "language": "Limba interfeței",
+        "languageDesc": "Selectează limba preferată pentru interfața aplicației",
+        "saveLanguage": "Salvează limba",
+        "saving": "Se salvează...",
+        "savedSuccess": "Limba a fost salvată cu succes",
+        "saveError": "Eroare la salvarea limbii",
+        "info": "Informație",
+        "infoMessage": "Traducerile interfeței au fost implementate. Selecția limbii este salvată în profil."
+    },
+    "failure": {
+        "title": "Raportează defecțiune",
+        "subtitle": "Raportează unealtă sau echipament defect",
+        "equipmentName": "Numele echipamentului",
+        "equipmentPlaceholder": "ex. Burghiu, Scară, Ciocan",
+        "description": "Descrierea problemei",
+        "descriptionPlaceholder": "Descrie ce s-a defectat...",
+        "photo": "Fotografie (opțional)",
+        "submit": "Trimite raport",
+        "submitting": "Se trimite...",
+        "back": "Înapoi",
+        "successMessage": "Raportul de defecțiune a fost trimis",
+        "errorMessage": "Eroare la trimiterea raportului",
+        "fillRequired": "Completează toate câmpurile obligatorii",
+        "mustBeLoggedIn": "Trebuie să fii autentificat"
+    },
+    "common": {
+        "loading": "Se încarcă...",
+        "error": "Eroare",
+        "save": "Salvează",
+        "cancel": "Anulează",
+        "delete": "Șterge",
+        "edit": "Editează",
+        "close": "Închide",
+        "required": "obligatoriu"
+    },
+    "calendar": {
+        "title": "Planificarea Instalărilor",
+        "subtitle": "Previzualizarea programului tuturor echipelor",
+        "error": "Eroare la încărcarea calendarului"
+    },
+    "languages": {
+        "pl": "Poloneză",
+        "mo": "Moldovenească",
+        "uk": "Ucraineană"
+    },
+    "requests": {
+        "title": "Cereri",
+        "subtitle": "Solicitați unelte sau materiale",
+        "successMessage": "Cerere trimisă",
+        "errorMessage": "Eroare la trimiterea cererii",
+        "formTitle": "Trimiteți cerere",
+        "itemName": "Nume articol / unealtă",
+        "itemPlaceholder": "ex. Șuruburi 5x50, Burghiu fi 10",
+        "quantity": "Cantitate",
+        "description": "Descriere suplimentară (opțional)",
+        "descriptionPlaceholder": "Detalii, link produs, etc.",
+        "submitting": "Se trimite...",
+        "submit": "Trimite cererea",
+        "myRequests": "Cererile mele",
+        "date": "Data",
+        "item": "Articol",
+        "status": "Stare",
+        "noRequests": "Nicio cerere",
+        "statusPending": "În așteptare",
+        "statusOrdered": "Comandat",
+        "statusCompleted": "Primit",
+        "statusRejected": "Respins"
+    },
+    "acceptance": {
+        "title": "Acceptare Instalare",
+        "installationInfo": "Informații instalare",
+        "product": "Produs:",
+        "address": "Adresă:",
+        "date": "Data:",
+        "checklist": "Listă de verificare",
+        "checkStructure": "Integritate structurală",
+        "checkMaterial": "Calitate material",
+        "checkFunctionality": "Test funcționalitate",
+        "checkCleaning": "Curățenie finalizată",
+        "checkInstruction": "Instruire client",
+        "checkWarranty": "Garanție predată",
+        "clientName": "Nume și prenume client",
+        "clientNamePlaceholder": "ex. Ion Popescu",
+        "clientSignature": "Semnătură client",
+        "notes": "Note (opțional)",
+        "notesPlaceholder": "Note suplimentare sau comentarii...",
+        "submit": "Confirmă Acceptarea",
+        "loadError": "Eroare la încărcarea datelor instalării",
+        "fillChecklist": "Completați toate punctele de verificare",
+        "signatureRequired": "Semnătura clientului este necesară",
+        "nameRequired": "Introduceți numele clientului",
+        "successMessage": "Acceptare instalare salvată!",
+        "errorMessage": "Eroare la salvarea acceptării",
+        "notFound": "Instalarea nu a fost găsită"
+    },
+    "fuel": {
+        "pageTitle": "Registru Combustibil",
+        "pageSubtitle": "Adăugați alimentare nouă și vizualizați istoricul",
+        "formTitle": "Raport Nou Combustibil",
+        "vehiclePlate": "Număr de Înmatriculare",
+        "platePlaceholder": "ex. KR 12345",
+        "date": "Data",
+        "odometer": "Kilometraj (km)",
+        "liters": "Cantitate Combustibil (L)",
+        "cost": "Cost (PLN)",
+        "odometerPhoto": "Poză Kilometraj",
+        "receiptPhoto": "Poză Bon",
+        "submit": "Trimite Raport",
+        "submitting": "Se trimite...",
+        "fillRequired": "Completați toate câmpurile obligatorii",
+        "plateRequired": "Introduceți numărul de înmatriculare",
+        "photosRequired": "Adăugați poze cu kilometrajul și bonul",
+        "successMessage": "Raport combustibil trimis",
+        "errorMessage": "Eroare la trimiterea raportului",
+        "noLogs": "Niciun raport de combustibil",
+        "vehicle": "Vehicul",
+        "fuel": "Combustibil",
+        "costHeader": "Cost",
+        "photos": "Poze",
+        "odometerLink": "Kilometraj",
+        "receiptLink": "Bon",
+        "loadError": "Eroare la încărcarea registrului de combustibil"
+    }
+}

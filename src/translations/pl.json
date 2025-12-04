@@ -1,0 +1,158 @@
+{
+    "nav": {
+        "dashboard": "Dashboard",
+        "calendar": "Kalendarz",
+        "requests": "Zapotrzebowania",
+        "fuel": "Tankowanie",
+        "settings": "Ustawienia",
+        "logout": "Wyloguj"
+    },
+    "dashboard": {
+        "welcome": "Witaj",
+        "todayInstallation": "Dzisiejszy Montaż",
+        "noInstallation": "Brak montażu na dzisiaj",
+        "acceptance": "Odbiór Montażu",
+        "acceptanceDesc": "Sprawdź i podpisz",
+        "viewFullCalendar": "Zobacz cały kalendarz montaży",
+        "installer": "Montażysta"
+    },
+    "tiles": {
+        "requests": {
+            "title": "Zapotrzebowanie",
+            "desc": "Zamów narzędzia i materiały"
+        },
+        "fuel": {
+            "title": "Tankowanie",
+            "desc": "Dodaj nowe tankowanie"
+        },
+        "failure": {
+            "title": "Awaria",
+            "desc": "Zgłoś zepsute narzędzie"
+        }
+    },
+    "settings": {
+        "title": "Ustawienia",
+        "language": "Język interfejsu",
+        "languageDesc": "Wybierz preferowany język dla interfejsu aplikacji",
+        "saveLanguage": "Zapisz język",
+        "saving": "Zapisywanie...",
+        "savedSuccess": "Język zapisany pomyślnie",
+        "saveError": "Błąd zapisu języka",
+        "info": "Informacja",
+        "infoMessage": "Tłumaczenia interfejsu zostały wdrożone. Wybór języka jest zapisywany w profilu."
+    },
+    "failure": {
+        "title": "Zgłoś Awarię",
+        "subtitle": "Zgłoś zepsute narzędzie lub sprzęt",
+        "equipmentName": "Nazwa sprzętu",
+        "equipmentPlaceholder": "np. Wiertarka, Drabina, Młotek",
+        "description": "Opis problemu",
+        "descriptionPlaceholder": "Opisz co się zepsuło...",
+        "photo": "Zdjęcie (opcjonalne)",
+        "submit": "Zgłoś Awarię",
+        "submitting": "Wysyłanie...",
+        "back": "Powrót",
+        "successMessage": "Zgłoszenie awarii zostało wysłane",
+        "errorMessage": "Błąd podczas wysyłania zgłoszenia",
+        "fillRequired": "Wypełnij wszystkie wymagane pola",
+        "mustBeLoggedIn": "Musisz być zalogowany"
+    },
+    "common": {
+        "loading": "Ładowanie...",
+        "error": "Błąd",
+        "save": "Zapisz",
+        "cancel": "Anuluj",
+        "delete": "Usuń",
+        "edit": "Edytuj",
+        "close": "Zamknij",
+        "required": "wymagane"
+    },
+    "calendar": {
+        "title": "Planowanie Montaży",
+        "subtitle": "Podgląd harmonogramu wszystkich ekip",
+        "error": "Błąd ładowania kalendarza"
+    },
+    "languages": {
+        "pl": "Polski",
+        "mo": "Mołdawski",
+        "uk": "Ukraiński"
+    },
+    "requests": {
+        "title": "Zapotrzebowania",
+        "subtitle": "Zgłoś zapotrzebowanie na narzędzia lub materiały",
+        "successMessage": "Zapotrzebowanie wysłane",
+        "errorMessage": "Błąd wysyłania zapotrzebowania",
+        "formTitle": "Zgłoś zapotrzebowanie",
+        "itemName": "Nazwa przedmiotu / narzędzia",
+        "itemPlaceholder": "np. Wkręty 5x50, Wiertło fi 10",
+        "quantity": "Ilość",
+        "description": "Dodatkowy opis (opcjonalnie)",
+        "descriptionPlaceholder": "Szczegóły, link do produktu, itp.",
+        "submitting": "Wysyłanie...",
+        "submit": "Wyślij zgłoszenie",
+        "myRequests": "Moje Zapotrzebowania",
+        "date": "Data",
+        "item": "Przedmiot",
+        "status": "Status",
+        "noRequests": "Brak zgłoszeń",
+        "statusPending": "Oczekujące",
+        "statusOrdered": "Zamówione",
+        "statusCompleted": "Odebrane",
+        "statusRejected": "Odrzucone"
+    },
+    "acceptance": {
+        "title": "Odbiór Montażu",
+        "installationInfo": "Informacje o montażu",
+        "product": "Produkt:",
+        "address": "Adres:",
+        "date": "Data:",
+        "checklist": "Lista kontrolna",
+        "checkStructure": "Integralność konstrukcji",
+        "checkMaterial": "Jakość materiałów",
+        "checkFunctionality": "Test funkcjonalności",
+        "checkCleaning": "Sprzątanie ukończone",
+        "checkInstruction": "Instruktaż klienta",
+        "checkWarranty": "Przekazanie gwarancji",
+        "clientName": "Imię i nazwisko klienta",
+        "clientNamePlaceholder": "np. Jan Kowalski",
+        "clientSignature": "Podpis klienta",
+        "notes": "Uwagi (opcjonalnie)",
+        "notesPlaceholder": "Dodatkowe uwagi lub komentarze...",
+        "submit": "Zatwierdź Odbiór",
+        "loadError": "Błąd ładowania danych montażu",
+        "fillChecklist": "Uzupełnij wszystkie punkty kontrolne",
+        "signatureRequired": "Wymagany podpis klienta",
+        "nameRequired": "Podaj imię i nazwisko klienta",
+        "successMessage": "Odbiór montażu zapisany!",
+        "errorMessage": "Błąd podczas zapisywania odbioru",
+        "notFound": "Nie znaleziono montażu"
+    },
+    "fuel": {
+        "pageTitle": "Rejestr Paliwowy",
+        "pageSubtitle": "Dodaj nowe tankowanie i przeglądaj historię",
+        "formTitle": "Nowe Zgłoszenie Paliwowe",
+        "vehiclePlate": "Numer Rejestracyjny",
+        "platePlaceholder": "np. KR 12345",
+        "date": "Data",
+        "odometer": "Stan Licznika (km)",
+        "liters": "Ilość Paliwa (L)",
+        "cost": "Koszt (PLN)",
+        "odometerPhoto": "Zdjęcie Licznika",
+        "receiptPhoto": "Zdjęcie Paragonu",
+        "submit": "Wyślij Zgłoszenie",
+        "submitting": "Wysyłanie...",
+        "fillRequired": "Wypełnij wszystkie wymagane pola",
+        "plateRequired": "Podaj numer rejestracyjny pojazdu",
+        "photosRequired": "Dodaj zdjęcia licznika i paragonu",
+        "successMessage": "Zgłoszenie paliwowe wysłane",
+        "errorMessage": "Błąd podczas wysyłania zgłoszenia",
+        "noLogs": "Brak zgłoszeń paliwowych",
+        "vehicle": "Pojazd",
+        "fuel": "Paliwo",
+        "costHeader": "Koszt",
+        "photos": "Zdjęcia",
+        "odometerLink": "Licznik",
+        "receiptLink": "Paragon",
+        "loadError": "Błąd ładowania rejestru paliwowego"
+    }
+}

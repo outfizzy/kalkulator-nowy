@@ -26,6 +26,7 @@ export interface User {
     partnerMargin?: number; // e.g. 0.25 = 25%
     // Commission rate for sales reps (e.g. 0.05 = 5%)
     commissionRate?: number;
+    preferredLanguage?: 'pl' | 'mo' | 'uk';
 }
 
 export interface Customer {
@@ -162,6 +163,24 @@ export interface SalesProfile {
     email: string;
     phone: string;
     monthlyTarget: number; // e.g., 50000 EUR revenue
+}
+
+export type FailureReportStatus = 'pending' | 'in_progress' | 'resolved';
+
+export interface FailureReport {
+    id: string;
+    userId: string;
+    equipmentName: string;
+    description: string;
+    photoUrl?: string;
+    status: FailureReportStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    userName?: string;
+    user?: {
+        firstName: string;
+        lastName: string;
+    };
 }
 
 export interface Visit {
@@ -393,3 +412,48 @@ export interface DeletedWalletTransaction extends WalletTransaction {
     deletedAt: Date;
 }
 
+
+// --- Order Requests Types ---
+
+export type OrderRequestStatus = 'pending' | 'ordered' | 'rejected' | 'completed';
+
+export interface OrderRequest {
+    id: string;
+    userId: string;
+    itemName: string;
+    quantity: number;
+    description?: string;
+    status: OrderRequestStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    // Joined user data
+    user?: {
+        firstName: string;
+        lastName: string;
+    };
+}
+
+// --- Fuel Logs Types ---
+
+export type FuelLogType = 'sales_rep' | 'installer';
+
+export interface FuelLog {
+    id: string;
+    userId: string;
+    vehiclePlate?: string;
+    odometerReading: number;
+    odometerPhotoUrl?: string;
+    receiptPhotoUrl?: string;
+    liters: number;
+    cost: number;
+    currency: 'PLN' | 'EUR';
+    logDate: string; // ISO Date
+    type: FuelLogType;
+    createdAt: Date;
+    userName?: string; // Joined user data
+    // Joined user data
+    user?: {
+        firstName: string;
+        lastName: string;
+    };
+}

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats } from '../types';
+import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus } from '../types';
 import type { AuthError } from '@supabase/supabase-js';
 
 interface InstallationData {
@@ -31,29 +31,6 @@ const normalizePricing = (pricing: Partial<PricingResult> | null | undefined): P
         marginPercentage: typeof p.marginPercentage === 'number' ? p.marginPercentage : 0,
         marginValue: Number(p.marginValue ?? 0),
     };
-};
-
-// Helper: generate sequential contract number PL/1100/MM/RRRR for current month/year
-const generateContractNumberFromList = (contracts: Contract[]): string => {
-    const now = new Date();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const year = now.getFullYear();
-
-    const currentMonthContracts = contracts.filter(c => {
-        const parts = (c.contractNumber || '').split('/');
-        return parts.length >= 4 && parts[2] === month && parts[3] === year.toString();
-    });
-
-    let maxNum = 0;
-    currentMonthContracts.forEach(c => {
-        const parts = c.contractNumber.split('/');
-        const num = parseInt(parts[1], 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-    });
-
-    const base = 1100;
-    const nextNum = maxNum === 0 ? base : maxNum + 1;
-    return `PL/${nextNum}/${month}/${year}`;
 };
 
 export const DatabaseService = {
@@ -288,9 +265,13 @@ export const DatabaseService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        // Generate sequential contract number for current month/year
-        const existingContracts = await DatabaseService.getContracts();
-        const newContractNumber = generateContractNumberFromList(existingContracts);
+        // Generate sequential contract number using database function
+        // This bypasses RLS to ensure sequential numbers across ALL users
+        const { data: contractNumberData, error: rpcError } = await supabase
+            .rpc('get_next_contract_number');
+
+        if (rpcError) throw rpcError;
+        const newContractNumber = contractNumberData as string;
 
         const contractData = {
             contractNumber: newContractNumber,
@@ -573,6 +554,18 @@ export const DatabaseService = {
         if (error) throw error;
     },
 
+    async updateUserLanguage(userId: string, language: 'pl' | 'mo' | 'uk'): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                preferred_language: language,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
     async getSoldOffersCount(userId: string): Promise<number> {
         const { count, error } = await supabase
             .from('offers')
@@ -697,52 +690,70 @@ export const DatabaseService = {
     },
 
     async getInstallationsForInstaller(userId: string): Promise<Installation[]> {
-        const { data: assignments, error: assignError } = await supabase
+        // 1. Get user's teams
+        const { data: teamMembers, error: teamError } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', userId);
+
+        if (teamError) throw teamError;
+
+        const teamIds = teamMembers?.map((tm: { team_id: string }) => tm.team_id) || [];
+
+        // 2. Get direct assignments
+        const { data: directAssignments, error: directError } = await supabase
             .from('installation_assignments')
             .select('installation_id')
             .eq('user_id', userId);
 
-        if (assignError) throw assignError;
-        if (!assignments || assignments.length === 0) return [];
+        if (directError) throw directError;
 
-        const ids = assignments.map((a: { installation_id: string }) => a.installation_id);
+        const directInstallationIds = directAssignments?.map((da: { installation_id: string }) => da.installation_id) || [];
 
+        // 3. Get all installations
+        // Since teamId is in JSON, we fetch all and filter in JS for now
+        // Ideally we would filter in DB but JSON filtering syntax can be tricky with multiple values
         const { data, error } = await supabase
             .from('installations')
-            .select('*')
-            .in('id', ids);
+            .select('*');
 
         if (error) throw error;
 
-        return (data || []).map(row => {
-            const installationData = (row as { installation_data: Partial<InstallationData> }).installation_data || {};
-            const clientData: Partial<Installation['client']> = installationData.client || {};
+        return (data || [])
+            .map(row => {
+                const installationData = (row as { installation_data: Partial<InstallationData> }).installation_data || {};
+                const clientData: Partial<Installation['client']> = installationData.client || {};
 
-            const client = {
-                firstName: clientData.firstName || '',
-                lastName: clientData.lastName || '',
-                city: clientData.city || installationData.city || '',
-                address: clientData.address || installationData.address || '',
-                phone: clientData.phone || installationData.phone || '',
-                coordinates: clientData.coordinates
-            };
+                const client = {
+                    firstName: clientData.firstName || '',
+                    lastName: clientData.lastName || '',
+                    city: clientData.city || installationData.city || '',
+                    address: clientData.address || installationData.address || '',
+                    phone: clientData.phone || installationData.phone || '',
+                    coordinates: clientData.coordinates
+                };
 
-            const scheduledRaw = (row as { scheduled_date: string | null }).scheduled_date;
-            const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
+                const scheduledRaw = (row as { scheduled_date: string | null }).scheduled_date;
+                const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
 
-            return {
-                id: row.id,
-                offerId: row.offer_id,
-                client,
-                productSummary: installationData.productSummary || '',
-                status: row.status as Installation['status'],
-                scheduledDate,
-                teamId: installationData.teamId,
-                notes: installationData.notes,
-                acceptance: installationData.acceptance,
-                createdAt: new Date(row.created_at)
-            } as Installation;
-        });
+                return {
+                    id: row.id,
+                    offerId: row.offer_id,
+                    client,
+                    productSummary: installationData.productSummary || '',
+                    status: row.status as Installation['status'],
+                    scheduledDate,
+                    teamId: installationData.teamId || (row as { team_id?: string }).team_id,
+                    notes: installationData.notes,
+                    acceptance: installationData.acceptance,
+                    createdAt: new Date(row.created_at)
+                } as Installation;
+            })
+            .filter(inst => {
+                const isTeamAssigned = inst.teamId && teamIds.includes(inst.teamId);
+                const isDirectlyAssigned = directInstallationIds.includes(inst.id);
+                return isTeamAssigned || isDirectlyAssigned;
+            });
     },
 
     async assignInstaller(installationId: string, userId: string): Promise<void> {
@@ -1666,7 +1677,7 @@ export const DatabaseService = {
             .from('measurements')
             .select(`
                 *,
-                sales_rep:profiles!sales_rep_id(first_name, last_name)
+                sales_rep:profiles!sales_rep_id(full_name)
             `)
             .order('scheduled_date', { ascending: true });
 
@@ -1677,7 +1688,7 @@ export const DatabaseService = {
             offerId: m.offer_id,
             scheduledDate: new Date(m.scheduled_date),
             salesRepId: m.sales_rep_id,
-            salesRepName: `${m.sales_rep?.first_name || ''} ${m.sales_rep?.last_name || ''}`.trim(),
+            salesRepName: m.sales_rep?.full_name || '',
             customerName: m.customer_name,
             customerAddress: m.customer_address,
             customerPhone: m.customer_phone,
@@ -1698,7 +1709,7 @@ export const DatabaseService = {
             .from('measurements')
             .select(`
                 *,
-                sales_rep:profiles!sales_rep_id(first_name, last_name)
+                sales_rep:profiles!sales_rep_id(full_name)
             `)
             .eq('sales_rep_id', userId)
             .order('scheduled_date', { ascending: true });
@@ -1710,7 +1721,7 @@ export const DatabaseService = {
             offerId: m.offer_id,
             scheduledDate: new Date(m.scheduled_date),
             salesRepId: m.sales_rep_id,
-            salesRepName: `${m.sales_rep?.first_name || ''} ${m.sales_rep?.last_name || ''}`.trim(),
+            salesRepName: m.sales_rep?.full_name || '',
             customerName: m.customer_name,
             customerAddress: m.customer_address,
             customerPhone: m.customer_phone,
@@ -2104,5 +2115,213 @@ export const DatabaseService = {
             deletedByName: tx.deleted_by_profile?.full_name,
             processedByName: tx.processed_by_profile?.full_name
         })) || [];
+    },
+
+    // --- Order Requests ---
+    async createOrderRequest(request: Omit<OrderRequest, 'id' | 'createdAt' | 'updatedAt' | 'user'>): Promise<{ error: any }> {
+        const { error } = await supabase
+            .from('order_requests')
+            .insert({
+                user_id: request.userId,
+                item_name: request.itemName,
+                quantity: request.quantity,
+                description: request.description,
+                status: request.status
+            });
+        return { error };
+    },
+
+    async getOrderRequests(userId?: string): Promise<OrderRequest[]> {
+        let query = supabase
+            .from('order_requests')
+            .select('*, user:profiles(full_name)')
+            .order('created_at', { ascending: false });
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            itemName: row.item_name,
+            quantity: row.quantity,
+            description: row.description,
+            status: row.status,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            user: row.user ? {
+                firstName: row.user.full_name?.split(' ')[0] || '',
+                lastName: row.user.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
+        }));
+    },
+
+    async updateOrderRequestStatus(id: string, status: OrderRequestStatus): Promise<{ error: any }> {
+        const { error } = await supabase
+            .from('order_requests')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', id);
+        return { error };
+    },
+
+    // --- Fuel Logs ---
+    async createFuelLog(log: Omit<FuelLog, 'id' | 'createdAt' | 'user'>): Promise<{ error: any }> {
+        const { error } = await supabase
+            .from('fuel_logs')
+            .insert({
+                user_id: log.userId,
+                vehicle_plate: log.vehiclePlate,
+                odometer_reading: log.odometerReading,
+                odometer_photo_url: log.odometerPhotoUrl,
+                receipt_photo_url: log.receiptPhotoUrl,
+                liters: log.liters,
+                cost: log.cost,
+                currency: log.currency,
+                log_date: log.logDate,
+                type: log.type
+            });
+        return { error };
+    },
+
+    async getFuelLogs(userId?: string): Promise<FuelLog[]> {
+        let query = supabase
+            .from('fuel_logs')
+            .select('*, user:profiles(full_name)')
+            .order('log_date', { ascending: false });
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            vehiclePlate: row.vehicle_plate,
+            odometerReading: row.odometer_reading,
+            odometerPhotoUrl: row.odometer_photo_url,
+            receiptPhotoUrl: row.receipt_photo_url,
+            liters: row.liters,
+            cost: row.cost,
+            currency: row.currency,
+            logDate: row.log_date,
+            type: row.type,
+            createdAt: new Date(row.created_at),
+            user: row.user ? {
+                firstName: row.user.full_name?.split(' ')[0] || '',
+                lastName: row.user.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
+        }));
+    },
+
+    async updateInstallationAcceptance(
+        installationId: string,
+        acceptance: {
+            acceptedAt: string;
+            clientName: string;
+            signature?: string;
+            notes?: string;
+        }
+    ): Promise<{ error: any }> {
+        const { error } = await supabase
+            .from('installations')
+            .update({
+                acceptance: acceptance,
+                status: 'completed'
+            })
+            .eq('id', installationId);
+
+        return { error };
+    },
+
+    // --- Failure Reports ---
+    async createFailureReport(
+        report: Omit<FailureReport, 'id' | 'createdAt' | 'updatedAt' | 'user'>,
+        photoFile?: File
+    ): Promise<{ error: any }> {
+        try {
+            let photoUrl: string | undefined;
+
+            // Upload photo if provided
+            if (photoFile) {
+                const fileExt = photoFile.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                const filePath = `${report.userId}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('failure-reports')
+                    .upload(filePath, photoFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: urlData } = supabase.storage
+                    .from('failure-reports')
+                    .getPublicUrl(filePath);
+
+                photoUrl = urlData.publicUrl;
+            }
+
+            // Insert failure report
+            const { error } = await supabase
+                .from('failure_reports')
+                .insert({
+                    user_id: report.userId,
+                    equipment_name: report.equipmentName,
+                    description: report.description,
+                    photo_url: photoUrl,
+                    status: report.status || 'pending'
+                });
+
+            return { error };
+        } catch (error) {
+            return { error };
+        }
+    },
+
+    async getFailureReports(userId?: string): Promise<FailureReport[]> {
+        let query = supabase
+            .from('failure_reports')
+            .select('*, user:profiles(full_name)')
+            .order('created_at', { ascending: false });
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            equipmentName: row.equipment_name,
+            description: row.description,
+            photoUrl: row.photo_url,
+            status: row.status,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            user: row.user ? {
+                firstName: row.user.full_name?.split(' ')[0] || '',
+                lastName: row.user.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
+        }));
+    },
+
+    async updateFailureReportStatus(id: string, status: FailureReportStatus): Promise<{ error: any }> {
+        const { error } = await supabase
+            .from('failure_reports')
+            .update({
+                status,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id);
+
+        return { error };
     }
 };

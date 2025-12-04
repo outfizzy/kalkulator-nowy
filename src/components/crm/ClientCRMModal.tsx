@@ -230,22 +230,93 @@ export const ClientCRMModal: React.FC<ClientCRMModalProps> = ({ customer, onClos
                                 <div className="text-center py-12 text-slate-500">Brak zleceń montażu</div>
                             ) : (
                                 clientInstallations.map(inst => (
-                                    <div key={inst.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-2">
+                                    <div key={inst.id} className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                                        {/* Installation Header */}
+                                        <div className="p-4 flex justify-between items-start border-b border-slate-100">
                                             <div>
                                                 <h4 className="font-bold text-slate-800">Montaż: {inst.productSummary}</h4>
                                                 <p className="text-sm text-slate-500">Adres: {inst.client.address}, {inst.client.city}</p>
                                             </div>
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${inst.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                inst.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
-                                                    'bg-yellow-100 text-yellow-700'
+                                                    inst.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
+                                                        'bg-yellow-100 text-yellow-700'
                                                 }`}>
-                                                {inst.status}
+                                                {inst.status === 'completed' ? 'Zakończony' :
+                                                    inst.status === 'scheduled' ? 'Zaplanowany' :
+                                                        inst.status === 'pending' ? 'Oczekujący' : inst.status}
                                             </span>
                                         </div>
-                                        {inst.scheduledDate && (
-                                            <div className="text-sm font-medium text-slate-700 mt-2">
-                                                Planowana data: {new Date(inst.scheduledDate).toLocaleDateString()}
+
+                                        {/* Installation Details */}
+                                        <div className="p-4 bg-slate-50">
+                                            {inst.scheduledDate && (
+                                                <div className="flex items-center gap-2 text-sm mb-2">
+                                                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <span className="font-medium text-slate-700">
+                                                        Planowana data: {new Date(inst.scheduledDate).toLocaleDateString('pl-PL')}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {inst.team && (
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                    </svg>
+                                                    <span className="text-slate-600">Ekipa: {inst.team.name}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Acceptance Section */}
+                                        {inst.acceptance && (
+                                            <div className="p-4 border-t border-slate-200">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <h5 className="font-bold text-slate-800">Odbiór Montażu</h5>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-1">Data odbioru:</p>
+                                                        <p className="text-sm font-medium text-slate-800">
+                                                            {new Date(inst.acceptance.acceptedAt).toLocaleDateString('pl-PL', {
+                                                                year: 'numeric',
+                                                                month: 'long',
+                                                                day: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-1">Odbiór przez:</p>
+                                                        <p className="text-sm font-medium text-slate-800">{inst.acceptance.clientName}</p>
+                                                    </div>
+                                                </div>
+
+                                                {inst.acceptance.notes && (
+                                                    <div className="mb-4">
+                                                        <p className="text-xs text-slate-500 mb-1">Uwagi:</p>
+                                                        <p className="text-sm text-slate-700 bg-slate-50 rounded p-2">{inst.acceptance.notes}</p>
+                                                    </div>
+                                                )}
+
+                                                {inst.acceptance.signature && (
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-2">Podpis klienta:</p>
+                                                        <div className="border-2 border-slate-200 rounded-lg overflow-hidden bg-white">
+                                                            <img
+                                                                src={inst.acceptance.signature}
+                                                                alt="Podpis klienta"
+                                                                className="w-full h-32 object-contain"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

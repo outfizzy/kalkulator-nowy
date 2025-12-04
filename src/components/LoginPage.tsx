@@ -17,6 +17,9 @@ export const LoginPage: React.FC = () => {
         try {
             const { error } = await login(email, password);
             if (error) throw error;
+
+            // Navigate to dashboard - ProtectedRoute will handle redirection based on role
+            // if the user is an installer or partner.
             navigate('/dashboard');
         } catch (error: unknown) {
             console.error('Login error:', error);
