@@ -1,5 +1,6 @@
 import type { Offer, SalesProfile, CommissionStats, MeasurementReport, User, UserRole, Installation, InstallationTeam, Contract } from '../types';
 import { calculateCommissionDetailed } from './commission';
+import { extractOrderedItemsFromOffer } from './contractHelpers';
 
 const STORAGE_KEY = 'aluxe_offers';
 const PROFILE_KEY = 'aluxe_profile';
@@ -534,7 +535,7 @@ export function createContractFromOffer(offer: Offer): Contract {
             powerSupply: false,
             foundation: false
         },
-        orderedItems: [],
+        orderedItems: extractOrderedItemsFromOffer(offer),
         comments: [],
         attachments: [],
         createdAt: new Date()

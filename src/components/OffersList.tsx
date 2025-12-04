@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Offer, OfferStatus, User, Contract, Installation } from '../types';
 import { ClientCRMModal } from './crm/ClientCRMModal';
 import { OfferPreviewModal } from './OfferPreviewModal';
+import { extractOrderedItemsFromOffer } from '../utils/contractHelpers';
 
 export const OffersList: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
@@ -95,7 +96,7 @@ export const OffersList: React.FC = () => {
                             powerSupply: false,
                             foundation: false
                         },
-                        orderedItems: [],
+                        orderedItems: extractOrderedItemsFromOffer(offer),
                         comments: [],
                         attachments: []
                     });
@@ -180,7 +181,7 @@ export const OffersList: React.FC = () => {
                         powerSupply: false,
                         foundation: false
                     },
-                    orderedItems: [],
+                    orderedItems: extractOrderedItemsFromOffer(offer),
                     comments: [],
                     attachments: []
                 });
