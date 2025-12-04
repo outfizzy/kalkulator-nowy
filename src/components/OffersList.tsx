@@ -95,6 +95,7 @@ export const OffersList: React.FC = () => {
                             powerSupply: false,
                             foundation: false
                         },
+                        orderedItems: [],
                         comments: [],
                         attachments: []
                     });
@@ -179,6 +180,7 @@ export const OffersList: React.FC = () => {
                         powerSupply: false,
                         foundation: false
                     },
+                    orderedItems: [],
                     comments: [],
                     attachments: []
                 });

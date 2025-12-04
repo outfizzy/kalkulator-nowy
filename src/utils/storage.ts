@@ -534,6 +534,7 @@ export function createContractFromOffer(offer: Offer): Contract {
             powerSupply: false,
             foundation: false
         },
+        orderedItems: [],
         comments: [],
         attachments: [],
         createdAt: new Date()

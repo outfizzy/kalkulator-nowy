@@ -6,6 +6,7 @@ import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/off
 import type { Contract, ContractComment, ContractAttachment } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { OrderedItemsModule } from './OrderedItemsModule';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -516,6 +517,12 @@ export const ContractDetails: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <OrderedItemsModule
+                contract={contract}
+                onUpdate={(items) => setContract({ ...contract, orderedItems: items })}
+                isEditing={isEditing}
+            />
         </div >
     );
 };

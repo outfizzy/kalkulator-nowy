@@ -302,6 +302,14 @@ export interface ContractRequirements {
     other?: string;
 }
 
+export interface OrderedItem {
+    id: string;
+    category: 'Roofing' | 'Awning' | 'ZIP Screen' | 'Sliding Glass' | 'Accessories' | 'Flooring' | 'Other';
+    name: string;
+    details?: string;
+    status: 'pending' | 'ordered' | 'delivered';
+}
+
 export interface Contract {
     id: string;
     contractNumber: string; // Format: PL/001/11/2025
@@ -317,6 +325,7 @@ export interface Contract {
     commission: number; // 5% of net price
 
     requirements: ContractRequirements;
+    orderedItems: OrderedItem[]; // New field for ordered items tracking
     comments: ContractComment[];
     attachments: ContractAttachment[];
 
