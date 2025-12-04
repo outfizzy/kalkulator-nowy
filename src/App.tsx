@@ -20,8 +20,6 @@ import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
 import { OrderRequestManager } from './components/admin/OrderRequestManager';
 import { FuelLogManager } from './components/admin/FuelLogManager';
 import { FailureReportManager } from './components/admin/FailureReportManager';
-import { MultiSupplierCalculator } from './components/admin/MultiSupplierCalculator';
-import { ExtendedOfferBuilder } from './components/offers/ExtendedOfferBuilder';
 import { InstallerRequestsPage } from './components/installer/InstallerRequestsPage';
 import { InstallerDashboard } from './components/installer/InstallerDashboard';
 import { InstallationAcceptance } from './components/installer/InstallationAcceptance';
@@ -309,8 +307,6 @@ function App() {
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/requests" element={<OrderRequestManager />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
-              <Route path="/admin/calculator" element={<MultiSupplierCalculator />} />
-              <Route path="/admin/extended-offer" element={<ExtendedOfferBuilder />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
             </Route>

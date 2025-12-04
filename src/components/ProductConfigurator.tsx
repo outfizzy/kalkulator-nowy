@@ -277,34 +277,95 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                     {activeStep === 0 && (
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                             <SectionHeader title="Wybierz Model" icon="🏠" />
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {[
-                                    { id: 'orangestyle', name: 'Orangestyle', desc: 'Klasyczny design, do 1.5 kN/m²', features: ['Softline Design', 'Rynna zintegrowana'] },
-                                    { id: 'trendstyle', name: 'Trendstyle', desc: 'Nowoczesny, do 2.0 kN/m²', features: ['Płaskie profile', 'Wzmocniona konstrukcja'] },
-                                    { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] },
-                                    { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] },
-                                    { id: 'topstyle_xl', name: 'Topstyle XL', desc: 'Premium XL, szerokości 6-7m', features: ['Większe rozpiętości', 'Ukryty odpływ'] },
-                                    { id: 'skystyle', name: 'Skystyle', desc: 'Tylko szkło VSG, 4-7m szerokości', features: ['Tylko szkło VSG', 'Przyścienny / wolnostojący'] }
-                                ].map(model => (
-                                    <div
-                                        key={model.id}
-                                        onClick={() => {
-                                            handleBasicConfigChange('modelId', model.id);
-                                            if (model.id === 'skystyle') {
-                                                // Skystyle: tylko szkło VSG
-                                                handleBasicConfigChange('roofType', 'glass');
-                                                handleBasicConfigChange('glassType', 'standard');
-                                            }
-                                        }}
-                                        className={`cursor-pointer border-2 rounded-xl p-6 transition-all ${config.modelId === model.id ? 'border-accent bg-accent/5 shadow-md' : 'border-slate-100 hover:border-accent/30'}`}
-                                    >
-                                        <h3 className="text-xl font-bold mb-2 text-slate-900">{model.name}</h3>
-                                        <p className="text-sm text-slate-500 mb-4">{model.desc}</p>
-                                        <ul className="text-xs text-slate-600 space-y-1">
-                                            {model.features.map((f, i) => <li key={i}>• {f}</li>)}
-                                        </ul>
-                                    </div>
-                                ))}
+
+                            {/* Aluxe Models */}
+                            <div className="mb-8">
+                                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                                    Zadaszenia Aluxe (konfigurowane)
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {[
+                                        { id: 'orangestyle', name: 'Orangestyle', desc: 'Klasyczny design, do 1.5 kN/m²', features: ['Softline Design', 'Rynna zintegrowana'] },
+                                        { id: 'trendstyle', name: 'Trendstyle', desc: 'Nowoczesny, do 2.0 kN/m²', features: ['Płaskie profile', 'Wzmocniona konstrukcja'] },
+                                        { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] },
+                                        { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] },
+                                        { id: 'topstyle_xl', name: 'Topstyle XL', desc: 'Premium XL, szerokości 6-7m', features: ['Większe rozpiętości', 'Ukryty odpływ'] },
+                                        { id: 'skystyle', name: 'Skystyle', desc: 'Tylko szkło VSG, 4-7m szerokości', features: ['Tylko szkło VSG', 'Przyścienny / wolnostojący'] },
+                                        { id: 'ultrastyle_style', name: 'Ultrastyle', desc: 'Minimalistyczny design', features: ['Ultra cienkie profile', 'Modern look'], comingSoon: true },
+                                        { id: 'carport', name: 'Carport', desc: 'Zadaszenie samochodowe', features: ['Wiata garażowa', 'Do 2 samochodów'], comingSoon: true }
+                                    ].map(model => (
+                                        <div
+                                            key={model.id}
+                                            onClick={() => {
+                                                if (model.comingSoon) return;
+                                                handleBasicConfigChange('modelId', model.id);
+                                                if (model.id === 'skystyle') {
+                                                    handleBasicConfigChange('roofType', 'glass');
+                                                    handleBasicConfigChange('glassType', 'standard');
+                                                }
+                                            }}
+                                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${model.comingSoon
+                                                    ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
+                                                    : config.modelId === model.id
+                                                        ? 'border-accent bg-accent/5 shadow-md'
+                                                        : 'border-slate-100 hover:border-accent/30'
+                                                }`}
+                                        >
+                                            {model.comingSoon && (
+                                                <span className="absolute top-2 right-2 text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                                                    Wkrótce
+                                                </span>
+                                            )}
+                                            <h3 className="text-lg font-bold mb-1 text-slate-900">{model.name}</h3>
+                                            <p className="text-xs text-slate-500 mb-3">{model.desc}</p>
+                                            <ul className="text-[10px] text-slate-600 space-y-0.5">
+                                                {model.features.map((f, i) => <li key={i}>• {f}</li>)}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Deponti - Zadaszenia Gotowe */}
+                            <div className="border-t border-slate-200 pt-6">
+                                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                                    Zadaszenia Gotowe (Deponti) — wkrótce cenniki
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {[
+                                        { id: 'nebbiolo', name: 'Nebbiolo' },
+                                        { id: 'bosco', name: 'Bosco' },
+                                        { id: 'ribolla', name: 'Ribolla' },
+                                        { id: 'pigato', name: 'Pigato' },
+                                        { id: 'pigato_plus', name: 'Pigato Plus' },
+                                        { id: 'giallo', name: 'Giallo' },
+                                        { id: 'giallo_plus', name: 'Giallo Plus' },
+                                        { id: 'trebbiano', name: 'Trebbiano' },
+                                        { id: 'verdeca', name: 'Verdeca' },
+                                        { id: 'pinela', name: 'Pinela' },
+                                        { id: 'pinela_deluxe', name: 'Pinela Deluxe' },
+                                        { id: 'pinela_glass', name: 'Pinela Glass' },
+                                        { id: 'pinela_deluxe_plus', name: 'Pinela Deluxe+' }
+                                    ].map(product => (
+                                        <div
+                                            key={product.id}
+                                            onClick={() => {
+                                                handleBasicConfigChange('modelId', product.id);
+                                            }}
+                                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === product.id
+                                                    ? 'border-purple-500 bg-purple-50 shadow-sm'
+                                                    : 'border-slate-100 hover:border-purple-300 bg-slate-50'
+                                                }`}
+                                        >
+                                            <span className="font-bold text-sm text-slate-800">{product.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-slate-400 mt-3 italic">
+                                    💡 Wybierz produkt Deponti, a następnie przejdź dalej do konfiguracji wymiarów i dodatków.
+                                </p>
                             </div>
                         </section>
                     )}
