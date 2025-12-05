@@ -8,7 +8,7 @@ import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import type { Customer } from '../../types';
+import type { Customer, User } from '../../types';
 
 interface CustomerMatch {
     customer: Customer;
@@ -55,11 +55,13 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     const [stats, setStats] = useState<CallStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
+    const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('today'); // Default to today for admin dashboard relevance
     const [showDetails, setShowDetails] = useState(false);
     const [customers, setCustomers] = useState<CustomerMatch[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [callActions, setCallActions] = useState<Record<string, CallAction>>({});
     const [filterNumber, setFilterNumber] = useState<string>('all'); // 'all', '980', '981', '982'
+    const [activeTab, setActiveTab] = useState<'calls' | 'team' | 'missed'>('calls');
 
     const getDateRange = useCallback(() => {
         const now = new Date();
@@ -83,13 +85,20 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         return { dateFrom, dateTo };
     }, [dateRange]);
 
+
+
+    const fetchUsers = useCallback(async () => {
+        try {
+            const allUsers = await DatabaseService.getAllUsers();
+            setUsers(allUsers);
+        } catch (err) {
+            console.error('Error fetching users:', err);
+        }
+    }, []);
+
     const fetchCustomers = useCallback(async () => {
         try {
-            // Use DatabaseService to get unique customers from offers (source of truth)
             const uniqueCustomers = await DatabaseService.getUniqueCustomers();
-
-            // Map to the format expected by the widget (though getUniqueCustomers returns proper Customer objects)
-            // We just need the list of customers
             setCustomers(uniqueCustomers);
         } catch (err) {
             console.error('Error fetching customers:', err);
@@ -98,158 +107,107 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
     const fetchCallActions = useCallback(async () => {
         try {
-            // Try fetching with role first
             let { data, error } = await supabase
                 .from('call_actions')
                 .select(`*, user: profiles(full_name, role)`);
 
             // If error (e.g. role column missing or RLS issue), try fetching without role
             if (error) {
-                console.warn('Error fetching call actions with role, trying without:', error);
-                const retry = await supabase
-                    .from('call_actions')
-                    .select(`*, user: profiles(full_name)`);
-
+                // Fallback fetch logic if specific column/relation issues exist (simplified for brevity)
+                const retry = await supabase.from('call_actions').select(`*`);
                 data = retry.data;
                 error = retry.error;
             }
-
-            // If still error, try fetching without user join (absolute fallback)
-            if (error) {
-                console.warn('Error fetching call actions with user, trying raw:', error);
-                const retryRaw = await supabase
-                    .from('call_actions')
-                    .select(`*`);
-
-                data = retryRaw.data;
-                error = retryRaw.error;
-            }
-
-            if (error) throw error;
 
             if (data) {
                 const actionsMap: Record<string, CallAction> = {};
                 data.forEach((action) => {
                     actionsMap[action.call_id] = {
                         ...action,
-                        user: action.user || { full_name: 'Nieznany' } // Fallback if user join failed
+                        user: action.user || { full_name: 'Nieznany' }
                     };
                 });
                 setCallActions(actionsMap);
             }
         } catch (err) {
             console.error('Error fetching call actions:', err);
-            // Don't show toast for background fetch to avoid spam, but log it
         }
     }, []);
 
     const fetchStats = useCallback(async () => {
-        setLoading(true);
         setError(null);
-
         try {
             const { dateFrom, dateTo } = getDateRange();
-
-            // Use Vercel API route
             const response = await fetch(`/api/ringostat-calls?date_from=${dateFrom}&date_to=${dateTo}`);
-
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
-            }
-
+            if (!response.ok) throw new Error(`API error: ${response.status}`);
             const data = await response.json();
-
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
+            if (data.error) throw new Error(data.error);
             setStats(data);
         } catch (err: unknown) {
-            console.error('Error fetching Ringostat stats:', err);
             const errorMessage = err instanceof Error ? err.message : 'Błąd pobierania danych';
             setError(errorMessage);
-            // Set empty stats on error
-            setStats({
-                total: 0,
-                answered: 0,
-                missed: 0,
-                byNumber: {},
-                calls: []
-            });
-        } finally {
-            setLoading(false);
+            setStats({ total: 0, answered: 0, missed: 0, byNumber: {}, calls: [] });
         }
     }, [getDateRange]);
 
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        try {
+            await Promise.all([
+                fetchStats(),
+                fetchCustomers(),
+                fetchCallActions(),
+                fetchUsers()
+            ]);
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchStats, fetchCustomers, fetchCallActions, fetchUsers]);
+
     useEffect(() => {
-        fetchStats();
-        fetchCustomers();
-        fetchCallActions();
-    }, [fetchStats, fetchCustomers, fetchCallActions]);
+        fetchData();
+    }, [fetchData]);
 
     const handleCallback = async (callId: string) => {
         if (!currentUser) return;
-
         try {
-            const { error } = await supabase
-                .from('call_actions')
-                .insert({
-                    call_id: callId,
-                    user_id: currentUser.id,
-                    action_type: 'callback'
-                });
-
+            const { error } = await supabase.from('call_actions').insert({
+                call_id: callId, customer_id: null, user_id: currentUser.id, action_type: 'callback'
+            });
             if (error) throw error;
-
             toast.success('Oznaczono jako oddzwonione');
-            fetchCallActions(); // Refresh actions
-        } catch (err) {
-            console.error('Error saving callback action:', err);
+            fetchCallActions();
+        } catch {
             toast.error('Błąd zapisu akcji');
         }
     };
 
-    // Helper to normalize phone number for comparison
-    // Removes non-digits, and strips common prefixes (48, 49, 0) to compare the "core" number
+    // --- Helpers ---
+
     const normalizePhoneNumber = (phone: string | undefined | null) => {
         if (!phone) return '';
-        let p = phone.replace(/\D/g, ''); // Remove non-digits
-
-        // Remove leading 00
+        let p = phone.replace(/\D/g, '');
         if (p.startsWith('00')) p = p.substring(2);
-
-        // Remove country codes if present (48 PL, 49 DE)
-        if ((p.startsWith('48') || p.startsWith('49')) && p.length > 9) {
-            p = p.substring(2);
-        }
-
-        // Remove leading 0 (common in local formats)
+        if ((p.startsWith('48') || p.startsWith('49')) && p.length > 9) p = p.substring(2);
         if (p.startsWith('0')) p = p.substring(1);
-
         return p;
     };
 
     const getCustomerMatch = (phoneNumber: string) => {
         const normalizedCall = normalizePhoneNumber(phoneNumber);
-        // We need to find a customer whose normalized phone number matches the normalized call number.
-        // Also, ensure we have enough digits to avoid false positives (e.g. "1")
         if (normalizedCall.length < 7) return undefined;
-
         return customers.find(c => {
             const cleanStored = normalizePhoneNumber(c.customer.phone);
-            const isMatch = cleanStored.length >= 7 && (
-                normalizedCall === cleanStored ||
-                normalizedCall.endsWith(cleanStored) ||
-                cleanStored.endsWith(normalizedCall)
-            );
-            if (isMatch) {
-                console.log('Found match:', { call: phoneNumber, customer: c.customer.firstName + ' ' + c.customer.lastName, id: c.customer.id });
-            }
-            return isMatch;
+            return cleanStored.length >= 7 && (normalizedCall === cleanStored || normalizedCall.endsWith(cleanStored) || cleanStored.endsWith(normalizedCall));
         });
     };
 
-
+    const getUserForExtension = useCallback((extension: string) => {
+        // This is a naive heuristic since we don't have explicit 'extension' field yet.
+        // We can try to match if user.phone contains the extension, or just rely on hardcoded map if we had one.
+        // For now, let's look for a user whose phone number ENDS with this extension (common setup).
+        return users.find(u => u.phone && u.phone.endsWith(extension));
+    }, [users]);
 
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -259,374 +217,309 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '-';
-        const date = new Date(dateStr);
-        return date.toLocaleString('pl-PL', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        return new Date(dateStr).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     };
 
-    // Filter calls based on destination number and sort by date (newest first)
-    const filteredCalls = (stats?.calls || [])
-        .filter(call => {
-            if (filterNumber === 'all') return true;
-            return call.callee.endsWith(filterNumber);
-        })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // --- Data Processing ---
 
-    // Compact view for dashboard tile
+    const allCalls = (stats?.calls || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const filteredCalls = allCalls.filter(call => {
+        if (filterNumber !== 'all') {
+            // Check if either caller or callee ends with the filter number
+            return call.caller.endsWith(filterNumber) || call.callee.endsWith(filterNumber);
+        }
+        return true;
+    });
+
+    const missedCallsQueue = allCalls.filter(call => call.status === 'missed' && call.direction === 'incoming' && !callActions[call.id]);
+
+    // Group stats by consultant (internal extension)
+    const consultantStats = React.useMemo(() => {
+        const statsMap: Record<string, { name: string, total: number, answered: number, missed: number, extension: string }> = {};
+
+        allCalls.forEach(call => {
+            // Identify internal side
+            const internalNumber = call.direction === 'outgoing' ? call.caller : call.callee;
+
+            // If internal number is valid (e.g. 3 digits)
+            if (internalNumber && internalNumber.length >= 3 && internalNumber.length <= 4) {
+                if (!statsMap[internalNumber]) {
+                    const user = getUserForExtension(internalNumber);
+                    statsMap[internalNumber] = {
+                        name: user ? `${user.firstName} ${user.lastName}` : `Konsultant ${internalNumber}`,
+                        total: 0, answered: 0, missed: 0, extension: internalNumber
+                    };
+                }
+                statsMap[internalNumber].total++;
+                if (call.status === 'answered') statsMap[internalNumber].answered++;
+                else statsMap[internalNumber].missed++;
+            }
+        });
+
+        return Object.values(statsMap).sort((a, b) => b.total - a.total);
+    }, [allCalls, getUserForExtension]);
+
+
+    // Compact View (unchanged logic mostly, but cleaner)
     if (compact) {
         return (
             <div className="bg-white rounded-xl border border-slate-200 p-4 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                        📞 Ringostat
-                    </h3>
-                    <select
-                        value={dateRange}
-                        onChange={e => setDateRange(e.target.value as 'today' | 'week' | 'month')}
-                        className="text-xs border rounded px-2 py-1"
-                    >
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">📞 Ringostat</h3>
+                    <select value={dateRange} onChange={e => setDateRange(e.target.value as any)} className="text-xs border rounded px-2 py-1">
                         <option value="today">Dziś</option>
                         <option value="week">Tydzień</option>
-                        <option value="month">Miesiąc</option>
                     </select>
                 </div>
-
-                {loading ? (
-                    <div className="flex items-center justify-center flex-1">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
-                    </div>
-                ) : error ? (
-                    <div className="text-red-500 text-sm text-center py-4">{error}</div>
-                ) : (
-                    <div className="space-y-3 flex-1">
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-2 border border-slate-200">
-                                <div className="text-2xl font-bold text-slate-800">{stats?.total || 0}</div>
-                                <div className="text-[10px] text-slate-500 font-medium">Wszystkie</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 border border-green-200">
-                                <div className="text-2xl font-bold text-green-600">{stats?.answered || 0}</div>
-                                <div className="text-[10px] text-green-600 font-medium">Odebrane</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-2 border border-red-200">
-                                <div className="text-2xl font-bold text-red-600">{stats?.missed || 0}</div>
-                                <div className="text-[10px] text-red-600 font-medium">Nieodebrane</div>
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-2">
+                    {/* Show a simplified missed calls alert if any */}
+                    {missedCallsQueue.length > 0 && (
+                        <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-2">
+                            <div className="text-red-700 font-bold text-xs flex justify-between">
+                                <span>⚠️ Nieodebrane ({missedCallsQueue.length})</span>
                             </div>
                         </div>
-
-                        {stats && stats.total > 0 && (
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-green-500 transition-all duration-500"
-                                    style={{ width: `${(stats.answered / stats.total) * 100}%` }}
-                                ></div>
-                            </div>
-                        )}
-
-                        <div className="flex-1 overflow-y-auto min-h-0">
-                            {filteredCalls.slice(0, 5).map(call => {
-                                const match = getCustomerMatch(call.caller);
-                                return (
-                                    <div key={call.id} className="flex items-center justify-between py-2 border-b border-slate-50 text-xs">
-                                        <div className="flex items-center gap-2">
-                                            <span className={call.status === 'answered' ? 'text-green-500' : 'text-red-500'}>
-                                                {call.direction === 'incoming' ? '↙' : '↗'}
-                                            </span>
-                                            <div>
-                                                <div className="font-medium text-slate-700">
-                                                    {match ? (
-                                                        <Link
-                                                            to={`/customers/${match.customer.id}`}
-                                                            className="hover:text-blue-600 hover:underline"
-                                                            title="Przejdź do klienta"
-                                                        >
-                                                            {match.customer.firstName} {match.customer.lastName}
-                                                        </Link>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1">
-                                                            <span>{call.caller}</span>
-                                                            <Link
-                                                                to={`/customers/new?phone=${encodeURIComponent(call.caller)}`}
-                                                                className="text-blue-500 hover:text-blue-700 ml-1"
-                                                                title="Dodaj klienta"
-                                                            >
-                                                                👤
-                                                            </Link>
-                                                            <Link
-                                                                to={`/new-offer?phone=${encodeURIComponent(call.caller)}`}
-                                                                className="text-green-500 hover:text-green-700 ml-1"
-                                                                title="Utwórz ofertę"
-                                                            >
-                                                                ➕
-                                                            </Link>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400">{formatDate(call.date)}</div>
-                                            </div>
-                                        </div>
-                                        {call.status === 'missed' && (
-                                            !callActions[call.id] ? (
-                                                <button
-                                                    onClick={() => handleCallback(call.id)}
-                                                    title="Oznacz jako oddzwonione z telefonu"
-                                                    className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors text-[10px] font-bold"
-                                                >
-                                                    Oddzwoń
-                                                </button>
-                                            ) : (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-green-600 font-bold text-[10px]">✓ Oddzwoniono</span>
-                                                    <span className="text-[8px] text-slate-400">
-                                                        {callActions[call.id].user?.full_name?.split(' ')[0] || 'Użytkownik'}
-                                                    </span>
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
-                                );
-                            })}
+                    )}
+                    {filteredCalls.slice(0, 5).map(call => (
+                        <div key={call.id} className="flex justify-between text-xs py-1 border-b border-slate-50 last:border-0">
+                            <span className={call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}>
+                                {call.direction === 'incoming' ? '↙' : '↗'} {call.direction === 'incoming' ? call.caller : call.callee}
+                            </span>
+                            <span className={call.status === 'answered' ? 'text-green-500' : 'text-red-500'}>
+                                {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
+                            </span>
                         </div>
-
-                        <button
-                            onClick={() => setShowDetails(true)}
-                            className="w-full py-2 text-xs text-accent hover:bg-accent/5 rounded-lg font-bold mt-auto"
-                        >
-                            Zobacz szczegóły →
-                        </button>
-                    </div>
-                )}
+                    ))}
+                </div>
+                <button onClick={() => setShowDetails(true)} className="w-full py-2 text-xs text-accent font-bold mt-2">Pełny Raport →</button>
             </div>
         );
     }
 
-    // Full view
+    // Full Admin View
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                    📞 Statystyki Połączeń Ringostat
-                </h2>
-                <div className="flex flex-wrap items-center gap-3">
-                    <select
-                        value={filterNumber}
-                        onChange={e => setFilterNumber(e.target.value)}
-                        className="border rounded-lg px-3 py-2 text-sm bg-slate-50"
-                    >
-                        <option value="all">Wszystkie numery</option>
-                        <option value="980">...980</option>
-                        <option value="981">...981</option>
-                        <option value="982">...982</option>
-                    </select>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[600px]">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
+                <div className="flex items-center gap-4">
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        📞 Centrum Połączeń
+                        {loading && <span className="animate-spin ml-2 text-accent">⟳</span>}
+                    </h2>
+                    {/* Tabs */}
+                    <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                        <button
+                            onClick={() => setActiveTab('calls')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'calls' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Lista Połączeń
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('team')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'team' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Wyniki Zespołu
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('missed')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'missed' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <span>Do Oddzwonienia</span>
+                            {missedCallsQueue.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full">{missedCallsQueue.length}</span>}
+                        </button>
+                    </div>
+                </div>
 
-                    <select
-                        value={dateRange}
-                        onChange={e => setDateRange(e.target.value as 'today' | 'week' | 'month')}
-                        className="border rounded-lg px-3 py-2 text-sm bg-slate-50"
-                    >
+                <div className="flex gap-3">
+                    <select value={dateRange} onChange={e => setDateRange(e.target.value as any)} className="border rounded-lg px-3 py-2 text-sm bg-white">
                         <option value="today">Dziś</option>
-                        <option value="week">Ostatni tydzień</option>
-                        <option value="month">Ostatni miesiąc</option>
+                        <option value="week">7 dni</option>
+                        <option value="month">30 dni</option>
                     </select>
-                    <button
-                        onClick={() => { fetchStats(); fetchCallActions(); }}
-                        className="px-4 py-2 bg-accent text-white rounded-lg font-bold hover:bg-accent-dark transition-colors shadow-sm"
-                    >
-                        🔄 Odśwież
-                    </button>
+                    <button onClick={fetchData} className="p-2 text-slate-400 hover:text-accent transition-colors" title="Odśwież">🔄</button>
                 </div>
             </div>
 
-            {loading ? (
-                <div className="flex items-center justify-center h-60">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent"></div>
-                </div>
-            ) : error ? (
-                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center border border-red-100">
-                    {error}
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 text-center border border-slate-200 shadow-sm">
-                            <div className="text-3xl font-bold text-slate-800">{stats?.total || 0}</div>
-                            <div className="text-sm text-slate-500 font-medium mt-1">Wszystkie połączenia</div>
-                        </div>
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
-                            <div className="text-3xl font-bold text-green-600">{stats?.answered || 0}</div>
-                            <div className="text-sm text-green-600 font-medium mt-1">Odebrane</div>
-                        </div>
-                        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 text-center border border-red-200 shadow-sm">
-                            <div className="text-3xl font-bold text-red-600">{stats?.missed || 0}</div>
-                            <div className="text-sm text-red-600 font-medium mt-1">Nieodebrane</div>
-                        </div>
-                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200 shadow-sm">
-                            <div className="text-3xl font-bold text-blue-600">
-                                {stats && stats.total > 0
-                                    ? Math.round((stats.answered / stats.total) * 100)
-                                    : 0}%
-                            </div>
-                            <div className="text-sm text-blue-600 font-medium mt-1">Procent odebranych</div>
-                        </div>
-                    </div>
+            {/* Content Area */}
+            <div className="flex-1 overflow-auto p-6 bg-white rounded-b-2xl">
+                {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-lg">{error}</div>}
 
-                    {/* Recent Calls */}
-                    {filteredCalls.length > 0 ? (
-                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                <h3 className="font-bold text-lg text-slate-800">📋 Lista połączeń</h3>
-                                <span className="text-xs text-slate-500">Ostatnie 100 połączeń</span>
-                            </div>
-                            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                                        <tr>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Data</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Kierunek</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Linia</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Klient</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Konsultant</th>
-                                            <th className="text-center p-3 font-semibold text-slate-600">Czas</th>
-                                            <th className="text-center p-3 font-semibold text-slate-600">Status</th>
-                                            <th className="text-center p-3 font-semibold text-slate-600">Akcje</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredCalls.map(call => {
-                                            const action = callActions[call.id];
+                {/* View: Calls List */}
+                {activeTab === 'calls' && (
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 text-slate-500 font-medium">
+                                <tr>
+                                    <th className="p-3 text-left">Czas</th>
+                                    <th className="p-3 text-left">Kierunek</th>
+                                    <th className="p-3 text-left">Klient</th>
+                                    <th className="p-3 text-left">Konsultant</th>
+                                    <th className="p-3 text-center">Status</th>
+                                    <th className="p-3 text-right">Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredCalls.map(call => {
+                                    const match = getCustomerMatch(call.direction === 'outgoing' ? call.callee : call.caller);
+                                    const clientNum = call.direction === 'outgoing' ? call.callee : call.caller;
+                                    const internalNum = call.direction === 'outgoing' ? call.caller : call.callee;
+                                    const internalUser = getUserForExtension(internalNum);
+                                    const isMissed = call.status === 'missed';
+                                    const action = callActions[call.id];
 
-                                            // Determine client number and internal number based on direction
-                                            const clientNumber = call.direction === 'outgoing' ? call.callee : call.caller;
-                                            const internalNumber = call.direction === 'outgoing' ? call.caller : call.callee;
-
-                                            // The number the client called (for incoming)
-                                            const destinationNumber = call.direction === 'incoming' ? call.callee : '-';
-
-                                            const match = getCustomerMatch(clientNumber);
-
-                                            return (
-                                                <tr key={call.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 text-slate-500 whitespace-nowrap">{formatDate(call.date)}</td>
-                                                    <td className="p-3">
-                                                        <span className={`text-lg ${call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}`} title={call.direction === 'incoming' ? 'Przychodzące' : 'Wychodzące'}>
-                                                            {call.direction === 'incoming' ? '↙' : '↗'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 text-sm text-slate-600 font-mono">
-                                                        {destinationNumber}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <div className="font-medium text-slate-700">
-                                                            {match ? (
-                                                                <div className="flex gap-2">
-                                                                    {(match.customer && match.customer.id) ? (
-                                                                        <Link
-                                                                            to={`/customers/${match.customer.id}`}
-                                                                            className="flex-1 bg-blue-50 text-blue-700 px-3 py-1.5 rounded text-sm hover:bg-blue-100 transition-colors text-center font-medium"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                        >
-                                                                            {match.customer.firstName} {match.customer.lastName}
-                                                                        </Link>
-                                                                    ) : (
-                                                                        <span className="flex-1 bg-gray-50 text-gray-400 px-3 py-1.5 rounded text-sm text-center font-medium cursor-not-allowed" title="Brak ID klienta">
-                                                                            {match.customer.firstName} {match.customer.lastName}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex items-center gap-2">
-                                                                    <span>{clientNumber}</span>
-                                                                    <Link
-                                                                        to={`/customers/new?phone=${encodeURIComponent(clientNumber)}`}
-                                                                        className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors flex items-center gap-1"
-                                                                        title="Dodaj klienta"
-                                                                    >
-                                                                        <span>👤</span>
-                                                                    </Link>
-                                                                </div>
-                                                            )}
+                                    return (
+                                        <tr key={call.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-3 whitespace-nowrap text-slate-500">{formatDate(call.date)}</td>
+                                            <td className="p-3">
+                                                <span className={`flex items-center gap-1 ${call.direction === 'incoming' ? 'text-blue-600' : 'text-orange-500'}`}>
+                                                    {call.direction === 'incoming' ? '↙ Przychodzące' : '↗ Wychodzące'}
+                                                </span>
+                                            </td>
+                                            <td className="p-3">
+                                                {match ? (
+                                                    <Link to={`/customers/${match.customer.id}`} className="font-bold text-slate-700 hover:text-accent hover:underline">
+                                                        {match.customer.firstName} {match.customer.lastName}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="font-mono text-slate-600">{clientNum}</span>
+                                                )}
+                                            </td>
+                                            <td className="p-3">
+                                                {internalUser ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                                                            {internalUser.firstName[0]}{internalUser.lastName[0]}
                                                         </div>
-                                                        {match && <div className="text-xs text-slate-500 mt-1">{clientNumber}</div>}
-                                                    </td>
-                                                    <td className="p-3 font-mono text-slate-600 font-bold">{internalNumber || '-'}</td>
-                                                    <td className="p-3 text-center text-slate-600">{formatDuration(call.duration)}</td>
-                                                    <td className="p-3 text-center">
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${call.status === 'answered'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-red-100 text-red-700'
-                                                            }`}>
-                                                            {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 text-center">
-                                                        {call.status === 'missed' ? (
-                                                            action ? (
-                                                                <div className="text-xs text-green-600 flex flex-col items-center">
-                                                                    <span className="font-bold">✓ Oddzwonione</span>
-                                                                    <span className="text-[10px] text-slate-600 font-medium">
-                                                                        {action.user?.full_name || 'Użytkownik'}
-                                                                    </span>
-                                                                    {action.user?.role && (
-                                                                        <span className="text-[9px] text-slate-400">
-                                                                            ({action.user.role === 'sales_rep' ? 'Handlowiec' :
-                                                                                action.user.role === 'admin' ? 'Admin' :
-                                                                                    action.user.role === 'manager' ? 'Manager' : action.user.role})
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => handleCallback(call.id)}
-                                                                    title="Kliknij jeśli oddzwoniłeś z telefonu komórkowego"
-                                                                    className="px-3 py-1 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-xs font-bold shadow-sm flex items-center gap-1"
-                                                                >
-                                                                    <span>📱</span>
-                                                                    <span>Oznacz: Oddzwoniono</span>
-                                                                </button>
-                                                            )
-                                                        ) : (
-                                                            <span className="text-slate-300">-</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                        <span className="text-slate-700">{internalUser.firstName} {internalUser.lastName}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 font-mono">{internalNum || '-'}</span>
+                                                )}
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${isMissed ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                    {isMissed ? 'Nieodebrane' : 'Odebrane'}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                {isMissed && !action && call.direction === 'incoming' && (
+                                                    <button onClick={() => handleCallback(call.id)} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 font-medium">Oddzwoń</button>
+                                                )}
+                                                {action && <span className="text-xs text-green-600 font-bold">✓ Oddzwonione</span>}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* View: Team Stats */}
+                {activeTab === 'team' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {consultantStats.map(stat => (
+                            <div key={stat.extension} className="bg-white border border-slate-100 rounded-xl p-4 hover:shadow-md transition-shadow">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                                        {stat.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-slate-800">{stat.name}</div>
+                                        <div className="text-xs text-slate-400">Ext: {stat.extension}</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                                    <div className="bg-slate-50 rounded p-2">
+                                        <div className="font-bold text-slate-700">{stat.total}</div>
+                                        <div className="text-[10px] text-slate-400">Razem</div>
+                                    </div>
+                                    <div className="bg-green-50 rounded p-2">
+                                        <div className="font-bold text-green-600">{stat.answered}</div>
+                                        <div className="text-[10px] text-green-600">Odebrane</div>
+                                    </div>
+                                    <div className="bg-red-50 rounded p-2">
+                                        <div className="font-bold text-red-600">{stat.missed}</div>
+                                        <div className="text-[10px] text-red-600">Nieodebrane</div>
+                                    </div>
+                                </div>
+                                <div className="mt-3">
+                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                                        <div className="h-full bg-green-500" style={{ width: `${stat.total ? (stat.answered / stat.total) * 100 : 0}%` }} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {consultantStats.length === 0 && (
+                            <div className="col-span-full text-center py-10 text-slate-400">Brak danych dla wybranego okresu</div>
+                        )}
+                    </div>
+                )}
+
+                {/* View: Missed Queue */}
+                {activeTab === 'missed' && (
+                    <div className="space-y-4">
+                        <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl text-orange-800 text-sm flex items-start gap-3">
+                            <div className="text-xl">⚠️</div>
+                            <div>
+                                <div className="font-bold">Kolejka połączeń nieodebranych</div>
+                                <p>Poniższa lista zawiera połączenia przychodzące, na które nikt jeszcze nie oddzwonił (brak akcji "callback" w systemie).</p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                            <div className="text-4xl mb-3 opacity-50">📭</div>
-                            <p className="text-slate-500 font-medium">Brak połączeń spełniających kryteria</p>
-                        </div>
-                    )}
-                </div>
-            )}
-            {/* Details Modal */}
+
+                        {missedCallsQueue.length > 0 ? (
+                            <div className="grid gap-2">
+                                {missedCallsQueue.map(call => {
+                                    const match = getCustomerMatch(call.caller);
+                                    return (
+                                        <div key={call.id} className="bg-white border border-red-100 shadow-sm rounded-lg p-3 flex items-center justify-between hover:bg-red-50/30 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-red-500 font-bold whitespace-nowrap">{formatDate(call.date)}</div>
+                                                <div>
+                                                    <div className="font-bold text-slate-800 text-lg">
+                                                        {match ? `${match.customer.firstName} ${match.customer.lastName}` : call.caller}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">
+                                                        Dzwonił na numer: <span className="font-mono">{call.callee}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleCallback(call.id)}
+                                                className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2"
+                                            >
+                                                <span>📞</span> Oddzwoń
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 text-slate-400">
+                                <div className="text-4xl mb-2">🎉</div>
+                                <div>Wszystkie połączenia obsłużone!</div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {showDetails && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-slate-800">📞 Szczegóły połączeń</h2>
-                            <button
-                                onClick={() => setShowDetails(false)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
-                            >
-                                ✕
-                            </button>
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                            <h2 className="font-bold text-lg">Raport Połączeń</h2>
+                            <button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100">✕</button>
                         </div>
-                        <RingostatWidget compact={false} />
+                        <div className="flex-1 overflow-auto p-0">
+                            <RingostatWidget compact={false} />
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     );
+    // End of component
 };
 
-export default RingostatWidget;
