@@ -14,6 +14,8 @@ import orangelineData from '../data/orangeline_full.json';
 import topstyleData from '../data/topstyle_full.json';
 import topstyleXlData from '../data/topstyle_xl_full.json';
 import skystyleData from '../data/skystyle_full.json';
+import ultrastyleData from '../data/ultrastyle_full.json';
+import carportData from '../data/carport_full.json';
 import { formatCurrency } from '../utils/translations';
 import { toast } from 'react-hot-toast';
 
@@ -111,11 +113,41 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
     const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories' | 'floor'>('sliding');
 
+    const basePrice = useMemo(() => {
+        if (!config.modelId) return 0;
+
+        let data: any = null;
+        switch (config.modelId) {
+            case 'trendstyle': data = trendstyleData; break;
+            case 'orangeline': data = orangelineData; break;
+            case 'topstyle': data = topstyleData; break;
+            case 'topstyle_xl': data = topstyleXlData; break;
+            case 'skystyle': data = skystyleData; break;
+            case 'ultrastyle': data = ultrastyleData; break;
+            case 'carport': data = carportData; break;
+            default: return 0;
+        }
+
+        if (!data) return 0;
+
+        // Find matching product
+        const product = data.products.find((p: any) => {
+            // For Skystyle check mounting type
+            if (config.modelId === 'skystyle') {
+                const mountingType = config.installationType === 'wall-mounted' ? 'wall' : 'freestanding';
+                if (p.mounting_type !== mountingType) return false;
+            }
+            return p.width_mm === config.width && p.depth_mm === config.projection;
+        });
+
+        return product ? product.price_eur : 0;
+    }, [config.modelId, config.width, config.projection, config.installationType]);
+
     const totalPrice = useMemo(() => {
         const addonsTotal = config.addons.reduce((sum, a) => sum + a.price, 0);
         const accessoriesTotal = config.selectedAccessories?.reduce((sum, a) => sum + a.price * (a.quantity || 1), 0) || 0;
-        return addonsTotal + accessoriesTotal;
-    }, [config.addons, config.selectedAccessories]);
+        return basePrice + addonsTotal + accessoriesTotal;
+    }, [basePrice, config.addons, config.selectedAccessories]);
 
     // --- Logic & Calculations ---
 
@@ -192,8 +224,34 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             };
         }
 
+        if (config.modelId === 'ultrastyle') {
+            const entries = (ultrastyleData as any).products.filter((p: any) => p.model === 'Ultrastyle');
+            const widths = entries.map((p: any) => p.width_mm);
+            const depths = entries.map((p: any) => p.depth_mm);
+            return {
+                minWidth: Math.min(...widths),
+                maxWidth: Math.max(...widths),
+                minDepth: Math.min(...depths),
+                maxDepth: Math.max(...depths)
+            };
+        }
+
+        if (config.modelId === 'carport') {
+            const entries = (carportData as any).products.filter((p: any) => p.model === 'Carport');
+            const widths = entries.map((p: any) => p.width_mm);
+            const depths = entries.map((p: any) => p.depth_mm);
+            return {
+                minWidth: Math.min(...widths),
+                maxWidth: Math.max(...widths),
+                minDepth: Math.min(...depths),
+                maxDepth: Math.max(...depths)
+            };
+        }
+
         return defaultLimits;
     }, [config.modelId, config.installationType]);
+
+
 
     const accessoryPool = useMemo(() => {
         if (config.modelId === 'trendstyle' || config.modelId === 'trendstyle_plus') {
@@ -271,6 +329,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     ]);
 
     const [activeStep, setActiveStep] = useState(0);
+
+
 
     const steps = [
         { id: 'model', label: 'Model', icon: '🏠' },
@@ -356,8 +416,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] },
                                         { id: 'topstyle_xl', name: 'Topstyle XL', desc: 'Premium XL, szerokości 6-7m', features: ['Większe rozpiętości', 'Ukryty odpływ'] },
                                         { id: 'skystyle', name: 'Skystyle', desc: 'Tylko szkło VSG, 4-7m szerokości', features: ['Tylko szkło VSG', 'Przyścienny / wolnostojący'] },
-                                        { id: 'ultrastyle_style', name: 'Ultrastyle', desc: 'Minimalistyczny design', features: ['Ultra cienkie profile', 'Modern look'], comingSoon: true },
-                                        { id: 'carport', name: 'Carport', desc: 'Zadaszenie samochodowe', features: ['Wiata garażowa', 'Do 2 samochodów'], comingSoon: true }
+                                        { id: 'ultrastyle', name: 'Ultrastyle', desc: 'Minimalistyczny design', features: ['Ultra cienkie profile', 'Modern look'] },
+                                        { id: 'carport', name: 'Carport', desc: 'Zadaszenie samochodowe', features: ['Wiata garażowa', 'Do 2 samochodów'] }
                                     ].map(model => (
                                         <div
                                             key={model.id}
@@ -559,8 +619,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                             <button
                                                 onClick={handleAddExternalItem}
                                                 className={`w-full py-3 rounded-xl font-bold text-white ${showExternalForm === 'selt'
-                                                        ? 'bg-blue-600 hover:bg-blue-700'
-                                                        : 'bg-green-600 hover:bg-green-700'
+                                                    ? 'bg-blue-600 hover:bg-blue-700'
+                                                    : 'bg-green-600 hover:bg-green-700'
                                                     }`}
                                             >
                                                 ✓ Dodaj do oferty

@@ -173,6 +173,26 @@ export type Database = {
                     data?: any;
                 };
             };
+            call_actions: {
+                Row: {
+                    id: string;
+                    call_id: string;
+                    user_id: string;
+                    action_type: string;
+                    note: string | null;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    call_id: string;
+                    user_id: string;
+                    action_type: string;
+                    note?: string | null;
+                };
+                Update: {
+                    note?: string | null;
+                };
+            };
         };
     };
 };

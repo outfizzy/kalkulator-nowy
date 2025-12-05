@@ -19,13 +19,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const authKey = '9rHWrjnNdwnHHC1Nz9dwd7x4B9vjfNjX';
 
         // Fetch calls from Ringostat
-        const ringostatUrl = `https://api.ringostat.net/calls/list?date_from=${dateFrom}&date_to=${dateTo}`;
+        // API expects 'from' and 'to' with timestamps, and 'export_type=json'
+        // Verified fields: calldate, caller, dst, disposition, billsec, recording
+        const fields = 'calldate,caller,dst,disposition,billsec,recording';
+        const ringostatUrl = `https://api.ringostat.net/calls/list?from=${dateFrom} 00:00:00&to=${dateTo} 23:59:59&export_type=json&fields=${fields}`;
 
         const response = await fetch(ringostatUrl, {
             method: 'GET',
             headers: {
                 'Auth-key': authKey,
-                'Project-ID': projectId,
+                'Project-Id': projectId,
                 'Content-Type': 'application/json'
             }
         });
@@ -38,20 +41,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Process calls data
         interface CallData {
-            id?: string;
-            uniqueid?: string;
-            status?: string;
-            billsec?: number;
-            disposition?: string;
-            caller_id?: string;
-            dst?: string;
-            src?: string;
-            calldate?: string;
-            start_time?: string;
-            duration?: number;
-            direction?: string;
-            recording_url?: string;
-            recordingfile?: string;
+            calldate: string;
+            caller: string;
+            dst: string;
+            disposition: string;
+            billsec: number;
+            recording: string;
         }
 
         interface StatsType {
@@ -81,7 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         for (const call of calls as CallData[]) {
             // Determine if call was answered
-            const isAnswered = call.status === 'answered' || (call.billsec && call.billsec > 0) || call.disposition === 'ANSWER';
+            // disposition: ANSWERED, NO ANSWER, BUSY, FAILED, VOICEMAIL
+            const isAnswered = call.disposition === 'ANSWERED';
 
             if (isAnswered) {
                 stats.answered++;
@@ -90,7 +86,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             // Group by phone number
-            const phoneNumber = call.caller_id || call.dst || call.src || 'Unknown';
+            // If dst is long, it's likely the business number (incoming) or external (outgoing)
+            // We'll group by the "other party"
+            // For now, let's group by caller if it looks like a client number
+            const phoneNumber = call.caller;
+
             if (!stats.byNumber[phoneNumber]) {
                 stats.byNumber[phoneNumber] = { total: 0, answered: 0, missed: 0 };
             }
@@ -104,14 +104,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Add to calls list (limit to 100 most recent)
             if (stats.calls.length < 100) {
                 stats.calls.push({
-                    id: call.id || call.uniqueid || String(Date.now()),
-                    date: call.calldate || call.start_time || '',
-                    duration: call.billsec || call.duration || 0,
-                    caller: call.caller_id || call.src || '',
-                    callee: call.dst || '',
+                    id: String(Date.now() + Math.random()), // Generate ID as it's not in response
+                    date: call.calldate,
+                    duration: call.billsec,
+                    caller: call.caller,
+                    callee: call.dst,
                     status: isAnswered ? 'answered' : 'missed',
-                    direction: call.direction as 'incoming' | 'outgoing' || (call.src?.startsWith('+') ? 'incoming' : 'outgoing'),
-                    recording: call.recording_url || call.recordingfile
+                    direction: 'incoming', // Default to incoming for now as we can't reliably determine
+                    recording: call.recording
                 });
             }
         }
