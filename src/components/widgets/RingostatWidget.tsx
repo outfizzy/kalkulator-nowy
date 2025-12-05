@@ -2,7 +2,7 @@
  * RingostatWidget - Widget do wyświetlania statystyk połączeń z Ringostat
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,7 +61,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     const [callActions, setCallActions] = useState<Record<string, CallAction>>({});
     const [filterNumber, setFilterNumber] = useState<string>('all'); // 'all', '980', '981', '982'
 
-    const getDateRange = () => {
+    const getDateRange = useCallback(() => {
         const now = new Date();
         const dateTo = now.toISOString().split('T')[0];
         let dateFrom: string;
@@ -81,9 +81,9 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         }
 
         return { dateFrom, dateTo };
-    };
+    }, [dateRange]);
 
-    const fetchCustomers = async () => {
+    const fetchCustomers = useCallback(async () => {
         try {
             // Use DatabaseService to get unique customers from offers (source of truth)
             const uniqueCustomers = await DatabaseService.getUniqueCustomers();
@@ -94,9 +94,9 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         } catch (err) {
             console.error('Error fetching customers:', err);
         }
-    };
+    }, []);
 
-    const fetchCallActions = async () => {
+    const fetchCallActions = useCallback(async () => {
         try {
             // Try fetching with role first
             let { data, error } = await supabase
@@ -141,9 +141,9 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
             console.error('Error fetching call actions:', err);
             // Don't show toast for background fetch to avoid spam, but log it
         }
-    };
+    }, []);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         setLoading(true);
         setError(null);
 
@@ -179,13 +179,13 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         } finally {
             setLoading(false);
         }
-    };
+    }, [getDateRange]);
 
     useEffect(() => {
         fetchStats();
         fetchCustomers();
         fetchCallActions();
-    }, [dateRange]);
+    }, [fetchStats, fetchCustomers, fetchCallActions]);
 
     const handleCallback = async (callId: string) => {
         if (!currentUser) return;
@@ -488,7 +488,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                         <tr>
                                             <th className="text-left p-3 font-semibold text-slate-600">Data</th>
                                             <th className="text-left p-3 font-semibold text-slate-600">Kierunek</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Klient</th>
+                                            <th className="text-left p-3 font-semibold text-slate-600">Linia</th>
                                             <th className="text-left p-3 font-semibold text-slate-600">Klient</th>
                                             <th className="text-left p-3 font-semibold text-slate-600">Konsultant</th>
                                             <th className="text-center p-3 font-semibold text-slate-600">Czas</th>
@@ -504,6 +504,9 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                             const clientNumber = call.direction === 'outgoing' ? call.callee : call.caller;
                                             const internalNumber = call.direction === 'outgoing' ? call.caller : call.callee;
 
+                                            // The number the client called (for incoming)
+                                            const destinationNumber = call.direction === 'incoming' ? call.callee : '-';
+
                                             const match = getCustomerMatch(clientNumber);
 
                                             return (
@@ -513,6 +516,9 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                         <span className={`text-lg ${call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}`} title={call.direction === 'incoming' ? 'Przychodzące' : 'Wychodzące'}>
                                                             {call.direction === 'incoming' ? '↙' : '↗'}
                                                         </span>
+                                                    </td>
+                                                    <td className="p-3 text-sm text-slate-600 font-mono">
+                                                        {destinationNumber}
                                                     </td>
                                                     <td className="p-3">
                                                         <div className="font-medium text-slate-700">

@@ -80,14 +80,26 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     if (response.ok) {
                         const data = await response.json();
                         if (data.calls) {
-                            // Normalize customer phone for matching
-                            const normalize = (p: string) => p.replace(/\D/g, '').replace(/^48/, '').replace(/^0048/, '');
+                            const normalize = (p: string) => {
+                                let clean = p.replace(/\D/g, '');
+                                // Handle Polish country code variations
+                                if (clean.startsWith('0048')) clean = clean.substring(4);
+                                if (clean.startsWith('48') && clean.length > 9) clean = clean.substring(2);
+                                return clean;
+                            };
                             const customerPhone = normalize(customer.phone);
+
+                            console.log('Debug Ringostat: Normalized Customer Phone:', customerPhone);
+                            console.log('Debug Ringostat: Raw Calls:', data.calls.length);
 
                             const customerCalls = data.calls.filter((call: any) => {
                                 const caller = normalize(call.caller);
                                 const callee = normalize(call.callee);
-                                return caller.includes(customerPhone) || callee.includes(customerPhone);
+                                const match = caller.includes(customerPhone) || callee.includes(customerPhone);
+
+                                // Debug logging for first few calls or matches
+                                if (match) console.log('Debug Ringostat: Match found:', call);
+                                return match;
                             });
                             setCalls(customerCalls);
                         }
@@ -104,6 +116,17 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
 
         loadData();
     }, [customer.id, customer.phone]);
+
+    const handleUpdateInstallation = async (id: string, updates: Partial<Installation>) => {
+        try {
+            await DatabaseService.updateInstallation(id, updates);
+            setInstallations(prev => prev.map(inst => inst.id === id ? { ...inst, ...updates } : inst));
+            toast.success('Zaktualizowano montaż');
+        } catch (error) {
+            console.error('Error updating installation:', error);
+            toast.error('Nie udało się zaktualizować montażu');
+        }
+    };
 
     const formatMoney = (amount: number) => amount.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' });
     const formatDate = (date: string | Date) => new Date(date).toLocaleDateString('pl-PL');
@@ -125,6 +148,8 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                         </span>
                         <span>•</span>
                         <span>{customer.city}</span>
+                        <span>•</span>
+                        <span className="select-all">{customer.phone}</span>
                     </div>
                 </div>
                 <div className="flex gap-3">
@@ -216,8 +241,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                             <div>
                                 <h3 className="font-bold text-slate-800 mb-4">Ostatnie Aktywności</h3>
                                 <div className="space-y-3">
-                                    {history.length === 0 && <span className="text-slate-400 text-sm">Brak aktywności</span>}
-                                    {/* Simplified activity feed based on offers/contracts */}
+                                    {contracts.length === 0 && calls.length === 0 && <span className="text-slate-400 text-sm">Brak aktywności</span>}
                                     {contracts.slice(0, 3).map(c => (
                                         <div key={c.id} className="flex gap-3 text-sm">
                                             <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0">
@@ -370,19 +394,32 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                 {installations.length > 0 ? (
                                     <div className="space-y-3">
                                         {installations.map(inst => (
-                                            <div key={inst.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg">
-                                                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center font-bold flex-col leading-none">
+                                            <div key={inst.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-white shadow-sm">
+                                                <div className={`w-14 h-14 rounded-lg flex items-center justify-center font-bold flex-col leading-none border ${inst.scheduledDate ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                                    <input
+                                                        type="date"
+                                                        className="absolute opacity-0 w-14 h-14 cursor-pointer"
+                                                        value={inst.scheduledDate || ''}
+                                                        onChange={(e) => handleUpdateInstallation(inst.id, { scheduledDate: e.target.value })}
+                                                    />
                                                     <span className="text-lg">{inst.scheduledDate ? new Date(inst.scheduledDate).getDate() : '?'}</span>
-                                                    <span className="text-[10px] uppercase">{inst.scheduledDate ? new Date(inst.scheduledDate).toLocaleString('pl-PL', { month: 'short' }) : '-'}</span>
+                                                    <span className="text-[10px] uppercase">{inst.scheduledDate ? new Date(inst.scheduledDate).toLocaleString('pl-PL', { month: 'short' }) : 'USTAL'}</span>
                                                 </div>
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="font-bold text-slate-800">{inst.productSummary}</div>
-                                                    <div className="text-sm text-slate-500">Status: {inst.status}</div>
-                                                </div>
-                                                <div className="ml-auto">
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${inst.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                        {inst.status === 'completed' ? 'Zakończono' : 'Zaplanowano'}
-                                                    </span>
+                                                    <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
+                                                        Status:
+                                                        <select
+                                                            value={inst.status}
+                                                            onChange={(e) => handleUpdateInstallation(inst.id, { status: e.target.value as any })}
+                                                            className="text-xs border-none bg-slate-100 rounded px-2 py-0.5 font-bold text-slate-700 cursor-pointer hover:bg-slate-200"
+                                                        >
+                                                            <option value="pending">Oczekuje</option>
+                                                            <option value="scheduled">Zaplanowano</option>
+                                                            <option value="completed">Zakończono</option>
+                                                            <option value="cancelled">Anulowano</option>
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -396,6 +433,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
 
                     {/* COMMUNICATION TAB */}
                     {activeTab === 'communication' && (
+
                         <div>
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="font-bold text-slate-800">Historia Połączeń (Ringostat)</h3>

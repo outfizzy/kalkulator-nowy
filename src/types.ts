@@ -243,7 +243,7 @@ export interface CommissionHistoryItem {
 
 // --- Installation Module Types ---
 
-export type InstallationStatus = 'pending' | 'scheduled' | 'completed' | 'issue';
+export type InstallationStatus = 'pending' | 'scheduled' | 'completed' | 'issue' | 'cancelled';
 
 export interface InstallationTeam {
     id: string;

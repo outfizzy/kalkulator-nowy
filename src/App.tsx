@@ -43,6 +43,7 @@ import { MeasurementDashboard } from './components/measurements/MeasurementDashb
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
+import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
 import { CustomersList } from './components/customers/CustomersList';
 import { CustomerPage } from './components/customers/CustomerPage';
 
@@ -318,6 +319,9 @@ function App() {
               <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
+
+              {/* CRM & Logistics */}
+              <Route path="/logistics" element={<LogisticsCalendar />} />
 
               {/* Customers Module */}
               <Route path="/customers" element={<CustomersList />} />

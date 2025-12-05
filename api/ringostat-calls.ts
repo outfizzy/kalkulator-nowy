@@ -91,22 +91,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!id) return '';
                 // Try to extract number from <number> format
                 const match = id.match(/<([^>]+)>/);
-                if (match) return match[1];
-                // Otherwise just use the string as is (maybe remove quotes)
-                return id.replace(/['"]/g, '').trim();
+                const cleaned = match ? match[1] : id.replace(/['"]/g, '').trim();
+
+                // Hide technical SIP identifiers
+                if (cleaned.toLowerCase().includes('tgametalcom') || cleaned.toLowerCase().includes('rspmob')) {
+                    return ''; // Hide completely as requested
+                }
+
+                return cleaned;
             };
 
             const cleanCaller = cleanCallerId(call.caller);
             const cleanDst = cleanCallerId(call.dst);
             // Determine direction based on internal numbers (extensions usually <= 4 digits)
-            const isInternal = (num: string) => num.length <= 4;
+            const isInternal = (num: string) => num.length > 0 && num.length <= 4 && /^\d+$/.test(num);
 
             let direction: 'incoming' | 'outgoing' = 'incoming';
 
-            if (isInternal(cleanCaller) && !isInternal(cleanDst)) {
+            // If caller is empty (hidden SIP) and dst is internal -> incoming
+            // If caller is internal and dst is external/hidden -> outgoing
+            // If caller is external and dst is internal or hidden (but caller is definitely external) -> incoming
+
+            if (isInternal(cleanCaller)) {
                 direction = 'outgoing';
-            } else if (!isInternal(cleanCaller) && isInternal(cleanDst)) {
+            } else if (isInternal(cleanDst)) {
                 direction = 'incoming';
+            } else {
+                // Fallback: if caller looks like mobile/landline (> 4 digits) and dst is empty/hidden -> incoming
+                /* 
+                   If dst was 'tgametalcom...' it became ''.
+                   So External -> '' is Incoming.
+                   If '' -> External is Outgoing (unlikely).
+                */
+                if (!cleanCaller && cleanDst) direction = 'outgoing'; // ???
+                else direction = 'incoming';
             }
 
             // Group by "Client" number (the external party)
