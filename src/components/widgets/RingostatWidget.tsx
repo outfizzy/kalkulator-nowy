@@ -489,8 +489,8 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                             <th className="text-left p-3 font-semibold text-slate-600">Data</th>
                                             <th className="text-left p-3 font-semibold text-slate-600">Kierunek</th>
                                             <th className="text-left p-3 font-semibold text-slate-600">Klient</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Numer</th>
-                                            <th className="text-left p-3 font-semibold text-slate-600">Odbierający</th>
+                                            <th className="text-left p-3 font-semibold text-slate-600">Klient</th>
+                                            <th className="text-left p-3 font-semibold text-slate-600">Konsultant</th>
                                             <th className="text-center p-3 font-semibold text-slate-600">Czas</th>
                                             <th className="text-center p-3 font-semibold text-slate-600">Status</th>
                                             <th className="text-center p-3 font-semibold text-slate-600">Akcje</th>
@@ -499,7 +499,13 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                     <tbody className="divide-y divide-slate-100">
                                         {filteredCalls.map(call => {
                                             const action = callActions[call.id];
-                                            const match = getCustomerMatch(call.caller);
+
+                                            // Determine client number and internal number based on direction
+                                            const clientNumber = call.direction === 'outgoing' ? call.callee : call.caller;
+                                            const internalNumber = call.direction === 'outgoing' ? call.caller : call.callee;
+
+                                            const match = getCustomerMatch(clientNumber);
+
                                             return (
                                                 <tr key={call.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="p-3 text-slate-500 whitespace-nowrap">{formatDate(call.date)}</td>
@@ -518,37 +524,30 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                                             className="flex-1 bg-blue-50 text-blue-700 px-3 py-1.5 rounded text-sm hover:bg-blue-100 transition-colors text-center font-medium"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
-                                                                            Karta klienta
+                                                                            {match.customer.firstName} {match.customer.lastName}
                                                                         </Link>
                                                                     ) : (
                                                                         <span className="flex-1 bg-gray-50 text-gray-400 px-3 py-1.5 rounded text-sm text-center font-medium cursor-not-allowed" title="Brak ID klienta">
-                                                                            Karta klienta
+                                                                            {match.customer.firstName} {match.customer.lastName}
                                                                         </span>
                                                                     )}
-                                                                    <Link
-                                                                        to="/customers/new"
-                                                                        className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 transition-colors text-center font-medium"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        Dodaj
-                                                                    </Link>
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex items-center gap-2">
-                                                                    <span>-</span>
+                                                                    <span>{clientNumber}</span>
                                                                     <Link
-                                                                        to={`/customers/new?phone=${encodeURIComponent(call.caller)}`}
+                                                                        to={`/customers/new?phone=${encodeURIComponent(clientNumber)}`}
                                                                         className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors flex items-center gap-1"
                                                                         title="Dodaj klienta"
                                                                     >
-                                                                        <span>👤</span> Dodaj
+                                                                        <span>👤</span>
                                                                     </Link>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="text-xs text-slate-500">{call.caller}</div>
+                                                        {match && <div className="text-xs text-slate-500 mt-1">{clientNumber}</div>}
                                                     </td>
-                                                    <td className="p-3 font-mono text-slate-600">{call.callee || '-'}</td>
+                                                    <td className="p-3 font-mono text-slate-600 font-bold">{internalNumber || '-'}</td>
                                                     <td className="p-3 text-center text-slate-600">{formatDuration(call.duration)}</td>
                                                     <td className="p-3 text-center">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${call.status === 'answered'

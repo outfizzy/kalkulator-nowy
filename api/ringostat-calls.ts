@@ -98,7 +98,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const cleanCaller = cleanCallerId(call.caller);
             const cleanDst = cleanCallerId(call.dst);
-            const phoneNumber = cleanCaller;
+            // Determine direction based on internal numbers (extensions usually <= 4 digits)
+            const isInternal = (num: string) => num.length <= 4;
+
+            let direction: 'incoming' | 'outgoing' = 'incoming';
+
+            if (isInternal(cleanCaller) && !isInternal(cleanDst)) {
+                direction = 'outgoing';
+            } else if (!isInternal(cleanCaller) && isInternal(cleanDst)) {
+                direction = 'incoming';
+            }
+
+            // Group by "Client" number (the external party)
+            // If outgoing (Agent -> Client), group by callee.
+            // If incoming (Client -> Agent), group by caller.
+            const phoneNumber = direction === 'outgoing' ? cleanDst : cleanCaller;
 
             if (!stats.byNumber[phoneNumber]) {
                 stats.byNumber[phoneNumber] = { total: 0, answered: 0, missed: 0 };
@@ -119,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     caller: cleanCaller,
                     callee: cleanDst,
                     status: isAnswered ? 'answered' : 'missed',
-                    direction: 'incoming', // Default to incoming for now as we can't reliably determine
+                    direction: direction,
                     recording: call.recording
                 });
             }
