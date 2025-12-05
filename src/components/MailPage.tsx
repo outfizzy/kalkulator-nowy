@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
@@ -52,8 +52,8 @@ export const MailPage: React.FC = () => {
                 <button
                     onClick={() => setActiveTab('compose')}
                     className={`p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm ${activeTab === 'compose'
-                            ? 'bg-accent text-white shadow-accent/30'
-                            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                        ? 'bg-accent text-white shadow-accent/30'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                         }`}
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
