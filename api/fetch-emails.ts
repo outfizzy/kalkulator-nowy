@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { config, box = 'INBOX', limit = 20 } = req.body;
+    const { config, box = 'INBOX', limit = 50 } = req.body;
 
     if (!config) {
         return res.status(400).json({ error: 'Missing configuration' });

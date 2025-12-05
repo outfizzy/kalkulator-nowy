@@ -4,18 +4,21 @@ import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
 // Mock Email Data
-const MOCK_INBOX = [
-    { id: 1, from: 'klient@example.com', subject: 'Pytanie o ofertę ODH-2024/05/23', date: '2024-05-23 10:30', read: false },
-    { id: 2, from: 'biuro@architekci.pl', subject: 'Współpraca przy projekcie', date: '2024-05-22 14:15', read: true },
-    { id: 3, from: 'jan.kowalski@gmail.com', subject: 'Re: Termin montażu', date: '2024-05-21 09:00', read: true },
-];
+// Mock Email Data Removed for Production
 
-const MOCK_SENT = [
-    { id: 4, to: 'klient@example.com', subject: 'Oferta ODH-2024/05/23', date: '2024-05-23 10:00' },
-    { id: 5, to: 'anna.nowak@firma.com', subject: 'Potwierdzenie spotkania', date: '2024-05-20 16:20' },
-];
 
 type MailTab = 'inbox' | 'sent' | 'compose';
+
+// Email Details Interface
+interface EmailDetails {
+    id: string;
+    subject: string;
+    from: string;
+    to: string;
+    date: string;
+    text: string;
+    html?: string;
+}
 
 export const MailPage: React.FC = () => {
     const { currentUser } = useAuth();
@@ -25,6 +28,9 @@ export const MailPage: React.FC = () => {
     const [emails, setEmails] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0); // to force refresh
+
+    const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
 
     // Check if email is configured
     const isConfigured = !!currentUser?.emailConfig?.smtpHost;
@@ -64,6 +70,35 @@ export const MailPage: React.FC = () => {
             fetchEmails();
         }
     }, [currentUser, activeTab, isConfigured, refreshTrigger]);
+
+    const handleSelectEmail = async (uid: number) => {
+        setLoadingDetails(true);
+        setSelectedEmail(null); // Clear previous selection while loading
+        try {
+            const response = await fetch('/api/fetch-email-body', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    config: currentUser?.emailConfig,
+                    uid: uid
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch email body');
+
+            const data = await response.json();
+            setSelectedEmail(data);
+        } catch (error) {
+            console.error('Error loading email details:', error);
+            toast.error('Nie udało się pobrać treści wiadomości');
+        } finally {
+            setLoadingDetails(false);
+        }
+    };
+
+    const handleBackToList = () => {
+        setSelectedEmail(null);
+    };
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -113,7 +148,7 @@ export const MailPage: React.FC = () => {
             {/* Sidebar */}
             <div className="w-full md:w-64 flex flex-col gap-2">
                 <button
-                    onClick={() => setActiveTab('compose')}
+                    onClick={() => { setActiveTab('compose'); setSelectedEmail(null); }}
                     className={`p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm ${activeTab === 'compose'
                         ? 'bg-accent text-white shadow-accent/30'
                         : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
@@ -127,7 +162,7 @@ export const MailPage: React.FC = () => {
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-4 overflow-hidden">
                     <button
-                        onClick={() => setActiveTab('inbox')}
+                        onClick={() => { setActiveTab('inbox'); setSelectedEmail(null); }}
                         className={`w-full p-4 flex items-center justify-between text-left transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
@@ -140,7 +175,7 @@ export const MailPage: React.FC = () => {
                         {/* Optional: Add unread count if we fetch it */}
                     </button>
                     <button
-                        onClick={() => setActiveTab('sent')}
+                        onClick={() => { setActiveTab('sent'); setSelectedEmail(null); }}
                         className={`w-full p-4 flex items-center justify-between text-left transition-colors ${activeTab === 'sent' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
@@ -165,45 +200,107 @@ export const MailPage: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-140px)]">
                 {/* Inbox View */}
                 {activeTab === 'inbox' && (
-                    <div className="flex-1 flex flex-col">
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                            <h2 className="text-lg font-bold text-slate-800">Skrzynka Odbiorcza</h2>
-                            <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
-                                <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                            {emails.length > 0 ? (
-                                <div className="divide-y divide-slate-100">
-                                    {emails.map((mail, idx) => (
-                                        <div key={mail.id || idx} className={`p-4 hover:bg-slate-50 cursor-pointer flex gap-4`}>
-                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold overflow-hidden">
-                                                {mail.from ? (typeof mail.from === 'string' ? mail.from[0]?.toUpperCase() : '?') : '?'}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className={`font-medium truncate text-slate-900`}>{typeof mail.from === 'string' ? mail.from.replace(/<.*>/, '') : 'Unknown'}</span>
-                                                    <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
-                                                        {new Date(mail.date).toLocaleString('pl-PL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
+                    <div className="flex-1 flex flex-col h-full">
+                        {selectedEmail || loadingDetails ? (
+                            // Detail View
+                            <div className="flex-1 flex flex-col h-full overflow-hidden">
+                                <div className="p-4 border-b border-slate-100 flex items-center gap-4 bg-slate-50">
+                                    <button
+                                        onClick={handleBackToList}
+                                        className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
+                                        title="Wróć do listy"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                        </svg>
+                                    </button>
+                                    <h2 className="text-lg font-bold text-slate-800 truncate flex-1">
+                                        {loadingDetails ? 'Ładowanie...' : selectedEmail?.subject}
+                                    </h2>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 bg-white">
+                                    {loadingDetails ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
+                                            <svg className="w-10 h-10 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <p>Pobieranie treści wiadomości...</p>
+                                        </div>
+                                    ) : selectedEmail && (
+                                        <div className="max-w-4xl mx-auto">
+                                            <div className="flex justify-between items-start mb-6 pb-6 border-b border-slate-100">
+                                                <div>
+                                                    <h1 className="text-2xl font-bold text-slate-900 mb-2">{selectedEmail.subject}</h1>
+                                                    <p className="text-slate-600"><strong>Od:</strong> {selectedEmail.from}</p>
+                                                    <p className="text-slate-600"><strong>Do:</strong> {selectedEmail.to || 'Ja'}</p>
                                                 </div>
-                                                <p className={`text-sm truncate text-slate-800 font-medium`}>{mail.subject}</p>
-                                                {/* <p className="text-xs text-slate-400 truncate mt-1">...</p> */}
+                                                <div className="text-right text-sm text-slate-400">
+                                                    {new Date(selectedEmail.date).toLocaleString('pl-PL')}
+                                                </div>
+                                            </div>
+
+                                            <div className="email-content prose prose-slate max-w-none">
+                                                {selectedEmail.html ? (
+                                                    <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                                                ) : (
+                                                    <pre className="whitespace-pre-wrap font-sans text-slate-700">{selectedEmail.text}</pre>
+                                                )}
                                             </div>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="p-12 text-center text-slate-400">
-                                    {loading ? 'Ładowanie wiadomości...' : isConfigured ? 'Brak wiadomości' : 'Skonfiguruj IMAP aby pobrać pocztę'}
+                            </div>
+                        ) : (
+                            // List View
+                            <>
+                                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                    <h2 className="text-lg font-bold text-slate-800">Skrzynka Odbiorcza</h2>
+                                    <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
+                                        <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    </button>
                                 </div>
-                            )}
-                        </div>
+                                <div className="flex-1 overflow-y-auto">
+                                    {emails.length > 0 ? (
+                                        <div className="divide-y divide-slate-100">
+                                            {emails.map((mail, idx) => (
+                                                <div
+                                                    key={mail.id || idx}
+                                                    onClick={() => handleSelectEmail(mail.id)}
+                                                    className="p-4 hover:bg-slate-50 cursor-pointer flex gap-4 transition-colors"
+                                                >
+                                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold overflow-hidden">
+                                                        {mail.from ? (typeof mail.from === 'string' ? mail.from[0]?.toUpperCase() : '?') : '?'}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <span className="font-medium truncate text-slate-900">{typeof mail.from === 'string' ? mail.from.replace(/<.*>/, '') : 'Unknown'}</span>
+                                                            <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
+                                                                {new Date(mail.date).toLocaleString('pl-PL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm truncate text-slate-800 font-medium">{mail.subject}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {/* Footer Info */}
+                                            <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 border-t border-slate-100">
+                                                Pokazuję ostatnie 50 wiadomości.
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="p-12 text-center text-slate-400">
+                                            {loading ? 'Ładowanie wiadomości...' : isConfigured ? 'Brak wiadomości' : 'Skonfiguruj IMAP aby pobrać pocztę'}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
