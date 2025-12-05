@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import type { Customer } from '../../types';
@@ -76,21 +77,12 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
     const fetchCustomers = async () => {
         try {
-            const { data, error } = await supabase
-                .from('customers')
-                .select('first_name, last_name, phone, company_name'); // Added company_name if available, assuming standard fields
+            // Use DatabaseService to get unique customers from offers (source of truth)
+            const uniqueCustomers = await DatabaseService.getUniqueCustomers();
 
-            if (error) throw error;
-            if (data) {
-                // Map to Customer type (partial)
-                setCustomers(data.map(c => ({
-                    firstName: c.first_name,
-                    lastName: c.last_name,
-                    phone: c.phone || '',
-                    // @ts-ignore - companyName might not be in Customer type yet or mapped differently
-                    companyName: c.company_name
-                } as any)));
-            }
+            // Map to the format expected by the widget (though getUniqueCustomers returns proper Customer objects)
+            // We just need the list of customers
+            setCustomers(uniqueCustomers.map((item: { customer: Customer }) => item.customer));
         } catch (err) {
             console.error('Error fetching customers:', err);
         }
