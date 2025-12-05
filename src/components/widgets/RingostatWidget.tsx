@@ -192,12 +192,38 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
     const getCustomerName = (phoneNumber: string) => {
         if (!phoneNumber) return '-';
-        // Normalize phone number (remove spaces, dashes, +)
-        const cleanPhone = phoneNumber.replace(/[\s\-\+]/g, '');
+
+        // Helper to normalize phone number for comparison
+        // Removes non-digits, and strips common prefixes (48, 49, 0) to compare the "core" number
+        const normalize = (phone: string) => {
+            if (!phone) return '';
+            let p = phone.replace(/\D/g, ''); // Remove non-digits
+
+            // Remove leading 00
+            if (p.startsWith('00')) p = p.substring(2);
+
+            // Remove country codes if present (48 PL, 49 DE)
+            if ((p.startsWith('48') || p.startsWith('49')) && p.length > 9) {
+                p = p.substring(2);
+            }
+
+            // Remove leading 0 (common in local formats)
+            if (p.startsWith('0')) p = p.substring(1);
+
+            return p;
+        };
+
+        const cleanIncoming = normalize(phoneNumber);
 
         const customer = customers.find(c => {
-            const cPhone = c.phone?.replace(/[\s\-\+]/g, '') || '';
-            return cPhone.includes(cleanPhone) || cleanPhone.includes(cPhone);
+            const cleanStored = normalize(c.phone || '');
+            // Match if one contains the other (to handle cases where one might still have extra digits)
+            // but ensure we have enough digits to avoid false positives (e.g. "1")
+            if (cleanIncoming.length < 7 || cleanStored.length < 7) return false;
+
+            return cleanIncoming === cleanStored ||
+                cleanIncoming.endsWith(cleanStored) ||
+                cleanStored.endsWith(cleanIncoming);
         });
 
         if (customer) {
