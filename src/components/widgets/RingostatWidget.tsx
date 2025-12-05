@@ -1,4 +1,3 @@
-```
 /**
  * RingostatWidget - Widget do wyświetlania statystyk połączeń z Ringostat
  */
@@ -68,6 +67,8 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
             case 'month':
                 dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 break;
+            default:
+                dateFrom = dateTo;
         }
 
         return { dateFrom, dateTo };
@@ -78,7 +79,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
             const { data, error } = await supabase
                 .from('customers')
                 .select('first_name, last_name, phone, company_name'); // Added company_name if available, assuming standard fields
-            
+
             if (error) throw error;
             if (data) {
                 // Map to Customer type (partial)
@@ -131,10 +132,10 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
             const { dateFrom, dateTo } = getDateRange();
 
             // Use Vercel API route
-            const response = await fetch(`/ api / ringostat - calls ? date_from = ${ dateFrom }& date_to=${ dateTo } `);
+            const response = await fetch(`/api/ringostat-calls?date_from=${dateFrom}&date_to=${dateTo}`);
 
             if (!response.ok) {
-                throw new Error(`API error: ${ response.status } `);
+                throw new Error(`API error: ${response.status}`);
             }
 
             const data = await response.json();
@@ -193,14 +194,14 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         if (!phoneNumber) return '-';
         // Normalize phone number (remove spaces, dashes, +)
         const cleanPhone = phoneNumber.replace(/[\s\-\+]/g, '');
-        
+
         const customer = customers.find(c => {
             const cPhone = c.phone?.replace(/[\s\-\+]/g, '') || '';
             return cPhone.includes(cleanPhone) || cleanPhone.includes(cPhone);
         });
 
         if (customer) {
-            return `${ customer.firstName } ${ customer.lastName } `;
+            return `${customer.firstName} ${customer.lastName}`;
         }
         return '-';
     };
@@ -208,7 +209,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        return `${ mins }:${ secs.toString().padStart(2, '0') } `;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     const formatDate = (dateStr: string) => {
@@ -274,7 +275,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-green-500 transition-all duration-500"
-                                    style={{ width: `${ (stats.answered / stats.total) * 100 }% ` }}
+                                    style={{ width: `${(stats.answered / stats.total) * 100}%` }}
                                 ></div>
                             </div>
                         )}
@@ -292,7 +293,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                         </div>
                                     </div>
                                     {call.status === 'missed' && !callActions[call.id] && (
-                                        <button 
+                                        <button
                                             onClick={() => handleCallback(call.id)}
                                             className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors text-[10px] font-bold"
                                         >
@@ -414,7 +415,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                 <tr key={call.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="p-3 text-slate-500 whitespace-nowrap">{formatDate(call.date)}</td>
                                                     <td className="p-3">
-                                                        <span className={`text - lg ${ call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500' } `} title={call.direction === 'incoming' ? 'Przychodzące' : 'Wychodzące'}>
+                                                        <span className={`text-lg ${call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}`} title={call.direction === 'incoming' ? 'Przychodzące' : 'Wychodzące'}>
                                                             {call.direction === 'incoming' ? '↙' : '↗'}
                                                         </span>
                                                     </td>
@@ -425,11 +426,10 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                     <td className="p-3 font-mono text-slate-600">{call.callee || '-'}</td>
                                                     <td className="p-3 text-center text-slate-600">{formatDuration(call.duration)}</td>
                                                     <td className="p-3 text-center">
-                                                        <span className={`px - 2 py - 1 rounded - full text - xs font - bold ${
-    call.status === 'answered'
-        ? 'bg-green-100 text-green-700'
-        : 'bg-red-100 text-red-700'
-} `}>
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${call.status === 'answered'
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                            }`}>
                                                             {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
                                                         </span>
                                                     </td>
