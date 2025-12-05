@@ -22,10 +22,50 @@ export const MailPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<MailTab>('inbox');
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
 
+    const [emails, setEmails] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0); // to force refresh
+
     // Check if email is configured
     const isConfigured = !!currentUser?.emailConfig?.smtpHost;
 
-    const handleSend = (e: React.FormEvent) => {
+    // Fetch Emails Effect
+    React.useEffect(() => {
+        const fetchEmails = async () => {
+            if (!currentUser?.emailConfig?.imapHost || activeTab !== 'inbox') return;
+
+            setLoading(true);
+            try {
+                const response = await fetch('/api/fetch-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config: currentUser.emailConfig })
+                });
+
+                if (!response.ok) {
+                    const errInfo = await response.json();
+                    if (errInfo.details && errInfo.details.includes('authentication failed')) {
+                        toast.error('Błąd logowania IMAP. Sprawdź hasło.');
+                    }
+                    throw new Error(errInfo.error || 'Fetch failed');
+                }
+
+                const data = await response.json();
+                setEmails(data.messages || []);
+            } catch (error) {
+                console.error('Error fetching emails:', error);
+                // Don't toast on every fetch error to avoid spam, unless it's critical
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (isConfigured) {
+            fetchEmails();
+        }
+    }, [currentUser, activeTab, isConfigured, refreshTrigger]);
+
+    const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!composeData.to || !composeData.subject || !composeData.body) {
@@ -38,12 +78,34 @@ export const MailPage: React.FC = () => {
             return;
         }
 
-        // Here we would call the backend API to send email
-        // await DatabaseService.sendEmail(composeData);
+        const toastId = toast.loading('Wysyłanie wiadomości...');
 
-        toast.success(`Wysłano wiadomość do: ${composeData.to}`);
-        setComposeData({ to: '', subject: '', body: '' });
-        setActiveTab('sent');
+        try {
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: composeData.to,
+                    subject: composeData.subject,
+                    body: composeData.body,
+                    config: currentUser?.emailConfig
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || result.details || 'Send failed');
+            }
+
+            toast.success(`Wysłano wiadomość do: ${composeData.to}`, { id: toastId });
+            setComposeData({ to: '', subject: '', body: '' });
+            setActiveTab('sent');
+            // Optimistically add to sent list or re-fetch if we implemented Sent folder fetching
+        } catch (error: any) {
+            console.error('Send error:', error);
+            toast.error(`Błąd wysyłania: ${error.message}`, { id: toastId });
+        }
     };
 
     return (
@@ -75,7 +137,7 @@ export const MailPage: React.FC = () => {
                             </svg>
                             <span>Odebrane</span>
                         </div>
-                        <span className="bg-blue-100 text-blue-700 py-0.5 px-2 rounded-full text-xs font-bold">3</span>
+                        {/* Optional: Add unread count if we fetch it */}
                     </button>
                     <button
                         onClick={() => setActiveTab('sent')}
@@ -109,33 +171,37 @@ export const MailPage: React.FC = () => {
                     <div className="flex-1 flex flex-col">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <h2 className="text-lg font-bold text-slate-800">Skrzynka Odbiorcza</h2>
-                            <button className="text-slate-500 hover:text-slate-700">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
+                                <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto">
-                            {MOCK_INBOX.length > 0 ? (
+                            {emails.length > 0 ? (
                                 <div className="divide-y divide-slate-100">
-                                    {MOCK_INBOX.map(mail => (
-                                        <div key={mail.id} className={`p-4 hover:bg-slate-50 cursor-pointer flex gap-4 ${!mail.read ? 'bg-blue-50/30' : ''}`}>
-                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold">
-                                                {mail.from[0].toUpperCase()}
+                                    {emails.map((mail, idx) => (
+                                        <div key={mail.id || idx} className={`p-4 hover:bg-slate-50 cursor-pointer flex gap-4`}>
+                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold overflow-hidden">
+                                                {mail.from ? (typeof mail.from === 'string' ? mail.from[0]?.toUpperCase() : '?') : '?'}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start mb-1">
-                                                    <span className={`font-medium truncate ${!mail.read ? 'text-slate-900 font-bold' : 'text-slate-700'}`}>{mail.from}</span>
-                                                    <span className="text-xs text-slate-400 whitespace-nowrap ml-2">{mail.date}</span>
+                                                    <span className={`font-medium truncate text-slate-900`}>{typeof mail.from === 'string' ? mail.from.replace(/<.*>/, '') : 'Unknown'}</span>
+                                                    <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
+                                                        {new Date(mail.date).toLocaleString('pl-PL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
                                                 </div>
-                                                <p className={`text-sm truncate ${!mail.read ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>{mail.subject}</p>
-                                                <p className="text-xs text-slate-400 truncate mt-1">Kliknij, aby zobaczyć treść wiadomości...</p>
+                                                <p className={`text-sm truncate text-slate-800 font-medium`}>{mail.subject}</p>
+                                                {/* <p className="text-xs text-slate-400 truncate mt-1">...</p> */}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="p-12 text-center text-slate-400">Brak wiadomości</div>
+                                <div className="p-12 text-center text-slate-400">
+                                    {loading ? 'Ładowanie wiadomości...' : isConfigured ? 'Brak wiadomości' : 'Skonfiguruj IMAP aby pobrać pocztę'}
+                                </div>
                             )}
                         </div>
                     </div>
@@ -147,24 +213,18 @@ export const MailPage: React.FC = () => {
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <h2 className="text-lg font-bold text-slate-800">Wysłane</h2>
                         </div>
+                        <div className="p-12 text-center text-slate-400">
+                            Funkcja podglądu folderu "Wysłane" (Sent) dostępna wkrótce.
+                        </div>
+                        {/* 
                         <div className="flex-1 overflow-y-auto">
                             <div className="divide-y divide-slate-100">
                                 {MOCK_SENT.map(mail => (
-                                    <div key={mail.id} className="p-4 hover:bg-slate-50 cursor-pointer flex gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-green-600 font-bold">
-                                            {mail.to[0].toUpperCase()}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <span className="font-medium text-slate-700 truncate">Do: {mail.to}</span>
-                                                <span className="text-xs text-slate-400 whitespace-nowrap ml-2">{mail.date}</span>
-                                            </div>
-                                            <p className="text-sm text-slate-600 truncate">{mail.subject}</p>
-                                        </div>
-                                    </div>
+                                    // ... kept for later implementation
                                 ))}
                             </div>
-                        </div>
+                        </div> 
+                        */}
                     </div>
                 )}
 
