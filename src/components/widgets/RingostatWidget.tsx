@@ -35,6 +35,7 @@ interface CallAction {
     created_at: string;
     user?: {
         full_name: string | null;
+        role?: string;
     };
 }
 
@@ -94,14 +95,14 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                 .from('call_actions')
                 .select(`
     *,
-    user: profiles(full_name)
+    user: profiles(full_name, role)
         `);
 
             if (error) throw error;
 
             if (data) {
                 const actionsMap: Record<string, CallAction> = {};
-                data.forEach((action: any) => {
+                data.forEach((action) => {
                     // Store latest action for each call_id
                     // In a real app, might want list of actions, but for now just "is handled"
                     actionsMap[action.call_id] = {
@@ -259,7 +260,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                     </h3>
                     <select
                         value={dateRange}
-                        onChange={e => setDateRange(e.target.value as any)}
+                        onChange={e => setDateRange(e.target.value as 'today' | 'week' | 'month')}
                         className="text-xs border rounded px-2 py-1"
                     >
                         <option value="today">Dziś</option>
@@ -358,7 +359,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
                     <select
                         value={dateRange}
-                        onChange={e => setDateRange(e.target.value as any)}
+                        onChange={e => setDateRange(e.target.value as 'today' | 'week' | 'month')}
                         className="border rounded-lg px-3 py-2 text-sm bg-slate-50"
                     >
                         <option value="today">Dziś</option>
@@ -459,7 +460,16 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                             action ? (
                                                                 <div className="text-xs text-green-600 flex flex-col items-center">
                                                                     <span className="font-bold">✓ Oddzwonione</span>
-                                                                    <span className="text-[10px] text-slate-400">przez {action.user?.full_name || 'Użytkownika'}</span>
+                                                                    <span className="text-[10px] text-slate-600 font-medium">
+                                                                        {action.user?.full_name || 'Użytkownik'}
+                                                                    </span>
+                                                                    {action.user?.role && (
+                                                                        <span className="text-[9px] text-slate-400">
+                                                                            ({action.user.role === 'sales_rep' ? 'Handlowiec' :
+                                                                                action.user.role === 'admin' ? 'Admin' :
+                                                                                    action.user.role === 'manager' ? 'Manager' : action.user.role})
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <button
