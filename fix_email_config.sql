@@ -17,4 +17,4 @@ GRANT ALL ON TABLE public.profiles TO authenticated;
 NOTIFY pgrst, 'reload config';
 
 -- 4. Verify (Selects one row to prove it works - look at the specific 'email_config' column in Results)
-SELECT id, email, email_config FROM public.profiles LIMIT 1;
+SELECT id, email_config FROM public.profiles LIMIT 1;

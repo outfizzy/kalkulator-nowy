@@ -148,13 +148,14 @@ export const SettingsPage: React.FC = () => {
                             <h3 className="text-lg font-bold">Błąd Krytyczny Bazy Danych</h3>
                         </div>
                         <p className="mb-4 font-semibold">
-                            Twoja baza danych nie posiada wymaganej kolumny <code>email_config</code>. Aplikacja nie może zapisać ustawień.
+                            Twoja baza danych nie posiada wymaganych kolumn (email_config, monthly_target lub phone).
                         </p>
                         <p className="mb-2 text-sm">Wykonaj poniższe polecenie w Supabase SQL Editor, aby naprawić problem:</p>
                         <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-xs overflow-x-auto select-all cursor-text relative group">
                             <code className="block">
                                 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_config JSONB DEFAULT '{ }'::jsonb;
-                                COMMENT ON COLUMN public.profiles.email_config IS 'Email settings';
+                                ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS monthly_target NUMERIC DEFAULT 50000;
+                                ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
                                 NOTIFY pgrst, 'reload config';
                             </code>
                         </div>
