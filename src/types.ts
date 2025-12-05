@@ -30,6 +30,7 @@ export interface User {
 }
 
 export interface Customer {
+    id?: string; // Optional for backward compatibility with offers that embed customer data without ID
     salutation: 'Herr' | 'Frau' | 'Firma';
     firstName: string;
     lastName: string;

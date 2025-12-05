@@ -6,9 +6,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import type { Customer } from '../../types';
 
+interface CustomerMatch {
+    customer: Customer;
+    lastOfferDate: Date;
+    offerCount: number;
+    latestOfferId?: string;
+}
 interface CallStats {
     total: number;
     answered: number;
@@ -50,7 +57,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
     const [showDetails, setShowDetails] = useState(false);
-    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [customers, setCustomers] = useState<CustomerMatch[]>([]);
     const [callActions, setCallActions] = useState<Record<string, CallAction>>({});
     const [filterNumber, setFilterNumber] = useState<string>('all'); // 'all', '980', '981', '982'
 
@@ -83,7 +90,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
             // Map to the format expected by the widget (though getUniqueCustomers returns proper Customer objects)
             // We just need the list of customers
-            setCustomers(uniqueCustomers.map((item: { customer: Customer }) => item.customer));
+            setCustomers(uniqueCustomers);
         } catch (err) {
             console.error('Error fetching customers:', err);
         }
@@ -202,47 +209,47 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         }
     };
 
-    const getCustomerName = (phoneNumber: string) => {
-        if (!phoneNumber) return '-';
+    // Helper to normalize phone number for comparison
+    // Removes non-digits, and strips common prefixes (48, 49, 0) to compare the "core" number
+    const normalizePhoneNumber = (phone: string | undefined | null) => {
+        if (!phone) return '';
+        let p = phone.replace(/\D/g, ''); // Remove non-digits
 
-        // Helper to normalize phone number for comparison
-        // Removes non-digits, and strips common prefixes (48, 49, 0) to compare the "core" number
-        const normalize = (phone: string) => {
-            if (!phone) return '';
-            let p = phone.replace(/\D/g, ''); // Remove non-digits
+        // Remove leading 00
+        if (p.startsWith('00')) p = p.substring(2);
 
-            // Remove leading 00
-            if (p.startsWith('00')) p = p.substring(2);
-
-            // Remove country codes if present (48 PL, 49 DE)
-            if ((p.startsWith('48') || p.startsWith('49')) && p.length > 9) {
-                p = p.substring(2);
-            }
-
-            // Remove leading 0 (common in local formats)
-            if (p.startsWith('0')) p = p.substring(1);
-
-            return p;
-        };
-
-        const cleanIncoming = normalize(phoneNumber);
-
-        const customer = customers.find(c => {
-            const cleanStored = normalize(c.phone || '');
-            // Match if one contains the other (to handle cases where one might still have extra digits)
-            // but ensure we have enough digits to avoid false positives (e.g. "1")
-            if (cleanIncoming.length < 7 || cleanStored.length < 7) return false;
-
-            return cleanIncoming === cleanStored ||
-                cleanIncoming.endsWith(cleanStored) ||
-                cleanStored.endsWith(cleanIncoming);
-        });
-
-        if (customer) {
-            return `${customer.firstName} ${customer.lastName}`;
+        // Remove country codes if present (48 PL, 49 DE)
+        if ((p.startsWith('48') || p.startsWith('49')) && p.length > 9) {
+            p = p.substring(2);
         }
-        return '-';
+
+        // Remove leading 0 (common in local formats)
+        if (p.startsWith('0')) p = p.substring(1);
+
+        return p;
     };
+
+    const getCustomerMatch = (phoneNumber: string) => {
+        const normalizedCall = normalizePhoneNumber(phoneNumber);
+        // We need to find a customer whose normalized phone number matches the normalized call number.
+        // Also, ensure we have enough digits to avoid false positives (e.g. "1")
+        if (normalizedCall.length < 7) return undefined;
+
+        return customers.find(c => {
+            const cleanStored = normalizePhoneNumber(c.customer.phone);
+            const isMatch = cleanStored.length >= 7 && (
+                normalizedCall === cleanStored ||
+                normalizedCall.endsWith(cleanStored) ||
+                cleanStored.endsWith(normalizedCall)
+            );
+            if (isMatch) {
+                console.log('Found match:', { call: phoneNumber, customer: c.customer.firstName + ' ' + c.customer.lastName, id: c.customer.id });
+            }
+            return isMatch;
+        });
+    };
+
+
 
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -321,37 +328,68 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                         )}
 
                         <div className="flex-1 overflow-y-auto min-h-0">
-                            {filteredCalls.slice(0, 5).map(call => (
-                                <div key={call.id} className="flex items-center justify-between py-2 border-b border-slate-50 text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <span className={call.status === 'answered' ? 'text-green-500' : 'text-red-500'}>
-                                            {call.direction === 'incoming' ? '↙' : '↗'}
-                                        </span>
-                                        <div>
-                                            <div className="font-medium text-slate-700">{getCustomerName(call.caller) !== '-' ? getCustomerName(call.caller) : call.caller}</div>
-                                            <div className="text-[10px] text-slate-400">{formatDate(call.date)}</div>
-                                        </div>
-                                    </div>
-                                    {call.status === 'missed' && (
-                                        !callActions[call.id] ? (
-                                            <button
-                                                onClick={() => handleCallback(call.id)}
-                                                title="Oznacz jako oddzwonione z telefonu"
-                                                className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors text-[10px] font-bold"
-                                            >
-                                                Oddzwoń
-                                            </button>
-                                        ) : (
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-green-600 font-bold text-[10px]">✓ Oddzwoniono</span>
-                                                <span className="text-[8px] text-slate-400">
-                                                    {callActions[call.id].user?.full_name?.split(' ')[0] || 'Użytkownik'}
-                                                </span>
+                            {filteredCalls.slice(0, 5).map(call => {
+                                const match = getCustomerMatch(call.caller);
+                                return (
+                                    <div key={call.id} className="flex items-center justify-between py-2 border-b border-slate-50 text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className={call.status === 'answered' ? 'text-green-500' : 'text-red-500'}>
+                                                {call.direction === 'incoming' ? '↙' : '↗'}
+                                            </span>
+                                            <div>
+                                                <div className="font-medium text-slate-700">
+                                                    {match ? (
+                                                        <Link
+                                                            to={`/customers/${match.customer.id}`}
+                                                            className="hover:text-blue-600 hover:underline"
+                                                            title="Przejdź do klienta"
+                                                        >
+                                                            {match.customer.firstName} {match.customer.lastName}
+                                                        </Link>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1">
+                                                            <span>{call.caller}</span>
+                                                            <Link
+                                                                to={`/customers/new?phone=${encodeURIComponent(call.caller)}`}
+                                                                className="text-blue-500 hover:text-blue-700 ml-1"
+                                                                title="Dodaj klienta"
+                                                            >
+                                                                👤
+                                                            </Link>
+                                                            <Link
+                                                                to={`/new-offer?phone=${encodeURIComponent(call.caller)}`}
+                                                                className="text-green-500 hover:text-green-700 ml-1"
+                                                                title="Utwórz ofertę"
+                                                            >
+                                                                ➕
+                                                            </Link>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400">{formatDate(call.date)}</div>
                                             </div>
-                                        )
-                                    )}
-                                </div>
-                            ))}
+                                        </div>
+                                        {call.status === 'missed' && (
+                                            !callActions[call.id] ? (
+                                                <button
+                                                    onClick={() => handleCallback(call.id)}
+                                                    title="Oznacz jako oddzwonione z telefonu"
+                                                    className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors text-[10px] font-bold"
+                                                >
+                                                    Oddzwoń
+                                                </button>
+                                            ) : (
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-green-600 font-bold text-[10px]">✓ Oddzwoniono</span>
+                                                    <span className="text-[8px] text-slate-400">
+                                                        {callActions[call.id].user?.full_name?.split(' ')[0] || 'Użytkownik'}
+                                                    </span>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         <button
@@ -461,6 +499,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                     <tbody className="divide-y divide-slate-100">
                                         {filteredCalls.map(call => {
                                             const action = callActions[call.id];
+                                            const match = getCustomerMatch(call.caller);
                                             return (
                                                 <tr key={call.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="p-3 text-slate-500 whitespace-nowrap">{formatDate(call.date)}</td>
@@ -469,10 +508,46 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                             {call.direction === 'incoming' ? '↙' : '↗'}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3 font-medium text-slate-800">
-                                                        {getCustomerName(call.caller)}
+                                                    <td className="p-3">
+                                                        <div className="font-medium text-slate-700">
+                                                            {match ? (
+                                                                <div className="flex gap-2">
+                                                                    {(match.customer && match.customer.id) ? (
+                                                                        <Link
+                                                                            to={`/customers/${match.customer.id}`}
+                                                                            className="flex-1 bg-blue-50 text-blue-700 px-3 py-1.5 rounded text-sm hover:bg-blue-100 transition-colors text-center font-medium"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            Karta klienta
+                                                                        </Link>
+                                                                    ) : (
+                                                                        <span className="flex-1 bg-gray-50 text-gray-400 px-3 py-1.5 rounded text-sm text-center font-medium cursor-not-allowed" title="Brak ID klienta">
+                                                                            Karta klienta
+                                                                        </span>
+                                                                    )}
+                                                                    <Link
+                                                                        to="/customers/new"
+                                                                        className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 transition-colors text-center font-medium"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        Dodaj
+                                                                    </Link>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2">
+                                                                    <span>-</span>
+                                                                    <Link
+                                                                        to={`/customers/new?phone=${encodeURIComponent(call.caller)}`}
+                                                                        className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors flex items-center gap-1"
+                                                                        title="Dodaj klienta"
+                                                                    >
+                                                                        <span>👤</span> Dodaj
+                                                                    </Link>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500">{call.caller}</div>
                                                     </td>
-                                                    <td className="p-3 font-mono text-slate-600">{call.caller || '-'}</td>
                                                     <td className="p-3 font-mono text-slate-600">{call.callee || '-'}</td>
                                                     <td className="p-3 text-center text-slate-600">{formatDuration(call.duration)}</td>
                                                     <td className="p-3 text-center">

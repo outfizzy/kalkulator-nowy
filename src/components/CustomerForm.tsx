@@ -6,6 +6,7 @@ import { DatabaseService } from '../services/database';
 interface CustomerFormProps {
     onComplete: (customer: Customer, snowZone: any) => void;
     initialData?: Customer;
+    submitLabel?: string;
 }
 
 const normalizeCustomer = (raw: Partial<Customer> | any): Customer => {
@@ -29,7 +30,7 @@ const normalizeCustomer = (raw: Partial<Customer> | any): Customer => {
     };
 };
 
-export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialData }) => {
+export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialData, submitLabel }) => {
     const [customer, setCustomer] = useState<Customer>(normalizeCustomer(initialData || {}));
 
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -387,10 +388,16 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         type="submit"
                         className="px-8 py-4 bg-accent text-white rounded-xl font-bold text-lg hover:bg-orange-600 transition-all shadow-lg shadow-accent/30 hover:shadow-xl hover:scale-[1.02] flex items-center gap-3"
                     >
-                        <span>Dalej: Konfiguracja Produktu</span>
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
+                        <span>{submitLabel || 'Dalej: Konfiguracja Produktu'}</span>
+                        {submitLabel ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        )}
                     </button>
                 </div>
             </form>

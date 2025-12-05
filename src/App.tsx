@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Layout } from './components/Layout';
 import { CustomerForm } from './components/CustomerForm';
@@ -43,6 +43,8 @@ import { MeasurementDashboard } from './components/measurements/MeasurementDashb
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
+import { CustomersList } from './components/customers/CustomersList';
+import { CustomerPage } from './components/customers/CustomerPage';
 
 // Partner Components
 import { LandingPage } from './components/LandingPage';
@@ -98,6 +100,9 @@ function DashboardRouter() {
 
 function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) {
   const { currentUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialPhone = searchParams.get('phone');
+
   const [step, setStep] = useState<Step>('customer');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
@@ -226,7 +231,10 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
       {/* Content */}
       <div className="transition-all duration-300 ease-in-out">
         {step === 'customer' && (
-          <CustomerForm onComplete={handleCustomerComplete} initialData={customer || undefined} />
+          <CustomerForm
+            onComplete={handleCustomerComplete}
+            initialData={initialPhone ? { phone: initialPhone } as Customer : customer || undefined}
+          />
         )}
 
         {step === 'product' && (
@@ -308,7 +316,13 @@ function App() {
               <Route path="/admin/requests" element={<OrderRequestManager />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
+              <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
+
+              {/* Customers Module */}
+              <Route path="/customers" element={<CustomersList />} />
+              <Route path="/customers/new" element={<CustomerPage />} />
+              <Route path="/customers/:id" element={<CustomerPage />} />
             </Route>
 
 

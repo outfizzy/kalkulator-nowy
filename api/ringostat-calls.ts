@@ -86,10 +86,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             // Group by phone number
-            // If dst is long, it's likely the business number (incoming) or external (outgoing)
-            // We'll group by the "other party"
-            // For now, let's group by caller if it looks like a client number
-            const phoneNumber = call.caller;
+            // Clean caller ID (remove "Name" <Number> formatting if present)
+            const cleanCallerId = (id: string) => {
+                if (!id) return '';
+                // Try to extract number from <number> format
+                const match = id.match(/<([^>]+)>/);
+                if (match) return match[1];
+                // Otherwise just use the string as is (maybe remove quotes)
+                return id.replace(/['"]/g, '').trim();
+            };
+
+            const cleanCaller = cleanCallerId(call.caller);
+            const cleanDst = cleanCallerId(call.dst);
+            const phoneNumber = cleanCaller;
 
             if (!stats.byNumber[phoneNumber]) {
                 stats.byNumber[phoneNumber] = { total: 0, answered: 0, missed: 0 };
@@ -107,8 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     id: String(Date.now() + Math.random()), // Generate ID as it's not in response
                     date: call.calldate,
                     duration: call.billsec,
-                    caller: call.caller,
-                    callee: call.dst,
+                    caller: cleanCaller,
+                    callee: cleanDst,
                     status: isAnswered ? 'answered' : 'missed',
                     direction: 'incoming', // Default to incoming for now as we can't reliably determine
                     recording: call.recording

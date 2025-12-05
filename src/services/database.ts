@@ -116,6 +116,7 @@ export const DatabaseService = {
                 user_id: user.id,
                 offer_number: offer.offerNumber || `OFF/${Date.now()}`,
                 customer_data: offer.customer,
+                customer_id: offer.customer.id, // Link to customer table if ID exists
                 product_config: offer.product,
                 pricing: offer.pricing,
                 status: offer.status,
@@ -132,6 +133,8 @@ export const DatabaseService = {
             id: data.id,
             offerNumber: data.offer_number,
             customer: data.customer_data,
+            // Ensure customer_id is preserved if needed, though Offer type might not have it yet.
+            // For now, we just return the Offer object as defined in types.
             product: data.product_config,
             pricing: normalizePricing(data.pricing),
             status: data.status as Offer['status'],
@@ -148,7 +151,12 @@ export const DatabaseService = {
             updated_at: new Date().toISOString()
         };
 
-        if (updates.customer) dbUpdates.customer_data = updates.customer;
+        if (updates.customer) {
+            dbUpdates.customer_data = updates.customer;
+            if (updates.customer.id) {
+                dbUpdates.customer_id = updates.customer.id;
+            }
+        }
         if (updates.product) dbUpdates.product_config = updates.product;
         if (updates.pricing) {
             dbUpdates.pricing = updates.pricing;
@@ -176,63 +184,202 @@ export const DatabaseService = {
     },
 
     // --- Customers ---
-    // Replaced getCustomers with getUniqueCustomers to match storage.ts behavior
-    async getUniqueCustomers(): Promise<{ customer: Customer; lastOfferDate: Date; offerCount: number }[]> {
-        const normalizeCustomer = (raw: Record<string, unknown> = {}): Customer => ({
-            salutation: (['Herr', 'Frau', 'Firma'].includes(raw.salutation as string) ? raw.salutation : 'Herr') as Customer['salutation'],
-            firstName: (raw.firstName || '').toString(),
-            lastName: (raw.lastName || '').toString(),
-            street: (raw.street || '').toString(),
-            houseNumber: (raw.houseNumber || '').toString(),
-            postalCode: (raw.postalCode || '').toString(),
-            city: (raw.city || '').toString(),
-            phone: (raw.phone || '').toString(),
-            email: (raw.email || '').toString(),
-            country: (raw.country || 'Deutschland').toString(),
-        });
-
+    // --- Customers ---
+    async getCustomers(): Promise<Customer[]> {
         const { data, error } = await supabase
-            .from('offers')
-            .select('customer_data, created_at')
+            .from('customers')
+            .select('*')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const customerMap = new Map<string, { customer: Customer; lastOfferDate: Date; offerCount: number }>();
+        return data.map(row => ({
+            id: row.id, // Ensure Customer type has ID if needed, or just return Customer data
+            salutation: row.salutation as Customer['salutation'],
+            firstName: row.first_name,
+            lastName: row.last_name,
+            street: row.street,
+            houseNumber: row.house_number,
+            postalCode: row.postal_code,
+            city: row.city,
+            phone: row.phone,
+            email: row.email,
+            country: row.country,
+            // Add metadata if needed in Customer type
+        }));
+    },
 
-        (data || []).forEach(row => {
-            const customer = normalizeCustomer(row.customer_data);
-            const email = customer.email.toLowerCase();
-            const firstName = customer.firstName;
-            const lastName = customer.lastName;
-            const city = customer.city;
+    async getCustomer(id: string): Promise<Customer | null> {
+        const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-            // Unikalny klucz oparty o email lub kombinację imię+nazwisko+miasto (spójne z utils/storage.ts)
-            const key = email || `${firstName}_${lastName}_${city}`.toLowerCase();
-            const createdAt = new Date(row.created_at);
+        if (error) return null;
 
-            const existing = customerMap.get(key);
+        return {
+            id: data.id, // We might need to extend Customer type to include ID
+            salutation: data.salutation as Customer['salutation'],
+            firstName: data.first_name,
+            lastName: data.last_name,
+            street: data.street,
+            houseNumber: data.house_number,
+            postalCode: data.postal_code,
+            city: data.city,
+            phone: data.phone,
+            email: data.email,
+            country: data.country,
+        } as Customer & { id: string };
+    },
 
-            if (!existing) {
-                customerMap.set(key, {
-                    customer,
-                    lastOfferDate: createdAt,
-                    offerCount: 1
-                });
-            } else {
-                // Aktualizujemy dane klienta, jeśli ta oferta jest nowsza
-                if (createdAt > existing.lastOfferDate) {
-                    existing.customer = customer;
-                    existing.lastOfferDate = createdAt;
+    async createCustomer(customer: Customer): Promise<Customer & { id: string }> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('customers')
+            .insert({
+                created_by: user.id,
+                salutation: customer.salutation,
+                first_name: customer.firstName,
+                last_name: customer.lastName,
+                street: customer.street,
+                house_number: customer.houseNumber,
+                postal_code: customer.postalCode,
+                city: customer.city,
+                country: customer.country,
+                phone: customer.phone,
+                email: customer.email,
+                source: 'manual'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            ...customer,
+            id: data.id
+        };
+    },
+
+    async updateCustomer(id: string, updates: Partial<Customer>): Promise<void> {
+        const dbUpdates: Record<string, any> = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (updates.salutation) dbUpdates.salutation = updates.salutation;
+        if (updates.firstName) dbUpdates.first_name = updates.firstName;
+        if (updates.lastName) dbUpdates.last_name = updates.lastName;
+        if (updates.street) dbUpdates.street = updates.street;
+        if (updates.houseNumber) dbUpdates.house_number = updates.houseNumber;
+        if (updates.postalCode) dbUpdates.postal_code = updates.postalCode;
+        if (updates.city) dbUpdates.city = updates.city;
+        if (updates.country) dbUpdates.country = updates.country;
+        if (updates.phone) dbUpdates.phone = updates.phone;
+        if (updates.email) dbUpdates.email = updates.email;
+
+        const { error } = await supabase
+            .from('customers')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    // Updated to use customers table + offers for stats
+    async getUniqueCustomers(): Promise<{ customer: Customer & { id?: string }; lastOfferDate: Date; offerCount: number; latestOfferId: string }[]> {
+        // 1. Fetch all customers
+        const { data: customersData, error: customersError } = await supabase
+            .from('customers')
+            .select('*');
+
+        if (customersError) throw customersError;
+
+        // 2. Fetch offer stats
+        const { data: offersData, error: offersError } = await supabase
+            .from('offers')
+            .select('id, customer_data, customer_id, created_at')
+            .order('created_at', { ascending: false });
+
+        if (offersError) throw offersError;
+
+        // Map customers
+        const customers = customersData.map(row => ({
+            id: row.id,
+            salutation: row.salutation as Customer['salutation'],
+            firstName: row.first_name,
+            lastName: row.last_name,
+            street: row.street,
+            houseNumber: row.house_number,
+            postalCode: row.postal_code,
+            city: row.city,
+            phone: row.phone,
+            email: row.email,
+            country: row.country,
+        }));
+
+        // Calculate stats from offers
+        // We need to match offers to customers. 
+        // Since offers store customer_data JSON, we try to match by email or name+city
+        // Or we rely on the fact that we migrated data.
+
+        const result = customers.map(customer => {
+            // Find offers for this customer
+            const customerOffers = offersData.filter(offer => {
+                // 1. Try matching by DB ID (most reliable)
+                if (offer.customer_id && customer.id && offer.customer_id === customer.id) {
+                    return true;
                 }
-                existing.offerCount += 1;
-            }
+
+                // 2. Fallback to data matching (for legacy/unlinked offers)
+                const offerCustomer = offer.customer_data;
+                if (!offerCustomer) return false;
+
+                const emailMatch = customer.email && offerCustomer.email && customer.email.toLowerCase() === offerCustomer.email.toLowerCase();
+                const nameMatch = customer.lastName.toLowerCase() === (offerCustomer.lastName || '').toLowerCase() &&
+                    customer.firstName.toLowerCase() === (offerCustomer.firstName || '').toLowerCase() &&
+                    customer.city.toLowerCase() === (offerCustomer.city || '').toLowerCase();
+
+                return emailMatch || nameMatch;
+            });
+
+            const lastOffer = customerOffers[0]; // Ordered by date desc
+
+            return {
+                customer,
+                lastOfferDate: lastOffer ? new Date(lastOffer.created_at) : new Date(0), // 0 if no offers
+                offerCount: customerOffers.length,
+                latestOfferId: lastOffer?.id || ''
+            };
         });
 
-        // Zwracamy posortowaną listę – najnowsze oferty na górze
-        return Array.from(customerMap.values()).sort(
-            (a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime()
-        );
+        return result.sort((a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime());
+    },
+
+    async getCustomerOffers(customerId: string): Promise<Offer[]> {
+        const { data, error } = await supabase
+            .from('offers')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            offerNumber: row.offer_number,
+            customer: row.customer_data,
+            product: row.product_config,
+            pricing: normalizePricing(row.pricing),
+            status: row.status as Offer['status'],
+            snowZone: row.snow_zone,
+            commission: row.commission,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            createdBy: row.user_id
+        }));
     },
 
     // --- Contracts ---
