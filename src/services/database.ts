@@ -683,6 +683,45 @@ export const DatabaseService = {
         if (error) throw error;
     },
 
+    async getAllInstallations(): Promise<Installation[]> {
+        const { data, error } = await supabase
+            .from('installations')
+            .select('*')
+            .order('scheduled_date', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map(row => {
+            const installationData = (row as { installation_data: Partial<InstallationData> }).installation_data || {};
+            const clientData: Partial<Installation['client']> = installationData.client || {};
+
+            const client = {
+                firstName: clientData.firstName || '',
+                lastName: clientData.lastName || '',
+                city: clientData.city || '',
+                address: clientData.address || '',
+                phone: clientData.phone || '',
+                coordinates: clientData.coordinates
+            };
+
+            const scheduledRaw = (row as { scheduled_date: string | null }).scheduled_date;
+            const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
+
+            return {
+                id: row.id,
+                offerId: row.offer_id,
+                client,
+                productSummary: installationData.productSummary || '',
+                status: row.status as Installation['status'],
+                scheduledDate,
+                teamId: installationData.teamId || (row as { team_id?: string }).team_id,
+                notes: installationData.notes,
+                acceptance: installationData.acceptance,
+                createdAt: new Date(row.created_at)
+            };
+        });
+    },
+
     async getCustomerInstallations(customerId: string): Promise<Installation[]> {
         // Similar to contracts, we link via offers
         const { data: offers, error: offersError } = await supabase
