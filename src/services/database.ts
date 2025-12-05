@@ -826,6 +826,16 @@ export const DatabaseService = {
             commissionRate: typeof data.commission_rate === 'number' ? data.commission_rate : undefined
         };
     },
+    async checkEmailConfigColumn(userId: string): Promise<{ error: any }> {
+        // Try strict selection of the specific column to test schema
+        const { error } = await supabase
+            .from('profiles')
+            .select('email_config')
+            .eq('id', userId)
+            .single();
+        return { error };
+    },
+
     async updateUserProfile(profile: Partial<User>): Promise<void> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');

@@ -15,17 +15,54 @@ export const SettingsPage: React.FC = () => {
     });
 
     useEffect(() => {
-        if (currentUser && profile.email !== currentUser.email) {
-            setProfile({
-                firstName: currentUser.firstName,
-                lastName: currentUser.lastName,
-                email: currentUser.email,
-                phone: currentUser.phone || '',
-                monthlyTarget: currentUser.monthlyTarget || 50000,
-                emailConfig: currentUser.emailConfig || {}
-            });
-        }
+        const loadProfileAndCheckDb = async () => {
+            if (!currentUser) return;
+
+            // 1. Diagnostic Check: Verify if email_config column exists
+            try {
+                const { error } = await DatabaseService.checkEmailConfigColumn(currentUser.id);
+                if (error) {
+                    console.error('Diagnostic: email_config column missing', error);
+                    setDbError(true);
+                } else {
+                    setDbError(false);
+                }
+            } catch (err) {
+                console.error('Diagnostic check failed', err);
+                setDbError(true);
+            }
+
+            // 2. Load Profile Data
+            if (profile.email !== currentUser.email) {
+                // Auto-fill defaults for Home.pl (requested by user) if empty
+                const currentConfig = currentUser.emailConfig || {};
+                const defaultConfig = {
+                    smtpHost: currentConfig.smtpHost || 'serwer2426445.home.pl',
+                    smtpPort: currentConfig.smtpPort || 587,
+                    smtpUser: currentConfig.smtpUser || '',
+                    smtpPassword: currentConfig.smtpPassword || '',
+                    imapHost: currentConfig.imapHost || 'serwer2426445.home.pl',
+                    imapPort: currentConfig.imapPort || 993,
+                    imapUser: currentConfig.imapUser || '',
+                    imapPassword: currentConfig.imapPassword || '',
+                    signature: currentConfig.signature || ''
+                };
+
+                setProfile({
+                    firstName: currentUser.firstName,
+                    lastName: currentUser.lastName,
+                    email: currentUser.email,
+                    phone: currentUser.phone || '',
+                    monthlyTarget: currentUser.monthlyTarget || 50000,
+                    emailConfig: defaultConfig
+                });
+            }
+        };
+
+        loadProfileAndCheckDb();
     }, [currentUser, profile.email]);
+
+    const [dbError, setDbError] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -101,6 +138,30 @@ export const SettingsPage: React.FC = () => {
         <div className="space-y-8">
             <div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Ustawienia Profilu</h2>
+
+                {dbError && (
+                    <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-6 text-red-800 animate-pulse">
+                        <div className="flex items-center gap-3 mb-3">
+                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <h3 className="text-lg font-bold">Błąd Krytyczny Bazy Danych</h3>
+                        </div>
+                        <p className="mb-4 font-semibold">
+                            Twoja baza danych nie posiada wymaganej kolumny <code>email_config</code>. Aplikacja nie może zapisać ustawień.
+                        </p>
+                        <p className="mb-2 text-sm">Wykonaj poniższe polecenie w Supabase SQL Editor, aby naprawić problem:</p>
+                        <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-xs overflow-x-auto select-all cursor-text relative group">
+                            <code className="block">
+                                ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_config JSONB DEFAULT '{ }'::jsonb;
+                                COMMENT ON COLUMN public.profiles.email_config IS 'Email settings';
+                                NOTIFY pgrst, 'reload config';
+                            </code>
+                        </div>
+                        <p className="mt-2 text-xs text-red-600 font-bold">Po wykonaniu odśwież tę stronę (F5).</p>
+                    </div>
+                )}
+
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Dane Osobowe</h3>
