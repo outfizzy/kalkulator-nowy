@@ -131,6 +131,10 @@ export interface PricingResult {
     installationCosts?: InstallationCostResult;
     numberOfFields?: number;
     numberOfPosts?: number;
+    // New fields for CRM Financials
+    paymentMethod?: 'cash' | 'transfer';
+    advancePayment?: number;
+    advancePaymentDate?: Date;
     finalPriceNet?: number; // For signed contracts override
 }
 

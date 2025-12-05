@@ -398,7 +398,12 @@ export const DatabaseService = {
             status: row.status as Contract['status'],
             client: row.contract_data.client,
             product: row.contract_data.product,
-            pricing: row.contract_data.pricing,
+            pricing: {
+                ...row.contract_data.pricing,
+                paymentMethod: row.contract_data.pricing?.paymentMethod,
+                advancePayment: row.contract_data.pricing?.advancePayment,
+                advancePaymentDate: row.contract_data.pricing?.advancePaymentDate ? new Date(row.contract_data.pricing.advancePaymentDate) : undefined,
+            },
             commission: row.contract_data.commission,
             requirements: row.contract_data.requirements,
             orderedItems: row.contract_data.orderedItems || [],
@@ -511,6 +516,54 @@ export const DatabaseService = {
             .eq('id', id);
 
         if (error) throw error;
+    },
+
+    async getCustomerContracts(customerId: string): Promise<Contract[]> {
+        // Since we don't have direct customer_id on contracts table yet, we can filter by querying offers first OR filter in JS.
+        // Assuming performance is not an issue yet, we can fetch all and filter, OR join with offers.
+        // Better: Fetch offers for customer, then fetch contracts for those offer IDs.
+
+        // 1. Get Offer IDs for customer
+        const { data: offers, error: offersError } = await supabase
+            .from('offers')
+            .select('id')
+            .eq('customer_id', customerId);
+
+        if (offersError) throw offersError;
+        const offerIds = offers.map(o => o.id);
+
+        if (offerIds.length === 0) return [];
+
+        // 2. Get Contracts for these offers
+        const { data, error } = await supabase
+            .from('contracts')
+            .select('*')
+            .in('offer_id', offerIds)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            offerId: row.offer_id,
+            contractNumber: row.contract_data.contractNumber,
+            client: row.contract_data.client,
+            product: row.contract_data.product,
+            pricing: {
+                ...row.contract_data.pricing,
+                paymentMethod: row.contract_data.pricing?.paymentMethod,
+                advancePayment: row.contract_data.pricing?.advancePayment,
+                advancePaymentDate: row.contract_data.pricing?.advancePaymentDate ? new Date(row.contract_data.pricing.advancePaymentDate) : undefined,
+            },
+            status: row.status as Contract['status'],
+            commission: row.contract_data.commission,
+            requirements: row.contract_data.requirements,
+            orderedItems: row.contract_data.orderedItems || [],
+            comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            attachments: row.contract_data.attachments || [],
+            createdAt: new Date(row.created_at),
+            signedAt: row.signed_at ? new Date(row.signed_at) : undefined
+        }));
     },
 
     // --- Installations ---
@@ -628,6 +681,57 @@ export const DatabaseService = {
             .eq('id', id);
 
         if (error) throw error;
+    },
+
+    async getCustomerInstallations(customerId: string): Promise<Installation[]> {
+        // Similar to contracts, we link via offers
+        const { data: offers, error: offersError } = await supabase
+            .from('offers')
+            .select('id')
+            .eq('customer_id', customerId);
+
+        if (offersError) throw offersError;
+        const offerIds = offers.map(o => o.id);
+
+        if (offerIds.length === 0) return [];
+
+        const { data, error } = await supabase
+            .from('installations')
+            .select('*')
+            .in('offer_id', offerIds)
+            .order('scheduled_date', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map(row => {
+            const installationData = (row as { installation_data: Partial<InstallationData> }).installation_data || {};
+            const clientData: Partial<Installation['client']> = installationData.client || {};
+
+            const client = {
+                firstName: clientData.firstName || '',
+                lastName: clientData.lastName || '',
+                city: clientData.city || '',
+                address: clientData.address || '',
+                phone: clientData.phone || '',
+                coordinates: clientData.coordinates
+            };
+
+            const scheduledRaw = (row as { scheduled_date: string | null }).scheduled_date;
+            const scheduledDate = scheduledRaw ? scheduledRaw.toString().slice(0, 10) : undefined;
+
+            return {
+                id: row.id,
+                offerId: row.offer_id,
+                client,
+                productSummary: installationData.productSummary || '',
+                status: row.status as Installation['status'],
+                scheduledDate,
+                teamId: installationData.teamId || (row as { team_id?: string }).team_id,
+                notes: installationData.notes,
+                acceptance: installationData.acceptance,
+                createdAt: new Date(row.created_at)
+            };
+        });
     },
 
     // --- Users ---
