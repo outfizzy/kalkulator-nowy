@@ -313,14 +313,23 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                             <div className="text-[10px] text-slate-400">{formatDate(call.date)}</div>
                                         </div>
                                     </div>
-                                    {call.status === 'missed' && !callActions[call.id] && (
-                                        <button
-                                            onClick={() => handleCallback(call.id)}
-                                            title="Oznacz jako oddzwonione z telefonu"
-                                            className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors text-[10px] font-bold"
-                                        >
-                                            Oddzwoń
-                                        </button>
+                                    {call.status === 'missed' && (
+                                        !callActions[call.id] ? (
+                                            <button
+                                                onClick={() => handleCallback(call.id)}
+                                                title="Oznacz jako oddzwonione z telefonu"
+                                                className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors text-[10px] font-bold"
+                                            >
+                                                Oddzwoń
+                                            </button>
+                                        ) : (
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-green-600 font-bold text-[10px]">✓ Oddzwoniono</span>
+                                                <span className="text-[8px] text-slate-400">
+                                                    {callActions[call.id].user?.full_name?.split(' ')[0] || 'Użytkownik'}
+                                                </span>
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             ))}
