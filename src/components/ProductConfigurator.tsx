@@ -15,10 +15,24 @@ import topstyleData from '../data/topstyle_full.json';
 import topstyleXlData from '../data/topstyle_xl_full.json';
 import skystyleData from '../data/skystyle_full.json';
 import { formatCurrency } from '../utils/translations';
+import { toast } from 'react-hot-toast';
+
+// === OFFER BASKET TYPES ===
+interface ExternalOfferItem {
+    id: string;
+    supplier: 'selt' | 'aliplast' | 'other';
+    productName: string;
+    description: string;
+    purchasePrice: number;
+    sellingPrice: number;
+}
 
 interface ProductConfiguratorProps {
     onComplete: (config: ProductConfig) => void;
     initialData?: ProductConfig;
+    // New: support for external items basket
+    externalItems?: ExternalOfferItem[];
+    onExternalItemsChange?: (items: ExternalOfferItem[]) => void;
 }
 
 const SectionHeader = ({ title, icon }: { title: string, icon: string }) => (
@@ -28,7 +42,12 @@ const SectionHeader = ({ title, icon }: { title: string, icon: string }) => (
     </div>
 );
 
-export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComplete, initialData }) => {
+export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
+    onComplete,
+    initialData,
+    externalItems: initialExternalItems = [],
+    onExternalItemsChange
+}) => {
     const [config, setConfig] = useState<ProductConfig>(initialData || {
         modelId: '',
         width: 3000,
@@ -44,6 +63,51 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
         addons: [],
         selectedAccessories: []
     });
+
+    // === EXTERNAL ITEMS BASKET ===
+    const [externalItems, setExternalItems] = useState<ExternalOfferItem[]>(initialExternalItems);
+    const [showExternalForm, setShowExternalForm] = useState<'selt' | 'aliplast' | null>(null);
+    const [externalForm, setExternalForm] = useState({
+        productName: '',
+        description: '',
+        purchasePrice: 0,
+        sellingPrice: 0
+    });
+
+    // Notify parent when external items change
+    useEffect(() => {
+        if (onExternalItemsChange) {
+            onExternalItemsChange(externalItems);
+        }
+    }, [externalItems, onExternalItemsChange]);
+
+    const handleAddExternalItem = () => {
+        if (!externalForm.productName || !externalForm.sellingPrice) {
+            toast.error('Podaj nazwę produktu i cenę sprzedaży');
+            return;
+        }
+        const newItem: ExternalOfferItem = {
+            id: crypto.randomUUID(),
+            supplier: showExternalForm!,
+            productName: externalForm.productName,
+            description: externalForm.description,
+            purchasePrice: externalForm.purchasePrice,
+            sellingPrice: externalForm.sellingPrice
+        };
+        setExternalItems([...externalItems, newItem]);
+        setExternalForm({ productName: '', description: '', purchasePrice: 0, sellingPrice: 0 });
+        setShowExternalForm(null);
+        toast.success(`Dodano ${newItem.productName} do oferty`);
+    };
+
+    const handleRemoveExternalItem = (id: string) => {
+        setExternalItems(externalItems.filter(i => i.id !== id));
+        toast.success('Usunięto pozycję');
+    };
+
+    const externalItemsTotal = useMemo(() => {
+        return externalItems.reduce((sum, i) => sum + i.sellingPrice, 0);
+    }, [externalItems]);
 
     const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories' | 'floor'>('sliding');
 
@@ -396,9 +460,12 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                         >
                                             Otwórz Konfigurator Selt ↗
                                         </a>
-                                        <p className="text-[10px] text-slate-400 mt-2 text-center">
-                                            Skonfiguruj produkt na stronie Selt, następnie wpisz dane do oferty
-                                        </p>
+                                        <button
+                                            onClick={() => setShowExternalForm('selt')}
+                                            className="block w-full text-center py-2 mt-2 border-2 border-blue-500 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors"
+                                        >
+                                            ➕ Dodaj produkt Selt
+                                        </button>
                                     </div>
 
                                     {/* Aliplast */}
@@ -422,46 +489,122 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({ onComp
                                         >
                                             Otwórz Konfigurator Aliplast ↗
                                         </a>
-                                        <p className="text-[10px] text-slate-400 mt-2 text-center">
-                                            Skonfiguruj produkt na stronie Aliplast, następnie wpisz dane do oferty
-                                        </p>
+                                        <button
+                                            onClick={() => setShowExternalForm('aliplast')}
+                                            className="block w-full text-center py-2 mt-2 border-2 border-green-500 text-green-600 rounded-lg font-bold text-sm hover:bg-green-50 transition-colors"
+                                        >
+                                            ➕ Dodaj produkt Aliplast
+                                        </button>
                                     </div>
                                 </div>
 
-                                {/* Manual entry hint */}
-                                <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                    <p className="text-xs text-slate-600">
-                                        <span className="font-bold">💡 Jak dodać produkt Selt/Aliplast do oferty:</span>
-                                        <br />
-                                        1. Otwórz konfigurator dostawcy i skonfiguruj produkt
-                                        <br />
-                                        2. Wróć tutaj i wybierz odpowiedni kafelek dostawcy poniżej
-                                        <br />
-                                        3. Wpisz dane produktu ręcznie w kolejnych krokach
-                                    </p>
-                                </div>
+                                {/* External Product Form Modal */}
+                                {showExternalForm && (
+                                    <div className="mt-4 p-4 bg-white border-2 border-slate-200 rounded-xl shadow-lg">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h5 className="font-bold text-lg flex items-center gap-2">
+                                                <span className={`w-3 h-3 rounded-full ${showExternalForm === 'selt' ? 'bg-blue-500' : 'bg-green-500'}`}></span>
+                                                Dodaj produkt {showExternalForm === 'selt' ? 'Selt' : 'Aliplast'}
+                                            </h5>
+                                            <button
+                                                onClick={() => setShowExternalForm(null)}
+                                                className="text-slate-400 hover:text-slate-600"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Nazwa produktu *</label>
+                                                <input
+                                                    type="text"
+                                                    value={externalForm.productName}
+                                                    onChange={e => setExternalForm({ ...externalForm, productName: e.target.value })}
+                                                    className="w-full p-2 border border-slate-200 rounded-lg"
+                                                    placeholder="np. Pergola SR3500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Opis / Specyfikacja</label>
+                                                <textarea
+                                                    value={externalForm.description}
+                                                    onChange={e => setExternalForm({ ...externalForm, description: e.target.value })}
+                                                    className="w-full p-2 border border-slate-200 rounded-lg"
+                                                    rows={2}
+                                                    placeholder="np. 4000x3000mm, RAL 7016, LED..."
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cena zakupu (€)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={externalForm.purchasePrice || ''}
+                                                        onChange={e => setExternalForm({ ...externalForm, purchasePrice: Number(e.target.value) })}
+                                                        className="w-full p-2 border border-slate-200 rounded-lg"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cena sprzedaży (€) *</label>
+                                                    <input
+                                                        type="number"
+                                                        value={externalForm.sellingPrice || ''}
+                                                        onChange={e => setExternalForm({ ...externalForm, sellingPrice: Number(e.target.value) })}
+                                                        className="w-full p-2 border border-slate-200 rounded-lg font-bold"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleAddExternalItem}
+                                                className={`w-full py-3 rounded-xl font-bold text-white ${showExternalForm === 'selt'
+                                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                                        : 'bg-green-600 hover:bg-green-700'
+                                                    }`}
+                                            >
+                                                ✓ Dodaj do oferty
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
-                                {/* Selt/Aliplast as selectable options */}
-                                <div className="grid grid-cols-2 gap-3 mt-4">
-                                    <div
-                                        onClick={() => handleBasicConfigChange('modelId', 'selt_external')}
-                                        className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === 'selt_external'
-                                                ? 'border-blue-500 bg-blue-50 shadow-sm'
-                                                : 'border-slate-100 hover:border-blue-300 bg-white'
-                                            }`}
-                                    >
-                                        <span className="font-bold text-sm text-slate-800">Produkt Selt (ręczny)</span>
+                                {/* External Items Basket */}
+                                {externalItems.length > 0 && (
+                                    <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl">
+                                        <h5 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
+                                            🛒 Dodane produkty zewnętrzne ({externalItems.length})
+                                        </h5>
+                                        <div className="space-y-2">
+                                            {externalItems.map(item => (
+                                                <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-2 h-2 rounded-full ${item.supplier === 'selt' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                                                        <div>
+                                                            <div className="font-bold text-sm">{item.productName}</div>
+                                                            <div className="text-xs text-slate-500">
+                                                                {item.supplier.toUpperCase()} • {item.description || 'Brak opisu'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-bold text-accent">{formatCurrency(item.sellingPrice)}</span>
+                                                        <button
+                                                            onClick={() => handleRemoveExternalItem(item.id)}
+                                                            className="text-red-500 hover:bg-red-50 p-1 rounded"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                                            <span className="text-sm text-slate-600">Suma produktów zewnętrznych:</span>
+                                            <span className="font-bold text-lg text-accent">{formatCurrency(externalItemsTotal)}</span>
+                                        </div>
                                     </div>
-                                    <div
-                                        onClick={() => handleBasicConfigChange('modelId', 'aliplast_external')}
-                                        className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === 'aliplast_external'
-                                                ? 'border-green-500 bg-green-50 shadow-sm'
-                                                : 'border-slate-100 hover:border-green-300 bg-white'
-                                            }`}
-                                    >
-                                        <span className="font-bold text-sm text-slate-800">Produkt Aliplast (ręczny)</span>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </section>
                     )}
