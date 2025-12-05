@@ -60,7 +60,6 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     const [customers, setCustomers] = useState<CustomerMatch[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [callActions, setCallActions] = useState<Record<string, CallAction>>({});
-    const [filterNumber, setFilterNumber] = useState<string>('all'); // 'all', '980', '981', '982'
     const [activeTab, setActiveTab] = useState<'calls' | 'team' | 'missed'>('calls');
 
     const getDateRange = useCallback(() => {
@@ -209,11 +208,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         return users.find(u => u.phone && u.phone.endsWith(extension));
     }, [users]);
 
-    const formatDuration = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
+
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '-';
@@ -224,13 +219,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
     const allCalls = (stats?.calls || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const filteredCalls = allCalls.filter(call => {
-        if (filterNumber !== 'all') {
-            // Check if either caller or callee ends with the filter number
-            return call.caller.endsWith(filterNumber) || call.callee.endsWith(filterNumber);
-        }
-        return true;
-    });
+    const filteredCalls = allCalls;
 
     const missedCallsQueue = allCalls.filter(call => call.status === 'missed' && call.direction === 'incoming' && !callActions[call.id]);
 
