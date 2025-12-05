@@ -362,6 +362,11 @@ export const SettingsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <div className="text-center text-xs text-slate-300 mt-8 pb-4">
+                <p>System ID: {import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || 'Unknown'}</p>
+                <p>Version: 1.0.2</p>
+            </div>
         </div>
     );
 };
