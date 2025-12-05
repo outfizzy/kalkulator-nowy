@@ -122,18 +122,18 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium text-slate-800">{offer.offerNumber}</span>
-                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${offer.status === 'won' ? 'bg-green-100 text-green-700' :
-                                                        offer.status === 'lost' ? 'bg-red-100 text-red-700' :
-                                                            'bg-blue-100 text-blue-700'
+                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${offer.status === 'sold' ? 'bg-green-100 text-green-700' :
+                                                    offer.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                        'bg-blue-100 text-blue-700'
                                                     }`}>
                                                     {offer.status === 'draft' ? 'Szkic' :
                                                         offer.status === 'sent' ? 'Wysłana' :
-                                                            offer.status === 'won' ? 'Przyjęta' :
-                                                                offer.status === 'lost' ? 'Odrzucona' : offer.status}
+                                                            offer.status === 'sold' ? 'Przyjęta' :
+                                                                offer.status === 'rejected' ? 'Odrzucona' : offer.status}
                                                 </span>
                                             </div>
                                             <div className="text-xs text-slate-500 mt-1">
-                                                {offer.product?.type === 'pergola' ? 'Pergola' : 'Materiały'} • {offer.createdAt.toLocaleDateString('pl-PL')}
+                                                {offer.product?.modelId || 'Produkt'} • {offer.createdAt.toLocaleDateString('pl-PL')}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
