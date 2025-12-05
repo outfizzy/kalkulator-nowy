@@ -91,29 +91,48 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
 
     const fetchCallActions = async () => {
         try {
-            const { data, error } = await supabase
+            // Try fetching with role first
+            let { data, error } = await supabase
                 .from('call_actions')
-                .select(`
-    *,
-    user: profiles(full_name, role)
-        `);
+                .select(`*, user: profiles(full_name, role)`);
+
+            // If error (e.g. role column missing or RLS issue), try fetching without role
+            if (error) {
+                console.warn('Error fetching call actions with role, trying without:', error);
+                const retry = await supabase
+                    .from('call_actions')
+                    .select(`*, user: profiles(full_name)`);
+
+                data = retry.data;
+                error = retry.error;
+            }
+
+            // If still error, try fetching without user join (absolute fallback)
+            if (error) {
+                console.warn('Error fetching call actions with user, trying raw:', error);
+                const retryRaw = await supabase
+                    .from('call_actions')
+                    .select(`*`);
+
+                data = retryRaw.data;
+                error = retryRaw.error;
+            }
 
             if (error) throw error;
 
             if (data) {
                 const actionsMap: Record<string, CallAction> = {};
                 data.forEach((action) => {
-                    // Store latest action for each call_id
-                    // In a real app, might want list of actions, but for now just "is handled"
                     actionsMap[action.call_id] = {
                         ...action,
-                        user: action.user
+                        user: action.user || { full_name: 'Nieznany' } // Fallback if user join failed
                     };
                 });
                 setCallActions(actionsMap);
             }
         } catch (err) {
             console.error('Error fetching call actions:', err);
+            // Don't show toast for background fetch to avoid spam, but log it
         }
     };
 
