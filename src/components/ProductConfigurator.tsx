@@ -422,25 +422,17 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         <div
                                             key={model.id}
                                             onClick={() => {
-                                                if (model.comingSoon) return;
                                                 handleBasicConfigChange('modelId', model.id);
                                                 if (model.id === 'skystyle') {
                                                     handleBasicConfigChange('roofType', 'glass');
                                                     handleBasicConfigChange('glassType', 'standard');
                                                 }
                                             }}
-                                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${model.comingSoon
-                                                ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
-                                                : config.modelId === model.id
-                                                    ? 'border-accent bg-accent/5 shadow-md'
-                                                    : 'border-slate-100 hover:border-accent/30'
+                                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${config.modelId === model.id
+                                                ? 'border-accent bg-accent/5 shadow-md'
+                                                : 'border-slate-100 hover:border-accent/30'
                                                 }`}
                                         >
-                                            {model.comingSoon && (
-                                                <span className="absolute top-2 right-2 text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
-                                                    Wkrótce
-                                                </span>
-                                            )}
                                             <h3 className="text-lg font-bold mb-1 text-slate-900">{model.name}</h3>
                                             <p className="text-xs text-slate-500 mb-3">{model.desc}</p>
                                             <ul className="text-[10px] text-slate-600 space-y-0.5">
