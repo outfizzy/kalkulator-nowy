@@ -88,7 +88,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     status: data.status as 'pending' | 'active' | 'blocked',
                     companyName: data.company_name || undefined,
                     nip: data.nip || undefined,
-                    partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined
+                    partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined,
+                    emailConfig: data.email_config || undefined
                 };
 
                 // Block non-active users

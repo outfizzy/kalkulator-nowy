@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
@@ -93,7 +94,10 @@ export const MailPage: React.FC = () => {
                 {!isConfigured && (
                     <div className="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-800">
                         <p className="font-bold mb-1">Konfiguracja Wymagana</p>
-                        <p>Aby w pełni korzystać z poczty, skonfiguruj ustawienia SMTP/IMAP w swoim profilu.</p>
+                        <p className="mb-2">Aby w pełni korzystać z poczty, skonfiguruj ustawienia SMTP/IMAP w swoim profilu.</p>
+                        <Link to="/settings" className="text-orange-900 underline font-bold text-xs">
+                            Przejdź do ustawień →
+                        </Link>
                     </div>
                 )}
             </div>

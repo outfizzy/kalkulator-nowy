@@ -838,6 +838,7 @@ export const DatabaseService = {
         }
         if (profile.phone !== undefined) updates.phone = profile.phone;
         if (profile.monthlyTarget !== undefined) updates.monthly_target = profile.monthlyTarget;
+        if (profile.emailConfig !== undefined) updates.email_config = profile.emailConfig;
 
         const { error } = await supabase
             .from('profiles')
