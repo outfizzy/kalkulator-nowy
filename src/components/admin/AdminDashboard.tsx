@@ -4,6 +4,7 @@ import { SalesTeamStats } from './SalesTeamStats';
 import { PartnerOffersList } from './PartnerOffersList';
 import { DatabaseService } from '../../services/database';
 import { WalletWidget } from './WalletWidget';
+import { RingostatWidget } from '../widgets/RingostatWidget';
 
 
 export const AdminDashboard: React.FC = () => {
@@ -260,6 +261,16 @@ export const AdminDashboard: React.FC = () => {
                         <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full opacity-10 ${action.color.includes('gradient') ? 'bg-white' : 'bg-accent'}`} />
                     </Link>
                 ))}
+            </section>
+
+            {/* Ringostat Calls Section */}
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                    <RingostatWidget />
+                </div>
+                <div>
+                    <WalletWidget />
+                </div>
             </section>
 
             {/* Statistics Section - Tabbed View */}

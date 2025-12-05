@@ -9,6 +9,7 @@ import type { SalesRepStats } from '../utils/statistics';
 import { useAuth } from '../contexts/AuthContext';
 import type { CommissionStats, Offer, SalesProfile } from '../types';
 import { Link } from 'react-router-dom';
+import { RingostatWidget } from './widgets/RingostatWidget';
 
 export const SalesDashboard: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
@@ -255,6 +256,11 @@ export const SalesDashboard: React.FC = () => {
                         <p className="text-white/80 text-sm">Zobacz harmonogram montaży</p>
                     </div>
                 </Link>
+            </div>
+
+            {/* Ringostat Widget */}
+            <div className="mb-6">
+                <RingostatWidget compact />
             </div>
 
             {/* Monthly Settlement Card */}
