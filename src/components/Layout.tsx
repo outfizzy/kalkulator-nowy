@@ -38,6 +38,9 @@ export const Layout: React.FC = () => {
                     <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
                     <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
                     <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
+                    <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
+                    <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
+                    <NavLink to="/mail" label="Poczta" icon="mail" />
                     {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" />}
                     {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" />}
                     <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />
@@ -102,6 +105,9 @@ export const Layout: React.FC = () => {
                             <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/mail" label="Poczta" icon="mail" onClick={() => setMobileMenuOpen(false)} />
                             {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
                             {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                             <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
@@ -166,7 +172,7 @@ export const Layout: React.FC = () => {
 interface NavLinkProps {
     to: string;
     label: string;
-    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users';
+    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail';
     onClick?: () => void;
 }
 
@@ -224,6 +230,11 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
         users: (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+        ),
+        mail: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
         ),
     };

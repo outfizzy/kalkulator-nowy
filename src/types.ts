@@ -6,6 +6,18 @@ export interface SnowZoneInfo {
     description: string;
 }
 
+export interface EmailConfig {
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpUser?: string;
+    smtpPassword?: string; // In real app should be encrypted/handled securely
+    imapHost?: string;
+    imapPort?: number; // 993 usually
+    imapUser?: string;
+    imapPassword?: string;
+    signature?: string; // HTML or text signature
+}
+
 // User Roles
 export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner' | 'installer';
 
@@ -27,6 +39,7 @@ export interface User {
     // Commission rate for sales reps (e.g. 0.05 = 5%)
     commissionRate?: number;
     preferredLanguage?: 'pl' | 'mo' | 'uk';
+    emailConfig?: EmailConfig;
 }
 
 export interface Customer {

@@ -270,16 +270,22 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                             </div>
                         </div>
                     )}
-                    {filteredCalls.slice(0, 5).map(call => (
-                        <div key={call.id} className="flex justify-between text-xs py-1 border-b border-slate-50 last:border-0">
-                            <span className={call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}>
-                                {call.direction === 'incoming' ? '↙' : '↗'} {call.direction === 'incoming' ? call.caller : call.callee}
-                            </span>
-                            <span className={call.status === 'answered' ? 'text-green-500' : 'text-red-500'}>
-                                {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
-                            </span>
-                        </div>
-                    ))}
+                    {filteredCalls.slice(0, 5).map(call => {
+                        const action = callActions[call.id];
+                        const isHandled = call.status === 'answered' || !!action;
+                        return (
+                            <div key={call.id} className="flex justify-between text-xs py-1 border-b border-slate-50 last:border-0">
+                                <span className={call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}>
+                                    {call.direction === 'incoming' ? '↙' : '↗'} {call.direction === 'incoming' ? call.caller : call.callee}
+                                </span>
+                                <span className={isHandled ? 'text-green-500 font-medium' : 'text-red-500 font-bold'}>
+                                    {call.status === 'answered'
+                                        ? 'Odebrane'
+                                        : (action ? '✓ Oddzwonione' : 'Nieodebrane')}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
                 <button onClick={() => setShowDetails(true)} className="w-full py-2 text-xs text-accent font-bold mt-2">Pełny Raport →</button>
             </div>

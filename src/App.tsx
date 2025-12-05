@@ -46,6 +46,7 @@ import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
 import { CustomersList } from './components/customers/CustomersList';
 import { CustomerPage } from './components/customers/CustomerPage';
+import { MailPage } from './components/MailPage';
 
 // Partner Components
 import { LandingPage } from './components/LandingPage';
@@ -327,6 +328,7 @@ function App() {
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/customers/new" element={<CustomerPage />} />
               <Route path="/customers/:id" element={<CustomerPage />} />
+              <Route path="/mail" element={<MailPage />} />
             </Route>
 
 

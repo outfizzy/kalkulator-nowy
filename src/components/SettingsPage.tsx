@@ -21,7 +21,8 @@ export const SettingsPage: React.FC = () => {
                 lastName: currentUser.lastName,
                 email: currentUser.email,
                 phone: currentUser.phone || '',
-                monthlyTarget: currentUser.monthlyTarget || 50000
+                monthlyTarget: currentUser.monthlyTarget || 50000,
+                emailConfig: currentUser.emailConfig || {}
             });
         }
     }, [currentUser, profile.email]);
