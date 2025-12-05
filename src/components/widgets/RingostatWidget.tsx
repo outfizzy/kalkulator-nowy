@@ -3,7 +3,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
 
 interface CallStats {
     total: number;
@@ -61,16 +60,24 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         try {
             const { dateFrom, dateTo } = getDateRange();
 
-            const { data, error: fnError } = await supabase.functions.invoke('ringostat-calls', {
-                body: { date_from: dateFrom, date_to: dateTo }
-            });
+            // Use Vercel API route instead of Supabase Edge Function
+            const response = await fetch(`/api/ringostat-calls?date_from=${dateFrom}&date_to=${dateTo}`);
 
-            if (fnError) throw fnError;
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
 
             setStats(data);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Error fetching Ringostat stats:', err);
-            setError(err.message || 'Błąd pobierania danych');
+            const errorMessage = err instanceof Error ? err.message : 'Błąd pobierania danych';
+            setError(errorMessage);
             // Set empty stats on error
             setStats({
                 total: 0,
@@ -255,10 +262,10 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                     <td className="p-3 text-center text-red-600">{data.missed}</td>
                                                     <td className="p-3 text-center">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${(data.answered / data.total) >= 0.8
-                                                                ? 'bg-green-100 text-green-700'
-                                                                : (data.answered / data.total) >= 0.5
-                                                                    ? 'bg-yellow-100 text-yellow-700'
-                                                                    : 'bg-red-100 text-red-700'
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : (data.answered / data.total) >= 0.5
+                                                                ? 'bg-yellow-100 text-yellow-700'
+                                                                : 'bg-red-100 text-red-700'
                                                             }`}>
                                                             {Math.round((data.answered / data.total) * 100)}%
                                                         </span>
@@ -301,8 +308,8 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                 <td className="p-3 text-center">{formatDuration(call.duration)}</td>
                                                 <td className="p-3 text-center">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${call.status === 'answered'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-red-100 text-red-700'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-red-100 text-red-700'
                                                         }`}>
                                                         {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
                                                     </span>
