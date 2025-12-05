@@ -40,8 +40,13 @@ export const SettingsPage: React.FC = () => {
             await DatabaseService.updateUserProfile(profile);
             toast.success('Profil zapisany pomyślnie');
         } catch (error) {
-            console.error('Error saving profile:', error);
-            toast.error('Błąd zapisu profilu');
+            console.error('Error saving profile:', JSON.stringify(error, null, 2));
+            const errorMessage = (error as any)?.message || 'Nieznany błąd';
+            if (errorMessage.includes('email_config') || errorMessage.includes('column')) {
+                toast.error('Błąd: Brak kolumny email_config w bazie. Uruchom migrację SQL.');
+            } else {
+                toast.error(`Błąd zapisu: ${errorMessage}`);
+            }
         }
     };
 

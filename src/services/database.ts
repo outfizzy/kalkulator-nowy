@@ -845,7 +845,10 @@ export const DatabaseService = {
             .update(updates)
             .eq('id', user.id);
 
-        if (error) throw error;
+        if (error) {
+            console.error('DatabaseService updateUserProfile error:', error);
+            throw error;
+        }
     },
 
     async updateUserLanguage(userId: string, language: 'pl' | 'mo' | 'uk'): Promise<void> {
