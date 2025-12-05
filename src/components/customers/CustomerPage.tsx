@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { CustomerForm } from '../CustomerForm';
@@ -9,6 +9,8 @@ import type { Customer } from '../../types';
 export const CustomerPage: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const initialPhone = searchParams.get('phone');
     const [customer, setCustomer] = useState<Customer & { id?: string } | null>(null);
     const [loading, setLoading] = useState(!!id);
     const [isEditing, setIsEditing] = useState(!id); // Edit mode by default if adding new
@@ -80,6 +82,7 @@ export const CustomerPage: React.FC = () => {
                     <CustomerForm
                         onComplete={(data) => handleSave(data)}
                         submitLabel="Dodaj Klienta"
+                        initialData={initialPhone ? { phone: initialPhone } as any : undefined}
                     />
                 </div>
             </div>

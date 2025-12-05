@@ -371,7 +371,16 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                         {match.customer.firstName} {match.customer.lastName}
                                                     </Link>
                                                 ) : (
-                                                    <span className="font-mono text-slate-600">{clientNum}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono text-slate-600">{clientNum}</span>
+                                                        <Link
+                                                            to={`/customers/new?phone=${clientNum}`}
+                                                            className="w-5 h-5 rounded-full bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 hover:scale-110 transition-all font-bold text-xs"
+                                                            title="Dodaj do bazy"
+                                                        >
+                                                            +
+                                                        </Link>
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="p-3">
@@ -395,7 +404,14 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                 {isMissed && !action && call.direction === 'incoming' && (
                                                     <button onClick={() => handleCallback(call.id)} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 font-medium">Oddzwoń</button>
                                                 )}
-                                                {action && <span className="text-xs text-green-600 font-bold">✓ Oddzwonione</span>}
+                                                {action && (
+                                                    <span
+                                                        className="text-xs text-green-600 font-bold cursor-help border-b border-dotted border-green-600"
+                                                        title={`Oddzwonił: ${action.user?.full_name || 'Nieznany'}\nData: ${new Date(action.created_at).toLocaleString('pl-PL')}`}
+                                                    >
+                                                        ✓ Oddzwonione
+                                                    </span>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -472,6 +488,11 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                                     <div className="text-xs text-slate-500">
                                                         Dzwonił na numer: <span className="font-mono">{call.callee}</span>
                                                     </div>
+                                                    {!match && (
+                                                        <Link to={`/customers/new?phone=${call.caller}`} className="text-green-600 text-xs font-bold hover:underline mt-1 block">
+                                                            + Dodaj klienta
+                                                        </Link>
+                                                    )}
                                                 </div>
                                             </div>
                                             <button
