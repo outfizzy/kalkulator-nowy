@@ -165,6 +165,149 @@ export const SettingsPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Email Configuration */}
+            <div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
+                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Konfiguracja Poczty (SMTP/IMAP)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="md:col-span-2">
+                            <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm mb-4">
+                                <p className="font-bold">Informacja:</p>
+                                <p>Wprowadź dane serwera pocztowego, aby wysyłać i odbierać wiadomości bezpośrednio z aplikacji.</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
+                            <input
+                                type="text"
+                                value={profile.emailConfig?.smtpHost || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, smtpHost: e.target.value }
+                                }))}
+                                placeholder="np. smtp.gmail.com"
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Port SMTP</label>
+                            <input
+                                type="text"
+                                value={profile.emailConfig?.smtpPort || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, smtpPort: parseInt(e.target.value) || 587 }
+                                }))}
+                                placeholder="np. 587"
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik SMTP</label>
+                            <input
+                                type="text"
+                                value={profile.emailConfig?.smtpUser || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, smtpUser: e.target.value }
+                                }))}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Hasło SMTP</label>
+                            <input
+                                type="password"
+                                value={profile.emailConfig?.smtpPassword || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, smtpPassword: e.target.value }
+                                }))}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2 border-t pt-4 mt-2">
+                            <h4 className="text-sm font-bold text-slate-700 mb-3">Ustawienia Odbierania (IMAP)</h4>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Host IMAP</label>
+                            <input
+                                type="text"
+                                value={profile.emailConfig?.imapHost || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, imapHost: e.target.value }
+                                }))}
+                                placeholder="np. imap.gmail.com"
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Port IMAP</label>
+                            <input
+                                type="text"
+                                value={profile.emailConfig?.imapPort || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, imapPort: parseInt(e.target.value) || 993 }
+                                }))}
+                                placeholder="np. 993"
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik IMAP</label>
+                            <input
+                                type="text"
+                                value={profile.emailConfig?.imapUser || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, imapUser: e.target.value }
+                                }))}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Hasło IMAP</label>
+                            <input
+                                type="password"
+                                value={profile.emailConfig?.imapPassword || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, imapPassword: e.target.value }
+                                }))}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Stopka (Podpis)</label>
+                            <textarea
+                                value={profile.emailConfig?.signature || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, signature: e.target.value }
+                                }))}
+                                rows={4}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono text-sm"
+                                placeholder="Tutaj wpisz treść swojej stopki..."
+                            />
+                        </div>
+                    </div>
+                    <div className="mt-8 flex justify-end">
+                        <button
+                            onClick={handleSave}
+                            className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors"
+                        >
+                            Zapisz Konfigurację
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Zmiana Hasła</h3>
