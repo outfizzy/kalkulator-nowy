@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 export const SettingsPage: React.FC = () => {
     const { currentUser } = useAuth();
+    const [dbError, setDbError] = useState(false);
     const [profile, setProfile] = useState<Partial<User>>({
         firstName: '',
         lastName: '',
@@ -61,8 +62,6 @@ export const SettingsPage: React.FC = () => {
 
         loadProfileAndCheckDb();
     }, [currentUser, profile.email]);
-
-    const [dbError, setDbError] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;

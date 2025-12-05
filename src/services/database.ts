@@ -827,10 +827,10 @@ export const DatabaseService = {
         };
     },
     async checkEmailConfigColumn(userId: string): Promise<{ error: any }> {
-        // Try strict selection of the specific column to test schema
+        // Try selecting ALL required columns to verify schema closure
         const { error } = await supabase
             .from('profiles')
-            .select('email_config')
+            .select('email_config, monthly_target, phone')
             .eq('id', userId)
             .single();
         return { error };
