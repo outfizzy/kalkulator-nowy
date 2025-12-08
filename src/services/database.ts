@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus } from '../types';
+import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus, Lead } from '../types';
 import type { AuthError } from '@supabase/supabase-js';
 
 interface InstallationData {
@@ -34,6 +34,97 @@ const normalizePricing = (pricing: Partial<PricingResult> | null | undefined): P
 };
 
 export const DatabaseService = {
+    // --- Leads ---
+    async getLeads(): Promise<Lead[]> {
+        const { data, error } = await supabase
+            .from('leads')
+            .select(`
+                *,
+                assigned_user:assigned_to (
+                    first_name,
+                    last_name
+                )
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            status: row.status,
+            source: row.source,
+            customerData: row.customer_data,
+            assignedTo: row.assigned_to,
+            emailMessageId: row.email_message_id,
+            notes: row.notes,
+            lastContactDate: row.last_contact_date ? new Date(row.last_contact_date) : undefined,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            assignee: row.assigned_user ? {
+                firstName: row.assigned_user.first_name,
+                lastName: row.assigned_user.last_name
+            } : undefined
+        }));
+    },
+
+    async createLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('leads')
+            .insert({
+                status: lead.status,
+                source: lead.source,
+                customer_data: lead.customerData,
+                assigned_to: lead.assignedTo || user.id, // Default to current user if not set
+                email_message_id: lead.emailMessageId,
+                notes: lead.notes,
+                last_contact_date: lead.lastContactDate ? lead.lastContactDate.toISOString() : null
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            ...lead,
+            id: data.id,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at)
+        } as Lead;
+    },
+
+    async updateLead(id: string, updates: Partial<Lead>): Promise<void> {
+        const dbUpdates: Record<string, any> = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.source) dbUpdates.source = updates.source;
+        if (updates.customerData) dbUpdates.customer_data = updates.customerData;
+        if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
+        if (updates.emailMessageId) dbUpdates.email_message_id = updates.emailMessageId;
+        if (updates.notes) dbUpdates.notes = updates.notes;
+        if (updates.lastContactDate) dbUpdates.last_contact_date = updates.lastContactDate.toISOString();
+
+        const { error } = await supabase
+            .from('leads')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async deleteLead(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
     // --- Offers ---
     async getOffers(): Promise<Offer[]> {
         const { data, error } = await supabase
@@ -2632,5 +2723,61 @@ export const DatabaseService = {
             .eq('id', id);
 
         return { error };
+    },
+
+    async getLead(id: string): Promise<Lead | null> {
+        const { data, error } = await supabase
+            .from('leads')
+            .select(`
+                *,
+                driver:profiles!assignee_id (
+                    id,
+                    first_name,
+                    last_name,
+                    email
+                )
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            console.error('Error fetching lead:', error);
+            return null;
+        }
+
+        // Map the response to our Lead type
+        return {
+            ...data,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at),
+            lastContactDate: data.last_contact_date ? new Date(data.last_contact_date) : undefined,
+            customerData: data.customer_data,
+            salesRep: data.driver ? {
+                id: data.driver.id,
+                firstName: data.driver.first_name,
+                lastName: data.driver.last_name,
+                email: data.driver.email
+            } : undefined
+        } as Lead;
+    },
+
+    async updateLead(id: string, updates: Partial<Lead> & { assigneeId?: string }): Promise<void> {
+        // Map frontend CamelCase to DB snake_case
+        const dbUpdates: any = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.source) dbUpdates.source = updates.source;
+        if (updates.customerData) dbUpdates.customer_data = updates.customerData;
+        if (updates.notes) dbUpdates.notes = updates.notes;
+        if (updates.assigneeId) dbUpdates.assigned_to = updates.assigneeId;
+
+        const { error } = await supabase
+            .from('leads')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
     }
 };

@@ -362,6 +362,28 @@ export const SettingsPage: React.FC = () => {
                                 placeholder="Tutaj wpisz treść swojej stopki..."
                             />
                         </div>
+
+
+                        <div className="md:col-span-2 border-t pt-4 mt-2">
+                            <h4 className="text-sm font-bold text-slate-700 mb-3">Konfiguracja AI (Opcjonalne)</h4>
+                            <div className="bg-purple-50 text-purple-800 p-3 rounded-lg text-sm mb-3">
+                                <p>Dodaj klucz API OpenAI, aby korzystać z asystenta pisania wiadomości.</p>
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Klucz API OpenAI (sk-proj-...)</label>
+                            <input
+                                type="password"
+                                value={profile.emailConfig?.openaiKey || ''}
+                                onChange={(e) => setProfile(prev => ({
+                                    ...prev,
+                                    emailConfig: { ...prev.emailConfig, openaiKey: e.target.value }
+                                }))}
+                                placeholder="sk-..."
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono text-sm"
+                            />
+                        </div>
                     </div>
                     <div className="mt-8 flex justify-end">
                         <button
@@ -428,6 +450,6 @@ export const SettingsPage: React.FC = () => {
                 <p>System ID: {import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || 'Unknown'}</p>
                 <p>Version: 1.0.2</p>
             </div>
-        </div>
+        </div >
     );
 };

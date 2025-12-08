@@ -7,77 +7,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { config, box = 'INBOX', limit = 50 } = req.body;
+    const { config, limit = 50, box = 'INBOX' } = req.body;
 
-    if (!config) {
-        return res.status(400).json({ error: 'Missing configuration' });
-    }
-
-    const { imapHost, imapPort, imapUser, imapPassword } = config;
-
-    if (!imapHost || !imapPort || !imapUser || !imapPassword) {
-        return res.status(400).json({ error: 'Incomplete IMAP configuration' });
+    if (!config || !config.imapHost || !config.imapUser || !config.imapPassword) {
+        return res.status(400).json({ error: 'Missing IMAP configuration' });
     }
 
     const imapConfig = {
         imap: {
-            user: imapUser,
-            password: imapPassword,
-            host: imapHost,
-            port: Number(imapPort),
-            tls: Number(imapPort) === 993,
-            authTimeout: 10000,
+            user: config.imapUser,
+            password: config.imapPassword,
+            host: config.imapHost,
+            port: Number(config.imapPort),
+            tls: Number(config.imapPort) === 993,
+            authTimeout: 3000,
             tlsOptions: { rejectUnauthorized: false }
         }
     };
 
     try {
         const connection = await imaps.connect(imapConfig);
-        await connection.openBox(box);
+
+        // Open box: try 'box' first
+        try {
+            await connection.openBox(box);
+        } catch (e) {
+            // Fallback for Sent folder naming differences
+            if (box === 'Sent') {
+                try {
+                    await connection.openBox('Sent Items');
+                } catch (e2) {
+                    // Try Polish folder name? Home.pl often uses standard Sent but maybe mapped differently
+                    // Just fail if primary and secondary fail, or try 'Wysłane'
+                    await connection.openBox('Wysłane');
+                }
+            } else {
+                throw e;
+            }
+        }
 
         const searchCriteria = ['ALL'];
         const fetchOptions = {
             bodies: ['HEADER', 'TEXT'],
-            markSeen: false,
-            struct: true // Need struct to parse parts if needed, but simple-parser does job mostly
+            struct: true,
+            markSeen: false
         };
 
-        // Fetch latest 'limit' messages
-        // Since IMAP search returns IDs via search, we want the LAST ones (most recent)
-        // imap-simple doesn't support 'limit' easily in search, so we search all and slice.
-        // Optimization: search only recent? For MVP search ALL and slice last N is okay for small inboxes.
-        // Better: searchCriteria = [['uid', '1:*']] or similar. 
-        // Let's stick to default ALL and manually slice the array of messages.
-
+        // Fetch ALL messages (Robustness > Performance for MVP)
+        // Note: For very large inboxes this is slow, but guarantees we get the actual latest messages regardless of UID gaps.
         const messages = await connection.search(searchCriteria, fetchOptions);
 
-        // Sort by date descending (newest first) and take limit
-        const sortedMessages = messages.sort((a, b) => {
-            const dateA = new Date(a.parts.find((p: any) => p.which === 'HEADER')?.body.date?.[0] || 0);
-            const dateB = new Date(b.parts.find((p: any) => p.which === 'HEADER')?.body.date?.[0] || 0);
-            return dateB.getTime() - dateA.getTime();
-        }).slice(0, limit);
+        if (messages.length === 0) {
+            connection.end();
+            return res.status(200).json({ messages: [] });
+        }
 
-        const parsedMessages = sortedMessages.map(msg => {
-            const headerPart = msg.parts.find((p: any) => p.which === 'HEADER');
-            const bodyPart = msg.parts.find((p: any) => p.which === 'TEXT');
+        // Sort by Date Descending
+        const simplified = messages.map(msg => {
+            const headerPart = msg.parts.find((part: any) => part.which === 'HEADER' || part.which.startsWith('HEADER'));
+            // Safety check for date
+            const dateStr = headerPart?.body.date?.[0];
+            const date = dateStr ? new Date(dateStr) : new Date();
 
             return {
                 id: msg.attributes.uid,
-                seq: msg.seq,
-                from: headerPart?.body.from?.[0] || 'Unknown',
                 subject: headerPart?.body.subject?.[0] || '(No Subject)',
-                date: headerPart?.body.date?.[0] || new Date().toISOString(),
-                // Body needs parsing if MIME, currently just raw text for MVP check
-                // For real HTML body we need 'mailparser' but that's heavy.
-                // Let's return a snippet.
-                flags: msg.attributes.flags
+                from: headerPart?.body.from?.[0] || 'Unknown',
+                to: headerPart?.body.to?.[0] || 'Unknown',
+                date: date.toISOString(),
+                hasAttachment: false,
+                timestamp: date.getTime()
             };
-        });
+        })
+            .sort((a, b) => b.timestamp - a.timestamp) // Newest first
+            .slice(0, limit); // Take top N
+
+        // Remove timestamp helper before sending
+        const finalMessages = simplified.map(({ timestamp, ...msg }) => msg);
 
         connection.end();
-
-        return res.status(200).json({ messages: parsedMessages });
+        return res.status(200).json({ messages: finalMessages });
 
     } catch (error: any) {
         console.error('IMAP Fetch error:', error);

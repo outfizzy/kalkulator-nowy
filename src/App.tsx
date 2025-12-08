@@ -46,6 +46,9 @@ import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
 import { CustomersList } from './components/customers/CustomersList';
 import { CustomerPage } from './components/customers/CustomerPage';
+import { LeadsList } from './components/leads/LeadsList';
+import { LeadForm } from './components/leads/LeadForm';
+import { LeadDetailsPage } from './components/leads/LeadDetailsPage';
 import { MailPage } from './components/MailPage';
 
 // Partner Components
@@ -318,7 +321,6 @@ function App() {
               <Route path="/admin/requests" element={<OrderRequestManager />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
-              <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
 
               {/* CRM & Logistics */}
@@ -328,6 +330,9 @@ function App() {
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/customers/new" element={<CustomerPage />} />
               <Route path="/customers/:id" element={<CustomerPage />} />
+              <Route path="/leads" element={<LeadsList />} />
+              <Route path="/leads/new" element={<LeadForm />} />
+              <Route path="/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/mail" element={<MailPage />} />
             </Route>
 

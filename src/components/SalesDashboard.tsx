@@ -7,7 +7,7 @@ import { DatabaseService } from '../services/database';
 import { calculateCommissionStats, calculateSalesRepStats } from '../utils/statistics';
 import type { SalesRepStats } from '../utils/statistics';
 import { useAuth } from '../contexts/AuthContext';
-import type { CommissionStats, Offer, SalesProfile } from '../types';
+import type { CommissionStats, Offer, SalesProfile, Lead } from '../types';
 import { Link } from 'react-router-dom';
 import { RingostatWidget } from './widgets/RingostatWidget';
 
@@ -15,6 +15,7 @@ export const SalesDashboard: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
     const [stats, setStats] = useState<CommissionStats | null>(null);
     const [offers, setOffers] = useState<Offer[]>([]);
+    const [leads, setLeads] = useState<Lead[]>([]);
     const [profile, setProfile] = useState<SalesProfile | null>(null);
     const [teamStats, setTeamStats] = useState<SalesRepStats[]>([]);
     const [loading, setLoading] = useState(true);
@@ -40,7 +41,11 @@ export const SalesDashboard: React.FC = () => {
                 }
                 setOffers(userOffers);
 
-                // 2. Calculate Stats
+                // 2. Fetch Leads
+                const allLeads = await DatabaseService.getLeads();
+                setLeads(allLeads);
+
+                // 3. Calculate Stats
                 const computedStats = calculateCommissionStats(userOffers);
                 setStats(computedStats);
 
@@ -137,6 +142,11 @@ export const SalesDashboard: React.FC = () => {
 
     const years = [2024, 2025, 2026];
 
+    // Leads Stats
+    const totalLeads = leads.length;
+    const newLeads = leads.filter(l => l.status === 'new').length;
+    const inProgressLeads = leads.filter(l => ['contacted', 'offer_sent', 'negotiation'].includes(l.status)).length;
+
     return (
         <div className="space-y-8">
             {/* Header & Filter */}
@@ -185,6 +195,27 @@ export const SalesDashboard: React.FC = () => {
                         </div>
                         <h3 className="text-xl font-bold mb-2">Nowa Oferta</h3>
                         <p className="text-white/80 text-sm">Utwórz nową ofertę dla klienta</p>
+                    </div>
+                </Link>
+
+                <Link
+                    to="/leads"
+                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-yellow-500/20 transition-colors">
+                            <svg className="w-7 h-7 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Leady</h3>
+                        <p className="text-slate-600 text-sm">Zarządzaj potencjalnymi klientami</p>
+                        {newLeads > 0 && (
+                            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold">
+                                {newLeads} nowych
+                            </div>
+                        )}
                     </div>
                 </Link>
 
@@ -340,6 +371,13 @@ export const SalesDashboard: React.FC = () => {
                             style: 'currency',
                             currency: 'EUR'
                         })}
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="text-slate-500 text-sm font-medium mb-1">Leady (Nowe/W toku)</div>
+                    <div className="text-3xl font-bold text-yellow-600">
+                        {newLeads} / {inProgressLeads}
                     </div>
                 </div>
             </div>

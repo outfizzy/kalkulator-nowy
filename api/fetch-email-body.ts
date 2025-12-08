@@ -55,6 +55,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Parse the raw email
         const parsed = await simpleParser(rawBody);
 
+        const attachments = parsed.attachments.map(att => ({
+            filename: att.filename,
+            contentType: att.contentType,
+            size: att.size,
+            contentId: att.contentId,
+            content: att.content.toString('base64') // Send as base64
+        }));
+
         connection.end();
 
         return res.status(200).json({
@@ -64,7 +72,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             to: parsed.to?.text,
             date: parsed.date,
             text: parsed.text,
-            html: parsed.html || parsed.textAsHtml // Fallback to textAsHtml if no HTML part
+            html: parsed.html || parsed.textAsHtml,
+            attachments: attachments
         });
 
     } catch (error: any) {

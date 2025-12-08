@@ -16,6 +16,7 @@ export interface EmailConfig {
     imapUser?: string;
     imapPassword?: string;
     signature?: string; // HTML or text signature
+    openaiKey?: string; // For AI features
 }
 
 // User Roles
@@ -59,6 +60,35 @@ export interface Customer {
 export type InstallationType = 'wall-mounted' | 'freestanding';
 export type RoofType = 'polycarbonate' | 'glass';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected';
+
+// --- Leads Types ---
+export type LeadStatus = 'new' | 'contacted' | 'offer_sent' | 'negotiation' | 'won' | 'lost';
+export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'other';
+
+export interface Lead {
+    id: string;
+    status: LeadStatus;
+    source: LeadSource;
+    customerData: {
+        firstName?: string;
+        lastName?: string;
+        companyName?: string;
+        email?: string;
+        phone?: string;
+        city?: string;
+    };
+    assignedTo?: string; // User ID
+    emailMessageId?: string;
+    notes?: string;
+    lastContactDate?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+    // Joined data
+    assignee?: {
+        firstName: string;
+        lastName: string;
+    };
+}
 
 // --- New Catalog Types ---
 

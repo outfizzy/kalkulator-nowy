@@ -34,10 +34,9 @@ export const Layout: React.FC = () => {
                     <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />
                     <NavLink to="/offers" label="Lista Ofert" icon="offers" />
                     <NavLink to="/customers" label="Klienci" icon="users" />
+                    <NavLink to="/leads" label="Leady" icon="users" />
                     <NavLink to="/reports" label="Raporty" icon="reports" />
                     <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
-                    <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
-                    <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
                     <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
                     <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
                     <NavLink to="/mail" label="Poczta" icon="mail" />
@@ -102,9 +101,8 @@ export const Layout: React.FC = () => {
                             <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/offers" label="Lista Ofert" icon="offers" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/reports" label="Raporty" icon="reports" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/leads" label="Leady" icon="users" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/mail" label="Poczta" icon="mail" onClick={() => setMobileMenuOpen(false)} />
