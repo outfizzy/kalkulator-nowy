@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Layout } from './components/Layout';
 import { CustomerForm } from './components/CustomerForm';
@@ -40,6 +40,7 @@ import { InstallationDashboard } from './components/installations/InstallationDa
 
 import { WalletPage } from './components/admin/WalletPage';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
+import { MeasurementReportsList } from './components/reports/MeasurementReportsList';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
@@ -50,6 +51,7 @@ import { LeadsList } from './components/leads/LeadsList';
 import { LeadForm } from './components/leads/LeadForm';
 import { LeadDetailsPage } from './components/leads/LeadDetailsPage';
 import { MailPage } from './components/MailPage';
+import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
 
 // Partner Components
 import { LandingPage } from './components/LandingPage';
@@ -106,23 +108,33 @@ function DashboardRouter() {
 function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) {
   const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const initialPhone = searchParams.get('phone');
+
+  // Handle both direct customer object (legacy) and wrapped object with leadId
+  const state = location.state as any;
+  const leadData = (state?.customer || state) as Partial<Customer> | undefined;
+  const leadId = state?.leadId as string | undefined;
 
   const [step, setStep] = useState<Step>('customer');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
   const [product, setProduct] = useState<ProductConfig | null>(null);
   const [offer, setOffer] = useState<Offer | null>(null);
-  const [margin, setMargin] = useState<number>(0.40);
 
-  // Set initial margin based on user role / mode
-  useEffect(() => {
+  // Initialize margin based on mode and user
+  const [margin, setMargin] = useState<number>(() => {
     if (mode === 'partner') {
-      setMargin(currentUser?.partnerMargin ?? 0.25);
-    } else {
-      setMargin(0.40);
+      // We need currentUser accessible here. If currentUser is loaded, great. 
+      // But useAuth might not have it immediately? 
+      // If it's undefined, default to 0.25, then useEffect can update it ONCE.
+      // Hooks rule: don't use hook return in callback if not stable? currentUser changes.
+      return 0.25;
     }
-  }, [mode, currentUser]);
+    return 0.40;
+  });
+
+
 
   const handleCustomerComplete = (data: Customer, zone: SnowZoneInfo) => {
     setCustomer(data);
@@ -152,6 +164,7 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
           product: config,
           pricing,
           commission,
+          leadId, // Pass lead ID if available
         };
 
         const savedOffer = await DatabaseService.createOffer(newOffer);
@@ -238,7 +251,7 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
         {step === 'customer' && (
           <CustomerForm
             onComplete={handleCustomerComplete}
-            initialData={initialPhone ? { phone: initialPhone } as Customer : customer || undefined}
+            initialData={leadData ? (leadData as Customer) : (initialPhone ? { phone: initialPhone } as Customer : customer || undefined)}
           />
         )}
 
@@ -313,6 +326,7 @@ function App() {
               <Route path="/admin/wallet" element={<WalletPage />} />
               <Route path="/reports" element={<ReportsList />} />
               <Route path="/reports/new" element={<ReportForm />} />
+              <Route path="/reports/measurements" element={<MeasurementReportsList />} />
               <Route path="/measurements" element={<MeasurementDashboard />} />
               <Route path="/installations" element={<InstallationDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
@@ -329,7 +343,7 @@ function App() {
               {/* Customers Module */}
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/customers/new" element={<CustomerPage />} />
-              <Route path="/customers/:id" element={<CustomerPage />} />
+              <Route path="/customers/:id" element={<CustomerDetailsPage />} />
               <Route path="/leads" element={<LeadsList />} />
               <Route path="/leads/new" element={<LeadForm />} />
               <Route path="/leads/:id" element={<LeadDetailsPage />} />

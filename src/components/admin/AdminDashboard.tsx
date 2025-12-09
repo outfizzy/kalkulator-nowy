@@ -47,6 +47,28 @@ export const AdminDashboard: React.FC = () => {
                     description: 'Przeglądaj wszystkie oferty'
                 },
                 {
+                    title: 'Leady',
+                    icon: (
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    ),
+                    path: '/leads',
+                    color: 'bg-yellow-50 text-yellow-600',
+                    description: 'Potencjalni klienci'
+                },
+                {
+                    title: 'Poczta',
+                    icon: (
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    ),
+                    path: '/mail',
+                    color: 'bg-purple-50 text-purple-600',
+                    description: 'Skrzynka odbiorcza'
+                },
+                {
                     title: 'Raporty',
                     icon: (
                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

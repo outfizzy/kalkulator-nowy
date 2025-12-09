@@ -38,7 +38,9 @@ export interface User {
     nip?: string;
     partnerMargin?: number; // e.g. 0.25 = 25%
     // Commission rate for sales reps (e.g. 0.05 = 5%)
-    commissionRate?: number;
+    commissionRate?: number; // 0-1 (0% - 100%)
+    substituteUserId?: string | null;
+    substituteUntil?: Date | null;
     preferredLanguage?: 'pl' | 'mo' | 'uk';
     emailConfig?: EmailConfig;
 }
@@ -55,6 +57,26 @@ export interface Customer {
     phone: string;
     email: string;
     country: string; // Default 'Deutschland'
+}
+
+export interface Communication {
+    id: string;
+    userId: string;
+    customerId?: string;
+    leadId?: string;
+    type: 'email' | 'call' | 'sms' | 'note';
+    direction: 'inbound' | 'outbound';
+    subject?: string;
+    content?: string;
+    date: string; // ISO Date
+    externalId?: string;
+    metadata?: Record<string, any>;
+    createdAt: Date;
+    // Joined User data
+    user?: {
+        firstName: string;
+        lastName: string;
+    };
 }
 
 export type InstallationType = 'wall-mounted' | 'freestanding';
@@ -76,7 +98,10 @@ export interface Lead {
         email?: string;
         phone?: string;
         city?: string;
+        address?: string; // Street + House Number
+        postalCode?: string;
     };
+    customerId?: string; // Link to Customers table
     assignedTo?: string; // User ID
     emailMessageId?: string;
     notes?: string;
@@ -144,14 +169,13 @@ export interface ProductConfig {
     polycarbonateType?: 'standard' | 'ir-gold';
     glassType?: 'standard' | 'mat' | 'sunscreen';
     installationType: InstallationType;
+    installationDays?: number;
     addons: SelectedAddon[];
     selectedAccessories?: {
         name: string;
         price: number;
         quantity: number;
     }[];
-    activeTab?: 'dimensions' | 'accessories' | 'installation';
-    installationDays?: number; // 0-3 days
 }
 
 export interface InstallationCostResult {
@@ -179,6 +203,9 @@ export interface PricingResult {
     advancePayment?: number;
     advancePaymentDate?: Date;
     finalPriceNet?: number; // For signed contracts override
+    // Cost Tracking
+    orderCosts?: number; // Manual input for additional costs
+    measurementCost?: number; // Calculated/Cached measurement cost
 }
 
 export interface Offer {
@@ -188,12 +215,13 @@ export interface Offer {
     updatedAt: Date;
     status: OfferStatus;
     customer: Customer;
-    snowZone: SnowZoneInfo;
+    snowZone: SnowZoneInfo; // Using full info object for display
     product: ProductConfig;
     pricing: PricingResult;
     commission: number;
     distance?: number;
     createdBy: string; // User ID of creator
+    leadId?: string; // Link to Lead source
 }
 
 export interface CommissionStats {
@@ -326,6 +354,7 @@ export interface Installation {
         signature?: string;
         notes?: string;
     };
+    photoUrls?: string[]; // Array of photo URLs from installation
 }
 
 // --- Contracts Module Types ---

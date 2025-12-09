@@ -1,17 +1,22 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
 import type { Offer, OfferStatus, User, Contract, Installation } from '../types';
-import { ClientCRMModal } from './crm/ClientCRMModal';
 import { OfferPreviewModal } from './OfferPreviewModal';
 import { extractOrderedItemsFromOffer } from '../utils/contractHelpers';
 
-export const OffersList: React.FC = () => {
+interface OffersListProps {
+    offers?: Offer[];
+    onDelete?: (id: string) => Promise<void>;
+}
+
+export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDelete }) => {
     const { currentUser, isAdmin } = useAuth();
     const navigate = useNavigate();
-    const [offers, setOffers] = useState<Offer[]>([]);
+    const [fetchedOffers, setFetchedOffers] = useState<Offer[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [filter, setFilter] = useState<OfferStatus | 'all'>('all');
@@ -19,17 +24,21 @@ export const OffersList: React.FC = () => {
     const [selectedUserId, setSelectedUserId] = useState<string>('all'); // Admin filter
     const [salesReps, setSalesReps] = useState<User[]>([]);
     const [previewOffer, setPreviewOffer] = useState<Offer | null>(null);
+
+    const offers = propOffers || fetchedOffers;
     const [loading, setLoading] = useState(true);
 
     const loadOffers = React.useCallback(async () => {
+        if (propOffers) return;
         if (!currentUser) return;
         setLoading(true);
 
         try {
-            const [allOffers, allContracts, allInstallations] = await Promise.all([
+            const [allOffers, allContracts, allInstallations, delegatedIds] = await Promise.all([
                 DatabaseService.getOffers(),
                 DatabaseService.getContracts(),
-                DatabaseService.getInstallations()
+                DatabaseService.getInstallations(),
+                DatabaseService.getDelegatedUserIds()
             ]);
 
             setContracts(allContracts);
@@ -40,12 +49,13 @@ export const OffersList: React.FC = () => {
                 const filtered = selectedUserId === 'all'
                     ? allOffers
                     : allOffers.filter(o => o.createdBy === selectedUserId);
-                setOffers(filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+                setFetchedOffers(filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
             } else {
-                // Sales rep: load only own offers
-                // Note: RLS should already handle this, but explicit filtering is safe
-                const userOffers = allOffers.filter(o => o.createdBy === currentUser.id);
-                setOffers(userOffers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+                // Sales rep: load own offers AND offers from users who delegated access
+                const userOffers = allOffers.filter(o =>
+                    o.createdBy === currentUser.id || delegatedIds.includes(o.createdBy)
+                );
+                setFetchedOffers(userOffers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
             }
         } catch (error) {
             console.error('Error loading offers:', error);
@@ -53,7 +63,7 @@ export const OffersList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentUser, isAdmin, selectedUserId]);
+    }, [currentUser, isAdmin, selectedUserId, propOffers]);
 
     useEffect(() => {
         // Load sales reps for admin filter
@@ -115,6 +125,10 @@ export const OffersList: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
+        if (onDelete) {
+            await onDelete(id);
+            return;
+        }
         if (confirm('Czy na pewno usunąć tę ofertę?')) {
             try {
                 await DatabaseService.deleteOffer(id);
@@ -216,14 +230,6 @@ export const OffersList: React.FC = () => {
         }
     };
 
-    // CRM Modal State
-    const [selectedCustomer, setSelectedCustomer] = useState<import('../types').Customer | null>(null);
-    const [showCRMModal, setShowCRMModal] = useState(false);
-
-    const handleOpenCRM = (customer: import('../types').Customer) => {
-        setSelectedCustomer(customer);
-        setShowCRMModal(true);
-    };
 
 
     const filteredOffers = offers
@@ -380,14 +386,19 @@ export const OffersList: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="font-medium text-slate-900">{offer.customer.firstName} {offer.customer.lastName}</div>
-                                                    <button
-                                                        onClick={() => handleOpenCRM(offer.customer)}
-                                                        className="text-xs bg-accent-soft text-accent-dark px-2 py-0.5 rounded hover:bg-accent/10 transition-colors"
+                                                    <div
+                                                        className="font-medium text-slate-900 cursor-pointer hover:text-accent"
+                                                        onClick={() => {
+                                                            if (offer.customer.id) {
+                                                                navigate(`/customers/${offer.customer.id}`);
+                                                            } else {
+                                                                toast.error('Brak ID klienta');
+                                                            }
+                                                        }}
                                                         title="Otwórz Kartę Klienta"
                                                     >
-                                                        CRM
-                                                    </button>
+                                                        {offer.customer.firstName} {offer.customer.lastName}
+                                                    </div>
                                                 </div>
                                                 <div className="text-xs text-slate-500">{offer.customer.city}</div>
                                             </td>
@@ -528,13 +539,6 @@ export const OffersList: React.FC = () => {
                 />
             )}
 
-            {/* CRM Modal */}
-            {showCRMModal && selectedCustomer && (
-                <ClientCRMModal
-                    customer={selectedCustomer}
-                    onClose={() => setShowCRMModal(false)}
-                />
-            )}
         </div>
     );
 };

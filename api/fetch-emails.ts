@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import imaps from 'imap-simple';
-import { SimpleParser } from 'mailparser';
+// import { simpleParser } from 'mailparser';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { // Using POST to securely pass credentials in body
@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const searchCriteria = ['ALL'];
         const fetchOptions = {
-            bodies: ['HEADER', 'TEXT'],
+            bodies: ['HEADER'],
             struct: true,
             markSeen: false
         };
@@ -76,6 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 to: headerPart?.body.to?.[0] || 'Unknown',
                 date: date.toISOString(),
                 hasAttachment: false,
+                flags: msg.attributes.flags || [],
                 timestamp: date.getTime()
             };
         })
@@ -83,7 +84,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .slice(0, limit); // Take top N
 
         // Remove timestamp helper before sending
-        const finalMessages = simplified.map(({ timestamp, ...msg }) => msg);
+        const finalMessages = simplified.map(msg => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { timestamp, ...rest } = msg;
+            return rest;
+        });
 
         connection.end();
         return res.status(200).json({ messages: finalMessages });

@@ -12,8 +12,11 @@ export const SettingsPage: React.FC = () => {
         lastName: '',
         email: '',
         phone: '',
-        monthlyTarget: 50000
+        monthlyTarget: 50000,
+        substituteUserId: null,
+        substituteUntil: null
     });
+    const [availableSubstitutes, setAvailableSubstitutes] = useState<User[]>([]);
 
     useEffect(() => {
         const loadProfileAndCheckDb = async () => {
@@ -55,8 +58,19 @@ export const SettingsPage: React.FC = () => {
                     email: currentUser.email,
                     phone: currentUser.phone || '',
                     monthlyTarget: currentUser.monthlyTarget || 50000,
-                    emailConfig: defaultConfig
+                    emailConfig: defaultConfig,
+                    substituteUserId: currentUser.substituteUserId || null,
+                    substituteUntil: currentUser.substituteUntil ? new Date(currentUser.substituteUntil) : null
                 });
+            }
+
+            // 3. Load Sales Reps for Substitution Dropdown
+            try {
+                const reps = await DatabaseService.getSalesReps();
+                // Filter out current user from potential substitutes
+                setAvailableSubstitutes(reps.filter(r => r.id !== currentUser.id));
+            } catch (err) {
+                console.error('Error loading substitutes:', err);
             }
         };
 
@@ -74,7 +88,13 @@ export const SettingsPage: React.FC = () => {
     const handleSave = async () => {
         try {
             await DatabaseService.updateUserProfile(profile);
-            toast.success('Profil zapisany pomyślnie');
+            // Save substitution settings separately as they might need different permissions or distinct update call
+            await DatabaseService.updateSubstitution(
+                profile.substituteUserId || null,
+                profile.substituteUntil || null
+            );
+            toast.success('Profil i ustawienia delegacji zapisane pomyślnie');
+            window.location.reload(); // Reload to refresh auth context with new delegation rules if needed
         } catch (error) {
             console.error('Error saving profile:', JSON.stringify(error, null, 2));
             const errorMessage = (error as any)?.message || 'Nieznany błąd';
@@ -226,6 +246,69 @@ export const SettingsPage: React.FC = () => {
                             className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors"
                         >
                             Zapisz Dane
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Vacation / Substitution Mode */}
+            <div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-orange-100 p-2 rounded-lg">
+                            <svg className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700">Delegacja / Tryb Urlopowy</h3>
+                            <p className="text-sm text-slate-500">Przekaż dostęp do swoich leadów i ofert innemu przedstawicielowi.</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Zastępca (Kto otrzyma dostęp?)</label>
+                            <select
+                                value={profile.substituteUserId || ''}
+                                onChange={(e) => setProfile(prev => ({ ...prev, substituteUserId: e.target.value || null }))}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white"
+                            >
+                                <option value="">-- Brak zastępstwa --</option>
+                                {availableSubstitutes.map(user => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.firstName} {user.lastName} ({user.email})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {profile.substituteUserId && (
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Zastępstwo ważne do (włącznie)</label>
+                                <input
+                                    type="date"
+                                    value={profile.substituteUntil ? new Date(profile.substituteUntil).toISOString().split('T')[0] : ''}
+                                    onChange={(e) => setProfile(prev => ({ ...prev, substituteUntil: e.target.value ? new Date(e.target.value) : null }))}
+                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white"
+                                />
+                                <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Wybrana osoba będzie miała pełny podgląd Twoich leadów i ofert do wskazanego dnia.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                        <button
+                            onClick={handleSave}
+                            className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors"
+                        >
+                            Zapisz Ustawienia
                         </button>
                     </div>
                 </div>

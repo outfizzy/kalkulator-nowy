@@ -29,7 +29,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const connection = await imaps.connect(imapConfig);
-        await connection.openBox(box);
+        // Open box: try 'box' first with fallback logic
+        console.log(`[DEBUG] Opening box: ${box} for UID: ${uid}`);
+        try {
+            await connection.openBox(box);
+        } catch (e) {
+            console.warn(`[DEBUG] Failed to open box '${box}', trying fallbacks...`);
+            // Fallback for Sent folder naming differences
+            if (box === 'Sent') {
+                try {
+                    await connection.openBox('Sent Items');
+                } catch {
+                    try {
+                        await connection.openBox('Wysłane');
+                    } catch {
+                        // Some providers use [Gmail]/Sent Mail or similar. 
+                        // For now if these 3 fail, we fail, but we could try listing boxes.
+                        console.error('[DEBUG] All Sent folder fallbacks failed.');
+                        throw e;
+                    }
+                }
+            } else {
+                throw e;
+            }
+        }
 
         const searchCriteria = [['UID', uid.toString()]];
         const fetchOptions = {

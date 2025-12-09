@@ -143,7 +143,7 @@ export const SalesDashboard: React.FC = () => {
     const years = [2024, 2025, 2026];
 
     // Leads Stats
-    const totalLeads = leads.length;
+
     const newLeads = leads.filter(l => l.status === 'new').length;
     const inProgressLeads = leads.filter(l => ['contacted', 'offer_sent', 'negotiation'].includes(l.status)).length;
 
@@ -216,6 +216,22 @@ export const SalesDashboard: React.FC = () => {
                                 {newLeads} nowych
                             </div>
                         )}
+                    </div>
+                </Link>
+
+                <Link
+                    to="/mail"
+                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
+                            <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Poczta</h3>
+                        <p className="text-slate-600 text-sm">Skrzynka odbiorcza</p>
                     </div>
                 </Link>
 

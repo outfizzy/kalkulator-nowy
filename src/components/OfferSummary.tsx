@@ -2,6 +2,10 @@ import React from 'react';
 import type { Offer } from '../types';
 import { generateOfferPDF } from '../utils/pdfGenerator';
 import { translations, translate, formatCurrency } from '../utils/translations';
+import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
+import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 
 interface OfferSummaryProps {
@@ -13,6 +17,76 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
 
 
     const [isGenerating, setIsGenerating] = React.useState(false);
+    const { currentUser } = useAuth();
+    const isAdminOrManager = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    const navigate = useNavigate();
+
+    const [orderCosts, setOrderCosts] = React.useState<number>(offer.pricing.orderCosts || 0);
+    const [isUpdatingCosts, setIsUpdatingCosts] = React.useState(false);
+    const [isCreatingContract, setIsCreatingContract] = React.useState(false);
+
+    // Update local state when offer changes (e.g. after parent refresh)
+    React.useEffect(() => {
+        setOrderCosts(offer.pricing.orderCosts || 0);
+    }, [offer.pricing.orderCosts]);
+
+    const handleCreateContract = async () => {
+        setIsCreatingContract(true);
+        try {
+            // Transform Offer to Contract
+            // We use the DatabaseService.createContract but we need to pass data matching Omit<Contract, ...>
+            // Actually, we should probably add a helper method in DatabaseService to "convertOfferToContract(offerId)" 
+            // but the existing createContract takes a Contract object without ID.
+            // Let's iterate on this. The best way is to construct the contract object here.
+
+            const contractPayload = {
+                offerId: offer.id,
+                status: 'draft' as const,
+                client: offer.customer,
+                product: offer.product,
+                pricing: offer.pricing,
+                commission: offer.commission,
+                requirements: {
+                    constructionProject: false,
+                    powerSupply: false,
+                    foundation: false
+                },
+                comments: [],
+                attachments: [],
+                orderedItems: [] // Start empty
+            };
+
+            const newContract = await DatabaseService.createContract(contractPayload);
+            toast.success('Umowa została utworzona');
+            navigate(`/contracts/${newContract.id}`); // Navigate to new contract
+
+        } catch (error) {
+            console.error('Contract creation failed:', error);
+            toast.error('Błąd tworzenia umowy');
+        } finally {
+            setIsCreatingContract(false);
+        }
+    };
+
+    const handleUpdateCosts = async () => {
+        setIsUpdatingCosts(true);
+        try {
+            await DatabaseService.calculateOrderCosts(offer.id, orderCosts);
+            toast.success('Koszty zostały zaktualizowane');
+            // Trigger a reload? ideally onReset callback or similar triggers parent refresh. 
+            // Since we don't have a clear "refresh" prop, we might need to rely on the user refreshing 
+            // or modify the component to accept onUpdate callback. 
+            // For now, let's assume the user might need to refresh or we can try to call onReset if it reloads data? 
+            // Actually onReset usually clears the view. 
+            // Let's reload the page or just show toast.
+            window.location.reload();
+        } catch (error) {
+            console.error('Failed to update costs:', error);
+            toast.error('Błąd aktualizacji kosztów');
+        } finally {
+            setIsUpdatingCosts(false);
+        }
+    };
 
     const handleDownloadPDF = async () => {
         setIsGenerating(true);
@@ -20,7 +94,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
             await generateOfferPDF(offer);
         } catch (error) {
             console.error('PDF Generation failed:', error);
-            // toast.error('Błąd generowania PDF'); // Assuming toast is available or add it
+            toast.error('Błąd generowania PDF');
         } finally {
             setIsGenerating(false);
         }
@@ -193,7 +267,98 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                     </div>
                 )}
 
-                {/* Total */}
+                {/* Profitability Analysis - Admin Only */}
+                {isAdminOrManager && (
+                    <div className="mb-12 bg-slate-800 rounded-xl p-6 text-slate-100 shadow-xl border border-slate-700">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 3.666V14m-1.286-7.544l-2.006 2.158 1.286 1.206v-1.8pxM12 20h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Analiza Rentowności
+                                </h3>
+                                <p className="text-sm text-slate-400 mt-1">Widoczne tylko dla Administratorów</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {/* 1. Revenue */}
+                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Przychód Netto</p>
+                                <p className="text-xl font-bold text-white">{formatCurrency(offer.pricing.sellingPriceNet)}</p>
+                            </div>
+
+                            {/* 2. Commissions */}
+                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Prowizja (5%)</p>
+                                <p className="text-xl font-bold text-red-300">-{formatCurrency(offer.commission)}</p>
+                            </div>
+
+                            {/* 3. Measurement Cost */}
+                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Koszty Pomiarów</p>
+                                <p className="text-xl font-bold text-red-300">-{formatCurrency(offer.pricing.measurementCost || 0)}</p>
+                                <p className="text-xs text-slate-500 mt-1">Obliczone z raportów (0.50 EUR/km)</p>
+                            </div>
+
+                            {/* 4. Order Costs (Manual) */}
+                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Koszty Dodatkowe</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        value={orderCosts}
+                                        onChange={(e) => setOrderCosts(parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
+                                        placeholder="np. 150"
+                                    />
+                                    <button
+                                        onClick={handleUpdateCosts}
+                                        disabled={isUpdatingCosts}
+                                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                                    >
+                                        {isUpdatingCosts ? '...' : 'OK'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Profit Calculation */}
+                        <div className="mt-6 pt-6 border-t border-slate-600">
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <p className="text-sm text-slate-400 mb-1">Zysk Końcowy (Szacunkowy)</p>
+                                    <p className="text-xs text-slate-500">Przychód - (Produkt + Prowizja + Pomiary + Dodatkowe)</p>
+                                </div>
+                                <div className="text-right">
+                                    {(() => {
+                                        // Simple Profit Calculation
+                                        // Profit = Net Price - Product Base Cost (implied) - Commission - Measurement - Order
+                                        // Wait, we don't know "Product Base Cost" exactly if it's dynamic.
+                                        // Strategy: If we implicitly assume "Margin Value" in pricing IS the gross margin (Price - Product Cost),
+                                        // Then Profit = Margin Value - (Commission + Measurement + Order)
+
+                                        const marginVal = offer.pricing.marginValue || 0;
+                                        const costs = offer.commission + (offer.pricing.measurementCost || 0) + (offer.pricing.orderCosts || 0);
+                                        const finalProfit = marginVal - costs;
+                                        const profitClass = finalProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+
+                                        return (
+                                            <>
+                                                <p className={`text-3xl font-bold ${profitClass}`}>{formatCurrency(finalProfit)}</p>
+                                                <p className="text-sm text-slate-400">
+                                                    Marża Handlowa: {formatCurrency(marginVal)}
+                                                </p>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex justify-end mb-12">
                     <div className="text-right p-6 bg-slate-50 rounded-xl border border-slate-200 min-w-[300px]">
                         <p className="text-sm text-slate-500 mb-1">{translations.netPrice}</p>
@@ -211,7 +376,6 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                     </div>
                 </div>
 
-                {/* Actions */}
                 <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center print:hidden">
                     <button
                         onClick={onReset}
@@ -220,6 +384,17 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                         Neues Angebot
                     </button>
                     <div className="flex gap-3">
+                        {/* Contract Conversion Button */}
+                        {offer.status === 'sold' && (
+                            <button
+                                onClick={handleCreateContract}
+                                disabled={isCreatingContract}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isCreatingContract ? 'Tworzenie...' : 'Utwórz Umowę'}
+                            </button>
+                        )}
+
                         <button
                             onClick={() => window.print()}
                             className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium"

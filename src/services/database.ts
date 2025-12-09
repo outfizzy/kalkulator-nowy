@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus, Lead } from '../types';
+import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus, Lead, LeadStatus, LeadSource, Communication } from '../types';
 import type { AuthError } from '@supabase/supabase-js';
 
 interface InstallationData {
@@ -35,37 +35,7 @@ const normalizePricing = (pricing: Partial<PricingResult> | null | undefined): P
 
 export const DatabaseService = {
     // --- Leads ---
-    async getLeads(): Promise<Lead[]> {
-        const { data, error } = await supabase
-            .from('leads')
-            .select(`
-                *,
-                assigned_user:assigned_to (
-                    first_name,
-                    last_name
-                )
-            `)
-            .order('created_at', { ascending: false });
 
-        if (error) throw error;
-
-        return data.map(row => ({
-            id: row.id,
-            status: row.status,
-            source: row.source,
-            customerData: row.customer_data,
-            assignedTo: row.assigned_to,
-            emailMessageId: row.email_message_id,
-            notes: row.notes,
-            lastContactDate: row.last_contact_date ? new Date(row.last_contact_date) : undefined,
-            createdAt: new Date(row.created_at),
-            updatedAt: new Date(row.updated_at),
-            assignee: row.assigned_user ? {
-                firstName: row.assigned_user.first_name,
-                lastName: row.assigned_user.last_name
-            } : undefined
-        }));
-    },
 
     async createLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
         const { data: { user } } = await supabase.auth.getUser();
@@ -197,9 +167,92 @@ export const DatabaseService = {
         };
     },
 
+    async ensureCustomer(customerData: Customer): Promise<Customer> {
+        // Try to find by ID first if provided
+        if (customerData.id) {
+            const existing = await this.getCustomer(customerData.id);
+            if (existing) return existing;
+        }
+
+        // Try to find by email
+        if (customerData.email) {
+            const { data } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('email', customerData.email)
+                .single();
+
+            if (data) {
+                return {
+                    id: data.id,
+                    salutation: data.salutation as Customer['salutation'],
+                    firstName: data.first_name,
+                    lastName: data.last_name,
+                    street: data.street,
+                    houseNumber: data.house_number,
+                    postalCode: data.postal_code,
+                    city: data.city,
+                    phone: data.phone,
+                    email: data.email,
+                    country: data.country,
+                };
+            }
+        }
+
+        // Create new if not found
+        const { data: { user } } = await supabase.auth.getUser();
+        // We use createCustomer logic but internal one handles user_id
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('customers')
+            .insert({
+                user_id: user.id,
+                salutation: customerData.salutation,
+                first_name: customerData.firstName,
+                last_name: customerData.lastName,
+                street: customerData.street,
+                house_number: customerData.houseNumber,
+                postal_code: customerData.postalCode,
+                city: customerData.city,
+                phone: customerData.phone,
+                email: customerData.email,
+                country: customerData.country || 'Deutschland'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            salutation: data.salutation as Customer['salutation'],
+            firstName: data.first_name,
+            lastName: data.last_name,
+            street: data.street,
+            houseNumber: data.house_number,
+            postalCode: data.postal_code,
+            city: data.city,
+            phone: data.phone,
+            email: data.email,
+            country: data.country,
+        };
+    },
+
     async createOffer(offer: Omit<Offer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<Offer> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
+
+        // Ensure customer exists in customers table
+        let customerId = offer.customer.id;
+        try {
+            const customer = await this.ensureCustomer(offer.customer);
+            customerId = customer.id;
+        } catch (e) {
+            console.error('Failed to ensure customer:', e);
+            // Fallback: proceed without strict link if needed, or fail. 
+            // We'll proceed but without customer_id if it failed, relying on customer_data jsonb
+        }
 
         const { data, error } = await supabase
             .from('offers')
@@ -207,7 +260,8 @@ export const DatabaseService = {
                 user_id: user.id,
                 offer_number: offer.offerNumber || `OFF/${Date.now()}`,
                 customer_data: offer.customer,
-                customer_id: offer.customer.id, // Link to customer table if ID exists
+                customer_id: customerId,
+                lead_id: offer.leadId, // Link to Lead
                 product_config: offer.product,
                 pricing: offer.pricing,
                 status: offer.status,
@@ -220,12 +274,18 @@ export const DatabaseService = {
 
         if (error) throw error;
 
+        // If created from a Lead, update the Lead with customer_id if it was missing
+        if (offer.leadId && customerId) {
+            // Optimistic update, don't block
+            supabase.from('leads').update({ customer_id: customerId, status: 'offer_sent' }).eq('id', offer.leadId).then(({ error }) => {
+                if (error) console.error('Error linking lead to customer:', error);
+            });
+        }
+
         return {
             id: data.id,
             offerNumber: data.offer_number,
-            customer: data.customer_data,
-            // Ensure customer_id is preserved if needed, though Offer type might not have it yet.
-            // For now, we just return the Offer object as defined in types.
+            customer: { ...data.customer_data, id: customerId }, // Return with ID
             product: data.product_config,
             pricing: normalizePricing(data.pricing),
             status: data.status as Offer['status'],
@@ -233,7 +293,8 @@ export const DatabaseService = {
             commission: data.commission,
             createdAt: new Date(data.created_at),
             updatedAt: new Date(data.updated_at),
-            createdBy: data.user_id
+            createdBy: data.user_id,
+            leadId: data.lead_id
         } as Offer;
     },
 
@@ -355,98 +416,128 @@ export const DatabaseService = {
         };
     },
 
-    async updateCustomer(id: string, updates: Partial<Customer>): Promise<void> {
-        const dbUpdates: Record<string, any> = {
-            updated_at: new Date().toISOString()
-        };
 
-        if (updates.salutation) dbUpdates.salutation = updates.salutation;
-        if (updates.firstName) dbUpdates.first_name = updates.firstName;
-        if (updates.lastName) dbUpdates.last_name = updates.lastName;
-        if (updates.street) dbUpdates.street = updates.street;
-        if (updates.houseNumber) dbUpdates.house_number = updates.houseNumber;
-        if (updates.postalCode) dbUpdates.postal_code = updates.postalCode;
-        if (updates.city) dbUpdates.city = updates.city;
-        if (updates.country) dbUpdates.country = updates.country;
-        if (updates.phone) dbUpdates.phone = updates.phone;
-        if (updates.email) dbUpdates.email = updates.email;
 
-        const { error } = await supabase
-            .from('customers')
-            .update(dbUpdates)
-            .eq('id', id);
-
-        if (error) throw error;
-    },
-
-    // Updated to use customers table + offers for stats
-    async getUniqueCustomers(): Promise<{ customer: Customer & { id?: string }; lastOfferDate: Date; offerCount: number; latestOfferId: string }[]> {
-        // 1. Fetch all customers
+    // Updated to use customers table + offers + contracts for stats
+    async getUniqueCustomers(): Promise<{ customer: Customer & { id?: string }; lastOfferDate: Date; offerCount: number; latestOfferId: string; contractCount: number; hasSignedContract: boolean }[]> {
+        // 1. Fetch all data
         const { data: customersData, error: customersError } = await supabase
             .from('customers')
             .select('*');
-
         if (customersError) throw customersError;
 
-        // 2. Fetch offer stats
         const { data: offersData, error: offersError } = await supabase
             .from('offers')
             .select('id, customer_data, customer_id, created_at')
             .order('created_at', { ascending: false });
-
         if (offersError) throw offersError;
 
-        // Map customers
-        const customers = customersData.map(row => ({
-            id: row.id,
-            salutation: row.salutation as Customer['salutation'],
-            firstName: row.first_name,
-            lastName: row.last_name,
-            street: row.street,
-            houseNumber: row.house_number,
-            postalCode: row.postal_code,
-            city: row.city,
-            phone: row.phone,
-            email: row.email,
-            country: row.country,
-        }));
+        const { data: contractsData, error: contractsError } = await supabase
+            .from('contracts')
+            .select('id, offer_id, status');
+        if (contractsError) throw contractsError;
 
-        // Calculate stats from offers
-        // We need to match offers to customers. 
-        // Since offers store customer_data JSON, we try to match by email or name+city
-        // Or we rely on the fact that we migrated data.
+        // Map to store unique customers. Keys:
+        // - "ID:<uuid>" for existing DB customers
+        // - "EMAIL:<email>" for virtual customers found in offers (if email exists)
+        // - "NAME:<first>:<last>" fallback
+        const uniqueCustomers = new Map<string, {
+            customer: Customer & { id?: string };
+            offers: typeof offersData;
+            contracts: typeof contractsData;
+        }>();
 
-        const result = customers.map(customer => {
-            // Find offers for this customer
-            const customerOffers = offersData.filter(offer => {
-                // 1. Try matching by DB ID (most reliable)
-                if (offer.customer_id && customer.id && offer.customer_id === customer.id) {
-                    return true;
-                }
 
-                // 2. Fallback to data matching (for legacy/unlinked offers)
-                const offerCustomer = offer.customer_data;
-                if (!offerCustomer) return false;
 
-                const emailMatch = customer.email && offerCustomer.email && customer.email.toLowerCase() === offerCustomer.email.toLowerCase();
-                const nameMatch = customer.lastName.toLowerCase() === (offerCustomer.lastName || '').toLowerCase() &&
-                    customer.firstName.toLowerCase() === (offerCustomer.firstName || '').toLowerCase() &&
-                    customer.city.toLowerCase() === (offerCustomer.city || '').toLowerCase();
-
-                return emailMatch || nameMatch;
-            });
-
-            const lastOffer = customerOffers[0]; // Ordered by date desc
-
-            return {
-                customer,
-                lastOfferDate: lastOffer ? new Date(lastOffer.created_at) : new Date(0), // 0 if no offers
-                offerCount: customerOffers.length,
-                latestOfferId: lastOffer?.id || ''
+        // 1. Initialize with DB Customers
+        customersData.forEach(row => {
+            const customer: Customer & { id?: string } = {
+                id: row.id,
+                salutation: row.salutation as Customer['salutation'],
+                firstName: row.first_name,
+                lastName: row.last_name,
+                street: row.street,
+                houseNumber: row.house_number,
+                postalCode: row.postal_code,
+                city: row.city,
+                phone: row.phone,
+                email: row.email,
+                country: row.country,
             };
+            uniqueCustomers.set(`ID:${row.id}`, { customer, offers: [], contracts: [] });
+            // Also map email/name to this ID to catch duplicates from offers
+            if (customer.email) uniqueCustomers.set(`EMAIL:${customer.email.toLowerCase()}`, { customer, offers: [], contracts: [] });
         });
 
-        return result.sort((a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime());
+        // 2. Process Offers
+        offersData.forEach(offer => {
+            const offerCustomer = offer.customer_data;
+            if (!offerCustomer) return;
+
+            let entry: any = null;
+
+            // Try to find existing entry
+            if (offer.customer_id && uniqueCustomers.has(`ID:${offer.customer_id}`)) {
+                entry = uniqueCustomers.get(`ID:${offer.customer_id}`);
+            } else if (offerCustomer.email && uniqueCustomers.has(`EMAIL:${offerCustomer.email.toLowerCase()}`)) {
+                entry = uniqueCustomers.get(`EMAIL:${offerCustomer.email.toLowerCase()}`);
+            } else {
+                const nameKey = `NAME:${(offerCustomer.firstName || '').toLowerCase()}:${(offerCustomer.lastName || '').toLowerCase()}`;
+                if (uniqueCustomers.has(nameKey)) {
+                    entry = uniqueCustomers.get(nameKey);
+                }
+            }
+
+            // If not found, create new Virtual Customer
+            if (!entry) {
+                const newCustomer = {
+                    ...offerCustomer,
+                    id: undefined // Explicitly undefined for virtual
+                };
+                entry = { customer: newCustomer, offers: [], contracts: [] };
+
+                // Register keys
+                if (offerCustomer.email) uniqueCustomers.set(`EMAIL:${offerCustomer.email.toLowerCase()}`, entry);
+                const nameKey = `NAME:${(offerCustomer.firstName || '').toLowerCase()}:${(offerCustomer.lastName || '').toLowerCase()}`;
+                uniqueCustomers.set(nameKey, entry);
+            }
+
+            entry.offers.push(offer);
+        });
+
+        // 3. Process Contracts (Link via Offers)
+        const offerToCustomerMap = new Map<string, any>();
+        // Build reverse lookup
+        Array.from(uniqueCustomers.values()).forEach(entry => {
+            entry.offers.forEach((o: any) => offerToCustomerMap.set(o.id, entry));
+        });
+
+        contractsData.forEach(contract => {
+            const entry = offerToCustomerMap.get(contract.offer_id);
+            if (entry) {
+                entry.contracts.push(contract);
+            }
+        });
+
+        // 4. Calculate Stats & Return List (Unique objects only)
+        const result = new Set(uniqueCustomers.values());
+
+        return Array.from(result).map(entry => {
+            // Sort offers desc
+            entry.offers.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            const lastOffer = entry.offers[0];
+            const signedContracts = entry.contracts.filter((c: any) => c.status === 'signed' || c.status === 'completed');
+
+            return {
+                customer: entry.customer,
+                lastOfferDate: lastOffer ? new Date(lastOffer.created_at) : new Date(0),
+                offerCount: entry.offers.length,
+                latestOfferId: lastOffer?.id || '',
+                contractCount: entry.contracts.length,
+                hasSignedContract: signedContracts.length > 0
+            };
+        }).sort((a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime());
     },
 
     async getCustomerOffers(customerId: string): Promise<Offer[]> {
@@ -525,7 +616,8 @@ export const DatabaseService = {
             commission: contract.commission,
             requirements: contract.requirements,
             comments: contract.comments,
-            attachments: contract.attachments
+            attachments: contract.attachments,
+            orderedItems: contract.orderedItems || []
         };
 
         const { data, error } = await supabase
@@ -691,7 +783,7 @@ export const DatabaseService = {
                 scheduledDate,
                 teamId: installationData.teamId || (row as { team_id?: string }).team_id,
                 notes: installationData.notes,
-                acceptance: installationData.acceptance,
+                acceptance: (row as any).acceptance || installationData.acceptance,
                 createdAt: new Date(row.created_at)
             };
         });
@@ -914,7 +1006,9 @@ export const DatabaseService = {
             companyName: data.company_name || undefined,
             nip: data.nip || undefined,
             partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined,
-            commissionRate: typeof data.commission_rate === 'number' ? data.commission_rate : undefined
+            commissionRate: typeof data.commission_rate === 'number' ? data.commission_rate : undefined,
+            substituteUserId: data.substitute_user_id,
+            substituteUntil: data.substitute_until ? new Date(data.substitute_until) : undefined
         };
     },
     async checkEmailConfigColumn(userId: string): Promise<{ error: any }> {
@@ -1085,6 +1179,46 @@ export const DatabaseService = {
             monthlyTarget: row.monthly_target,
             status: row.status as 'pending' | 'active' | 'blocked'
         }));
+    },
+
+    async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer> {
+        const dbUpdates: Record<string, any> = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (updates.salutation !== undefined) dbUpdates.salutation = updates.salutation;
+        if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
+        if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
+        if (updates.street !== undefined) dbUpdates.street = updates.street;
+        if (updates.houseNumber !== undefined) dbUpdates.house_number = updates.houseNumber;
+        if (updates.postalCode !== undefined) dbUpdates.postal_code = updates.postalCode;
+        if (updates.city !== undefined) dbUpdates.city = updates.city;
+        if (updates.country !== undefined) dbUpdates.country = updates.country;
+        if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+        if (updates.email !== undefined) dbUpdates.email = updates.email;
+
+        const { data, error } = await supabase
+            .from('customers')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            salutation: data.salutation as Customer['salutation'],
+            firstName: data.first_name,
+            lastName: data.last_name,
+            street: data.street,
+            houseNumber: data.house_number,
+            postalCode: data.postal_code,
+            city: data.city,
+            phone: data.phone,
+            email: data.email,
+            country: data.country,
+        };
     },
 
     async getInstallationsForInstaller(userId: string): Promise<Installation[]> {
@@ -1643,6 +1777,43 @@ export const DatabaseService = {
             }));
     },
 
+
+    // --- Substitution / Delegation Logic ---
+
+    async updateSubstitution(substituteUserId: string | null, substituteUntil: Date | null): Promise<void> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                substitute_user_id: substituteUserId,
+                substitute_until: substituteUntil ? substituteUntil.toISOString() : null
+            })
+            .eq('id', user.id);
+
+        if (error) throw error;
+    },
+
+    async getDelegatedUserIds(): Promise<string[]> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+
+        // Find users who have appointed ME as substitute AND date is valid
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('substitute_user_id', user.id)
+            .gt('substitute_until', new Date().toISOString());
+
+        if (error) {
+            console.error("Error fetching delegations:", error);
+            return [];
+        }
+
+        return data.map(row => row.id);
+    },
+
     // --- Installer Management ---
     async getInstallerManagementStats(): Promise<{
         installer: User;
@@ -2076,8 +2247,7 @@ export const DatabaseService = {
         const { data, error } = await supabase
             .from('measurements')
             .select(`
-                *,
-                sales_rep:profiles!sales_rep_id(full_name)
+                *
             `)
             .order('scheduled_date', { ascending: true });
 
@@ -2088,7 +2258,7 @@ export const DatabaseService = {
             offerId: m.offer_id,
             scheduledDate: new Date(m.scheduled_date),
             salesRepId: m.sales_rep_id,
-            salesRepName: m.sales_rep?.full_name || '',
+            salesRepName: '', // Can be populated if we join profiles
             customerName: m.customer_name,
             customerAddress: m.customer_address,
             customerPhone: m.customer_phone,
@@ -2104,13 +2274,91 @@ export const DatabaseService = {
         }));
     },
 
+    async createMeasurementReport(report: Omit<MeasurementReport, 'id' | 'createdAt'>): Promise<MeasurementReport> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('measurement_reports')
+            .insert({
+                user_id: user.id,
+                date: report.date,
+                car_plate: report.carPlate,
+                odometer_start: report.odometerStart,
+                odometer_end: report.odometerEnd,
+                total_km: report.totalKm,
+                with_driver: report.withDriver,
+                car_issues: report.carIssues,
+                report_description: report.reportDescription,
+                measurements_snapshot: report.visits // JSONB
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            date: data.date,
+            salesRepId: data.user_id,
+            carPlate: data.car_plate,
+            odometerStart: data.odometer_start,
+            odometerEnd: data.odometer_end,
+            totalKm: data.total_km,
+            withDriver: data.with_driver,
+            carIssues: data.car_issues,
+            reportDescription: data.report_description,
+            visits: data.measurements_snapshot,
+            signedContractsCount: 0,
+            offerIds: [],
+            createdAt: new Date(data.created_at)
+        };
+    },
+
+    async getMeasurementReports(filters?: { userId?: string; dateFrom?: string; dateTo?: string }): Promise<MeasurementReport[]> {
+        let query = supabase
+            .from('measurement_reports')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (filters?.userId) {
+            query = query.eq('user_id', filters.userId);
+        }
+        if (filters?.dateFrom) {
+            query = query.gte('date', filters.dateFrom);
+        }
+        if (filters?.dateTo) {
+            query = query.lte('date', filters.dateTo);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            date: row.date,
+            salesRepId: row.user_id,
+            carPlate: row.car_plate,
+            odometerStart: row.odometer_start,
+            odometerEnd: row.odometer_end,
+            totalKm: row.total_km,
+            withDriver: row.with_driver,
+            carIssues: row.car_issues,
+            reportDescription: row.report_description,
+            visits: row.measurements_snapshot || [],
+            signedContractsCount: (row.measurements_snapshot || []).filter((v: any) => v.outcome === 'signed').length,
+            offerIds: [],
+            createdAt: new Date(row.created_at)
+        }));
+    },
+
     async getMeasurementsBySalesRep(userId: string): Promise<Measurement[]> {
         const { data, error } = await supabase
             .from('measurements')
             .select(`
                 *,
-                sales_rep:profiles!sales_rep_id(full_name)
-            `)
+                sales_rep: profiles!sales_rep_id(full_name)
+                    `)
             .eq('sales_rep_id', userId)
             .order('scheduled_date', { ascending: true });
 
@@ -2165,9 +2413,9 @@ export const DatabaseService = {
                 location_lng: measurement.locationLng
             })
             .select(`
-                *,
-                sales_rep:profiles!sales_rep_id(full_name)
-            `)
+            *,
+                sales_rep: profiles!sales_rep_id(full_name)
+                    `)
             .single();
 
         if (error) throw error;
@@ -2219,9 +2467,9 @@ export const DatabaseService = {
             .update(updateData)
             .eq('id', id)
             .select(`
-                *,
-                sales_rep:profiles!sales_rep_id(full_name)
-            `)
+            *,
+                sales_rep: profiles!sales_rep_id(full_name)
+                    `)
             .single();
 
         if (error) throw error;
@@ -2484,10 +2732,10 @@ export const DatabaseService = {
         const { data, error } = await supabase
             .from('deleted_wallet_transactions')
             .select(`
-                *,
-                deleted_by_profile:profiles!deleted_by(full_name),
-                processed_by_profile:profiles!processed_by(full_name)
-            `)
+            *,
+                deleted_by_profile: profiles!deleted_by(full_name),
+                processed_by_profile: profiles!processed_by(full_name)
+                `)
             .order('deleted_at', { ascending: false });
 
         if (error) throw error;
@@ -2652,7 +2900,7 @@ export const DatabaseService = {
             if (photoFile) {
                 const fileExt = photoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                const filePath = `${report.userId}/${fileName}`;
+                const filePath = `${report.userId} / ${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('failure-reports')
@@ -2728,15 +2976,7 @@ export const DatabaseService = {
     async getLead(id: string): Promise<Lead | null> {
         const { data, error } = await supabase
             .from('leads')
-            .select(`
-                *,
-                driver:profiles!assignee_id (
-                    id,
-                    first_name,
-                    last_name,
-                    email
-                )
-            `)
+            .select('*')
             .eq('id', id)
             .single();
 
@@ -2752,32 +2992,243 @@ export const DatabaseService = {
             updatedAt: new Date(data.updated_at),
             lastContactDate: data.last_contact_date ? new Date(data.last_contact_date) : undefined,
             customerData: data.customer_data,
-            salesRep: data.driver ? {
-                id: data.driver.id,
-                firstName: data.driver.first_name,
-                lastName: data.driver.last_name,
-                email: data.driver.email
-            } : undefined
+            salesRep: undefined // drivers/profiles join removed due to missing relation
         } as Lead;
     },
 
-    async updateLead(id: string, updates: Partial<Lead> & { assigneeId?: string }): Promise<void> {
-        // Map frontend CamelCase to DB snake_case
-        const dbUpdates: any = {
-            updated_at: new Date().toISOString()
-        };
-
-        if (updates.status) dbUpdates.status = updates.status;
-        if (updates.source) dbUpdates.source = updates.source;
-        if (updates.customerData) dbUpdates.customer_data = updates.customerData;
-        if (updates.notes) dbUpdates.notes = updates.notes;
-        if (updates.assigneeId) dbUpdates.assigned_to = updates.assigneeId;
-
-        const { error } = await supabase
+    async getLeads(): Promise<Lead[]> {
+        const { data, error } = await supabase
             .from('leads')
-            .update(dbUpdates)
-            .eq('id', id);
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching leads:', error);
+            throw error;
+        }
+
+        return data.map((lead: any) => ({
+            ...lead,
+            id: lead.id,
+            assignedTo: lead.assigned_to,
+            status: lead.status as LeadStatus,
+            source: lead.source as LeadSource,
+            createdAt: new Date(lead.created_at),
+            updatedAt: new Date(lead.updated_at),
+            lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
+            customerData: lead.customer_data,
+            salesRep: undefined
+        }));
+    },
+
+    // --- Communications ---
+
+    async getLeadCommunications(leadId: string): Promise<Communication[]> {
+        const { data, error } = await supabase
+            .from('customer_communications')
+            .select(`
+                *,
+                user:profiles(first_name, last_name)
+            `)
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching lead communications:', error);
+            return [];
+        }
+
+        return data.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            customerId: row.customer_id,
+            leadId: row.lead_id,
+            type: row.type,
+            direction: row.direction,
+            subject: row.subject,
+            content: row.content,
+            date: row.date,
+            externalId: row.external_id,
+            metadata: row.metadata,
+            createdAt: new Date(row.created_at),
+            user: row.user ? {
+                firstName: row.user.first_name,
+                lastName: row.user.last_name
+            } : undefined
+        }));
+    },
+
+    async getCommunications(customerId: string): Promise<Communication[]> {
+        const { data, error } = await supabase
+            .from('customer_communications')
+            .select(`
+                *,
+                user:profiles(first_name, last_name)
+            `)
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching communications:', error);
+            return [];
+        }
+
+        return data.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            customerId: row.customer_id,
+            leadId: row.lead_id,
+            type: row.type,
+            direction: row.direction,
+            subject: row.subject,
+            content: row.content,
+            date: row.date,
+            externalId: row.external_id,
+            metadata: row.metadata,
+            createdAt: new Date(row.created_at),
+            user: row.user ? {
+                firstName: row.user.first_name,
+                lastName: row.user.last_name
+            } : undefined
+        }));
+    },
+
+    // Get offers for a specific lead
+    async getLeadOffers(leadId: string): Promise<Offer[]> {
+        const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .single();
+
+        if (leadError) throw leadError;
+
+        let query = supabase
+            .from('offers')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (lead.customerData?.email) {
+            query = query.or(`lead_id.eq.${leadId},customer_data->>email.eq.${lead.customerData.email}`);
+        } else {
+            query = query.eq('lead_id', leadId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data as Offer[];
+    },
+
+    async uploadFile(file: File, bucket: string = 'attachments', path?: string): Promise<string> {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const filePath = path ? `${path}/${fileName}` : fileName;
+
+        const { error: uploadError } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        return data.publicUrl;
+    },
+
+    async addCommunication(comm: Omit<Communication, 'id' | 'createdAt' | 'user' | 'userId'>): Promise<Communication> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('customer_communications')
+            .insert({
+                user_id: user.id,
+                customer_id: comm.customerId,
+                lead_id: comm.leadId,
+                type: comm.type,
+                direction: comm.direction,
+                subject: comm.subject,
+                content: comm.content,
+                date: comm.date,
+                external_id: comm.externalId,
+                metadata: comm.metadata || {}
+            })
+            .select('*, user:user_id(first_name, last_name)')
+            .single();
 
         if (error) throw error;
+
+        return {
+            id: data.id,
+            userId: data.user_id,
+            customerId: data.customer_id,
+            leadId: data.lead_id,
+            type: data.type,
+            direction: data.direction,
+            subject: data.subject,
+            content: data.content,
+            date: data.date,
+            externalId: data.external_id,
+            metadata: data.metadata,
+            createdAt: new Date(data.created_at),
+            user: data.user ? {
+
+                firstName: data.user.first_name,
+                lastName: data.user.last_name
+            } : undefined
+        };
+    },
+
+    async calculateOrderCosts(offerId: string, manualOrderCosts?: number): Promise<void> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // 1. Get all reports that include this offer
+        const { data: reports, error: reportsError } = await supabase
+            .from('reports')
+            .select('*');
+
+        if (reportsError) throw reportsError;
+
+        // Filter reports that contain the offerId
+        const linkedReports = reports.filter((r: any) => {
+            const ids = r.data.offerIds || [];
+            return Array.isArray(ids) && ids.includes(offerId);
+        });
+
+        // 2. Calculate Measurement Cost (Mileage)
+        const MILEAGE_RATE = 0.50; // EUR per km
+        let totalMeasurementCost = 0;
+
+        linkedReports.forEach((r: any) => {
+            const totalKm = r.data.totalKm || 0;
+            const visitsCount = (r.data.visits || []).length || 1;
+
+            // Split transport cost equally among all visits in that report
+            const costPerVisit = (totalKm * MILEAGE_RATE) / visitsCount;
+            totalMeasurementCost += costPerVisit;
+        });
+
+        // 3. Update Offer Pricing
+        const { data: offerData, error: fetchError } = await supabase
+            .from('offers')
+            .select('pricing')
+            .eq('id', offerId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const currentPricing = offerData.pricing || {};
+        const newPricing = {
+            ...currentPricing,
+            measurementCost: totalMeasurementCost,
+            orderCosts: manualOrderCosts !== undefined ? manualOrderCosts : currentPricing.orderCosts
+        };
+
+        const { error: updateError } = await supabase
+            .from('offers')
+            .update({ pricing: newPricing })
+            .eq('id', offerId);
+
+        if (updateError) throw updateError;
     }
 };

@@ -23,6 +23,9 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
         companyName: initialData?.customerData?.companyName || '',
         email: initialData?.customerData?.email || '',
         phone: initialData?.customerData?.phone || '',
+        address: initialData?.customerData?.address || '',
+        postalCode: initialData?.customerData?.postalCode || '',
+        city: initialData?.customerData?.city || '',
         status: initialData?.status || 'new' as LeadStatus,
         source: initialData?.source || 'manual' as LeadSource,
         notes: initialData?.notes || '',
@@ -43,6 +46,9 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                         companyName: formData.companyName,
                         email: formData.email,
                         phone: formData.phone,
+                        address: formData.address,
+                        city: formData.city,
+                        postalCode: formData.postalCode,
                     },
                     notes: formData.notes,
                 });
@@ -57,6 +63,9 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                         companyName: formData.companyName,
                         email: formData.email,
                         phone: formData.phone,
+                        address: formData.address,
+                        city: formData.city,
+                        postalCode: formData.postalCode,
                     },
                     notes: formData.notes,
                     emailMessageId: initialData?.emailMessageId,
@@ -114,6 +123,38 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                         value={formData.companyName}
                         onChange={e => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                     />
+                </div>
+
+                {/* Address Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-3">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Adres (Ulica i nr)</label>
+                        <input
+                            type="text"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-accent"
+                            value={formData.address}
+                            onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Kod pocztowy</label>
+                        <input
+                            type="text"
+                            placeholder="00-000"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-accent"
+                            value={formData.postalCode}
+                            onChange={e => setFormData(prev => ({ ...prev, postalCode: e.target.value }))}
+                        />
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Miasto</label>
+                        <input
+                            type="text"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-accent"
+                            value={formData.city}
+                            onChange={e => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                        />
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -179,7 +220,32 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                     />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 items-center">
+                    {isEditMode && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                // Navigate to new offer with customer data pre-filled
+                                navigate('/new-offer', {
+                                    state: {
+                                        firstName: formData.firstName,
+                                        lastName: formData.lastName,
+                                        email: formData.email,
+                                        phone: formData.phone,
+                                        companyName: formData.companyName,
+                                        // Map other fields if necessary
+                                    }
+                                });
+                            }}
+                            className="mr-auto px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 rounded-lg transition-colors font-medium flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Konwertuj na Ofertę
+                        </button>
+                    )}
+
                     <button
                         type="button"
                         onClick={onCancel || (() => navigate('/leads'))}

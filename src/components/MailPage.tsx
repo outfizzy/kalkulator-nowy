@@ -98,7 +98,6 @@ export const MailPage: React.FC = () => {
     const [refreshTrigger, setRefreshTrigger] = useState(0); // to force refresh
 
     const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
-    const [loadingDetails, setLoadingDetails] = useState(false);
 
     // Check if email is configured
     const isConfigured = !!currentUser?.emailConfig?.smtpHost;
@@ -158,7 +157,6 @@ export const MailPage: React.FC = () => {
     }, [currentUser, activeTab, isConfigured, refreshTrigger, boxName]);
 
     const handleSelectEmail = async (uid: number) => {
-        setLoadingDetails(true);
         setSelectedEmail(null); // Clear previous selection while loading
         setShowLeadForm(false); // Reset lead form
         try {
@@ -167,19 +165,21 @@ export const MailPage: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     config: currentUser?.emailConfig,
-                    uid: uid
+                    uid: uid,
+                    box: boxName
                 })
             });
 
-            if (!response.ok) throw new Error('Failed to fetch email body');
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.details || err.error || 'Failed to fetch email body');
+            }
 
             const data = await response.json();
             setSelectedEmail(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error loading email details:', error);
-            toast.error('Nie udało się pobrać treści wiadomości');
-        } finally {
-            setLoadingDetails(false);
+            toast.error(`Błąd: ${error.message}`);
         }
     };
 
@@ -217,10 +217,7 @@ export const MailPage: React.FC = () => {
         setShowLeadForm(true);
     };
 
-    const handleBackToList = () => {
-        setSelectedEmail(null);
-        setShowLeadForm(false);
-    };
+
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -341,44 +338,95 @@ export const MailPage: React.FC = () => {
         }
     };
 
+    // AI Extraction Handler
+    const handleAiExtract = async () => {
+        if (!selectedEmail) return;
+
+        const toastId = toast.loading('AI analizuje wiadomość...');
+
+        try {
+            // Combine subject and body for analysis
+            const fullText = `Temat: ${selectedEmail.subject}\nOd: ${selectedEmail.from}\n\n${selectedEmail.text || ''}`;
+
+            const res = await fetch('/api/extract-lead-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: fullText,
+                    apiKey: currentUser?.emailConfig?.openaiKey
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'AI Error');
+            }
+
+            const data = await res.json();
+            const extracted = data.leadData;
+
+            if (extracted) {
+                setLeadInitialData({
+                    customerData: {
+                        firstName: extracted.firstName || '',
+                        lastName: extracted.lastName || '',
+                        companyName: extracted.companyName || '',
+                        phone: extracted.phone || '',
+                        email: extracted.email || '', // extract email from body if found
+                        address: extracted.address || '',
+                        postalCode: extracted.postalCode || '',
+                        city: extracted.city || '',
+                    },
+                    source: 'email',
+                    emailMessageId: selectedEmail.id,
+                    notes: extracted.notes || `Utworzono z wiadomości e-mail: "${selectedEmail.subject}"`
+                });
+                setShowLeadForm(true);
+                toast.success('Dane wyodrębnione!', { id: toastId });
+            }
+        } catch (e: any) {
+            console.error(e);
+            toast.error(`Błąd AI: ${e.message}`, { id: toastId });
+        }
+    };
+
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6">
-            {/* Sidebar */}
-            <div className="w-full md:w-64 flex flex-col gap-2">
+        <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-4">
+            {/* 1. Sidebar (Navigation) - Fixed width */}
+            <div className="w-full md:w-48 flex flex-col gap-2 flex-shrink-0">
                 <button
                     onClick={() => { setActiveTab('compose'); setSelectedEmail(null); }}
-                    className={`p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm ${activeTab === 'compose'
+                    className={`p-3 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm text-sm ${activeTab === 'compose'
                         ? 'bg-accent text-white shadow-accent/30'
                         : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                         }`}
                 >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Nowa Wiadomość
+                    Nowa
                 </button>
 
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-4 overflow-hidden">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-2 overflow-hidden">
                     <button
-                        onClick={() => { setActiveTab('inbox'); setSelectedEmail(null); }}
-                        className={`w-full p-4 flex items-center justify-between text-left transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                        onClick={() => { setActiveTab('inbox'); }}
+                        className={`w-full p-3 flex items-center justify-between text-left transition-colors text-sm ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                             </svg>
                             <span>Odebrane</span>
                         </div>
-                        {/* Optional: Add unread count if we fetch it */}
                     </button>
                     <button
-                        onClick={() => { setActiveTab('sent'); setSelectedEmail(null); }}
-                        className={`w-full p-4 flex items-center justify-between text-left transition-colors ${activeTab === 'sent' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                        onClick={() => { setActiveTab('sent'); }}
+                        className={`w-full p-3 flex items-center justify-between text-left transition-colors text-sm ${activeTab === 'sent' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                             </svg>
                             <span>Wysłane</span>
@@ -397,387 +445,387 @@ export const MailPage: React.FC = () => {
                 )}
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-140px)]">
-                {/* Inbox and Sent View (Shared List) */}
-                {(activeTab === 'inbox' || activeTab === 'sent') && (
-                    <div className="flex-1 flex flex-col h-full">
-                        {selectedEmail || loadingDetails ? (
-                            // Detail View
-                            <div className="flex-1 flex flex-col h-full overflow-hidden">
-                                <div className="p-4 border-b border-slate-100 flex items-center gap-4 bg-slate-50">
-                                    <button
-                                        onClick={handleBackToList}
-                                        className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
-                                        title="Wróć do listy"
-                                    >
-                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                        </svg>
-                                    </button>
-                                    <h2 className="text-lg font-bold text-slate-800 truncate flex-1">
-                                        {loadingDetails ? 'Ładowanie...' : selectedEmail?.subject}
-                                    </h2>
-                                    {!loadingDetails && selectedEmail && (
-                                        <button
-                                            onClick={handleCreateLead}
-                                            className="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent hover:text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                            title="Utwórz Lead z tej wiadomości"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                            </svg>
-                                            <span className="hidden sm:inline">Utwórz Lead</span>
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex-1 flex overflow-hidden">
-                                    {/* Email Content Column */}
-                                    <div className={`flex-1 overflow-y-auto p-6 bg-white ${showLeadForm ? 'w-1/2 border-r border-slate-200' : 'w-full'}`}>
-                                        {loadingDetails ? (
-                                            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
-                                                <svg className="w-10 h-10 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                <p>Pobieranie treści wiadomości...</p>
-                                            </div>
-                                        ) : selectedEmail && (
-                                            <div className="max-w-4xl mx-auto">
-                                                <div className="flex justify-between items-start mb-6 pb-6 border-b border-slate-100">
-                                                    <div>
-                                                        <h1 className="text-2xl font-bold text-slate-900 mb-2">{selectedEmail.subject}</h1>
-                                                        <p className="text-slate-600"><strong>Od:</strong> {selectedEmail.from}</p>
-                                                        <p className="text-slate-600"><strong>Do:</strong> {selectedEmail.to || 'Ja'}</p>
-                                                    </div>
-                                                    <div className="text-right text-sm text-slate-400">
-                                                        {new Date(selectedEmail.date).toLocaleString('pl-PL')}
-                                                    </div>
-                                                </div>
+            {/* 2. List & Detail Container */}
+            <div className="flex-1 flex bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-[calc(100vh-140px)]">
 
-                                                {/* Attachments Section */}
-                                                {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                                                    <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                                                            Załączniki ({selectedEmail.attachments.length})
-                                                        </h3>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {selectedEmail.attachments.map((att, idx) => (
-                                                                <button
-                                                                    key={idx}
-                                                                    onClick={() => downloadAttachment(att)}
-                                                                    className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-md hover:border-accent hover:text-accent transition-colors shadow-sm text-sm"
-                                                                >
-                                                                    <span className="truncate max-w-[200px]">{att.filename || 'Bez nazwy'}</span>
-                                                                    <span className="text-xs text-slate-400">({Math.round(att.size / 1024)} KB)</span>
-                                                                    <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="email-content prose prose-slate max-w-none">
-                                                    {/* AI Reply Actions */}
-                                                    <div className="mb-6 bg-purple-50 p-4 rounded-xl border border-purple-100">
-                                                        <h3 className="text-xs font-bold text-purple-800 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                                            Szybka odpowiedź AI
-                                                        </h3>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {[
-                                                                { label: '👍 Potwierdź', intent: 'Potwierdź termin / zgodę / odbiór. Bądź konkretny.' },
-                                                                { label: '👎 Odmów', intent: 'Odmów grzecznie, podając ogólny powód (brak czasu/możliwości).' },
-                                                                { label: '❓ Dopytaj', intent: 'Podziękuj i dopytaj o szczegóły, których brakuje.' },
-                                                                { label: '🤝 Oferta', intent: 'Podziękuj za zapytanie i napisz, że przygotujemy ofertę wkrótce.' },
-                                                                { label: 'Kontakt telefoniczny', intent: 'Poproś o rozmowę telefoniczną w celu ustalenia szczegółów.' },
-                                                            ].map((action) => (
-                                                                <button
-                                                                    key={action.label}
-                                                                    onClick={async () => {
-                                                                        const toastId = toast.loading('Generowanie odpowiedzi...');
-                                                                        try {
-                                                                            const res = await fetch('/api/ai-reply', {
-                                                                                method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                body: JSON.stringify({
-                                                                                    originalText: selectedEmail.text || 'Brak treści', // Fallback
-                                                                                    intent: action.intent,
-                                                                                    apiKey: currentUser?.emailConfig?.openaiKey
-                                                                                })
-                                                                            });
-
-                                                                            if (!res.ok) throw new Error('Błąd generowania');
-
-                                                                            const data = await res.json();
-
-                                                                            // Switch to Compose
-                                                                            setComposeData({
-                                                                                to: selectedEmail.from,
-                                                                                subject: `Re: ${selectedEmail.subject}`,
-                                                                                body: data.reply
-                                                                            });
-                                                                            setActiveTab('compose');
-                                                                            toast.success('Wygenerowano odpowiedź!', { id: toastId });
-                                                                        } catch (e) {
-                                                                            console.error(e);
-                                                                            toast.error('Nie udało się wygenerować odpowiedzi', { id: toastId });
-                                                                        }
-                                                                    }}
-                                                                    className="px-3 py-2 bg-white text-purple-700 hover:bg-purple-600 hover:text-white border border-purple-200 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                                                >
-                                                                    {action.label}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    {selectedEmail.html ? (
-                                                        <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
-                                                    ) : (
-                                                        <pre className="whitespace-pre-wrap font-sans text-slate-700">{selectedEmail.text}</pre>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {showLeadForm && (
-                                        <div className="w-[400px] bg-slate-50 border-l border-slate-200 p-4 overflow-y-auto flex-shrink-0">
-                                            <LeadForm
-                                                initialData={leadInitialData}
-                                                embedded={true}
-                                                onSuccess={() => {
-                                                    setShowLeadForm(false);
-                                                }}
-                                                onCancel={() => setShowLeadForm(false)}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
+                {/* Email List Column (Visible unless in Compose mode) */}
+                {activeTab !== 'compose' && (
+                    <div className={`flex-col border-r border-slate-200 overflow-y-auto transition-all duration-300 ${selectedEmail ? 'w-80 hidden lg:flex' : 'w-full'}`}>
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <h2 className="text-lg font-bold text-slate-800">
+                                {activeTab === 'inbox' ? 'Skrzynka Odbiorcza' : 'Wysłane'}
+                            </h2>
+                            <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
+                                <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                        </div>
+                        {loading ? (
+                            <div className="p-8 text-center text-slate-400">
+                                <svg className="w-8 h-8 animate-spin mx-auto mb-2" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p className="text-sm">Odświeżanie...</p>
+                            </div>
+                        ) : !isConfigured ? (
+                            <div className="p-8 text-center text-slate-400">
+                                <svg className="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <p className="text-sm font-medium text-slate-600">Poczta nieskonfigurowana</p>
+                                <p className="text-xs text-slate-500 mt-1 mb-3">Uzupełnij dane SMTP/IMAP w ustawieniach.</p>
+                                <Link to="/settings" className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent-dark transition-colors">
+                                    Przejdź do Ustawień
+                                </Link>
+                            </div>
+                        ) : emails.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400">
+                                <p className="text-sm">Brak wiadomości</p>
                             </div>
                         ) : (
-                            <>
-                                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                    <h2 className="text-lg font-bold text-slate-800">
-                                        {activeTab === 'inbox' ? 'Skrzynka Odbiorcza' : 'Wysłane'}
-                                    </h2>
-                                    <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
-                                        <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto">
-                                    {emails.length > 0 ? (
-                                        <div className="divide-y divide-slate-100">
-                                            {emails.map((mail, idx) => {
-                                                // Display logic based on box
-                                                const displayPerson = activeTab === 'inbox' ? mail.from : mail.to;
-                                                const displayLabel = activeTab === 'inbox' ? '' : 'Do: ';
-
-                                                return (
-                                                    <div
-                                                        key={mail.id || idx}
-                                                        onClick={() => handleSelectEmail(mail.id)}
-                                                        className="p-4 hover:bg-slate-50 cursor-pointer flex gap-4 transition-colors"
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold overflow-hidden">
-                                                            {displayPerson ? (typeof displayPerson === 'string' ? displayPerson.replace(/<.*>/, '').trim()[0]?.toUpperCase() : '?') : '?'}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <span className="font-medium truncate text-slate-900">
-                                                                    {displayLabel}{typeof displayPerson === 'string' ? displayPerson.replace(/<.*>/, '') : 'Unknown'}
-                                                                </span>
-                                                                <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
-                                                                    {new Date(mail.date).toLocaleString('pl-PL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-sm truncate text-slate-800 font-medium">{mail.subject}</p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                            {/* Footer Info */}
-                                            <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 border-t border-slate-100">
-                                                Pokazuję ostatnie 50 wiadomości.
-                                            </div>
+                            <div className="divide-y divide-slate-100">
+                                {emails.map(email => (
+                                    <div
+                                        key={email.id}
+                                        onClick={() => handleSelectEmail(email.id)}
+                                        className={`p-3 cursor-pointer hover:bg-slate-50 transition-colors ${selectedEmail?.id === email.messageId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                                            } ${!email.flags?.includes('\\Seen') ? 'font-semibold bg-white' : 'text-slate-600 bg-slate-50/50'}`}
+                                    >
+                                        <div className="flex justify-between items-baseline mb-1">
+                                            <span className="truncate text-sm font-medium text-slate-900 max-w-[70%]">
+                                                {email.from.replace(/<.*>/, '').trim()}
+                                            </span>
+                                            <span className="text-xs text-slate-400 flex-shrink-0">
+                                                {new Date(email.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                                            </span>
                                         </div>
-                                    ) : (
-                                        <div className="p-12 text-center text-slate-400">
-                                            {loading ? 'Ładowanie wiadomości...' : isConfigured ? 'Brak wiadomości' : 'Skonfiguruj IMAP aby pobrać pocztę'}
-                                        </div>
-                                    )}
-                                </div>
-                            </>
+                                        <h3 className="text-sm text-slate-800 truncate mb-1">{email.subject}</h3>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
                 )}
 
-
-                {/* Compose View */}
-                {activeTab === 'compose' && (
-                    <div className="flex-1 flex flex-col h-full">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50">
-                            <h2 className="text-lg font-bold text-slate-800">Nowa Wiadomość</h2>
-                        </div>
-                        <form onSubmit={handleSend} className="flex-1 flex flex-col p-6 gap-4">
-                            <div>
-                                <input
-                                    type="text"
-                                    placeholder="Do:"
-                                    className="w-full text-sm font-medium p-2 border-b border-slate-200 focus:border-accent outline-none transition-colors"
-                                    value={composeData.to}
-                                    onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
-                                />
-                            </div>
-                            <div>
-                                <input
-                                    type="text"
-                                    placeholder="Temat:"
-                                    className="w-full text-lg font-bold p-2 border-b border-slate-200 focus:border-accent outline-none transition-colors"
-                                    value={composeData.subject}
-                                    onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
-                                />
-                            </div>
-
-                            {/* Toolbar - AI Button Removed */}
-                            <div className="flex items-center gap-4 py-2 border-b border-slate-100">
-                                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:bg-slate-100 px-2 py-1 rounded transition-colors relative">
-                                    <input type="file" multiple onChange={handleFileSelect} className="hidden" />
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                                    Dołącz plik
-                                </label>
-                                <button type="button" onClick={insertLink} className="flex items-center gap-2 text-sm text-slate-600 hover:bg-slate-100 px-2 py-1 rounded transition-colors">
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                                    Wstaw link
-                                </button>
-
-                                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
-                                    <input type="checkbox" checked={useSignature} onChange={(e) => setUseSignature(e.target.checked)} className="rounded text-accent focus:ring-accent" />
-                                    Podpis
-                                </label>
-                            </div>
-
-                            {/* Attachments Preview */}
-                            {attachments.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                    {attachments.map((att, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full text-sm">
-                                            <span className="truncate max-w-[150px]">{att.file.name}</span>
-                                            <button type="button" onClick={() => removeAttachment(idx)} className="text-slate-400 hover:text-red-500">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="flex-1">
-                                <textarea
-                                    className="w-full h-full p-4 resize-none outline-none text-slate-700 font-sans"
-                                    placeholder="Treść wiadomości..."
-                                    value={composeData.body}
-                                    onChange={(e) => setComposeData(prev => ({ ...prev, body: e.target.value }))}
-                                />
-                            </div>
-
-                            {useSignature && currentUser?.emailConfig?.signature && (
-                                <div className="text-sm text-slate-500 border-t pt-4 mt-2 italic opacity-75">
-                                    <pre className="font-sans whitespace-pre-wrap">{currentUser.emailConfig.signature}</pre>
-                                </div>
-                            )}
-
-                            <div className="flex flex-col md:flex-row justify-between items-end pt-4 border-t border-slate-100 gap-4">
-                                <div className="flex flex-col">
-                                    <label className="text-xs font-bold text-slate-500 ml-1 mb-1">Wyślij później (opcjonalnie):</label>
-                                    <input
-                                        type="datetime-local"
-                                        className="text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-accent"
-                                        value={scheduleDate}
-                                        onChange={(e) => setScheduleDate(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                                    {/* AI Controls */}
-                                    <div className="flex items-center bg-purple-50 rounded-xl p-1 border border-purple-100 hover:border-purple-300 transition-colors flex-1 md:flex-none relative">
-
-                                        {/* Presets Button */}
+                {/* 3. Reading Pane (Middle) */}
+                <div className="flex-1 flex flex-col min-w-0 bg-white">
+                    {activeTab === 'compose' ? (
+                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                            <form onSubmit={handleSend} className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                {/* Compose UI Header */}
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-bold text-slate-800">Nowa Wiadomość</h2>
+                                    <div className="flex gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setShowAiPresets(!showAiPresets)}
-                                            className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
-                                            title="Gotowe polecenia"
+                                            className="px-3 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 text-sm font-medium"
                                         >
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                             </svg>
+                                            AI Asystent
                                         </button>
-
-                                        {/* Presets Dropdown */}
-                                        {showAiPresets && (
-                                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
-                                                <div className="px-3 py-1 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Sugerowane polecenia</div>
-                                                {AI_PRESETS.map((preset) => (
-                                                    <button
-                                                        key={preset.label}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setAiPrompt(preset.value);
-                                                            setShowAiPresets(false);
-                                                        }}
-                                                        className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center justify-between group"
-                                                    >
-                                                        <span>{preset.label}</span>
-                                                        <span className="opacity-0 group-hover:opacity-100 text-purple-400">
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                                        </span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        <input
-                                            type="text"
-                                            value={aiPrompt}
-                                            onChange={(e) => setAiPrompt(e.target.value)}
-                                            placeholder="Instrukcja (np. oficjalny)..."
-                                            className="bg-transparent border-none outline-none text-sm text-purple-900 placeholder-purple-400 px-3 w-full md:w-48"
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    handleRewrite();
-                                                }
-                                            }}
-                                        />
                                         <button
-                                            type="button"
-                                            onClick={handleRewrite}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-1 whitespace-nowrap"
-                                            title="Wykonaj"
+                                            type="submit"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 shadow-lg shadow-blue-600/20"
                                         >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                            </svg>
+                                            Wyślij
                                         </button>
                                     </div>
-
-                                    <button
-                                        type="submit"
-                                        className={`${scheduleDate ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20' : 'bg-accent hover:bg-accent-dark shadow-accent/20'} text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-lg flex items-center gap-2 whitespace-nowrap`}
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                        </svg>
-                                        {scheduleDate ? 'Zaplanuj' : 'Wyślij'}
-                                    </button>
                                 </div>
-                            </div>
-                        </form>
-                    </div>
-                )
-                }
-            </div >
-        </div >
+                                {/* Compose Form Inputs */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <input
+                                            type="email"
+                                            placeholder="Do:"
+                                            value={composeData.to}
+                                            onChange={e => setComposeData({ ...composeData, to: e.target.value })}
+                                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div>
+                                        <input
+                                            type="text"
+                                            placeholder="Temat:"
+                                            value={composeData.subject}
+                                            onChange={e => setComposeData({ ...composeData, subject: e.target.value })}
+                                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all font-medium"
+                                        />
+                                    </div>
+                                    {/* AI Presets */}
+                                    {showAiPresets && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 bg-purple-50 rounded-xl animate-fade-in border border-purple-100">
+                                            {AI_PRESETS.map((preset, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    type="button"
+                                                    onClick={() => setAiPrompt(preset.value)}
+                                                    className={`text-left p-3 rounded-lg border text-sm transition-all ${aiPrompt === preset.value
+                                                        ? 'bg-purple-600 text-white border-purple-600 shadow-md transform scale-[1.02]'
+                                                        : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:shadow-sm'
+                                                        }`}
+                                                >
+                                                    <div className="font-medium mb-1">{preset.label}</div>
+                                                    <div className={`text-xs ${aiPrompt === preset.value ? 'text-purple-100' : 'text-slate-500'}`}>
+                                                        {preset.value}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                            <div className="col-span-2 md:col-span-3 mt-2 flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Własna instrukcja dla AI..."
+                                                    value={aiPrompt}
+                                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleRewrite();
+                                                        }
+                                                    }}
+                                                    className="flex-1 px-3 py-2 bg-white border border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                                                />
+                                                <button
+                                                    onClick={handleRewrite}
+                                                    type="button"
+                                                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm transition-colors shadow-sm"
+                                                >
+                                                    ✨ Przeredaguj
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="relative">
+                                        <textarea
+                                            placeholder="Treść wiadomości..."
+                                            value={composeData.body}
+                                            onChange={e => setComposeData({ ...composeData, body: e.target.value })}
+                                            className="w-full h-[400px] p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none resize-none font-sans text-slate-700 leading-relaxed"
+                                        />
+                                        {/* Schedule & Attachments Toolbar */}
+                                        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                                            <div className="flex gap-2">
+                                                <label className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer transition-colors" title="Dodaj załącznik">
+                                                    <input type="file" multiple className="hidden" onChange={handleFileSelect} />
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                    </svg>
+                                                </label>
+                                                <button onClick={insertLink} type="button" className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors" title="Dodaj link">
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <label className="flex items-center gap-2 text-xs font-medium text-slate-500 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={useSignature}
+                                                        onChange={e => setUseSignature(e.target.checked)}
+                                                        className="rounded text-accent focus:ring-accent"
+                                                    />
+                                                    Podpis
+                                                </label>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={scheduleDate}
+                                                    onChange={e => setScheduleDate(e.target.value)}
+                                                    className="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 focus:outline-none focus:border-accent"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Attachments List */}
+                                    {attachments.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {attachments.map((att, i) => (
+                                                <div key={i} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full text-xs font-medium text-slate-600 border border-slate-200">
+                                                    <span className="truncate max-w-[150px]">{att.file.name}</span>
+                                                    <span className="text-slate-400">({Math.round(att.file.size / 1024)}KB)</span>
+                                                    <button onClick={() => removeAttachment(i)} type="button" className="text-slate-400 hover:text-red-500">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </form>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                            {/* Email Reading Pane */}
+                            {selectedEmail ? (
+                                <div className="flex-1 flex flex-col overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white z-10 shadow-sm">
+                                        <h2 className="text-lg font-bold text-slate-800 truncate flex-1 pr-4">
+                                            {selectedEmail.subject}
+                                        </h2>
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            {!showLeadForm && (
+                                                <>
+                                                    <button
+                                                        onClick={handleAiExtract}
+                                                        className="px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                        title="Automatycznie wyciągnij dane z treści"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                        </svg>
+                                                        <span className="hidden sm:inline">Utwórz Lead (AI)</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={handleCreateLead}
+                                                        className="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                        <span className="hidden sm:inline">Utwórz Lead</span>
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 flex overflow-hidden relative">
+                                        {/* Email Body & Details */}
+                                        <div className={`flex-1 overflow-y-auto p-6 bg-white transition-all duration-300 ${showLeadForm ? 'w-1/2 border-r border-slate-200 hidden lg:block' : 'w-full'}`}>
+
+                                            {/* Header Info */}
+                                            <div className="mb-6">
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg">
+                                                        {selectedEmail.from.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-slate-900">{selectedEmail.from}</p>
+                                                        <p className="text-xs text-slate-500">{new Date(selectedEmail.date).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Body */}
+                                            <div className="prose max-w-none text-slate-700">
+                                                {selectedEmail.html ? (
+                                                    <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                                                ) : (
+                                                    <pre className="whitespace-pre-wrap font-sans text-slate-700">{selectedEmail.text}</pre>
+                                                )}
+                                            </div>
+
+                                            {/* Attachments */}
+                                            {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                                <div className="mt-8 pt-6 border-t border-slate-100">
+                                                    <h3 className="text-sm font-medium text-slate-900 mb-3">Załączniki</h3>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                        {selectedEmail.attachments.map((att, index) => (
+                                                            <div
+                                                                key={index}
+                                                                onClick={() => downloadAttachment(att)}
+                                                                className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                                                            >
+                                                                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 flex-shrink-0">
+                                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                    </svg>
+                                                                </div>
+                                                                <div className="overflow-hidden">
+                                                                    <p className="text-sm font-medium text-slate-700 truncate" title={att.filename}>{att.filename}</p>
+                                                                    <p className="text-xs text-slate-500">{Math.round(att.size / 1024)} KB</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 4. Lead Form Pane (Right) */}
+                                        {showLeadForm && (
+                                            <div className="w-full lg:w-[450px] bg-slate-50 flex flex-col h-full border-l border-slate-200 shadow-xl z-20 absolute right-0 top-0 bottom-0 lg:static">
+                                                <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
+                                                    <h3 className="font-bold text-slate-800">Nowy Lead</h3>
+                                                    <button
+                                                        onClick={() => setShowLeadForm(false)}
+                                                        className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto p-4">
+                                                    <LeadForm
+                                                        initialData={leadInitialData}
+                                                        embedded={true}
+                                                        onSuccess={() => {
+                                                            setShowLeadForm(false);
+                                                            toast.success('Lead utworzony pomyślnie!');
+                                                        }}
+                                                        onCancel={() => setShowLeadForm(false)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
+                                    <svg className="w-16 h-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    <p className="text-lg font-medium text-slate-600 mb-2">Wybierz wiadomość z listy</p>
+                                    <p className="text-sm">lub</p>
+                                    <button
+                                        onClick={() => {
+                                            setLeadInitialData({});
+                                            setShowLeadForm(true);
+                                        }}
+                                        className="mt-4 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
+                                    >
+                                        Dodaj Leada Ręcznie
+                                    </button>
+                                    {showLeadForm && (
+                                        <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" onClick={() => setShowLeadForm(false)}></div>
+                                    )}
+                                    {showLeadForm && (
+                                        <div className="absolute top-0 right-0 bottom-0 w-full md:w-[450px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200">
+                                            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                                                <h3 className="font-bold text-slate-800">Nowy Lead</h3>
+                                                <button onClick={() => setShowLeadForm(false)} className="p-2 text-slate-400 hover:text-slate-600">
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto p-4">
+                                                <LeadForm
+                                                    initialData={{}}
+                                                    embedded={true}
+                                                    onSuccess={() => setShowLeadForm(false)}
+                                                    onCancel={() => setShowLeadForm(false)}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 };

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { Measurement } from '../../types';
+import { MeasurementReportModal } from './MeasurementReportModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -15,12 +17,16 @@ function getStartOfWeek(date: Date): Date {
 }
 
 export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measurements, onEdit, onDragDrop }) => {
+    const { currentUser } = useAuth();
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
         return getStartOfWeek(today);
     });
     const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
     const [dropTarget, setDropTarget] = useState<{ date: Date } | null>(null);
+    const [showReportModal, setShowReportModal] = useState(false);
+    // const [selectedDateForReport, setSelectedDateForReport] = useState<Date>(new Date());
+
 
     const weekDays = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(currentWeekStart);
@@ -181,20 +187,45 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-4 text-sm bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div className="font-bold text-slate-700">Status:</div>
-                <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('scheduled')}`}>
-                        Zaplanowano
-                    </span>
-                    <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('completed')}`}>
-                        Zrealizowano
-                    </span>
-                    <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('cancelled')}`}>
-                        Anulowano
-                    </span>
+            <div className="flex items-center justify-between text-sm bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-4">
+                <div className="flex items-center gap-4">
+                    <div className="font-bold text-slate-700">Status:</div>
+                    <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('scheduled')}`}>
+                            Zaplanowano
+                        </span>
+                        <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('completed')}`}>
+                            Zrealizowano
+                        </span>
+                        <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('cancelled')}`}>
+                            Anulowano
+                        </span>
+                    </div>
                 </div>
+
+                <button
+                    onClick={() => setShowReportModal(true)}
+                    className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium flex items-center gap-2"
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Stwórz Raport z Dnia
+                </button>
             </div>
+
+            {showReportModal && (
+                <MeasurementReportModal
+                    date={new Date()}
+                    measurements={getMeasurementsForDate(new Date())}
+                    onClose={() => setShowReportModal(false)}
+                    onSave={() => {
+                        setShowReportModal(false);
+                        // Optional: trigger refresh
+                    }}
+                    currentUserId={currentUser?.id || ''}
+                />
+            )}
         </div>
     );
 };

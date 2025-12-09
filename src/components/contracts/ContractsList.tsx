@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import type { Contract } from '../../types';
 import { DatabaseService } from '../../services/database';
 import { toast } from 'react-hot-toast';
-
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
     const [contracts, setContracts] = useState<Contract[]>([]);
@@ -122,11 +121,20 @@ export const ContractsList: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-900">
                                                 {contract.contractNumber}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-slate-900">
+                                            <td className="px-6 py-4">
+                                                <div
+                                                    className="font-medium text-slate-800 cursor-pointer hover:text-accent"
+                                                    onClick={() => {
+                                                        if (contract.client.id) {
+                                                            navigate(`/customers/${contract.client.id}`);
+                                                        } else {
+                                                            toast.error('Brak ID klienta');
+                                                        }
+                                                    }}
+                                                >
                                                     {contract.client.firstName} {contract.client.lastName}
                                                 </div>
-                                                <div className="text-xs text-slate-500">{contract.client.city}</div>
+                                                <div className="text-sm text-slate-500">{contract.client.city}</div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                                 {new Date(contract.createdAt).toLocaleDateString()}
@@ -165,6 +173,7 @@ export const ContractsList: React.FC = () => {
                     </div>
                 </div>
             </div>
+
         </div>
     );
 };

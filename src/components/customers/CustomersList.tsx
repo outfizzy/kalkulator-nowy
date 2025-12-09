@@ -9,12 +9,15 @@ interface CustomerWithStats {
     lastOfferDate: Date;
     offerCount: number;
     latestOfferId: string;
+    contractCount: number;
+    hasSignedContract: boolean;
 }
 
 export const CustomersList: React.FC = () => {
     const [customers, setCustomers] = useState<CustomerWithStats[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<'all' | 'contracts' | 'unsigned'>('all');
 
     const loadCustomers = async () => {
         setLoading(true);
@@ -34,17 +37,28 @@ export const CustomersList: React.FC = () => {
     }, []);
 
     const filteredCustomers = customers.filter(item => {
-        if (!searchQuery) return true;
+        // 1. Text Search
         const query = searchQuery.toLowerCase();
         const c = item.customer;
-
-        return (
+        const matchesSearch = !searchQuery || (
             c.firstName.toLowerCase().includes(query) ||
             c.lastName.toLowerCase().includes(query) ||
             c.city.toLowerCase().includes(query) ||
             c.email.toLowerCase().includes(query) ||
             c.phone.includes(query)
         );
+
+        if (!matchesSearch) return false;
+
+        // 2. Tab Filter
+        if (activeTab === 'contracts') {
+            return item.hasSignedContract;
+        }
+        if (activeTab === 'unsigned') {
+            return !item.hasSignedContract;
+        }
+
+        return true;
     });
 
     if (loading) {
@@ -56,7 +70,7 @@ export const CustomersList: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">Klienci</h1>
-                    <p className="text-slate-500 mt-1">Baza klientów i historia kontaktów</p>
+                    <p className="text-slate-500 mt-1">Baza klientów, umów i ofert</p>
                 </div>
                 <Link
                     to="/customers/new"
@@ -69,15 +83,36 @@ export const CustomersList: React.FC = () => {
                 </Link>
             </div>
 
-            {/* Search */}
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                <div className="relative">
+            {/* Tabs & Search */}
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex bg-slate-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setActiveTab('all')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Wszyscy
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('contracts')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'contracts' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Umowy
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('unsigned')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'unsigned' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Niepodpisani
+                    </button>
+                </div>
+
+                <div className="relative w-full md:w-96">
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
                         type="text"
-                        placeholder="Szukaj po nazwisku, mieście, emailu lub telefonie..."
+                        placeholder="Szukaj klientów..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
@@ -89,7 +124,7 @@ export const CustomersList: React.FC = () => {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 {filteredCustomers.length === 0 ? (
                     <div className="p-12 text-center text-slate-400">
-                        <p>Brak klientów do wyświetlenia</p>
+                        <p>Brak klientów w tej kategorii</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -99,6 +134,7 @@ export const CustomersList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Klient</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Kontakt</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Adres</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Oferty</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ostatnia aktywność</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Akcje</th>
@@ -122,7 +158,22 @@ export const CustomersList: React.FC = () => {
                                             <div className="text-xs text-slate-500">{item.customer.postalCode} {item.customer.city}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            {item.hasSignedContract ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                                                    Umowa ({item.contractCount})
+                                                </span>
+                                            ) : item.offerCount > 0 ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                                                    Oferta
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                                                    Lead
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
                                                 {item.offerCount}
                                             </span>
                                         </td>
