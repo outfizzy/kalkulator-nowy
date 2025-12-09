@@ -2221,7 +2221,11 @@ export const DatabaseService = {
                 .single();
 
             if (insertError) {
-                console.error(`Error creating installation for contract ${contract.id}:`, insertError);
+                console.error(`Error creating installation for contract ${contract.id}:`, JSON.stringify(insertError, null, 2));
+                // Also attempt to log message if available
+                if ('message' in insertError) {
+                    console.error('Error details:', (insertError as any).message);
+                }
                 continue;
             }
 
@@ -3069,7 +3073,7 @@ export const DatabaseService = {
             .order('created_at', { ascending: false });
 
         if (error) {
-            console.error('Error fetching communications:', error);
+            console.error('Error fetching communications:', JSON.stringify(error, null, 2));
             return [];
         }
 

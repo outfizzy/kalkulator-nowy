@@ -2,22 +2,47 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-// Init Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // CORS headers - helpful for debugging if called from client
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
+
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { phoneNumber, installationDate, customerName, leadId } = req.body;
+    // Check Env Vars
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const apiKey = process.env.VAPI_PRIVATE_KEY;
+
+    // Destructure body EARLY so variables are available
+    const { phoneNumber, installationDate, customerName, leadId } = req.body;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        console.error('Missing Supabase Config');
+        return res.status(500).json({
+            error: 'Configuration Error: Missing SUPABASE_SERVICE_ROLE_KEY or URL.',
+            details: 'Please add SUPABASE_SERVICE_ROLE_KEY to Vercel Environment Variables.'
+        });
+    }
 
     if (!apiKey) {
         return res.status(500).json({ error: 'Server misconfiguration: Missing VAPI_PRIVATE_KEY' });
     }
+
+    // Init Supabase (safely inside try/catch if needed, but here we checked keys)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     if (!phoneNumber || !installationDate || !customerName) {
         return res.status(400).json({ error: 'Missing required fields: phoneNumber, installationDate, customerName' });
