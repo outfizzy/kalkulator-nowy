@@ -318,7 +318,19 @@ export const DatabaseService = {
                 .limit(1)
                 .single();
 
-            if (data) return this._mapCustomerRow(data);
+            if (data) {
+                // If found, update with new data to ensure we have the latest details
+                // Only update if we have meaningful new data
+                if (Object.keys(customerData).length > 2) { // crude check if we have more than just email
+                    try {
+                        const updated = await this.updateCustomer(data.id, customerData);
+                        return { ...updated, id: data.id };
+                    } catch (e) {
+                        console.warn('Failed to update existing customer in ensureCustomer', e);
+                    }
+                }
+                return this._mapCustomerRow(data);
+            }
         }
 
         // 3. Try to find by Phone (Secondary Identifier)
