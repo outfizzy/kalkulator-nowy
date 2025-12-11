@@ -21,14 +21,39 @@ export async function loadFonts(doc: jsPDF): Promise<boolean> {
     const loadFont = async (path: string, name: string, style: string): Promise<boolean> => {
         try {
             const response = await fetch(path);
-            if (!response.ok) return false;
+            if (!response.ok) {
+                console.warn(`Font fetch failed: ${path} ${response.status}`);
+                return false;
+            }
+
+            // Verify content type to avoid loading HTML (SPA fallback)
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('text/html')) {
+                console.warn(`Font fetch returned HTML (SPA fallback?): ${path}`);
+                return false;
+            }
+
             const blob = await response.blob();
+
+            // Basic size check (fonts should be > 1KB)
+            if (blob.size < 1000) {
+                console.warn(`Font file too small (${blob.size} bytes): ${path}`);
+                return false;
+            }
+
             const reader = new FileReader();
 
             return new Promise<boolean>((resolve) => {
                 reader.onloadend = () => {
                     try {
                         const base64data = (reader.result as string).split(',')[1];
+                        // Validate base64 data exists
+                        if (!base64data) {
+                            console.warn("Font read resulted in empty data");
+                            resolve(false);
+                            return;
+                        }
+
                         doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
                         doc.addFont(`${name}-${style}.ttf`, name, style);
                         resolve(true);
