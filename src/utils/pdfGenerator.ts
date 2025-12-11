@@ -151,7 +151,8 @@ export async function generateOfferPDF(offer: Offer) {
         doc.save(`Angebot_${safeId}.pdf`);
     } catch (e) {
         console.error("CRITICAL PDF GENERATION FAILURE", e);
-        alert("Błąd generowania PDF. Spróbuj ponownie lub skontaktuj się z administratorem.");
+        const msg = e instanceof Error ? e.message : String(e);
+        alert(`Błąd generowania PDF: ${msg}`);
     }
 }
 
@@ -161,9 +162,11 @@ export async function generateOfferPDFData(offer: Offer): Promise<string> {
         return doc.output('datauristring');
     } catch (e) {
         console.error("CRITICAL PDF GENERATION FAILURE", e);
-        // Return empty string or throw depending on consuming code requirement.
-        // Returning empty string might break callers expecting data.
-        throw new Error("PDF Generation Failed");
+        // Throw actual error message for debugging
+        if (e instanceof Error) {
+            throw new Error(`PDF Generation Failed: ${e.message}`);
+        }
+        throw new Error(`PDF Generation Failed: ${String(e)}`);
     }
 }
 
