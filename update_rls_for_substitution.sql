@@ -36,35 +36,41 @@ END $$;
 
 -- --- LEADS (Delegation Support) ---
 CREATE POLICY "Leads_SELECT" ON public.leads FOR SELECT USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR (assigned_to = auth.uid()) 
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = leads.assigned_to AND p.substitute_user_id = auth.uid() AND p.substitute_until >= NOW())
 );
 CREATE POLICY "Leads_INSERT" ON public.leads FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Leads_UPDATE" ON public.leads FOR UPDATE USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR (assigned_to = auth.uid())
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = leads.assigned_to AND p.substitute_user_id = auth.uid() AND p.substitute_until >= NOW())
 );
-CREATE POLICY "Leads_DELETE" ON public.leads FOR DELETE USING (auth.jwt() ->> 'role' IN ('admin', 'manager') OR (assigned_to = auth.uid()));
+CREATE POLICY "Leads_DELETE" ON public.leads FOR DELETE USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) 
+  OR (assigned_to = auth.uid())
+);
 
 -- --- OFFERS (Delegation Support) ---
 CREATE POLICY "Offers_SELECT" ON public.offers FOR SELECT USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR (user_id = auth.uid())
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = offers.user_id AND p.substitute_user_id = auth.uid() AND p.substitute_until >= NOW())
 );
 CREATE POLICY "Offers_INSERT" ON public.offers FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Offers_UPDATE" ON public.offers FOR UPDATE USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR (user_id = auth.uid())
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = offers.user_id AND p.substitute_user_id = auth.uid() AND p.substitute_until >= NOW())
 );
-CREATE POLICY "Offers_DELETE" ON public.offers FOR DELETE USING (auth.jwt() ->> 'role' IN ('admin', 'manager') OR (user_id = auth.uid()));
+CREATE POLICY "Offers_DELETE" ON public.offers FOR DELETE USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) 
+  OR (user_id = auth.uid())
+);
 
 -- --- CONTRACTS (Delegation Support via Offer) ---
 CREATE POLICY "Contracts_SELECT" ON public.contracts FOR SELECT USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR EXISTS (
     SELECT 1 FROM public.offers
     WHERE offers.id = contracts.offer_id
@@ -73,7 +79,7 @@ CREATE POLICY "Contracts_SELECT" ON public.contracts FOR SELECT USING (
 );
 CREATE POLICY "Contracts_INSERT" ON public.contracts FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Contracts_UPDATE" ON public.contracts FOR UPDATE USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR EXISTS (
     SELECT 1 FROM public.offers
     WHERE offers.id = contracts.offer_id
@@ -85,20 +91,23 @@ CREATE POLICY "Contracts_UPDATE" ON public.contracts FOR UPDATE USING (
 CREATE POLICY "Customers_SELECT" ON public.customers FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Customers_INSERT" ON public.customers FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Customers_UPDATE" ON public.customers FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Customers_DELETE" ON public.customers FOR DELETE USING (auth.jwt() ->> 'role' IN ('admin', 'manager'));
+CREATE POLICY "Customers_DELETE" ON public.customers FOR DELETE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')));
 
 -- --- MEASUREMENT REPORTS (Delegation Support) ---
 CREATE POLICY "Reports_SELECT" ON public.measurement_reports FOR SELECT USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR (user_id = auth.uid())
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = measurement_reports.user_id AND p.substitute_user_id = auth.uid() AND p.substitute_until >= NOW())
 );
 CREATE POLICY "Reports_INSERT" ON public.measurement_reports FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Reports_UPDATE" ON public.measurement_reports FOR UPDATE USING (
-  (auth.jwt() ->> 'role' IN ('admin', 'manager'))
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')))
   OR (user_id = auth.uid())
 );
-CREATE POLICY "Reports_DELETE" ON public.measurement_reports FOR DELETE USING (auth.jwt() ->> 'role' IN ('admin', 'manager') OR (user_id = auth.uid()));
+CREATE POLICY "Reports_DELETE" ON public.measurement_reports FOR DELETE USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) 
+  OR (user_id = auth.uid())
+);
 
 -- --- COMMUNICATIONS (Global Access for Authenticated) ---
 CREATE POLICY "Comms_SELECT" ON public.customer_communications FOR SELECT USING (auth.role() = 'authenticated');

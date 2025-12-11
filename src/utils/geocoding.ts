@@ -8,9 +8,9 @@ interface Coordinates {
  * Geocodes an address string to coordinates using OpenStreetMap Nominatim API.
  * Note: Nominatim Usage Policy requires max 1 request per second.
  */
-export async function geocodeAddress(address: string, city: string): Promise<Coordinates | null> {
+export async function geocodeAddress(address: string, city: string = ''): Promise<Coordinates | null> {
     try {
-        const query = encodeURIComponent(`${address}, ${city}`);
+        const query = encodeURIComponent(city ? `${address}, ${city}` : address);
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`;
 
         const response = await fetch(url, {

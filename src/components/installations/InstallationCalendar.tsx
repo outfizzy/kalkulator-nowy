@@ -70,10 +70,23 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({ inst
     };
 
     const getInstallationsForCell = (teamId: string | null, date: Date, hasTeams: boolean) => {
-        const dateStr = date.toISOString().split('T')[0];
         return installations.filter(i => {
-            const instDate = i.scheduledDate ? i.scheduledDate.slice(0, 10) : '';
-            if (!instDate || instDate !== dateStr) return false;
+            const instDateStr = i.scheduledDate ? i.scheduledDate.slice(0, 10) : '';
+            if (!instDateStr) return false;
+
+            // Safe normalizing
+            const instStartDate = new Date(instDateStr);
+            instStartDate.setHours(0, 0, 0, 0);
+
+            const duration = i.expectedDuration || 1;
+
+            const cellDate = new Date(date);
+            cellDate.setHours(0, 0, 0, 0);
+
+            // Should match if cellDate >= instStartDate AND cellDate < instStartDate + duration
+            const diffDays = Math.round((cellDate.getTime() - instStartDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0 || diffDays >= duration) return false;
 
             if (!hasTeams) {
                 // Widok bez ekip (np. monter) – pokazujemy wszystkie montaże w danym dniu
@@ -169,8 +182,8 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({ inst
                                             {cellInstallations.length > 0 && (
                                                 <div className="flex justify-end mb-1">
                                                     <span className={`text-[10px] font-bold px-1.5 rounded-full ${cellInstallations.length >= 3 ? 'bg-red-100 text-red-600' :
-                                                            cellInstallations.length === 2 ? 'bg-yellow-100 text-yellow-600' :
-                                                                'bg-green-100 text-green-600'
+                                                        cellInstallations.length === 2 ? 'bg-yellow-100 text-yellow-600' :
+                                                            'bg-green-100 text-green-600'
                                                         }`}>
                                                         {cellInstallations.length}/3
                                                     </span>
@@ -195,6 +208,11 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({ inst
                                                             }`}>
                                                             {inst.status === 'completed' ? 'Zakończony' :
                                                                 inst.status === 'issue' ? 'Problem' : 'Zaplanowany'}
+                                                            {(inst.expectedDuration || 1) > 1 && (
+                                                                <span className="ml-1 font-bold text-xs" title={`Czas trwania: ${inst.expectedDuration} dni`}>
+                                                                    (Dzień {Math.round((new Date(date.setHours(0, 0, 0, 0)).getTime() - new Date(inst.scheduledDate!.slice(0, 10)).getTime()) / (1000 * 60 * 60 * 24)) + 1}/{inst.expectedDuration})
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}

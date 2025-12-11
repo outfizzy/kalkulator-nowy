@@ -4,26 +4,24 @@ import type { Offer } from '../types';
 import { getSalesProfile } from './storage';
 import { translate, formatCurrency } from './translations';
 
-// Define colors for consistent branding
+// COPORATE IDENTITY COLORS (Professional & Modern)
 const COLORS = {
-    primary: [0, 102, 204] as [number, number, number], // Blue
-    secondary: [71, 85, 105] as [number, number, number], // Slate
-    accent: [59, 130, 246] as [number, number, number], // Light blue
-    text: [15, 23, 42] as [number, number, number], // Dark slate
-    textLight: [100, 116, 139] as [number, number, number], // Medium slate
-    background: [248, 250, 252] as [number, number, number], // Light gray
-    border: [226, 232, 240] as [number, number, number], // Border gray
+    primary: [44, 62, 80] as [number, number, number],    // Dark Slate Blue (Professional)
+    accent: [229, 142, 38] as [number, number, number],   // Elegant Orange/Gold accent
+    text: [30, 30, 30] as [number, number, number],       // Almost Black
+    textLight: [100, 100, 100] as [number, number, number], // Gray
+    line: [200, 200, 200] as [number, number, number],    // Light Gray for lines
+    tableHeader: [240, 240, 240] as [number, number, number] // Very light gray for headers
 };
 
-// Helper to load fonts - returns true if successful
-async function loadFonts(doc: jsPDF): Promise<boolean> {
+const DEFAULT_FONT = 'Helvetica'; // Standard font as fallback
+
+// Helper to load fonts safely
+export async function loadFonts(doc: jsPDF): Promise<boolean> {
     const loadFont = async (path: string, name: string, style: string): Promise<boolean> => {
         try {
             const response = await fetch(path);
-            if (!response.ok) {
-                console.warn(`Font ${path} not found, status: ${response.status}`);
-                return false;
-            }
+            if (!response.ok) return false;
             const blob = await response.blob();
             const reader = new FileReader();
 
@@ -34,428 +32,506 @@ async function loadFonts(doc: jsPDF): Promise<boolean> {
                         doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
                         doc.addFont(`${name}-${style}.ttf`, name, style);
                         resolve(true);
-                    } catch {
+                    } catch (e) {
+                        console.warn(`Failed to parse font ${name}-${style}`, e);
                         resolve(false);
                     }
                 };
                 reader.onerror = () => resolve(false);
                 reader.readAsDataURL(blob);
             });
-        } catch (error) {
-            console.warn(`Failed to load font ${path}:`, error);
-            return false;
+        } catch (e) {
+            console.warn(`Failed to load font ${name}-${style}`, e);
+            return false; // Silent failure, fallback to standard
         }
     };
 
-    const results = await Promise.all([
-        loadFont('/fonts/Roboto-Regular.ttf', 'Roboto', 'normal'),
-        loadFont('/fonts/Roboto-Bold.ttf', 'Roboto', 'bold')
-    ]);
-
-    return results.every(r => r);
+    try {
+        const results = await Promise.all([
+            loadFont('/fonts/Roboto-Regular.ttf', 'Roboto', 'normal'),
+            loadFont('/fonts/Roboto-Bold.ttf', 'Roboto', 'bold')
+        ]);
+        return results.every(r => r);
+    } catch (e) {
+        console.warn("Global font loading error", e);
+        return false;
+    }
 }
 
-// Helper to add logo and header to each page
-function addHeader(doc: jsPDF, pageNumber: number, fontFamily: string = 'helvetica') {
+// Draw Header on every page (Logo + Line)
+function addPageHeader(doc: jsPDF) {
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Add subtle background for header
-    doc.setFillColor(...COLORS.background);
-    doc.rect(0, 0, pageWidth, 30, 'F');
-
-    // Add logo
     try {
         const logoImg = new Image();
         logoImg.src = '/logo.png';
-        doc.addImage(logoImg, 'PNG', 15, 8, 60, 15);
-    } catch (e) {
-        // If logo fails, add text header with better styling
-        doc.setFontSize(20);
-        doc.setFont(fontFamily, 'bold');
+        // Add image: x, y, w, h
+        // Wrapped in try-catch to prevent crash if image is invalid
+        try {
+            doc.addImage(logoImg, 'PNG', 140, 10, 50, 12);
+        } catch (err) {
+            console.warn("Logo addImage failed", err);
+            // Verify if image loaded? addImage might fail if src is valid but content isn't loaded yet.
+            // In browser environment, usually we need to wait for onload.
+            // However, jspdf often handles img elements if cached.
+            // Best practice: Fallback text immediately.
+            throw err;
+        }
+    } catch {
+        // Fallback text
+        doc.setFontSize(18);
         doc.setTextColor(...COLORS.primary);
-        doc.text('PolenDach24', 15, 18);
+        // Use standard font safely
+        const font = doc.getFont().fontName === 'Roboto' ? 'Roboto' : 'Helvetica';
+        doc.setFont(font, 'bold');
+        doc.text('PolenDach24', 140, 20);
     }
 
-    // Add page number in top right with styling
-    doc.setFontSize(9);
-    doc.setFont(fontFamily, 'normal');
-    doc.setTextColor(...COLORS.textLight);
-    doc.text(`Seite ${pageNumber}`, pageWidth - 15, 18, { align: 'right' });
-
-    // Add decorative line under header
-    doc.setDrawColor(...COLORS.primary);
-    doc.setLineWidth(0.5);
-    doc.line(15, 28, pageWidth - 15, 28);
-
-    // Reset colors
-    doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(0, 0, 0);
+    // Thin line below header area
+    doc.setDrawColor(...COLORS.line);
+    doc.setLineWidth(0.1);
+    doc.line(20, 30, pageWidth - 20, 30);
 }
 
-// Helper to check if we need a new page
-function checkAndAddPage(doc: jsPDF, currentY: number, requiredSpace: number, pageNumber: number): { y: number; page: number } {
+// Draw Footer (3 Columns: Address, Contact, Bank/Reg)
+function addPageFooter(doc: jsPDF, pageNumber: number) {
+    const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const bottomMargin = 25;
+    const footerY = pageHeight - 35;
 
-    if (currentY + requiredSpace > pageHeight - bottomMargin) {
-        doc.addPage();
-        pageNumber++;
-        addHeader(doc, pageNumber);
-        return { y: 40, page: pageNumber }; // Start below header
-    }
-    return { y: currentY, page: pageNumber };
+    doc.setDrawColor(...COLORS.line);
+    doc.setLineWidth(0.1);
+    doc.line(20, footerY, pageWidth - 20, footerY);
+
+    const safeFont = doc.getFont().fontName === 'Roboto' ? 'Roboto' : 'Helvetica';
+
+    doc.setFontSize(7);
+    doc.setTextColor(...COLORS.textLight);
+    doc.setFont(safeFont, 'normal');
+
+    const colY = footerY + 5;
+    const colW = (pageWidth - 40) / 3;
+
+    // Col 1: Company Address
+    doc.setFont(safeFont, 'bold');
+    doc.text('PolenDach24', 20, colY);
+    doc.setFont(safeFont, 'normal');
+    doc.text('Musterstraße 123', 20, colY + 4);
+    doc.text('12345 Berlin', 20, colY + 8);
+    doc.text('Deutschland', 20, colY + 12);
+
+    // Col 2: Contact
+    doc.setFont(safeFont, 'bold');
+    doc.text('Kontakt', 20 + colW, colY);
+    doc.setFont(safeFont, 'normal');
+    doc.text('Tel: +49 123 456 789', 20 + colW, colY + 4);
+    doc.text('Email: kontakt@polendach24.de', 20 + colW, colY + 8);
+    doc.text('Web: www.polendach24.de', 20 + colW, colY + 12);
+
+    // Col 3: Bank / Legal
+    doc.setFont(safeFont, 'bold');
+    doc.text('Bankverbindung', 20 + (colW * 2), colY);
+    doc.setFont(safeFont, 'normal');
+    doc.text('Volksbank', 20 + (colW * 2), colY + 4);
+    doc.text('IBAN: DE00 0000 0000 0000 00', 20 + (colW * 2), colY + 8);
+    doc.text('BIC: AAAAAAAAAA', 20 + (colW * 2), colY + 12);
+
+    // Page count centered bottom
+    doc.text(`Seite ${pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
 }
 
-// Helper to add a section title with styling
-function addSectionTitle(doc: jsPDF, title: string, y: number, leftMargin: number = 15, fontFamily: string = 'helvetica'): number {
-    doc.setFontSize(11);
-    doc.setFont(fontFamily, 'bold');
-    doc.setTextColor(...COLORS.secondary);
-    doc.text(title, leftMargin, y);
-    doc.setTextColor(0, 0, 0);
-    return y + 8;
-}
+// Helpers for layout
+const MARGIN = 20;
+const CONTENT_START_Y = 40;
 
 export async function generateOfferPDF(offer: Offer) {
+    try {
+        const doc = await createDocument(offer);
+        const safeId = offer.id ? offer.id.substring(0, 7) : 'draft';
+        doc.save(`Angebot_${safeId}.pdf`);
+    } catch (e) {
+        console.error("CRITICAL PDF GENERATION FAILURE", e);
+        alert("Błąd generowania PDF. Spróbuj ponownie lub skontaktuj się z administratorem.");
+    }
+}
+
+export async function generateOfferPDFData(offer: Offer): Promise<string> {
+    try {
+        const doc = await createDocument(offer);
+        return doc.output('datauristring');
+    } catch (e) {
+        console.error("CRITICAL PDF GENERATION FAILURE", e);
+        // Return empty string or throw depending on consuming code requirement.
+        // Returning empty string might break callers expecting data.
+        throw new Error("PDF Generation Failed");
+    }
+}
+
+// SAFE STRING CONVERTER
+function safeStr(val: any): string {
+    if (val === null || val === undefined) return '';
+    return String(val);
+}
+
+async function createDocument(offer: Offer): Promise<jsPDF> {
+    // 1. SAFE DATA EXTRACTION
     const profile = getSalesProfile();
+
+    // 2. SETUP DOCUMENT
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // Load fonts first - use Helvetica as fallback
-    const fontsLoaded = await loadFonts(doc);
-    const fontFamily = fontsLoaded ? 'Roboto' : 'helvetica';
-    doc.setFont(fontFamily); // Set default font
+    // 3. FONT LOADING STRATEGY
+    const customFontsLoaded = await loadFonts(doc);
+    const fontFamily = customFontsLoaded ? 'Roboto' : 'Helvetica'; // Fallback to standard font
+
+    doc.setFont(fontFamily);
+
+    let currentY = CONTENT_START_Y;
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    let currentY = 40; // Start position after header
-    let pageNumber = 1;
 
-    // Add header to first page
-    addHeader(doc, pageNumber);
+    // --- PAGE 1 SETUP ---
+    addPageHeader(doc);
 
-    // Date formatting
-    const dateStr = new Date(offer.createdAt).toLocaleDateString('de-DE');
-
-    // Offer title box (visually enhanced)
-    const titleBoxHeight = 25;
-    doc.setFillColor(...COLORS.primary);
-    doc.roundedRect(pageWidth - 80, currentY - 5, 65, titleBoxHeight, 3, 3, 'F');
-
-    doc.setFontSize(16);
-    doc.setFont(fontFamily, 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('ANGEBOT', pageWidth - 47.5, currentY + 3, { align: 'center' });
-
-    doc.setFontSize(9);
-    doc.setFont(fontFamily, 'normal');
-    doc.text(`Nr: #${offer.id.substring(0, 8)}`, pageWidth - 47.5, currentY + 10, { align: 'center' });
-    doc.text(`Datum: ${dateStr}`, pageWidth - 47.5, currentY + 16, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-
-    currentY += 30;
-
-    // Customer and Seller addresses with boxes
-    const leftCol = 15;
-    const rightCol = pageWidth / 2 + 5;
-    const boxHeight = 45;
-
-    // Customer box
-    doc.setFillColor(...COLORS.background);
-    doc.setDrawColor(...COLORS.border);
-    doc.roundedRect(leftCol, currentY, (pageWidth / 2) - 20, boxHeight, 2, 2, 'FD');
-
-    // Seller box
-    doc.roundedRect(rightCol, currentY, (pageWidth / 2) - 10, boxHeight, 2, 2, 'FD');
-
-    let boxY = currentY + 5;
-
-    // Customer
-    doc.setFontSize(8);
-    doc.setFont(fontFamily, 'bold');
+    // 1. Sender Line (Tiny above address) - Standard DIN 5008
+    doc.setFontSize(6);
     doc.setTextColor(...COLORS.textLight);
-    doc.text('KUNDE', leftCol + 3, boxY);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(fontFamily, 'bold');
+    doc.text('PolenDach24 - Musterstraße 123 - 12345 Berlin', MARGIN, currentY + 5);
+
+    // 2. Recipient Address Block
     doc.setFontSize(10);
-    boxY += 5;
-    doc.text(`${offer.customer.salutation} ${offer.customer.firstName} ${offer.customer.lastName}`, leftCol + 3, boxY);
+    doc.setTextColor(...COLORS.text);
     doc.setFont(fontFamily, 'normal');
-    doc.setFontSize(8);
-    boxY += 4;
-    doc.text(`${offer.customer.street} ${offer.customer.houseNumber}`, leftCol + 3, boxY);
-    boxY += 4;
-    doc.text(`${offer.customer.postalCode} ${offer.customer.city}`, leftCol + 3, boxY);
-    boxY += 4;
-    doc.text(offer.customer.country, leftCol + 3, boxY);
-    boxY += 5;
-    doc.setTextColor(...COLORS.textLight);
-    doc.setFontSize(7);
-    doc.text(offer.customer.email, leftCol + 3, boxY);
-    boxY += 3;
-    doc.text(offer.customer.phone, leftCol + 3, boxY);
-    doc.setTextColor(0, 0, 0);
 
-    // Seller
-    let sellerBoxY = currentY + 5;
-    doc.setFontSize(8);
-    doc.setFont(fontFamily, 'bold');
-    doc.setTextColor(...COLORS.textLight);
-    doc.text('VERKÄUFER', rightCol + 3, sellerBoxY);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(fontFamily, 'bold');
+    let addrY = currentY + 15;
+    const c = offer.customer || {} as any; // Safe empty obj
+
+    // Defensive coding for address
+    const compName = safeStr(c.companyName);
+    if (compName) {
+        doc.text(compName, MARGIN, addrY);
+        addrY += 5;
+    }
+
+    const salutation = safeStr(c.salutation);
+    const firstName = safeStr(c.firstName);
+    const lastName = safeStr(c.lastName);
+
+    let recipientName = `${salutation} ${firstName} ${lastName}`.trim();
+    if (!recipientName) recipientName = "Kunde"; // Ultimate fallback
+
+    doc.text(recipientName, MARGIN, addrY);
+    addrY += 5;
+
+    const street = safeStr(c.street);
+    const houseNumber = safeStr(c.houseNumber);
+    doc.text(`${street} ${houseNumber}`.trim(), MARGIN, addrY);
+    addrY += 5;
+
+    const postalCode = safeStr(c.postalCode);
+    const city = safeStr(c.city);
+    doc.text(`${postalCode} ${city}`.trim(), MARGIN, addrY);
+    addrY += 5;
+
+    const country = safeStr(c.country) || 'Deutschland';
+    doc.text(country, MARGIN, addrY);
+
+    // 3. Info Block (Right side)
+    const infoX = pageWidth - MARGIN - 70; // 70mm width
+    const infoY = currentY + 10;
+
     doc.setFontSize(10);
-    sellerBoxY += 5;
+    // Labels
+    doc.setTextColor(...COLORS.textLight);
+    doc.text('Datum:', infoX, infoY);
+    doc.text('Kundennummer:', infoX, infoY + 6);
+    doc.text('Angebotsnummer:', infoX, infoY + 12);
+    doc.text('Ihr Ansprechpartner:', infoX, infoY + 18);
 
-    if (profile) {
-        doc.text(`${profile.firstName} ${profile.lastName}`, rightCol + 3, sellerBoxY);
-        doc.setFont(fontFamily, 'normal');
-        doc.setFontSize(8);
-        sellerBoxY += 4;
-        doc.text('PolenDach24 Vertreter', rightCol + 3, sellerBoxY);
-        sellerBoxY += 5;
-        doc.setTextColor(...COLORS.textLight);
-        doc.setFontSize(7);
-        doc.text(profile.email, rightCol + 3, sellerBoxY);
-        sellerBoxY += 3;
-        doc.text(profile.phone || '', rightCol + 3, sellerBoxY);
+    // Values
+    doc.setTextColor(...COLORS.text);
+    doc.text(new Date().toLocaleDateString('de-DE'), infoX + 35, infoY);
+
+    // Safe check for customerId
+    const customerIdStr = safeStr((offer as any).customerId || c.id);
+    doc.text(customerIdStr ? customerIdStr.substring(0, 8).toUpperCase() : '-', infoX + 35, infoY + 6);
+
+    const offerIdStr = safeStr(offer.id);
+    doc.text(offerIdStr ? offerIdStr.substring(0, 8).toUpperCase() : '-', infoX + 35, infoY + 12);
+
+    const contactName = profile ? `${safeStr(profile.firstName)} ${safeStr(profile.lastName)}` : 'Kundenservice';
+    doc.text(contactName, infoX + 35, infoY + 18);
+
+    // 4. Offer Title / Subject
+    currentY = 100; // Fixed position usually around 98mm-100mm
+    doc.setFontSize(14);
+    doc.setFont(fontFamily, 'bold');
+    doc.text(`Angebot #${offerIdStr ? offerIdStr.substring(0, 8).toUpperCase() : ''}`, MARGIN, currentY);
+
+    doc.setFontSize(11);
+    doc.setFont(fontFamily, 'normal');
+    currentY += 8;
+
+    // Safeguard product model
+    const modelId = offer.product ? offer.product.modelId : '';
+    const translatedModel = modelId ? translate(modelId, 'models') : 'Unbekanntes Modell';
+    doc.text(`Projekt: Terrassenüberdachung - ${translatedModel}`, MARGIN, currentY);
+
+    // 5. Intro Text
+    currentY += 15;
+    doc.setFontSize(10);
+
+    // 5. Intro Text
+    currentY += 15;
+    doc.setFontSize(10);
+
+    // Check for AI Description
+    if (offer.settings?.aiDescription) {
+        const aiText = safeStr(offer.settings.aiDescription);
+        const splitText = doc.splitTextToSize(aiText, pageWidth - (MARGIN * 2));
+        doc.text(splitText, MARGIN, currentY);
+        // Adjust Y based on lines count
+        currentY += (splitText.length * 5) + 5;
+
+        // Add bridge sentence if not present in AI text (optional, but good for consistency)
+        // doc.text('Gerne unterbreiten wir Ihnen folgendes freibleibendes Angebot:', MARGIN, currentY);
     } else {
-        doc.text('PolenDach24', rightCol + 3, sellerBoxY);
-        doc.setFont(fontFamily, 'normal');
-        doc.setFontSize(8);
-        sellerBoxY += 4;
-        doc.text('Kundenservice', rightCol + 3, sellerBoxY);
-        sellerBoxY += 5;
-        doc.setTextColor(...COLORS.textLight);
-        doc.setFontSize(7);
-        doc.text('kontakt@polendach24.de', rightCol + 3, sellerBoxY);
-    }
-    doc.setTextColor(0, 0, 0);
-
-    currentY += boxHeight + 12;
-
-    // Check if we need a new page
-    const check1 = checkAndAddPage(doc, currentY, 50, pageNumber);
-    currentY = check1.y;
-    pageNumber = check1.page;
-
-    // Product Specification Section
-    currentY = addSectionTitle(doc, 'PRODUKTSPEZIFIKATION', currentY);
-
-    // Prepare product details
-    const modelName = translate(offer.product.modelId, 'models');
-    const colorName = translate(offer.product.color, 'colors');
-    const roofName = translate(offer.product.roofType, 'roofTypes');
-
-    let roofDetail = '';
-    if (offer.product.roofType === 'polycarbonate' && offer.product.polycarbonateType) {
-        roofDetail = translate(offer.product.polycarbonateType, 'polycarbonateTypes');
-    } else if (offer.product.roofType === 'glass' && offer.product.glassType) {
-        roofDetail = translate(offer.product.glassType, 'glassTypes');
-    }
-
-    const installationType = translate(offer.product.installationType, 'installationTypes');
-
-    // Specification table with better styling
-    const specData = [
-        ['Modell:', modelName.toUpperCase()],
-        ['Abmessungen:', `${offer.product.width} mm × ${offer.product.projection} mm`],
-    ];
-
-    if (offer.product.postsHeight) {
-        specData.push(['Pfostenhöhe:', `${offer.product.postsHeight} mm`]);
-    }
-
-    specData.push(
-        ['Farbe:', colorName],
-        ['Dachtyp:', `${roofName}${roofDetail ? ' - ' + roofDetail : ''}`],
-        ['Montageart:', installationType],
-        ['Schneelastzone:', `Zone ${offer.snowZone.id} (${offer.snowZone.value} kN/m²)`]
-    );
-
-    autoTable(doc, {
-        startY: currentY,
-        head: [],
-        body: specData,
-        theme: 'plain',
-        styles: {
-            font: fontFamily,
-            fontSize: 9,
-            cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
-            lineColor: COLORS.border,
-            lineWidth: 0.1
-        },
-        columnStyles: {
-            0: { fontStyle: 'normal', textColor: COLORS.textLight, cellWidth: 55 },
-            1: { fontStyle: 'bold', textColor: COLORS.text }
-        },
-        margin: { left: leftCol },
-        alternateRowStyles: { fillColor: COLORS.background }
-    });
-
-    currentY = (doc as any).lastAutoTable.finalY + 12;
-
-    // Check if we need a new page
-    const check2 = checkAndAddPage(doc, currentY, 40, pageNumber);
-    currentY = check2.y;
-    pageNumber = check2.page;
-
-    // Addons Section (if any)
-    if (offer.product.addons.length > 0 || (offer.product.selectedAccessories && offer.product.selectedAccessories.length > 0)) {
-        currentY = addSectionTitle(doc, 'ZUSATZAUSSTATTUNG', currentY);
-
-        const addonsData: any[] = [];
-
-        offer.product.addons.forEach(addon => {
-            const name = addon.variant ? `${addon.name} (${addon.variant})` : addon.name;
-            addonsData.push([name, formatCurrency(addon.price)]);
-        });
-
-        if (offer.product.selectedAccessories) {
-            offer.product.selectedAccessories.forEach(acc => {
-                addonsData.push([`${acc.quantity}× ${acc.name}`, formatCurrency(acc.price * acc.quantity)]);
-            });
+        // Standard Fallback Text
+        let greeting = 'Sehr geehrte Damen und Herren,';
+        if (salutation === 'Firma') {
+            greeting = 'Sehr geehrte Damen und Herren,';
+        } else if (lastName) {
+            const suffix = salutation === 'Herr' ? 'r' : '';
+            if (salutation === 'Herr' || salutation === 'Frau') {
+                greeting = `Sehr geehrte${suffix} ${salutation} ${lastName},`;
+            }
         }
 
-        autoTable(doc, {
-            startY: currentY,
-            head: [['Position', 'Preis']],
-            body: addonsData,
-            theme: 'grid',
-            styles: {
-                font: fontFamily,
-                fontSize: 9,
-                cellPadding: 3,
-                lineColor: COLORS.border,
-                lineWidth: 0.1
-            },
-            headStyles: {
-                fillColor: COLORS.primary,
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'left'
-            },
-            alternateRowStyles: { fillColor: COLORS.background },
-            columnStyles: {
-                0: { cellWidth: pageWidth - 75 },
-                1: { halign: 'right', cellWidth: 45, fontStyle: 'bold' }
-            },
-            margin: { left: leftCol, right: 15 }
-        });
-
-        currentY = (doc as any).lastAutoTable.finalY + 12;
+        doc.text(greeting, MARGIN, currentY);
+        currentY += 6;
+        doc.text('vielen Dank für Ihre Anfrage und das damit verbundene Interesse an unseren Produkten.', MARGIN, currentY);
+        currentY += 5;
+        doc.text('Gerne unterbreiten wir Ihnen folgendes freibleibendes Angebot:', MARGIN, currentY);
     }
 
-    // Installation Section (if any)
-    if (offer.pricing.installationCosts) {
-        const check3 = checkAndAddPage(doc, currentY, 35, pageNumber);
-        currentY = check3.y;
-        pageNumber = check3.page;
+    currentY += 10;
 
-        currentY = addSectionTitle(doc, 'MONTAGE', currentY);
+    // 6. Product Table
+    // Define table content
+    const tableBody = [];
 
-        const installData = [
-            [`Montage (${offer.product.installationDays} Tage)`, formatCurrency(offer.pricing.installationCosts.dailyTotal)],
-            [`Anfahrt (${offer.pricing.installationCosts.travelDistance} km)`, formatCurrency(offer.pricing.installationCosts.travelCost)],
-            ['Gesamt Montage:', formatCurrency(offer.pricing.installationCosts.totalInstallation)]
-        ];
+    // Main Product
+    const width = offer.product ? safeStr(offer.product.width) : '0';
+    const projection = offer.product ? safeStr(offer.product.projection) : '0';
+    const color = offer.product ? translate(safeStr(offer.product.color), 'colors') : '-';
 
-        autoTable(doc, {
-            startY: currentY,
-            head: [],
-            body: installData,
-            theme: 'plain',
-            styles: {
-                font: fontFamily,
-                fontSize: 9,
-                cellPadding: 3,
-                lineColor: COLORS.border,
-                lineWidth: 0.1
-            },
-            columnStyles: {
-                0: { cellWidth: pageWidth - 75, textColor: COLORS.textLight },
-                1: { halign: 'right', fontStyle: 'bold', cellWidth: 45, textColor: COLORS.text }
-            },
-            margin: { left: leftCol, right: 15 },
-            alternateRowStyles: { fillColor: COLORS.background }
-        });
-
-        currentY = (doc as any).lastAutoTable.finalY + 12;
+    let roofDesc = '-';
+    if (offer.product) {
+        roofDesc = translate(safeStr(offer.product.roofType), 'roofTypes');
+        if (offer.product.roofType === 'polycarbonate' && offer.product.polycarbonateType) {
+            roofDesc += ` (${translate(offer.product.polycarbonateType, 'polycarbonateTypes')})`;
+        } else if (offer.product.roofType === 'glass' && offer.product.glassType) {
+            roofDesc += ` (${translate(offer.product.glassType, 'glassTypes')})`;
+        }
     }
 
-    // Pricing Summary
-    const check4 = checkAndAddPage(doc, currentY, 55, pageNumber);
-    currentY = check4.y;
-    pageNumber = check4.page;
+    const basePrice = offer.pricing ? offer.pricing.basePrice : 0;
 
-    currentY = addSectionTitle(doc, 'PREISZUSAMMENFASSUNG', currentY);
+    tableBody.push([
+        '1',
+        `Terrassenüberdachung Modell "${translatedModel}"\n` +
+        `Maße: ${width}mm x ${projection}mm\n` +
+        `Farbe: ${color}\n` +
+        `Dacheindeckung: ${roofDesc}`,
+        formatCurrency(basePrice)
+    ]);
 
-    const vatAmount = (offer.pricing?.sellingPriceGross ?? 0) - (offer.pricing?.sellingPriceNet ?? 0);
+    // Consolidate Addons & Custom Items
+    let pos = 2;
+    if (offer.product && offer.product.addons) {
+        offer.product.addons.forEach(addon => {
+            const variant = safeStr(addon.variant);
+            const name = variant ? `${addon.name} (${variant})` : addon.name;
+            tableBody.push([
+                String(pos),
+                safeStr(name),
+                formatCurrency(addon.price)
+            ]);
+            pos++;
+        });
+    }
 
-    const pricingData = [
-        ['Nettopreis:', formatCurrency(offer.pricing.sellingPriceNet)],
-        ['MwSt. (19%):', formatCurrency(vatAmount)],
-    ];
+    if (offer.product && offer.product.selectedAccessories) {
+        offer.product.selectedAccessories.forEach(acc => {
+            tableBody.push([
+                String(pos),
+                `${acc.quantity}x ${safeStr(acc.name)}`,
+                formatCurrency(acc.price * acc.quantity)
+            ]);
+            pos++;
+        });
+    }
 
+    if (offer.product && offer.product.customItems) {
+        offer.product.customItems.forEach(item => {
+            tableBody.push([
+                String(pos),
+                `${item.quantity}x ${safeStr(item.name)}`,
+                formatCurrency(item.price * item.quantity)
+            ]);
+            pos++;
+        });
+    }
+
+    // Installation
+    if (offer.pricing && offer.pricing.installationCosts) {
+        const days = safeStr(offer.product.installationDays);
+        const dist = safeStr(offer.pricing.installationCosts.travelDistance);
+        tableBody.push([
+            String(pos),
+            `Montage & Lieferung\n` +
+            `- Montage (${days} Tage)\n` +
+            `- Anfahrt (${dist} km)`,
+            formatCurrency(offer.pricing.installationCosts.totalInstallation)
+        ]);
+        pos++;
+    }
+
+    // Render Table
     autoTable(doc, {
         startY: currentY,
-        head: [],
-        body: pricingData,
-        theme: 'plain',
+        head: [['Pos.', 'Bezeichnung', 'Gesamtpreis']],
+        body: tableBody,
+        theme: 'plain', // Clean look
         styles: {
             font: fontFamily,
             fontSize: 10,
-            cellPadding: 4,
-            lineColor: COLORS.border,
-            lineWidth: 0.1
+            cellPadding: 5,
+            lineWidth: 0,
+        },
+        headStyles: {
+            fillColor: COLORS.tableHeader,
+            textColor: COLORS.text,
+            fontStyle: 'bold',
+            halign: 'left'
         },
         columnStyles: {
-            0: { textColor: COLORS.textLight, cellWidth: pageWidth - 75 },
-            1: { halign: 'right', fontStyle: 'bold', cellWidth: 45, textColor: COLORS.text }
+            0: { cellWidth: 15, halign: 'center' },
+            1: { cellWidth: 'auto' }, // Description
+            2: { cellWidth: 40, halign: 'right' }
         },
-        margin: { left: leftCol, right: 15 }
+        didDrawPage: () => {
+            // Optional: Handle multipage headers if needed
+        }
     });
 
-    currentY = (doc as any).lastAutoTable.finalY + 3;
+    // Update Y
+    // Defensive check for lastAutoTable presence
+    const lastTableY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : currentY;
+    currentY = lastTableY + 10;
 
-    // Grand Total with enhanced styling
-    const totalBoxHeight = 15;
-    doc.setFillColor(...COLORS.primary);
-    doc.roundedRect(leftCol, currentY, pageWidth - 30, totalBoxHeight, 2, 2, 'F');
+    // ensure we have space for totals
+    if (currentY + 60 > doc.internal.pageSize.getHeight() - 50) {
+        doc.addPage();
+        currentY = CONTENT_START_Y;
+        addPageHeader(doc); // Add header to new page
+    }
+
+    // 7. Totals Block (Right aligned)
+    const totalX = pageWidth - MARGIN - 80;
+    const valX = pageWidth - MARGIN;
+
+    // Defensive math
+    const sellingGross = offer.pricing ? Number(offer.pricing.sellingPriceGross) || 0 : 0;
+    const sellingNet = offer.pricing ? Number(offer.pricing.sellingPriceNet) || 0 : 0;
+    const vat = sellingGross - sellingNet;
+
+    doc.setFontSize(10);
+    doc.text('Nettosumme:', totalX, currentY);
+    doc.text(formatCurrency(sellingNet), valX, currentY, { align: 'right' });
+    currentY += 6;
+
+    doc.text('Zzgl. 19% MwSt.:', totalX, currentY);
+    doc.text(formatCurrency(vat), valX, currentY, { align: 'right' });
+    currentY += 4;
+
+    // Double Line under totals
+    doc.setDrawColor(...COLORS.text);
+    doc.setLineWidth(0.5);
+    doc.line(totalX, currentY, pageWidth - MARGIN, currentY);
+    currentY += 6;
 
     doc.setFontSize(12);
     doc.setFont(fontFamily, 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('GESAMTPREIS (BRUTTO):', leftCol + 4, currentY + 9);
+    doc.text('Gesamtsumme:', totalX, currentY);
+    doc.text(formatCurrency(sellingGross), valX, currentY, { align: 'right' });
 
-    doc.setFontSize(16);
-    doc.text(formatCurrency(offer.pricing.sellingPriceGross), pageWidth - 18, currentY + 9.5, { align: 'right' });
-    doc.setTextColor(0, 0, 0);
+    // Double line bottom
+    currentY += 2;
+    doc.setLineWidth(0.5);
+    doc.line(totalX, currentY, pageWidth - MARGIN, currentY);
+    doc.setLineWidth(0.1);
+    doc.line(totalX, currentY + 1, pageWidth - MARGIN, currentY + 1);
 
-    currentY += totalBoxHeight + 15;
+    currentY += 20;
 
-    // Footer / Terms
-    const check5 = checkAndAddPage(doc, currentY, 30, pageNumber);
-    currentY = check5.y;
-    pageNumber = check5.page;
+    // 8. Terms & Conditions Block
+    // Check space
+    if (currentY + 100 > doc.internal.pageSize.getHeight() - 50) {
+        doc.addPage();
+        currentY = CONTENT_START_Y;
+        addPageHeader(doc);
+    }
 
-    // Add decorative line above footer
-    doc.setDrawColor(...COLORS.border);
-    doc.setLineWidth(0.3);
-    doc.line(leftCol, currentY, pageWidth - 15, currentY);
-    currentY += 5;
+    doc.setFontSize(11);
+    doc.setFont(fontFamily, 'bold');
+    doc.setTextColor(...COLORS.primary);
+    doc.text('Zahlungsmethoden und Bedingungen', MARGIN, currentY);
+    currentY += 8;
 
-    doc.setFontSize(7);
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.text);
     doc.setFont(fontFamily, 'normal');
-    doc.setTextColor(...COLORS.textLight);
-    const footerText = [
-        'Dieses Angebot ist 30 Tage gültig.',
-        'Zahlungsbedingungen: 30% Anzahlung, 70% bei Lieferung.',
-        'Bei Fragen kontaktieren Sie uns gerne unter kontakt@polendach24.de'
+
+    const conditions = [
+        { t: 'Anzahlung', d: 'Für die Realisierung des Projekts ist eine Anzahlung von 40-50 % der Gesamtsumme erforderlich, abhängig von der Größe des Auftrags.' },
+        { t: 'Zahlung am Montagetag', d: '90 % der Gesamtsumme werden am Tag der Montage fällig, um die Fertigstellung und termingerechte Ausführung zu gewährleisten.' },
+        { t: 'Endzahlung', d: 'Der Restbetrag wird nach der erfolgreichen Fertigstellung des Projekts ausgezahlt.' },
+        { t: 'Flexible Anzahlung', d: 'In Ausnahmefällen und bei gegenseitigem Vertrauen kann auf eine Anzahlung verzichtet werden. Die Wahl der Materialien spielt hierbei eine entscheidende Rolle.' },
+        { t: 'Zahlungsoptionen', d: 'Barzahlung: Direkt an den Monteur.\nÜberweisung: Auf unser Konto bei der Volksbank.' },
+        { t: 'Steuerhinweis', d: 'Alle unsere Rechnungen werden mit 19% Mehrwertsteuer ausgewiesen.' }
     ];
 
-    footerText.forEach((line, i) => {
-        doc.text(line, pageWidth / 2, currentY + (i * 4), { align: 'center' });
+    conditions.forEach(item => {
+        // Check for page break
+        if (currentY + 15 > doc.internal.pageSize.getHeight() - 40) {
+            doc.addPage();
+            currentY = CONTENT_START_Y;
+            addPageHeader(doc);
+        }
+
+        doc.setFont(fontFamily, 'bold');
+        doc.text(item.t, MARGIN, currentY);
+        currentY += 4;
+
+        doc.setFont(fontFamily, 'normal');
+        // Handle multiline text
+        const splitText = doc.splitTextToSize(item.d, pageWidth - (MARGIN * 2));
+        doc.text(splitText, MARGIN, currentY);
+        currentY += (splitText.length * 4) + 4;
     });
 
-    // Save the PDF with proper encoding for Polish/German characters
-    doc.save(`Angebot_Polendach24_${offer.id.substring(0, 8)}.pdf`);
+    // Add Headers/Footers to all pages at the end
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        // Header is added during creation for page 1/resets, 
+        // but need to ensure footer is on all pages. 
+        // Careful not to double-add header. 
+        // Our 'addPageHeader' is safe to call if we manage positions, 
+        // but here we just want footers.
+        addPageFooter(doc, i);
+    }
+
+    return doc;
 }

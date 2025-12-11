@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { NotificationsDropdown } from './notifications/NotificationsDropdown';
 
 export const Layout: React.FC = () => {
     const { currentUser, logout, isAdmin } = useAuth();
@@ -36,9 +37,10 @@ export const Layout: React.FC = () => {
                     <NavLink to="/leads" label="Leady" icon="users" />
                     <NavLink to="/offers" label="Lista Ofert" icon="offers" />
                     <NavLink to="/customers" label="Klienci" icon="users" />
-                    <NavLink to="/reports" label="Raporty" icon="reports" />
+
                     <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />
                     <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
+                    <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />
                     <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
                     <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
                     {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" />}
@@ -104,7 +106,7 @@ export const Layout: React.FC = () => {
                             <NavLink to="/leads" label="Leady" icon="users" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/offers" label="Lista Ofert" icon="offers" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/customers" label="Klienci" icon="users" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/reports" label="Raporty" icon="reports" onClick={() => setMobileMenuOpen(false)} />
+
                             <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
@@ -155,9 +157,12 @@ export const Layout: React.FC = () => {
                         </button>
                         <h2 className="text-lg font-semibold text-slate-800">Kreator Ofert</h2>
                     </div>
-                    {/* Mobile logo */}
-                    <div className="md:hidden">
-                        <img src="/logo.png" alt="PolenDach 24" className="h-8 w-auto" />
+                    <div className="flex items-center gap-3">
+                        <NotificationsDropdown />
+                        {/* Mobile logo */}
+                        <div className="md:hidden">
+                            <img src="/logo.png" alt="PolenDach 24" className="h-8 w-auto" />
+                        </div>
                     </div>
                 </header>
                 <div className="flex-1 p-4 md:p-8 overflow-auto">

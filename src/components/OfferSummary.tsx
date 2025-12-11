@@ -1,19 +1,23 @@
 import React from 'react';
 import type { Offer } from '../types';
 import { generateOfferPDF } from '../utils/pdfGenerator';
+import { calculatePrice } from '../utils/pricing';
 import { translations, translate, formatCurrency } from '../utils/translations';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { PricingInsights } from './PricingInsights';
+import { AiService } from '../services/ai';
 
 
 interface OfferSummaryProps {
     offer: Offer;
     onReset: () => void;
+    onOfferUpdate?: (offer: Offer) => void;
 }
 
-export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) => {
+export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOfferUpdate }) => {
 
 
     const [isGenerating, setIsGenerating] = React.useState(false);
@@ -24,6 +28,120 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
     const [orderCosts, setOrderCosts] = React.useState<number>(offer.pricing.orderCosts || 0);
     const [isUpdatingCosts, setIsUpdatingCosts] = React.useState(false);
     const [isCreatingContract, setIsCreatingContract] = React.useState(false);
+
+    // Custom Item Form State
+    const [showCustomItemForm, setShowCustomItemForm] = React.useState(false);
+    const [newItemName, setNewItemName] = React.useState('');
+    const [newItemPrice, setNewItemPrice] = React.useState('');
+    const [newItemQty, setNewItemQty] = React.useState('1');
+
+    const handleAddCustomItem = async () => {
+        if (!newItemName || !newItemPrice || !onOfferUpdate) return;
+
+        try {
+            const price = parseFloat(newItemPrice.replace(',', '.'));
+            const qty = parseInt(newItemQty) || 1;
+
+            const newItem = {
+                id: crypto.randomUUID(),
+                name: newItemName,
+                price: price,
+                quantity: qty,
+                description: 'Pozycja dodatkowa'
+            };
+
+            const updatedProduct = {
+                ...offer.product,
+                customItems: [...(offer.product.customItems || []), newItem]
+            };
+
+            // Recalculate
+            const margin = (offer.pricing.marginPercentage || 40) / 100;
+            const newPricing = calculatePrice(updatedProduct, margin, offer.snowZone, offer.customer.postalCode);
+            // Preserve order costs if any
+            newPricing.orderCosts = offer.pricing.orderCosts;
+            newPricing.measurementCost = offer.pricing.measurementCost;
+
+            const updatedOffer = {
+                ...offer,
+                product: updatedProduct,
+                pricing: newPricing,
+                updatedAt: new Date()
+            };
+
+            // Update DB
+            await DatabaseService.updateOffer(updatedOffer.id, {
+                product: updatedProduct,
+                pricing: newPricing
+            });
+
+            // Update Parent
+            onOfferUpdate(updatedOffer);
+
+            // Reset Form
+            setNewItemName('');
+            setNewItemPrice('');
+            setNewItemQty('1');
+            setShowCustomItemForm(false);
+            toast.success('Dodano pozycję');
+        } catch (e) {
+            console.error(e);
+            toast.error('Błąd dodawania pozycji');
+        }
+    };
+
+    const handleRemoveCustomItem = async (itemId: string) => {
+        if (!onOfferUpdate) return;
+        try {
+            const updatedProduct = {
+                ...offer.product,
+                customItems: (offer.product.customItems || []).filter(i => i.id !== itemId)
+            };
+
+            const margin = (offer.pricing.marginPercentage || 40) / 100;
+            const newPricing = calculatePrice(updatedProduct, margin, offer.snowZone, offer.customer.postalCode);
+            // Preserve costs
+            newPricing.orderCosts = offer.pricing.orderCosts;
+            newPricing.measurementCost = offer.pricing.measurementCost;
+
+            const updatedOffer = {
+                ...offer,
+                product: updatedProduct,
+                pricing: newPricing,
+                updatedAt: new Date()
+            };
+
+            await DatabaseService.updateOffer(updatedOffer.id, {
+                product: updatedProduct,
+                pricing: newPricing
+            });
+
+            onOfferUpdate(updatedOffer);
+            toast.success('Usunięto pozycję');
+        } catch (e) {
+            toast.error('Błąd usuwania');
+        }
+    };
+
+    const handleManualSave = async () => {
+        if (!onOfferUpdate) return;
+        try {
+            // Force recalculate and save to be sure
+            const margin = (offer.pricing.marginPercentage || 40) / 100;
+            const newPricing = calculatePrice(offer.product, margin, offer.snowZone, offer.customer.postalCode);
+            // Preserve costs
+            newPricing.orderCosts = offer.pricing.orderCosts;
+            newPricing.measurementCost = offer.pricing.measurementCost;
+
+            await DatabaseService.updateOffer(offer.id, {
+                pricing: newPricing
+            });
+            toast.success('Oferta zapisana i przeliczona');
+            window.location.reload();
+        } catch (e) {
+            toast.error('Błąd zapisu');
+        }
+    };
 
     // Update local state when offer changes (e.g. after parent refresh)
     React.useEffect(() => {
@@ -130,6 +248,81 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
             </div>
 
             <div className="p-8">
+                {/* AI Enhancements */}
+                <div className="mb-8 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm uppercase tracking-wider text-indigo-800 font-semibold flex items-center gap-2">
+                            ✨ AI Asystent
+                        </h3>
+                        {onOfferUpdate && (
+                            <button
+                                onClick={async () => {
+                                    const toastId = toast.loading('Generuję opis...');
+                                    try {
+                                        const text = await AiService.generateOfferIntro(offer, currentUser);
+                                        // Save to offer.settings.aiDescription
+                                        const newSettings = { ...(offer.settings || {}), aiDescription: text };
+
+                                        await DatabaseService.updateOffer(offer.id, {
+                                            settings: newSettings
+                                        });
+
+                                        onOfferUpdate({
+                                            ...offer,
+                                            settings: newSettings as any
+                                        });
+
+                                        toast.success('Opis wygenerowany!', { id: toastId });
+                                    } catch (e: any) {
+                                        console.error(e);
+                                        toast.error(e.message || 'Błąd AI', { id: toastId });
+                                    }
+                                }}
+                                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-full hover:bg-indigo-700 transition flex items-center gap-1"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Generuj Wstęp
+                            </button>
+                        )}
+                        {onOfferUpdate && (
+                            <button
+                                onClick={async () => {
+                                    const toastId = toast.loading('Generuję maila...');
+                                    try {
+                                        const text = await AiService.generateEmail(offer, currentUser);
+                                        // Simple modal or alert for now
+                                        // Copy to clipboard
+                                        await navigator.clipboard.writeText(text);
+                                        toast.success('Treść maila skopiowana do schowka!', { id: toastId });
+                                        alert("Wygenerowana Treść Maila (Skopiowano do schowka):\n\n" + text);
+                                    } catch (e: any) {
+                                        toast.error('Błąd generowania maila', { id: toastId });
+                                    }
+                                }}
+                                className="ml-2 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-full hover:bg-emerald-700 transition flex items-center gap-1"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                Generuj Maila
+                            </button>
+                        )}
+                    </div>
+
+                    {offer.settings?.aiDescription && (
+                        <div className="bg-white p-3 rounded border border-indigo-100 text-sm text-slate-600 italic mb-4">
+                            "{offer.settings.aiDescription}"
+                        </div>
+                    )}
+
+                    <PricingInsights
+                        postalCode={offer.customer.postalCode}
+                        currentMargin={offer.pricing.marginPercentage || 0.25}
+                    />
+                </div>
+
                 {/* Customer Details */}
                 <div className="mb-8">
                     <h3 className="text-sm uppercase tracking-wider text-slate-500 font-semibold mb-4">{translations.customer}</h3>
@@ -232,8 +425,86 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                                     </td>
                                 </tr>
                             ))}
+                            {/* Custom Items */}
+                            {offer.product.customItems?.map((item, idx) => (
+                                <tr key={`custom-${idx}`} className="bg-amber-50/50">
+                                    <td className="py-4 text-slate-900 pl-2 border-l-2 border-amber-500">
+                                        <div className="flex justify-between items-center group">
+                                            <span className="font-medium">{item.quantity}x {item.name}</span>
+                                            {onOfferUpdate && (
+                                                <button onClick={() => handleRemoveCustomItem(item.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity px-2">
+                                                    🗑️
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="py-4 text-slate-900 text-right">
+                                        {formatCurrency(item.price * item.quantity)}
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
+
+                    {/* Add Custom Item Button */}
+                    {onOfferUpdate && !showCustomItemForm && (
+                        <div className="mt-4 print:hidden">
+                            <button
+                                onClick={() => setShowCustomItemForm(true)}
+                                className="text-sm font-bold text-accent hover:text-accent-dark flex items-center gap-2"
+                            >
+                                <span>➕ Dodaj własną pozycję</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Custom Item Form */}
+                    {showCustomItemForm && (
+                        <div className="mt-4 p-4 bg-white border border-accent/20 rounded-lg shadow-sm print:hidden animate-in fade-in slide-in-from-top-2">
+                            <h4 className="text-sm font-bold text-slate-700 mb-3">Nowa Pozycja</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div className="md:col-span-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Nazwa (np. Montaż dodatkowy)"
+                                        className="w-full p-2 border border-slate-300 rounded text-sm"
+                                        value={newItemName}
+                                        onChange={e => setNewItemName(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <input
+                                        type="number"
+                                        placeholder="Cena (Netto)"
+                                        className="w-full p-2 border border-slate-300 rounded text-sm"
+                                        value={newItemPrice}
+                                        onChange={e => setNewItemPrice(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        placeholder="Il."
+                                        className="w-full p-2 border border-slate-300 rounded text-sm"
+                                        value={newItemQty}
+                                        onChange={e => setNewItemQty(e.target.value)}
+                                    />
+                                    <button
+                                        onClick={handleAddCustomItem}
+                                        className="bg-accent text-white px-3 rounded hover:bg-accent-dark transition-colors"
+                                    >
+                                        OK
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCustomItemForm(false)}
+                                        className="text-slate-400 hover:text-slate-600 px-2"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Installation Costs */}
@@ -267,8 +538,8 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                     </div>
                 )}
 
-                {/* Profitability Analysis - Admin Only */}
-                {isAdminOrManager && (
+                {/* Profitability Analysis - Admin Only - HIDDEN BY DEFAULT AS REQUESTED */}
+                {false && isAdminOrManager && (
                     <div className="mb-12 bg-slate-800 rounded-xl p-6 text-slate-100 shadow-xl border border-slate-700">
                         <div className="flex justify-between items-start mb-6">
                             <div>
@@ -384,6 +655,16 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset }) =>
                         Neues Angebot
                     </button>
                     <div className="flex gap-3">
+                        {/* Manual Save Button */}
+                        <button
+                            onClick={handleManualSave}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-md transition-colors flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Zapisz Ofertę
+                        </button>
                         {/* Contract Conversion Button */}
                         {offer.status === 'sold' && (
                             <button

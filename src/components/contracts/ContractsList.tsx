@@ -1,25 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Contract } from '../../types';
+import type { Contract, Installation } from '../../types';
 import { DatabaseService } from '../../services/database';
+import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
+    const { isAdmin } = useAuth();
     const [contracts, setContracts] = useState<Contract[]>([]);
+    const [installations, setInstallations] = useState<Installation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const loadContracts = async () => {
+    const loadContracts = useCallback(async () => {
         try {
-            const data = await DatabaseService.getContracts();
-            setContracts(data);
+            const [contractsData, installationsData] = await Promise.all([
+                DatabaseService.getContracts(),
+                DatabaseService.getInstallations()
+            ]);
+            setContracts(contractsData);
+            setInstallations(installationsData);
         } catch (error) {
             console.error('Error loading contracts:', error);
         }
-    };
+    }, []); // No dependencies needed as setContracts and setInstallations are stable
 
     useEffect(() => {
         loadContracts();
-    }, []);
+    }, [loadContracts]); // Add loadContracts to dependencies
 
     const handleStatusChange = async (contractId: string, currentContract: Contract, newStatus: Contract['status']) => {
         // Confirm signing
@@ -103,6 +110,7 @@ export const ContractsList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Klient</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Data Utworzenia</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Montaż</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Wartość Netto</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Prowizja</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Akcje</th>
@@ -111,7 +119,7 @@ export const ContractsList: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {filteredContracts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                                             Brak umów spełniających kryteria wyszukiwania
                                         </td>
                                     </tr>
@@ -151,6 +159,18 @@ export const ContractsList: React.FC = () => {
                                                     <option value="cancelled">Anulowana</option>
                                                 </select>
                                             </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {(() => {
+                                                    const installation = installations.find(i => i.offerId === contract.offerId);
+                                                    if (!installation) return <span className="text-slate-300">-</span>;
+                                                    const color = installation.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                        installation.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
+                                                            'bg-yellow-100 text-yellow-700';
+                                                    const label = installation.status === 'completed' ? 'Zakończony' :
+                                                        installation.status === 'scheduled' ? 'Zaplanowany' : 'Oczekuje';
+                                                    return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
+                                                })()}
+                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-900">
                                                 {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
                                             </td>
@@ -164,6 +184,26 @@ export const ContractsList: React.FC = () => {
                                                 >
                                                     Szczegóły
                                                 </button>
+                                                {isAdmin() && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (window.confirm('Czy na pewno chcesz usunąć tę umowę?')) {
+                                                                try {
+                                                                    await DatabaseService.deleteContract(contract.id);
+                                                                    toast.success('Umowa usunięta');
+                                                                    loadContracts();
+                                                                } catch (err) {
+                                                                    console.error('Error deleting contract:', err);
+                                                                    toast.error('Błąd usuwania umowy');
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="text-red-500 hover:text-red-700 ml-4 font-bold"
+                                                        title="Usuń (Admin)"
+                                                    >
+                                                        Usuń
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

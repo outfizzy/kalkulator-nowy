@@ -29,6 +29,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
         status: initialData?.status || 'new' as LeadStatus,
         source: initialData?.source || 'manual' as LeadSource,
         notes: initialData?.notes || '',
+        clientWillContactAt: initialData?.clientWillContactAt ? new Date(initialData.clientWillContactAt).toISOString().slice(0, 16) : '',
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -51,6 +52,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                         postalCode: formData.postalCode,
                     },
                     notes: formData.notes,
+                    clientWillContactAt: formData.clientWillContactAt ? new Date(formData.clientWillContactAt) : undefined,
                 });
                 toast.success('Lead zaktualizowany pomyślnie!');
             } else {
@@ -69,7 +71,8 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                     },
                     notes: formData.notes,
                     emailMessageId: initialData?.emailMessageId,
-                    lastContactDate: new Date(), // Set last contact to now provided they are adding it now
+                    lastContactDate: new Date(),
+                    clientWillContactAt: formData.clientWillContactAt ? new Date(formData.clientWillContactAt) : undefined,
                 });
                 toast.success('Lead dodany pomyślnie!');
             }
@@ -208,6 +211,17 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                             <option value="other">Inne</option>
                         </select>
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Klient skontaktuje się (Data)</label>
+                    <input
+                        type="datetime-local"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-accent"
+                        value={formData.clientWillContactAt}
+                        onChange={e => setFormData(prev => ({ ...prev, clientWillContactAt: e.target.value }))}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Ustawienie daty utworzy automatyczne zadanie "Kontakt z klientem".</p>
                 </div>
 
                 <div>

@@ -7,6 +7,7 @@ import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/off
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
+import { SchedulerService, type ScheduleSuggestion } from '../../services/SchedulerService';
 
 interface InstallationDetailsModalProps {
     installation: Installation;
@@ -33,6 +34,9 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     const [saving, setSaving] = useState(false);
     const [assignedInstallerIds, setAssignedInstallerIds] = useState<string[]>([]);
     const [installers, setInstallers] = useState<User[]>([]);
+    const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([]);
+    const [isThinking, setIsThinking] = useState(false);
+    const [allInstallations, setAllInstallations] = useState<Installation[]>([]);
 
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
@@ -40,14 +44,16 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
         if (isOpen) {
             void (async () => {
                 try {
-                    const [dbTeams, assignedIds, allInstallers] = await Promise.all([
+                    const [dbTeams, assignedIds, allInstallers, allInst] = await Promise.all([
                         DatabaseService.getTeams(),
                         DatabaseService.getAssignmentsForInstallation(installation.id),
-                        DatabaseService.getInstallers()
+                        DatabaseService.getInstallers(),
+                        DatabaseService.getInstallations()
                     ]);
                     setTeams(dbTeams);
                     setAssignedInstallerIds(assignedIds);
                     setInstallers(allInstallers);
+                    setAllInstallations(allInst);
                 } catch (error) {
                     console.error('Error loading teams/assignments/installers:', error);
                 }
@@ -77,6 +83,39 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                 [field]: value
             }
         }));
+    };
+
+    const handleSuggest = () => {
+        setIsThinking(true);
+        // Simulate thinking delay for effect
+        setTimeout(() => {
+            try {
+                const results = SchedulerService.findOptimalSlots(
+                    { ...installation, expectedDuration: formData.expectedDuration || 1 }, // Use current duration local state
+                    allInstallations,
+                    teams
+                );
+                setSuggestions(results);
+                if (results.length === 0) {
+                    toast('Nie znaleziono oczywistych sugestii w najbliższym miesiącu', { icon: '🤔' });
+                }
+            } catch (e) {
+                console.error(e);
+                toast.error('Błąd algorytmu');
+            } finally {
+                setIsThinking(false);
+            }
+        }, 800);
+    };
+
+    const applySuggestion = (s: ScheduleSuggestion) => {
+        setFormData(prev => ({
+            ...prev,
+            scheduledDate: s.date,
+            teamId: s.teamId
+        }));
+        setSuggestions([]); // Clear after selection
+        toast.success(`Wybrano termin: ${s.date}`);
     };
 
     const handleSave = async () => {
@@ -109,7 +148,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
 
             await onSave(formData as Installation);
             toast.success('Zapisano zmiany');
-            onUpdate();
+            onUpdate(); // Call onUpdate without arguments
             onClose();
         } catch (error) {
             console.error('Error saving installation:', error);
@@ -170,6 +209,79 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             />
                         </div>
                     </div>
+
+                    {/* Planning Stats (New) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-purple-50 p-4 rounded-lg border border-purple-100">
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="partsReady"
+                                checked={formData.partsReady || false}
+                                onChange={(e) => handleChange('partsReady', e.target.checked)}
+                                className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                            />
+                            <label htmlFor="partsReady" className="font-medium text-slate-800 cursor-pointer">
+                                Materiały skompletowane (Gotowe do montażu)
+                            </label>
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <div className="flex-grow">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Przewidywany czas (dni)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="14"
+                                    value={formData.expectedDuration || 1}
+                                    onChange={(e) => handleChange('expectedDuration', parseInt(e.target.value) || 1)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg"
+                                />
+                            </div>
+                            <button
+                                onClick={handleSuggest}
+                                disabled={isThinking}
+                                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 h-[42px]"
+                            >
+                                {isThinking ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-white border-b-transparent rounded-full" />
+                                ) : (
+                                    <span>✨ Znajdź termin (AI)</span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* AI Suggestions Panel */}
+                    {suggestions.length > 0 && (
+                        <div className="mt-3 bg-white border border-indigo-100 rounded-lg p-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+                            <h4 className="text-xs font-bold text-indigo-800 uppercase mb-2">Sugerowane Terminy</h4>
+                            <div className="space-y-2">
+                                {suggestions.map((s, idx) => {
+                                    const teamName = teams.find(t => t.id === s.teamId)?.name || 'Nieznany zespół';
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => applySuggestion(s)}
+                                            className="w-full text-left p-2 hover:bg-indigo-50 rounded border border-slate-100 hover:border-indigo-200 transition-all group"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <span className="font-bold text-slate-700">{s.date}</span>
+                                                    <span className="mx-2 text-slate-300">|</span>
+                                                    <span className="text-sm text-slate-600">{teamName}</span>
+                                                </div>
+                                                <div className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                                                    {s.score}%
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                💡 {s.reason}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Installer Assignments */}
                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">

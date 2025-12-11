@@ -352,6 +352,17 @@ export function calculatePrice(
     let sellingPriceNet = totalCost / (1 - marginPercentage);
     const marginValue = sellingPriceNet - totalCost;
 
+    // Calculate Custom Items Price (Fixed Net Price added on top)
+    let customItemsPrice = 0;
+    if (config.customItems) {
+        config.customItems.forEach(item => {
+            customItemsPrice += item.price * item.quantity;
+        });
+    }
+
+    // Add Custom Items to Selling Price
+    sellingPriceNet += customItemsPrice;
+
     // VAT 19%
     let sellingPriceGross = sellingPriceNet * 1.19;
 
@@ -365,6 +376,7 @@ export function calculatePrice(
     return {
         basePrice,
         addonsPrice,
+        customItemsPrice,
         totalCost,
         marginPercentage: marginPercentage * 100,
         marginValue,

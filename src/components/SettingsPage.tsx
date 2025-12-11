@@ -442,7 +442,7 @@ export const SettingsPage: React.FC = () => {
                                 }))}
                                 rows={4}
                                 className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono text-sm"
-                                placeholder="Tutaj wpisz treść swojej stopki..."
+                                placeholder="Tutaj wpisz treść swojej stopki (możesz używać HTML)..."
                             />
                         </div>
 

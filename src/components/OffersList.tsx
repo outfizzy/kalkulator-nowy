@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
-import type { Offer, OfferStatus, User, Contract, Installation } from '../types';
+import type { Offer, OfferStatus, User, Contract } from '../types';
 import { OfferPreviewModal } from './OfferPreviewModal';
+import { SendEmailModal } from './leads/SendEmailModal';
 import { extractOrderedItemsFromOffer } from '../utils/contractHelpers';
 
 interface OffersListProps {
@@ -18,15 +19,16 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
     const navigate = useNavigate();
     const [fetchedOffers, setFetchedOffers] = useState<Offer[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
-    const [installations, setInstallations] = useState<Installation[]>([]);
     const [filter, setFilter] = useState<OfferStatus | 'all'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUserId, setSelectedUserId] = useState<string>('all'); // Admin filter
     const [salesReps, setSalesReps] = useState<User[]>([]);
     const [previewOffer, setPreviewOffer] = useState<Offer | null>(null);
+    const [selectedOfferForEmail, setSelectedOfferForEmail] = useState<Offer | null>(null);
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
     const offers = propOffers || fetchedOffers;
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!propOffers);
 
     const loadOffers = React.useCallback(async () => {
         if (propOffers) return;
@@ -34,17 +36,14 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
         setLoading(true);
 
         try {
-            const [allOffers, allContracts, allInstallations, delegatedIds] = await Promise.all([
+            const [allOffers, allContracts, delegatedIds] = await Promise.all([
                 DatabaseService.getOffers(),
                 DatabaseService.getContracts(),
-                DatabaseService.getInstallations(),
                 DatabaseService.getDelegatedUserIds()
             ]);
 
             setContracts(allContracts);
-            setInstallations(allInstallations);
 
-            // Admin: load all or filter by selected user
             if (isAdmin()) {
                 const filtered = selectedUserId === 'all'
                     ? allOffers
@@ -208,29 +207,6 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
         }
     };
 
-    const handleCreateInstallation = async (offer: Offer) => {
-        try {
-            await DatabaseService.createInstallation({
-                offerId: offer.id,
-                status: 'pending',
-                client: {
-                    firstName: offer.customer.firstName,
-                    lastName: offer.customer.lastName,
-                    city: offer.customer.city,
-                    address: `${offer.customer.street} ${offer.customer.houseNumber}, ${offer.customer.postalCode} ${offer.customer.city}`,
-                    phone: offer.customer.phone
-                },
-                productSummary: `${offer.product.width}x${offer.product.projection} mm, ${offer.product.roofType}`
-            });
-            toast.success('Utworzono zlecenie montażu');
-            navigate('/installations');
-        } catch (error) {
-            console.error('Error creating installation:', error);
-            toast.error('Błąd tworzenia montażu');
-        }
-    };
-
-
 
     const filteredOffers = offers
         .filter(o => filter === 'all' || o.status === filter)
@@ -364,8 +340,6 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                     <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Wartość</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Prowizja</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Pomiar</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Montaż</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Akcje</th>
                                 </tr>
                             </thead>
@@ -444,31 +418,7 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                                     <option value="rejected">Odrzucona</option>
                                                 </select>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                {(() => {
-                                                    const contract = contracts.find(c => c.offerId === offer.id);
-                                                    if (!contract) return <span className="text-slate-300">-</span>;
-                                                    const color = contract.status === 'signed' ? 'bg-green-100 text-green-700' :
-                                                        contract.status === 'completed' ? 'bg-accent-soft text-accent-dark' :
-                                                            'bg-yellow-100 text-yellow-700';
-                                                    const label = contract.status === 'signed' ? 'Podpisana' :
-                                                        contract.status === 'completed' ? 'Zakończona' : 'W trakcie';
-                                                    return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
-                                                })()}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                {(() => {
-                                                    const installation = installations.find(i => i.offerId === offer.id);
-                                                    if (!installation) return <span className="text-slate-300">-</span>;
-                                                    const color = installation.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                        installation.status === 'scheduled' ? 'bg-accent-soft text-accent-dark' :
-                                                            'bg-yellow-100 text-yellow-700';
-                                                    const label = installation.status === 'completed' ? 'Zakończony' :
-                                                        installation.status === 'scheduled' ? 'Zaplanowany' : 'Oczekuje';
-                                                    return <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>;
-                                                })()}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => setPreviewOffer(offer)}
@@ -481,14 +431,28 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                                         </svg>
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(offer.id)}
-                                                        className="text-red-600 hover:text-red-900"
-                                                        title="Usuń"
+                                                        onClick={() => {
+                                                            setSelectedOfferForEmail(offer);
+                                                            setIsEmailModalOpen(true);
+                                                        }}
+                                                        className="text-slate-400 hover:text-accent transition-colors"
+                                                        title="Wyślij E-mail"
                                                     >
                                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                                         </svg>
                                                     </button>
+                                                    {isAdmin() && (
+                                                        <button
+                                                            onClick={() => handleDelete(offer.id)}
+                                                            className="text-red-600 hover:text-red-900"
+                                                            title="Usuń"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
                                                     {offer.status === 'sold' && (
                                                         <>
                                                             <button
@@ -509,15 +473,6 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                                 </svg>
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleCreateInstallation(offer)}
-                                                                className="text-purple-600 hover:text-purple-900"
-                                                                title="Utwórz Montaż"
-                                                            >
-                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                                </svg>
-                                                            </button>
                                                         </>
                                                     )}
                                                 </div>
@@ -536,6 +491,16 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                 <OfferPreviewModal
                     offer={previewOffer}
                     onClose={() => setPreviewOffer(null)}
+                />
+            )}
+
+            {/* Email Modal */}
+            {selectedOfferForEmail && (
+                <SendEmailModal
+                    isOpen={isEmailModalOpen}
+                    onClose={() => setIsEmailModalOpen(false)}
+                    to={selectedOfferForEmail.customer.email}
+                    offer={selectedOfferForEmail}
                 />
             )}
 

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus, Lead, LeadStatus, LeadSource, Communication } from '../types';
+import type { Offer, MeasurementReport, Installation, Contract, User, PricingResult, Customer, SalesRepStat, Measurement, WalletTransaction, WalletStats, OrderRequest, OrderRequestStatus, FuelLog, FailureReport, FailureReportStatus, Lead, LeadStatus, LeadSource, Communication, Task, TaskStatus, TaskPriority, TaskType, Note, Notification as AppNotification } from '../types';
 import type { AuthError } from '@supabase/supabase-js';
 
 interface InstallationData {
@@ -41,12 +41,47 @@ export const DatabaseService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // Ensure customer exists
+        let customerId = lead.customerId;
+        try {
+            if (lead.customerData) {
+                // Map Lead Data to Customer
+                const fullAddress = lead.customerData.address || '';
+                let street = fullAddress;
+                let houseNumber = '';
+                const match = fullAddress.match(/^(.+)\s+(\d+[a-zA-Z-\/]*)$/);
+                if (match) {
+                    street = match[1];
+                    houseNumber = match[2];
+                }
+
+                const customerInput: Customer = {
+                    salutation: (lead.customerData.companyName ? 'Firma' : 'Herr') as 'Herr' | 'Frau' | 'Firma',
+                    firstName: lead.customerData.firstName || '',
+                    lastName: lead.customerData.lastName || '',
+                    street: street,
+                    houseNumber: houseNumber,
+                    postalCode: lead.customerData.postalCode || '',
+                    city: lead.customerData.city || '',
+                    phone: lead.customerData.phone || '',
+                    email: lead.customerData.email || '',
+                    country: 'Deutschland'
+                };
+
+                const customer = await this.ensureCustomer(customerInput);
+                customerId = customer.id;
+            }
+        } catch (e) {
+            console.warn('Failed to ensure customer for lead:', e);
+        }
+
         const { data, error } = await supabase
             .from('leads')
             .insert({
                 status: lead.status,
                 source: lead.source,
                 customer_data: lead.customerData,
+                customer_id: customerId,
                 assigned_to: lead.assignedTo || user.id, // Default to current user if not set
                 email_message_id: lead.emailMessageId,
                 notes: lead.notes,
@@ -77,6 +112,7 @@ export const DatabaseService = {
         if (updates.emailMessageId) dbUpdates.email_message_id = updates.emailMessageId;
         if (updates.notes) dbUpdates.notes = updates.notes;
         if (updates.lastContactDate) dbUpdates.last_contact_date = updates.lastContactDate.toISOString();
+        if (updates.clientWillContactAt) dbUpdates.client_will_contact_at = updates.clientWillContactAt.toISOString();
 
         const { error } = await supabase
             .from('leads')
@@ -84,6 +120,31 @@ export const DatabaseService = {
             .eq('id', id);
 
         if (error) throw error;
+
+        // Automation: Create Task when Client Will Contact date is set
+        if (updates.clientWillContactAt) {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    // Fetch lead to get name
+                    const { data: leadData } = await supabase.from('leads').select('customer_data').eq('id', id).single();
+                    const name = leadData?.customer_data?.lastName || 'Klient';
+
+                    await DatabaseService.createTask({
+                        userId: user.id,
+                        title: `Kontakt z klientem: ${name} `,
+                        description: 'Klient prosił o kontakt (lub sam się odezwie) w tym terminie.',
+                        dueDate: updates.clientWillContactAt.toISOString(),
+                        status: 'pending',
+                        priority: 'high',
+                        type: 'call',
+                        leadId: id
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to create automation task for lead:', err);
+            }
+        }
     },
 
     async deleteLead(id: string): Promise<void> {
@@ -93,6 +154,50 @@ export const DatabaseService = {
             .eq('id', id);
 
         if (error) throw error;
+    },
+
+    async deleteCustomer(id: string) {
+        // Warning: Supabase might block this if there are foreign key constraints (cascading).
+        // Ensure ON DELETE CASCADE is set in DB or handle cleanup manually if needed.
+        const { error } = await supabase.from('customers').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async deleteOffer(id: string) {
+        const { error } = await supabase.from('offers').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async deleteContract(id: string) {
+        const { error } = await supabase.from('contracts').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async checkAndAutoCompleteInstallations(): Promise<number> {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Find scheduled installations with date < today
+        const { data: overdue, error: fetchError } = await supabase
+            .from('installations')
+            .select('id, scheduled_date, status')
+            .eq('status', 'scheduled')
+            .lt('scheduled_date', today);
+
+        if (fetchError) throw fetchError;
+
+        if (!overdue || overdue.length === 0) return 0;
+
+        const ids = overdue.map(i => i.id);
+
+        // Bulk update to verification
+        const { error: updateError } = await supabase
+            .from('installations')
+            .update({ status: 'verification' })
+            .in('id', ids);
+
+        if (updateError) throw updateError;
+
+        return ids.length;
     },
 
     // --- Offers ---
@@ -107,7 +212,7 @@ export const DatabaseService = {
         return data.map(row => ({
             id: row.id,
             offerNumber: row.offer_number,
-            customer: row.customer_data,
+            customer: { ...row.customer_data, id: row.customer_id },
             product: row.product_config,
             pricing: normalizePricing(row.pricing),
             status: row.status as Offer['status'],
@@ -115,7 +220,8 @@ export const DatabaseService = {
             commission: row.commission,
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
-            createdBy: row.user_id
+            createdBy: row.user_id,
+            clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined
         }));
     },
 
@@ -139,7 +245,8 @@ export const DatabaseService = {
             commission: row.commission,
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
-            createdBy: row.user_id
+            createdBy: row.user_id,
+            clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined
         }));
     },
 
@@ -152,10 +259,38 @@ export const DatabaseService = {
 
         if (error) return null;
 
+        let customer = { ...data.customer_data, id: data.customer_id };
+
+        // Robustness: If customer data is missing essential fields (e.g. from bad migration), fetch it fresh
+        if (data.customer_id && (!customer.firstName || !customer.lastName || !customer.city)) {
+            const { data: freshCustomer } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', data.customer_id)
+                .single();
+
+            if (freshCustomer) {
+                customer = {
+                    id: freshCustomer.id,
+                    salutation: freshCustomer.salutation,
+                    firstName: freshCustomer.first_name,
+                    lastName: freshCustomer.last_name,
+                    street: freshCustomer.street,
+                    houseNumber: freshCustomer.house_number,
+                    postalCode: freshCustomer.postal_code,
+                    city: freshCustomer.city,
+                    phone: freshCustomer.phone,
+                    email: freshCustomer.email,
+                    country: freshCustomer.country,
+                    companyName: freshCustomer.company_name
+                };
+            }
+        }
+
         return {
             id: data.id,
             offerNumber: data.offer_number,
-            customer: data.customer_data,
+            customer: customer,
             product: data.product_config,
             pricing: normalizePricing(data.pricing),
             status: data.status as Offer['status'],
@@ -163,51 +298,62 @@ export const DatabaseService = {
             commission: data.commission,
             createdAt: new Date(data.created_at),
             updatedAt: new Date(data.updated_at),
-            createdBy: data.user_id
+            createdBy: data.user_id,
+            clientWillContactAt: data.client_will_contact_at ? new Date(data.client_will_contact_at) : undefined
         };
     },
 
-    async ensureCustomer(customerData: Customer): Promise<Customer> {
-        // Try to find by ID first if provided
+    async ensureCustomer(customerData: Customer, source: string = 'auto'): Promise<Customer & { id: string }> {
         if (customerData.id) {
             const existing = await this.getCustomer(customerData.id);
-            if (existing) return existing;
+            if (existing && existing.id) return existing as Customer & { id: string };
         }
 
-        // Try to find by email
+        // 2. Try to find by Email (Unique Identifier)
         if (customerData.email) {
             const { data } = await supabase
                 .from('customers')
                 .select('*')
-                .eq('email', customerData.email)
+                .ilike('email', customerData.email.trim())
+                .limit(1)
                 .single();
 
-            if (data) {
-                return {
-                    id: data.id,
-                    salutation: data.salutation as Customer['salutation'],
-                    firstName: data.first_name,
-                    lastName: data.last_name,
-                    street: data.street,
-                    houseNumber: data.house_number,
-                    postalCode: data.postal_code,
-                    city: data.city,
-                    phone: data.phone,
-                    email: data.email,
-                    country: data.country,
-                };
-            }
+            if (data) return this._mapCustomerRow(data);
         }
 
-        // Create new if not found
+        // 3. Try to find by Phone (Secondary Identifier)
+        if (customerData.phone) {
+            const { data } = await supabase
+                .from('customers')
+                .select('*')
+                .ilike('phone', customerData.phone.trim())
+                .limit(1)
+                .single();
+
+            if (data) return this._mapCustomerRow(data);
+        }
+
+        // 4. Try to find by First Name + Last Name (Weak Identifier)
+        if (customerData.firstName && customerData.lastName) {
+            const { data } = await supabase
+                .from('customers')
+                .select('*')
+                .ilike('first_name', customerData.firstName.trim())
+                .ilike('last_name', customerData.lastName.trim())
+                .limit(1)
+                .single();
+
+            if (data) return this._mapCustomerRow(data);
+        }
+
+        // 5. Create new if not found
         const { data: { user } } = await supabase.auth.getUser();
-        // We use createCustomer logic but internal one handles user_id
         if (!user) throw new Error('User not authenticated');
 
         const { data, error } = await supabase
             .from('customers')
             .insert({
-                user_id: user.id,
+                created_by: user.id,
                 salutation: customerData.salutation,
                 first_name: customerData.firstName,
                 last_name: customerData.lastName,
@@ -217,13 +363,18 @@ export const DatabaseService = {
                 city: customerData.city,
                 phone: customerData.phone,
                 email: customerData.email,
-                country: customerData.country || 'Deutschland'
+                country: customerData.country || 'Deutschland',
+                source: source
             })
             .select()
             .single();
 
         if (error) throw error;
 
+        return this._mapCustomerRow(data);
+    },
+
+    _mapCustomerRow(data: any): Customer & { id: string } {
         return {
             id: data.id,
             salutation: data.salutation as Customer['salutation'],
@@ -251,6 +402,7 @@ export const DatabaseService = {
         } catch (e) {
             console.error('Failed to ensure customer:', e);
             // Fallback: proceed without strict link if needed, or fail. 
+            // Fallback: proceed without strict link if needed, or fail.
             // We'll proceed but without customer_id if it failed, relying on customer_data jsonb
         }
 
@@ -258,8 +410,8 @@ export const DatabaseService = {
             .from('offers')
             .insert({
                 user_id: user.id,
-                offer_number: offer.offerNumber || `OFF/${Date.now()}`,
-                customer_data: offer.customer,
+                offer_number: offer.offerNumber || `OFF / ${Date.now()} `,
+                customer_data: { ...offer.customer, id: customerId }, // Ensure ID is saved in JSON
                 customer_id: customerId,
                 lead_id: offer.leadId, // Link to Lead
                 product_config: offer.product,
@@ -299,24 +451,21 @@ export const DatabaseService = {
     },
 
     async updateOffer(id: string, updates: Partial<Offer>): Promise<void> {
-        const dbUpdates: Record<string, unknown> = {
-            updated_at: new Date().toISOString()
-        };
-
-        if (updates.customer) {
-            dbUpdates.customer_data = updates.customer;
-            if (updates.customer.id) {
-                dbUpdates.customer_id = updates.customer.id;
-            }
-        }
-        if (updates.product) dbUpdates.product_config = updates.product;
-        if (updates.pricing) {
-            dbUpdates.pricing = updates.pricing;
-            dbUpdates.margin_percentage = updates.pricing.marginPercentage;
-        }
+        // Convert to DB format
+        const dbUpdates: any = {};
         if (updates.status) dbUpdates.status = updates.status;
-        if (updates.snowZone) dbUpdates.snow_zone = updates.snowZone;
-        if (updates.commission !== undefined) dbUpdates.commission = updates.commission;
+        if (updates.customer) dbUpdates.customer_data = updates.customer; // Full object update
+        if (updates.product) dbUpdates.product_config = updates.product;
+        if (updates.pricing) dbUpdates.pricing = updates.pricing;
+        if (updates.snowZone) dbUpdates.snow_zone = updates.snowZone; // Update snow zone if changed
+        if (updates.commission) dbUpdates.commission = updates.commission;
+        if (updates.leadId) dbUpdates.lead_id = updates.leadId;
+        if (updates.clientWillContactAt) dbUpdates.client_will_contact_at = updates.clientWillContactAt.toISOString();
+        if (updates.settings) dbUpdates.settings_data = updates.settings;
+        if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+        if (updates.viewCount !== undefined) dbUpdates.view_count = updates.viewCount;
+
+        dbUpdates.updated_at = new Date().toISOString();
 
         const { error } = await supabase
             .from('offers')
@@ -324,16 +473,71 @@ export const DatabaseService = {
             .eq('id', id);
 
         if (error) throw error;
+
+        // Automation: Create Follow-up Task when Offer is SENT
+        if (updates.status === 'sent') {
+            try {
+                const { data: offerData } = await supabase
+                    .from('offers')
+                    .select('offer_number, customer_data')
+                    .eq('id', id)
+                    .single();
+
+                if (offerData) {
+                    const customerName = (offerData.customer_data as any)?.lastName || 'Klient';
+                    const title = `Przypomnienie: Oferta ${offerData.offer_number} (${customerName})`;
+
+                    const dueDate = new Date();
+                    dueDate.setDate(dueDate.getDate() + 7);
+
+                    const { data: { user } } = await supabase.auth.getUser();
+
+                    if (user) {
+                        await DatabaseService.createTask({
+                            userId: user.id,
+                            title,
+                            description: 'Oferta wysłana 7 dni temu. Skontaktuj się z klientem.',
+                            dueDate: dueDate.toISOString(),
+                            status: 'pending',
+                            priority: 'medium',
+                            type: 'call',
+                        });
+                    }
+                }
+            } catch (taskError) {
+                console.error('Failed to create follow-up task:', taskError);
+                // Non-blocking error
+            }
+        }
+
+        // Automation: Create Task when Client Will Contact date is set (Offer)
+        if (updates.clientWillContactAt) {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    // We might already have offerData from previous block if status changed, but separate check is safer or just re-fetch if needed.
+                    // To avoid double fetch, we could optimize, but for now simple:
+                    const { data: offerData } = await supabase.from('offers').select('offer_number, customer_data').eq('id', id).single();
+                    const name = (offerData?.customer_data as any)?.lastName || 'Klient';
+
+                    await DatabaseService.createTask({
+                        userId: user.id,
+                        title: `Kontakt z klientem(Oferta ${offerData?.offer_number}): ${name} `,
+                        description: 'Klient prosił o kontakt (lub sam się odezwie) w tym terminie.',
+                        dueDate: updates.clientWillContactAt.toISOString(),
+                        status: 'pending',
+                        priority: 'high',
+                        type: 'call',
+                        customerId: updates.customer?.id // Offer is linked to customer
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to create automation task for offer:', err);
+            }
+        }
     },
 
-    async deleteOffer(id: string): Promise<void> {
-        const { error } = await supabase
-            .from('offers')
-            .delete()
-            .eq('id', id);
 
-        if (error) throw error;
-    },
 
     // --- Customers ---
     // --- Customers ---
@@ -386,34 +590,7 @@ export const DatabaseService = {
     },
 
     async createCustomer(customer: Customer): Promise<Customer & { id: string }> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
-
-        const { data, error } = await supabase
-            .from('customers')
-            .insert({
-                created_by: user.id,
-                salutation: customer.salutation,
-                first_name: customer.firstName,
-                last_name: customer.lastName,
-                street: customer.street,
-                house_number: customer.houseNumber,
-                postal_code: customer.postalCode,
-                city: customer.city,
-                country: customer.country,
-                phone: customer.phone,
-                email: customer.email,
-                source: 'manual'
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return {
-            ...customer,
-            id: data.id
-        };
+        return this.ensureCustomer(customer, 'manual');
     },
 
 
@@ -464,9 +641,9 @@ export const DatabaseService = {
                 email: row.email,
                 country: row.country,
             };
-            uniqueCustomers.set(`ID:${row.id}`, { customer, offers: [], contracts: [] });
+            uniqueCustomers.set(`ID:${row.id} `, { customer, offers: [], contracts: [] });
             // Also map email/name to this ID to catch duplicates from offers
-            if (customer.email) uniqueCustomers.set(`EMAIL:${customer.email.toLowerCase()}`, { customer, offers: [], contracts: [] });
+            if (customer.email) uniqueCustomers.set(`EMAIL:${customer.email.toLowerCase()} `, { customer, offers: [], contracts: [] });
         });
 
         // 2. Process Offers
@@ -477,12 +654,12 @@ export const DatabaseService = {
             let entry: any = null;
 
             // Try to find existing entry
-            if (offer.customer_id && uniqueCustomers.has(`ID:${offer.customer_id}`)) {
-                entry = uniqueCustomers.get(`ID:${offer.customer_id}`);
-            } else if (offerCustomer.email && uniqueCustomers.has(`EMAIL:${offerCustomer.email.toLowerCase()}`)) {
-                entry = uniqueCustomers.get(`EMAIL:${offerCustomer.email.toLowerCase()}`);
+            if (offer.customer_id && uniqueCustomers.has(`ID:${offer.customer_id} `)) {
+                entry = uniqueCustomers.get(`ID:${offer.customer_id} `);
+            } else if (offerCustomer.email && uniqueCustomers.has(`EMAIL:${offerCustomer.email.toLowerCase()} `)) {
+                entry = uniqueCustomers.get(`EMAIL:${offerCustomer.email.toLowerCase()} `);
             } else {
-                const nameKey = `NAME:${(offerCustomer.firstName || '').toLowerCase()}:${(offerCustomer.lastName || '').toLowerCase()}`;
+                const nameKey = `NAME:${(offerCustomer.firstName || '').toLowerCase()}:${(offerCustomer.lastName || '').toLowerCase()} `;
                 if (uniqueCustomers.has(nameKey)) {
                     entry = uniqueCustomers.get(nameKey);
                 }
@@ -497,8 +674,8 @@ export const DatabaseService = {
                 entry = { customer: newCustomer, offers: [], contracts: [] };
 
                 // Register keys
-                if (offerCustomer.email) uniqueCustomers.set(`EMAIL:${offerCustomer.email.toLowerCase()}`, entry);
-                const nameKey = `NAME:${(offerCustomer.firstName || '').toLowerCase()}:${(offerCustomer.lastName || '').toLowerCase()}`;
+                if (offerCustomer.email) uniqueCustomers.set(`EMAIL:${offerCustomer.email.toLowerCase()} `, entry);
+                const nameKey = `NAME:${(offerCustomer.firstName || '').toLowerCase()}:${(offerCustomer.lastName || '').toLowerCase()} `;
                 uniqueCustomers.set(nameKey, entry);
             }
 
@@ -552,7 +729,7 @@ export const DatabaseService = {
         return data.map(row => ({
             id: row.id,
             offerNumber: row.offer_number,
-            customer: row.customer_data,
+            customer: { ...row.customer_data, id: row.customer_id },
             product: row.product_config,
             pricing: normalizePricing(row.pricing),
             status: row.status as Offer['status'],
@@ -560,7 +737,15 @@ export const DatabaseService = {
             commission: row.commission,
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
-            createdBy: row.user_id
+            createdBy: row.user_id,
+
+            // Missing fields added to match getLeadOffers/getOffers rich objects
+            leadId: row.lead_id,
+            clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined,
+            validUntil: row.valid_until ? new Date(row.valid_until) : undefined,
+            settings: row.settings_data || {},
+            notes: row.notes,
+            viewCount: row.view_count || 0
         }));
     },
 
@@ -784,9 +969,85 @@ export const DatabaseService = {
                 teamId: installationData.teamId || (row as { team_id?: string }).team_id,
                 notes: installationData.notes,
                 acceptance: (row as any).acceptance || installationData.acceptance,
-                createdAt: new Date(row.created_at)
+                createdAt: new Date(row.created_at),
+                partsReady: (row as any).parts_ready,
+                expectedDuration: (row as any).expected_duration || 1
             };
         });
+    },
+
+    // --- Notes ---
+    async getNotes(entityType: 'lead' | 'customer', entityId: string): Promise<Note[]> {
+        const { data, error } = await supabase
+            .from('notes')
+            .select('*, user:user_id(id, first_name, last_name, email, avatar_url)')
+            .eq('entity_type', entityType)
+            .eq('entity_id', entityId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            entityType: row.entity_type,
+            entityId: row.entity_id,
+            content: row.content,
+            userId: row.user_id,
+            attachments: row.attachments || [],
+            createdAt: new Date(row.created_at),
+            user: row.user ? {
+                id: row.user.id,
+                firstName: row.user.first_name,
+                lastName: row.user.last_name,
+                email: row.user.email,
+                avatarUrl: row.user.avatar_url
+            } : undefined
+        }));
+    },
+
+    async createNote(note: Partial<Note>): Promise<Note> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('notes')
+            .insert({
+                entity_type: note.entityType,
+                entity_id: note.entityId,
+                content: note.content,
+                user_id: user.id,
+                attachments: note.attachments || []
+            })
+            .select('*, user:user_id(id, first_name, last_name, email, avatar_url)')
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            entityType: data.entity_type,
+            entityId: data.entity_id,
+            content: data.content,
+            userId: data.user_id,
+            attachments: data.attachments || [],
+            createdAt: new Date(data.created_at),
+            user: data.user ? {
+                id: data.user.id,
+                firstName: data.user.first_name,
+                lastName: data.user.last_name,
+                email: data.user.email,
+                avatarUrl: data.user.avatar_url
+            } : undefined
+        };
+    },
+
+    async deleteNote(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('notes')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     },
 
     async createInstallation(installation: Omit<Installation, 'id' | 'createdAt'>): Promise<Installation> {
@@ -836,6 +1097,8 @@ export const DatabaseService = {
         const dbUpdates: Record<string, unknown> = {};
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
+        if (updates.partsReady !== undefined) dbUpdates.parts_ready = updates.partsReady;
+        if (updates.expectedDuration !== undefined) dbUpdates.expected_duration = updates.expectedDuration;
 
         // Merge installation_data
         if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance) {
@@ -1029,7 +1292,7 @@ export const DatabaseService = {
             updated_at: new Date().toISOString()
         };
         if (profile.firstName || profile.lastName) {
-            updates.full_name = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+            updates.full_name = `${profile.firstName || ''} ${profile.lastName || ''} `.trim();
         }
         if (profile.phone !== undefined) updates.phone = profile.phone;
         if (profile.monthlyTarget !== undefined) updates.monthly_target = profile.monthlyTarget;
@@ -1410,7 +1673,7 @@ export const DatabaseService = {
                 const user = userMap.get(userId);
                 statsMap.set(userId, {
                     userId,
-                    userName: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+                    userName: user ? `${user.firstName} ${user.lastName} ` : 'Unknown',
                     role: user?.role || 'sales_rep',
                     totalOffers: 0,
                     soldOffers: 0,
@@ -1467,7 +1730,7 @@ export const DatabaseService = {
                 const user = userMap.get(userId);
                 statsMap.set(userId, {
                     userId,
-                    userName: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+                    userName: user ? `${user.firstName} ${user.lastName} ` : 'Unknown',
                     role: user?.role || 'sales_rep',
                     totalOffers: 0,
                     soldOffers: 0,
@@ -1653,13 +1916,13 @@ export const DatabaseService = {
             .map(row => {
                 const profile = partnerMap.get(row.user_id);
                 const createdByName = profile
-                    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+                    ? `${profile.firstName || ''} ${profile.lastName || ''} `.trim()
                     : undefined;
 
                 return {
                     id: row.id,
                     offerNumber: row.offer_number,
-                    customer: row.customer_data,
+                    customer: { ...row.customer_data, id: row.customer_id },
                     product: row.product_config,
                     pricing: normalizePricing(row.pricing),
                     status: row.status as Offer['status'],
@@ -1697,7 +1960,7 @@ export const DatabaseService = {
             .map(row => {
                 const profile = userMap.get(row.user_id);
                 const createdByName = profile
-                    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+                    ? `${profile.firstName || ''} ${profile.lastName || ''} `.trim()
                     : undefined;
 
                 return {
@@ -1740,7 +2003,7 @@ export const DatabaseService = {
             .map(row => {
                 const profile = userMap.get(row.user_id);
                 const createdByName = profile
-                    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+                    ? `${profile.firstName || ''} ${profile.lastName || ''} `.trim()
                     : undefined;
 
                 return {
@@ -1751,7 +2014,7 @@ export const DatabaseService = {
             })
             .filter(({ raw, profile, createdByName }) => {
                 const offerNumber = raw.offer_number?.toLowerCase() || '';
-                const customerName = `${raw.customer_data?.firstName || ''} ${raw.customer_data?.lastName || ''}`.toLowerCase();
+                const customerName = `${raw.customer_data?.firstName || ''} ${raw.customer_data?.lastName || ''} `.toLowerCase();
                 const companyName = profile?.companyName?.toLowerCase() || '';
                 const createdByLower = createdByName.toLowerCase();
 
@@ -1794,6 +2057,129 @@ export const DatabaseService = {
 
         if (error) throw error;
     },
+
+    // --- Tasks ---
+
+    async getTasks(filters?: { leadId?: string; customerId?: string; status?: TaskStatus }): Promise<Task[]> {
+        const { data: { user: _user } } = await supabase.auth.getUser(); // Kept as _user or simply remove if auth check is all that's needed. 
+        // Better: just check session or remove if not needed. 
+        // Actually, let's see why it was there.
+        // It says "const { data: { user } } = await supabase.auth.getUser();"
+        // If it's just for auth check, I can just await supabase.auth.getUser();
+        // Or if I need the ID, I should use it.
+        // Let's just create a valid replacement.
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) throw new Error('Not authenticated');
+        // Assuming RLS handles visibility (own tasks + assigned)
+
+        let query = supabase
+            .from('tasks')
+            .select(`
+    *,
+    assignee: user_id(
+        first_name,
+        last_name
+    )
+            `)
+            .order('due_date', { ascending: true }); // Soonest first
+
+        if (filters?.leadId) {
+            query = query.eq('lead_id', filters.leadId);
+        }
+        if (filters?.customerId) {
+            query = query.eq('customer_id', filters.customerId);
+        }
+        if (filters?.status) {
+            query = query.eq('status', filters.status);
+        }
+
+        // If no specific filter, maybe show only my tasks or pending? 
+        // For now, let RLS filter visibility, and fetches get everything relevant.
+        // We might want to filter by assignee in UI.
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            leadId: row.lead_id,
+            customerId: row.customer_id,
+            title: row.title,
+            description: row.description,
+            dueDate: row.due_date,
+            status: row.status as TaskStatus,
+            priority: row.priority as TaskPriority,
+            type: row.type as TaskType,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            assignee: row.assignee ? {
+                firstName: row.assignee.first_name,
+                lastName: row.assignee.last_name
+            } : undefined
+        }));
+    },
+
+    async createTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('tasks')
+            .insert({
+                user_id: task.userId || user.id, // Assign to self if not specified, or allow setting assignee
+                lead_id: task.leadId,
+                customer_id: task.customerId,
+                title: task.title,
+                description: task.description,
+                due_date: task.dueDate,
+                status: task.status,
+                priority: task.priority,
+                type: task.type
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            ...task,
+            id: data.id,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at),
+            userId: data.user_id
+        } as Task;
+    },
+
+    async updateTask(id: string, updates: Partial<Task>): Promise<void> {
+        const dbUpdates: any = {
+            updated_at: new Date().toISOString()
+        };
+        if (updates.title) dbUpdates.title = updates.title;
+        if (updates.description) dbUpdates.description = updates.description;
+        if (updates.dueDate) dbUpdates.due_date = updates.dueDate;
+        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.priority) dbUpdates.priority = updates.priority;
+        if (updates.userId) dbUpdates.user_id = updates.userId;
+
+        const { error } = await supabase
+            .from('tasks')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async deleteTask(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('tasks')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    // --- End Tasks ---
 
     async getDelegatedUserIds(): Promise<string[]> {
         const { data: { user } } = await supabase.auth.getUser();
@@ -1990,12 +2376,12 @@ export const DatabaseService = {
         const { data: members, error: membersError } = await supabase
             .from('team_members')
             .select(`
-                team_id,
-                user_id,
-                profiles:user_id (
-                    id,
-                    full_name
-                )
+team_id,
+    user_id,
+    profiles: user_id(
+        id,
+        full_name
+    )
             `);
 
         if (membersError) throw membersError;
@@ -2202,11 +2588,11 @@ export const DatabaseService = {
                     firstName: client.firstName || '',
                     lastName: client.lastName || '',
                     city: client.city || '',
-                    address: `${client.street || ''} ${client.houseNumber || ''}`.trim(),
+                    address: `${client.street || ''} ${client.houseNumber || ''} `.trim(),
                     phone: client.phone || '',
                     coordinates: undefined // Will be geocoded later if needed
                 },
-                productSummary: `${contractData.product.modelId} ${contractData.product.width}x${contractData.product.projection}mm`
+                productSummary: `${contractData.product.modelId} ${contractData.product.width}x${contractData.product.projection} mm`
             };
 
             const { data: newInstallation, error: insertError } = await supabase
@@ -2221,7 +2607,7 @@ export const DatabaseService = {
                 .single();
 
             if (insertError) {
-                console.error(`Error creating installation for contract ${contract.id}:`, JSON.stringify(insertError, null, 2));
+                console.error(`Error creating installation for contract ${contract.id}: `, JSON.stringify(insertError, null, 2));
                 // Also attempt to log message if available
                 if ('message' in insertError) {
                     console.error('Error details:', (insertError as any).message);
@@ -2251,8 +2637,8 @@ export const DatabaseService = {
         const { data, error } = await supabase
             .from('measurements')
             .select(`
-                *
-            `)
+    *
+    `)
             .order('scheduled_date', { ascending: true });
 
         if (error) throw error;
@@ -2360,9 +2746,9 @@ export const DatabaseService = {
         const { data, error } = await supabase
             .from('measurements')
             .select(`
-                *,
-                sales_rep: profiles!sales_rep_id(full_name)
-                    `)
+    *,
+    sales_rep: profiles!sales_rep_id(full_name)
+        `)
             .eq('sales_rep_id', userId)
             .order('scheduled_date', { ascending: true });
 
@@ -2417,9 +2803,9 @@ export const DatabaseService = {
                 location_lng: measurement.locationLng
             })
             .select(`
-            *,
-                sales_rep: profiles!sales_rep_id(full_name)
-                    `)
+        *,
+        sales_rep: profiles!sales_rep_id(full_name)
+            `)
             .single();
 
         if (error) throw error;
@@ -2472,8 +2858,8 @@ export const DatabaseService = {
             .eq('id', id)
             .select(`
             *,
-                sales_rep: profiles!sales_rep_id(full_name)
-                    `)
+            sales_rep: profiles!sales_rep_id(full_name)
+                `)
             .single();
 
         if (error) throw error;
@@ -2736,9 +3122,9 @@ export const DatabaseService = {
         const { data, error } = await supabase
             .from('deleted_wallet_transactions')
             .select(`
-            *,
+                *,
                 deleted_by_profile: profiles!deleted_by(full_name),
-                processed_by_profile: profiles!processed_by(full_name)
+                    processed_by_profile: profiles!processed_by(full_name)
                 `)
             .order('deleted_at', { ascending: false });
 
@@ -2903,7 +3289,7 @@ export const DatabaseService = {
             // Upload photo if provided
             if (photoFile) {
                 const fileExt = photoFile.name.split('.').pop();
-                const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt} `;
                 const filePath = `${report.userId} / ${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
@@ -2995,6 +3381,7 @@ export const DatabaseService = {
             createdAt: new Date(data.created_at),
             updatedAt: new Date(data.updated_at),
             lastContactDate: data.last_contact_date ? new Date(data.last_contact_date) : undefined,
+            clientWillContactAt: data.client_will_contact_at ? new Date(data.client_will_contact_at) : undefined,
             customerData: data.customer_data,
             salesRep: undefined // drivers/profiles join removed due to missing relation
         } as Lead;
@@ -3019,9 +3406,40 @@ export const DatabaseService = {
             source: lead.source as LeadSource,
             createdAt: new Date(lead.created_at),
             updatedAt: new Date(lead.updated_at),
+
             lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
+            clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
             customerData: lead.customer_data,
             salesRep: undefined
+        }));
+    },
+
+    async getStaleLeads(days = 3): Promise<Lead[]> {
+        const date = new Date();
+        date.setDate(date.getDate() - days);
+        const threshold = date.toISOString();
+
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .lt('updated_at', threshold)
+            .not('status', 'in', '("won","lost")')
+            .order('updated_at', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map((lead: any) => ({
+            ...lead,
+            id: lead.id,
+            assignedTo: lead.assigned_to,
+            status: lead.status as LeadStatus,
+            source: lead.source as LeadSource,
+            createdAt: new Date(lead.created_at),
+            updatedAt: new Date(lead.updated_at),
+
+            lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
+            clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
+            customerData: lead.customer_data,
         }));
     },
 
@@ -3120,7 +3538,29 @@ export const DatabaseService = {
 
         const { data, error } = await query;
         if (error) throw error;
-        return data as Offer[];
+
+        return data.map((row: any) => ({
+            id: row.id,
+            offerNumber: row.offer_number,
+            status: row.status as Offer['status'],
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            validUntil: new Date(row.valid_until),
+            leadId: row.lead_id,
+            createdBy: row.user_id, // Was row.created_by, check getOffers uses user_id
+
+            // Map JSON columns to Offer properties using correct DB column names
+            customer: row.customer_data,
+            product: row.product_config, // Was product_data
+            pricing: normalizePricing(row.pricing), // Was pricing_data
+            settings: row.settings_data || {},
+            commission: row.commission || 0,
+            snowZone: row.snow_zone, // Added
+
+            // Handle optional fields
+            notes: row.notes,
+            viewCount: row.view_count || 0
+        })) as Offer[];
     },
 
     async uploadFile(file: File, bucket: string = 'attachments', path?: string): Promise<string> {
@@ -3233,6 +3673,81 @@ export const DatabaseService = {
             .update({ pricing: newPricing })
             .eq('id', offerId);
 
+
         if (updateError) throw updateError;
-    }
+    },
+
+
+
+    // --- Notifications ---
+
+    async getNotifications(userId: string, limit = 50): Promise<AppNotification[]> {
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            type: row.type,
+            title: row.title,
+            message: row.message,
+            link: row.link,
+            isRead: row.is_read,
+            createdAt: new Date(row.created_at),
+            metadata: row.metadata
+        }));
+    },
+
+    async getUnreadNotificationsCount(userId: string): Promise<number> {
+        const { count, error } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_read', false);
+
+        if (error) throw error;
+        return count || 0;
+    },
+
+    async markNotificationAsRead(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async markAllNotificationsAsRead(userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('user_id', userId)
+            .eq('is_read', false);
+
+        if (error) throw error;
+    },
+
+    async addNotification(notification: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>): Promise<void> {
+        const { error } = await supabase
+            .from('notifications')
+            .insert({
+                user_id: notification.userId,
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                link: notification.link,
+                metadata: notification.metadata,
+                is_read: false
+            });
+
+        if (error) throw error;
+    },
+
 };

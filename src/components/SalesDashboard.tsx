@@ -10,15 +10,21 @@ import { useAuth } from '../contexts/AuthContext';
 import type { CommissionStats, Offer, SalesProfile, Lead } from '../types';
 import { Link } from 'react-router-dom';
 import { RingostatWidget } from './widgets/RingostatWidget';
+import { TasksList } from './tasks/TasksList';
+import { TaskModal } from './tasks/TaskModal';
+import { StaleLeadsWidget } from './widgets/StaleLeadsWidget';
 
 export const SalesDashboard: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
     const [stats, setStats] = useState<CommissionStats | null>(null);
     const [offers, setOffers] = useState<Offer[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
+    const [staleLeads, setStaleLeads] = useState<Lead[]>([]);
     const [profile, setProfile] = useState<SalesProfile | null>(null);
     const [teamStats, setTeamStats] = useState<SalesRepStats[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
 
     // Month Selection State
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -41,9 +47,13 @@ export const SalesDashboard: React.FC = () => {
                 }
                 setOffers(userOffers);
 
-                // 2. Fetch Leads
-                const allLeads = await DatabaseService.getLeads();
+                // 2. Fetch Leads & Stale Leads
+                const [allLeads, fetchedStaleLeads] = await Promise.all([
+                    DatabaseService.getLeads(),
+                    DatabaseService.getStaleLeads(3)
+                ]);
                 setLeads(allLeads);
+                setStaleLeads(fetchedStaleLeads);
 
                 // 3. Calculate Stats
                 const computedStats = calculateCommissionStats(userOffers);
@@ -305,10 +315,44 @@ export const SalesDashboard: React.FC = () => {
                 </Link>
             </div>
 
-            {/* Ringostat Widget */}
-            <div className="mb-6">
-                <RingostatWidget compact />
+            {/* Tasks, Stale Leads & Ringostat Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div className="lg:col-span-1">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full flex flex-col min-h-[400px]">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                                Moje Zadania
+                            </h3>
+                            <button
+                                onClick={() => setIsTaskModalOpen(true)}
+                                className="text-xs font-semibold text-accent hover:text-accent-dark bg-accent/10 hover:bg-accent/20 px-2 py-1 rounded transition-colors"
+                            >
+                                + Dodaj
+                            </button>
+                        </div>
+                        <div className="p-4 flex-1 overflow-y-auto max-h-[500px]">
+                            <TasksList refreshTrigger={tasksRefreshTrigger} />
+                        </div>
+                    </div>
+                </div>
+                {staleLeads.length > 0 && (
+                    <div className="lg:col-span-1">
+                        <StaleLeadsWidget leads={staleLeads} />
+                    </div>
+                )}
+                <div className={`lg:col-span-${staleLeads.length > 0 ? '2' : '3'} md:col-span-2`}>
+                    <RingostatWidget compact />
+                </div>
             </div>
+
+            <TaskModal
+                isOpen={isTaskModalOpen}
+                onClose={() => setIsTaskModalOpen(false)}
+                onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
+            />
 
             {/* Monthly Settlement Card */}
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 rounded-xl shadow-lg">

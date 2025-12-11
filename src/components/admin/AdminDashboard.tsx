@@ -5,6 +5,8 @@ import { PartnerOffersList } from './PartnerOffersList';
 import { DatabaseService } from '../../services/database';
 import { WalletWidget } from './WalletWidget';
 import { RingostatWidget } from '../widgets/RingostatWidget';
+import { TasksList } from '../tasks/TasksList';
+import { TaskModal } from '../tasks/TaskModal';
 
 
 export const AdminDashboard: React.FC = () => {
@@ -15,6 +17,8 @@ export const AdminDashboard: React.FC = () => {
         completedInstallations: 0
     });
     const [activeTab, setActiveTab] = React.useState<'sales' | 'partners'>('sales');
+    const [isTaskModalOpen, setIsTaskModalOpen] = React.useState(false);
+    const [tasksRefreshTrigger, setTasksRefreshTrigger] = React.useState(0);
 
     React.useEffect(() => {
         DatabaseService.getSystemStats().then(setStats).catch(console.error);
@@ -248,13 +252,40 @@ export const AdminDashboard: React.FC = () => {
 
             {/* Widgets Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 h-full">
+                <div className="lg:col-span-1 h-full min-h-[400px] space-y-6">
                     <WalletWidget />
+
+                    {/* Tasks Widget */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[400px]">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                                Moje Zadania
+                            </h3>
+                            <button
+                                onClick={() => setIsTaskModalOpen(true)}
+                                className="text-xs font-semibold text-accent hover:text-accent-dark bg-accent/10 hover:bg-accent/20 px-2 py-1 rounded transition-colors"
+                            >
+                                + Dodaj
+                            </button>
+                        </div>
+                        <div className="p-4 flex-1 overflow-y-auto">
+                            <TasksList refreshTrigger={tasksRefreshTrigger} />
+                        </div>
+                    </div>
                 </div>
                 <div className="lg:col-span-2 h-full">
                     <RingostatWidget />
                 </div>
             </div>
+
+            <TaskModal
+                isOpen={isTaskModalOpen}
+                onClose={() => setIsTaskModalOpen(false)}
+                onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
+            />
 
             {/* Quick Actions Groups */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

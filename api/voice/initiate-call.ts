@@ -25,6 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const apiKey = process.env.VAPI_PRIVATE_KEY;
+    const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
 
     // Destructure body EARLY so variables are available
     const { phoneNumber, installationDate, customerName, leadId } = req.body;
@@ -38,7 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!apiKey) {
-        return res.status(500).json({ error: 'Server misconfiguration: Missing VAPI_PRIVATE_KEY' });
+        return res.status(500).json({ error: 'Configuration Error: Missing VAPI_PRIVATE_KEY' });
+    }
+
+    if (!phoneNumberId) {
+        return res.status(500).json({
+            error: 'Configuration Error: Missing VAPI_PHONE_NUMBER_ID',
+            details: 'Outbound calls require a Vapi Phone Number ID. Please buy a number in Vapi Dashboard and add VAPI_PHONE_NUMBER_ID to Vercel.'
+        });
     }
 
     // Init Supabase (safely inside try/catch if needed, but here we checked keys)
@@ -54,6 +62,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const baseUrl = `${protocol}://${host}`;
     const webhookUrl = `${baseUrl}/api/voice/webhook`;
 
+    // E.164 format validation (simple check for Poland)
+    let formattedPhone = phoneNumber.replace(/\s+/g, ''); // Remove spaces
+    if (!formattedPhone.startsWith('+')) {
+        // Assume Poland if no country code
+        formattedPhone = `+48${formattedPhone}`;
+    }
+
     try {
         const response = await fetch('https://api.vapi.ai/call', {
             method: 'POST',
@@ -64,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             body: JSON.stringify({
                 phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID, // Optional: if you have multiple numbers
                 customer: {
-                    number: phoneNumber,
+                    number: formattedPhone,
                     name: customerName
                 },
                 assistant: {
@@ -76,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     model: {
                         provider: "openai",
                         model: "gpt-4",
-                        timeoutSeconds: 20,
+                        // timeoutSeconds removed as it is not supported
                         messages: [
                             {
                                 role: "system",
@@ -109,8 +124,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     parameters: {
                                         type: "object",
                                         properties: {
-                                            confirmed: { type: "boolean", const: true }
-                                        }
+                                            confirmed: {
+                                                type: "boolean",
+                                                description: "Set to true to confirm."
+                                            }
+                                        },
+                                        required: ["confirmed"]
                                     }
                                 }
                             },

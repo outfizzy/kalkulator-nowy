@@ -289,16 +289,27 @@ export const MailPage: React.FC = () => {
 
         try {
             // Append signature if enabled
-            let finalBody = composeData.body;
+            // 1. Process Message Body (Convert newlines to BR if it looks like plain text)
+            let processedBody = composeData.body;
+            if (!processedBody.includes('<') || !processedBody.includes('>')) {
+                processedBody = processedBody.replace(/\n/g, '<br>');
+            }
+
+            // 2. Process Signature
+            let processedSignature = '';
             if (useSignature && currentUser?.emailConfig?.signature) {
-                // Convert newlines in signature to BR for HTML email
-                const sigHtml = `<br><br>--<br>${currentUser.emailConfig.signature.replace(/\n/g, '<br>')}`;
-                finalBody += sigHtml;
+                const rawSig = currentUser.emailConfig.signature;
+                // Check if signature contains HTML tags
+                if (rawSig.includes('<') && rawSig.includes('>')) {
+                    // Treat as HTML - don't escape newlines, just append
+                    processedSignature = `<br><br>--<br>${rawSig}`;
+                } else {
+                    // Treat as Plain Text - convert newlines
+                    processedSignature = `<br><br>--<br>${rawSig.replace(/\n/g, '<br>')}`;
+                }
             }
-            // Simple newline to BR conversion for the main body if it looks like plain text
-            if (!finalBody.includes('<') && !finalBody.includes('>')) {
-                finalBody = finalBody.replace(/\n/g, '<br>');
-            }
+
+            const finalBody = processedBody + processedSignature;
 
             const response = await fetch('/api/send-email', {
                 method: 'POST',

@@ -4,6 +4,8 @@ import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
 import { OfferSearchModal } from './OfferSearchModal';
 import { InstallationCalendar } from './InstallationCalendar';
+import { InstallationPlanner } from './planner/InstallationPlanner';
+import { InstallationReports } from './reports/InstallationReports';
 import { ContractBulkSelectionPanel } from './ContractBulkSelectionPanel';
 import { GroupingControls } from './GroupingControls';
 import { groupInstallations, sortInstallations, getStatusLabel, getStatusColor, getTeamAvailability } from '../../utils/installationUtils';
@@ -16,7 +18,7 @@ export const InstallationDashboard: React.FC = () => {
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeocoding, setIsGeocoding] = useState(false);
-    const [view, setView] = useState<'list' | 'calendar' | 'contracts'>('list');
+    const [view, setView] = useState<'planner' | 'list' | 'calendar' | 'contracts' | 'reports'>('planner');
 
     // Modal State
     const [editingInstallation, setEditingInstallation] = useState<Installation | null>(null);
@@ -53,6 +55,15 @@ export const InstallationDashboard: React.FC = () => {
 
     useEffect(() => {
         const init = async () => {
+            // Auto-complete past installations
+            try {
+                const count = await DatabaseService.checkAndAutoCompleteInstallations();
+                if (count > 0) {
+                    toast.success(`Przesunięto ${count} montaży do weryfikacji`);
+                }
+            } catch (e) {
+                console.error('Auto-complete error:', e);
+            }
             await loadData();
         };
         void init();
@@ -187,6 +198,7 @@ export const InstallationDashboard: React.FC = () => {
     const filteredInstallations = installations.filter(inst => {
         if (filterStatus === 'all') return true;
         if (filterStatus === 'unassigned') return !inst.teamId;
+        if (filterStatus === 'ready_unscheduled') return inst.partsReady && !inst.scheduledDate;
         return inst.status === filterStatus;
     });
 
@@ -256,9 +268,11 @@ export const InstallationDashboard: React.FC = () => {
             {/* View Tabs */}
             <div className="bg-slate-100 p-1 rounded-full flex gap-1 self-start">
                 {[
-                    { id: 'list', label: 'Mapa/Lista' },
-                    { id: 'calendar', label: 'Kalendarz' },
-                    { id: 'contracts', label: 'Umowy' }
+                    { id: 'planner', label: '📅 Planer' },
+                    { id: 'list', label: '📍 Mapa/Lista' },
+                    { id: 'calendar', label: '📅 Kalendarz' },
+                    { id: 'reports', label: '📈 Raporty' },
+                    { id: 'contracts', label: '📝 Umowy' }
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -299,7 +313,11 @@ export const InstallationDashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 flex gap-4 min-h-0">
-                {view === 'list' ? (
+                {view === 'planner' ? (
+                    <div className="w-full h-full bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+                        <InstallationPlanner />
+                    </div>
+                ) : view === 'list' ? (
                     <>
                         {/* Left Panel: List */}
                         <div className="w-full lg:w-1/3 bg-white rounded-xl border border-slate-200 flex flex-col shadow-sm">
@@ -318,9 +336,11 @@ export const InstallationDashboard: React.FC = () => {
                                         className="w-full p-2 border rounded-lg text-sm"
                                     >
                                         <option value="all">Wszystkie</option>
+                                        <option value="ready_unscheduled">Gotowe do zaplanowania</option>
                                         <option value="pending">Oczekujące</option>
                                         <option value="unassigned">Nieprzypisane</option>
                                         <option value="scheduled">Zaplanowane</option>
+                                        <option value="verification">Do weryfikacji</option>
                                         <option value="completed">Zakończone</option>
                                     </select>
                                 </div>
@@ -432,10 +452,12 @@ export const InstallationDashboard: React.FC = () => {
                         <div className="hidden lg:block flex-1 bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
                             <InstallationMap
                                 installations={filteredInstallations}
+                                allInstallations={installations}
                                 teams={teams}
                                 selectedIds={selectedIds}
                                 onSelect={handleSelect}
                                 onEdit={handleEdit}
+                                previewRoute={assignDate && assignTargetId ? { date: assignDate, teamId: assignTargetId } : undefined}
                             />
                         </div>
                     </>
@@ -448,6 +470,10 @@ export const InstallationDashboard: React.FC = () => {
                             onDragDrop={handleDragDrop}
                         />
                     </div>
+                ) : view === 'reports' ? (
+                    <div className="w-full h-full overflow-y-auto bg-white rounded-xl shadow border border-slate-200 p-6">
+                        <InstallationReports installations={installations} teams={teams} />
+                    </div>
                 ) : (
                     <div className="w-full h-full">
                         <ContractBulkSelectionPanel onInstallationsCreated={loadData} />
@@ -456,92 +482,96 @@ export const InstallationDashboard: React.FC = () => {
             </div>
 
             {/* Bottom Panel: Assignment */}
-            {selectedIds.length > 0 && (
-                <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between animate-slide-up sticky bottom-4 z-20 mx-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <span className="font-bold">Wybrano: {selectedIds.length}</span>
-                        <div className="hidden md:block h-8 w-px bg-slate-600" />
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm text-slate-300">Data:</label>
-                            <input
-                                type="date"
-                                value={assignDate}
-                                onChange={(e) => setAssignDate(e.target.value)}
-                                className="bg-slate-700 border-none rounded px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent"
-                            />
+            {
+                selectedIds.length > 0 && (
+                    <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between animate-slide-up sticky bottom-4 z-20 mx-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="font-bold">Wybrano: {selectedIds.length}</span>
+                            <div className="hidden md:block h-8 w-px bg-slate-600" />
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm text-slate-300">Data:</label>
+                                <input
+                                    type="date"
+                                    value={assignDate}
+                                    onChange={(e) => setAssignDate(e.target.value)}
+                                    className="bg-slate-700 border-none rounded px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm text-slate-300">Ekipa/Monter:</label>
+                                <select
+                                    value={assignTargetId}
+                                    onChange={(e) => setAssignTargetId(e.target.value)}
+                                    className="bg-slate-700 border-none rounded px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent min-w-[220px]"
+                                >
+                                    <option value="">Wybierz...</option>
+                                    <optgroup label="Ekipy">
+                                        {teams.map(t => {
+                                            const availability = assignDate ? getTeamAvailability(t.id, assignDate, installations) : null;
+                                            let label = t.name;
+                                            if (availability) {
+                                                label += ` (${availability.count})`;
+                                                if (availability.status === 'busy') label += ' ⚠️';
+                                            }
+                                            return (
+                                                <option key={t.id} value={t.id}>
+                                                    {label}
+                                                </option>
+                                            );
+                                        })}
+                                    </optgroup>
+                                    <optgroup label="Przedstawiciele">
+                                        {salesReps.map(r => (
+                                            <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="Monterzy">
+                                        {installers.map(i => (
+                                            <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>
+                                        ))}
+                                    </optgroup>
+                                </select>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm text-slate-300">Ekipa/Monter:</label>
-                            <select
-                                value={assignTargetId}
-                                onChange={(e) => setAssignTargetId(e.target.value)}
-                                className="bg-slate-700 border-none rounded px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent min-w-[220px]"
-                            >
-                                <option value="">Wybierz...</option>
-                                <optgroup label="Ekipy">
-                                    {teams.map(t => {
-                                        const availability = assignDate ? getTeamAvailability(t.id, assignDate, installations) : null;
-                                        let label = t.name;
-                                        if (availability) {
-                                            label += ` (${availability.count})`;
-                                            if (availability.status === 'busy') label += ' ⚠️';
-                                        }
-                                        return (
-                                            <option key={t.id} value={t.id}>
-                                                {label}
-                                            </option>
-                                        );
-                                    })}
-                                </optgroup>
-                                <optgroup label="Przedstawiciele">
-                                    {salesReps.map(r => (
-                                        <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="Monterzy">
-                                    {installers.map(i => (
-                                        <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>
-                                    ))}
-                                </optgroup>
-                            </select>
-                        </div>
+                        <button
+                            onClick={() => {
+                                if (!assignDate) {
+                                    toast.error('Wybierz datę');
+                                    return;
+                                }
+                                if (!assignTargetId) {
+                                    toast.error('Wybierz ekipę lub montera');
+                                    return;
+                                }
+                                void handleAssignTeam(assignTargetId, assignDate);
+                            }}
+                            className="bg-accent hover:bg-accent-dark px-6 py-2 rounded-lg font-bold transition-colors"
+                        >
+                            Przypisz
+                        </button>
                     </div>
-                    <button
-                        onClick={() => {
-                            if (!assignDate) {
-                                toast.error('Wybierz datę');
-                                return;
-                            }
-                            if (!assignTargetId) {
-                                toast.error('Wybierz ekipę lub montera');
-                                return;
-                            }
-                            void handleAssignTeam(assignTargetId, assignDate);
-                        }}
-                        className="bg-accent hover:bg-accent-dark px-6 py-2 rounded-lg font-bold transition-colors"
-                    >
-                        Przypisz
-                    </button>
-                </div>
-            )}
+                )
+            }
             {/* Details Modal */}
-            {editingInstallation && (
-                <InstallationDetailsModal
-                    installation={editingInstallation}
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onUpdate={handleModalUpdate}
-                    onSave={async (updated) => {
-                        await DatabaseService.updateInstallation(updated.id, updated);
-                    }}
-                />
-            )}
+            {
+                editingInstallation && (
+                    <InstallationDetailsModal
+                        installation={editingInstallation}
+                        isOpen={isModalOpen}
+                        onClose={() => setIsModalOpen(false)}
+                        onUpdate={handleModalUpdate}
+                        onSave={async (updated) => {
+                            await DatabaseService.updateInstallation(updated.id, updated);
+                        }}
+                    />
+                )
+            }
 
             <OfferSearchModal
                 isOpen={isSearchModalOpen}
                 onClose={() => setIsSearchModalOpen(false)}
                 onInstallationCreated={loadData}
             />
-        </div>
+        </div >
     );
 };

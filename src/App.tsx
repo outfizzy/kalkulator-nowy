@@ -37,6 +37,7 @@ import { ReportForm } from './components/reports/ReportForm';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
+import { PortfolioDashboard } from './components/installations/PortfolioDashboard';
 
 import { WalletPage } from './components/admin/WalletPage';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
@@ -282,7 +283,7 @@ function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) 
               )}
             </div>
 
-            <OfferSummary offer={offer} onReset={handleReset} />
+            <OfferSummary offer={offer} onReset={handleReset} onOfferUpdate={setOffer} />
           </div>
         )}
       </div>
@@ -329,6 +330,7 @@ function App() {
               <Route path="/reports/measurements" element={<MeasurementReportsList />} />
               <Route path="/measurements" element={<MeasurementDashboard />} />
               <Route path="/installations" element={<InstallationDashboard />} />
+              <Route path="/portfolio" element={<PortfolioDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
               <Route path="/deliveries" element={<DeliveryCalendar />} />

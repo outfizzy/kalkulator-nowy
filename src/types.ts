@@ -106,6 +106,7 @@ export interface Lead {
     emailMessageId?: string;
     notes?: string;
     lastContactDate?: Date;
+    clientWillContactAt?: Date;
     createdAt: Date;
     updatedAt: Date;
     // Joined data
@@ -176,6 +177,13 @@ export interface ProductConfig {
         price: number;
         quantity: number;
     }[];
+    customItems?: {
+        id: string;
+        name: string;
+        price: number;
+        quantity: number;
+        description?: string;
+    }[];
 }
 
 export interface InstallationCostResult {
@@ -190,6 +198,7 @@ export interface InstallationCostResult {
 export interface PricingResult {
     basePrice: number;
     addonsPrice: number;
+    customItemsPrice?: number;
     totalCost: number;
     marginPercentage: number;
     marginValue: number;
@@ -222,6 +231,13 @@ export interface Offer {
     distance?: number;
     createdBy: string; // User ID of creator
     leadId?: string; // Link to Lead source
+    clientWillContactAt?: Date;
+    settings?: {
+        aiDescription?: string;
+        [key: string]: any;
+    };
+    viewCount?: number;
+    notes?: string;
 }
 
 export interface CommissionStats {
@@ -314,7 +330,7 @@ export interface CommissionHistoryItem {
 
 // --- Installation Module Types ---
 
-export type InstallationStatus = 'pending' | 'scheduled' | 'completed' | 'issue' | 'cancelled';
+export type InstallationStatus = 'pending' | 'scheduled' | 'completed' | 'issue' | 'cancelled' | 'verification';
 
 export interface InstallationTeam {
     id: string;
@@ -355,6 +371,8 @@ export interface Installation {
         notes?: string;
     };
     photoUrls?: string[]; // Array of photo URLs from installation
+    partsReady?: boolean; // Whether parts are ready for installation
+    expectedDuration?: number; // Duration in days (default 1)
 }
 
 // --- Contracts Module Types ---
@@ -414,6 +432,7 @@ export interface Contract {
 
     createdAt: Date;
     signedAt?: Date;
+    clientWillContactAt?: Date;
     completedAt?: Date;
 }
 
@@ -547,5 +566,71 @@ export interface FuelLog {
     user?: {
         firstName: string;
         lastName: string;
+    };
+}
+
+// --- Tasks Module Types ---
+
+export type TaskStatus = 'pending' | 'completed' | 'cancelled';
+export type TaskPriority = 'low' | 'medium' | 'high';
+export type TaskType = 'task' | 'call' | 'email' | 'meeting';
+
+export interface Task {
+    id: string;
+    userId: string;
+    leadId?: string;
+    customerId?: string;
+    title: string;
+    description?: string;
+    dueDate?: string; // ISO Date
+    status: TaskStatus;
+    priority: TaskPriority;
+    type: TaskType;
+    createdAt: Date;
+    updatedAt: Date;
+    // Joined data
+    assignee?: {
+        firstName: string;
+        lastName: string;
+    };
+}
+
+// --- Notifications Types ---
+
+export type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
+export interface Notification {
+    id: string;
+    userId: string;
+    type: NotificationType;
+    title: string;
+    message: string;
+    link?: string;
+    isRead: boolean;
+    createdAt: Date;
+    metadata?: any;
+}
+
+export interface NoteAttachment {
+    name: string;
+    path: string;
+    type: string;
+    size: number;
+}
+
+export interface Note {
+    id: string;
+    entityId: string;
+    entityType: 'lead' | 'customer';
+    content: string;
+    userId: string;
+    createdAt: Date;
+    attachments?: NoteAttachment[];
+    user?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        avatarUrl?: string;
     };
 }

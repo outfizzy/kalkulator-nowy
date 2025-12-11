@@ -120,7 +120,7 @@ export const CustomerDetailsPage: React.FC = () => {
     const totalRevenue = clientOffers
         .filter(o => o.status === 'sold')
         .reduce((sum, o) => {
-            const pricing = o.pricing || ({} as any);
+            const pricing = o.pricing || { sellingPriceNet: 0, finalPriceNet: 0 };
             const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
             const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
             return sum + (finalNet ?? baseNet);
@@ -598,9 +598,37 @@ export const CustomerDetailsPage: React.FC = () => {
                                                     {contract.status}
                                                 </span>
                                             </div>
-                                            <div className="text-sm text-slate-600">
+                                            <div className="text-sm text-slate-600 mb-3">
                                                 Oferta źródłowa: #{contract.offerId}
                                             </div>
+
+                                            {/* Attachments Section (Protocols) */}
+                                            {contract.attachments && contract.attachments.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-slate-100">
+                                                    <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Załączniki (Protokoły)</h5>
+                                                    <div className="space-y-2">
+                                                        {contract.attachments.map((att, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between bg-slate-50 p-2 rounded text-sm">
+                                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                                    <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                                    </svg>
+                                                                    <span className="truncate text-slate-700 font-medium" title={att.name}>{att.name}</span>
+                                                                </div>
+                                                                <a
+                                                                    href={att.url}
+                                                                    download={att.name}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                                                                >
+                                                                    Pobierz
+                                                                </a>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))
                                 )}

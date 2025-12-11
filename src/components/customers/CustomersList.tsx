@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import type { Customer } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CustomerWithStats {
     customer: Customer & { id?: string };
@@ -14,6 +15,7 @@ interface CustomerWithStats {
 }
 
 export const CustomersList: React.FC = () => {
+    const { isAdmin } = useAuth();
     const [customers, setCustomers] = useState<CustomerWithStats[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -182,12 +184,38 @@ export const CustomersList: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right text-sm font-medium">
                                             {item.customer.id ? (
-                                                <Link
-                                                    to={`/customers/${item.customer.id}`}
-                                                    className="text-accent hover:text-accent-dark"
-                                                >
-                                                    Szczegóły
-                                                </Link>
+                                                <>
+                                                    <Link
+                                                        to={`/customers/${item.customer.id}`}
+                                                        className="text-accent hover:text-accent-dark"
+                                                    >
+                                                        Szczegóły
+                                                    </Link>
+                                                    {isAdmin() && item.contractCount === 0 && (
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                if (window.confirm('Czy na pewno chcesz trwale usunąć tego klienta? Wszystkie oferty i historia zostaną utracone.')) {
+                                                                    try {
+                                                                        await DatabaseService.deleteCustomer(item.customer.id!);
+                                                                        toast.success('Klient został usunięty');
+                                                                        loadCustomers();
+                                                                    } catch (error) {
+                                                                        console.error('Failed to delete customer:', error);
+                                                                        toast.error('Błąd usuwania (sprawdź powiązania)');
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700 ml-4 hover:bg-red-50 p-1 rounded"
+                                                            title="Usuń (Admin)"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+                                                </>
                                             ) : (
                                                 <span className="text-slate-300 cursor-not-allowed" title="Brak ID klienta">
                                                     Szczegóły
