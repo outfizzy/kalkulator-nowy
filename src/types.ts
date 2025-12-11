@@ -48,6 +48,7 @@ export interface User {
 export interface Customer {
     id?: string; // Optional for backward compatibility with offers that embed customer data without ID
     salutation: 'Herr' | 'Frau' | 'Firma';
+    companyName?: string; // Added for PDF generation
     firstName: string;
     lastName: string;
     street: string;
@@ -56,6 +57,7 @@ export interface Customer {
     city: string;
     phone: string;
     email: string;
+    nip?: string; // VAT ID
     country: string; // Default 'Deutschland'
 }
 

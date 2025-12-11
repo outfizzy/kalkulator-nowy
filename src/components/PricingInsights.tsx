@@ -14,13 +14,13 @@ interface RegionStats {
 
 export const PricingInsights: React.FC<PricingInsightsProps> = ({ postalCode, currentMargin }) => {
     const [stats, setStats] = useState<RegionStats | null>(null);
-    const [loading, setLoading] = useState(false);
+
 
     useEffect(() => {
         if (!postalCode || postalCode.length < 2) return;
 
         const fetchStats = async () => {
-            setLoading(true);
+
             try {
                 // In a real app, this would be a DB RPC call. 
                 // Creating a simplified mock simulation based on available data 
@@ -38,8 +38,8 @@ export const PricingInsights: React.FC<PricingInsightsProps> = ({ postalCode, cu
                 setStats(data);
             } catch (e) {
                 console.error("Failed to load pricing insights", e);
-            } finally {
-                setLoading(false);
+                // finally
+
             }
         };
 

@@ -1,4 +1,4 @@
-import { Offer } from '../types';
+import type { Offer } from '../types';
 import { translate } from '../utils/translations';
 
 const SYSTEM_PROMPT = `

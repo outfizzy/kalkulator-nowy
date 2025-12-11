@@ -717,6 +717,50 @@ export const DatabaseService = {
         }).sort((a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime());
     },
 
+
+
+    async getRegionStats(postalCodePrefix: string) {
+        // Fetch all offers in this region
+        // We use a text search on the JSONB column for now
+        // performance warning: full table scan potential on large datasets if not indexed
+        const { data, error } = await supabase
+            .from('offers')
+            .select('status, pricing, customer_data')
+            .textSearch('customer_data', `'${postalCodePrefix}':*`) // simplistic approach
+            // Better approach: filter in JS after fetching recent offers or use RPC
+            // For now, let's fetch last 100 offers to save bandwidth and calc stats
+            .limit(100);
+
+        // Alternative safer queries if textSearch is tricky on jsonb:
+        // .filter('customer_data->>postalCode', 'like', `${postalCodePrefix}%`) 
+
+        if (error) {
+            console.error("Error fetching region stats", error);
+            return { winRate: 0, avgMargin: 0, totalOffers: 0 };
+        }
+
+        if (!data || data.length === 0) return { winRate: 0, avgMargin: 0, totalOffers: 0 };
+
+        const regionOffers = data.filter((o: any) => {
+            const pc = o.customer_data?.postalCode || '';
+            return pc.startsWith(postalCodePrefix);
+        });
+
+        if (regionOffers.length === 0) return { winRate: 0, avgMargin: 0, totalOffers: 0 };
+
+        const total = regionOffers.length;
+        const sold = regionOffers.filter((o: any) => o.status === 'sold').length;
+        const winRate = (sold / total) * 100;
+
+        // Avg Margin
+        const margins = regionOffers.map((o: any) => o.pricing?.marginPercentage || 0);
+        const avgMargin = margins.reduce((a: number, b: number) => a + b, 0) / total;
+
+        return { winRate, avgMargin, totalOffers: total };
+    },
+
+
+
     async getCustomerOffers(customerId: string): Promise<Offer[]> {
         const { data, error } = await supabase
             .from('offers')

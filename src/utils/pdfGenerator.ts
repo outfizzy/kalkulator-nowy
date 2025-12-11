@@ -14,7 +14,7 @@ const COLORS = {
     tableHeader: [240, 240, 240] as [number, number, number] // Very light gray for headers
 };
 
-const DEFAULT_FONT = 'Helvetica'; // Standard font as fallback
+
 
 // Helper to load fonts safely
 export async function loadFonts(doc: jsPDF): Promise<boolean> {
