@@ -239,7 +239,27 @@ export interface Offer {
         [key: string]: any;
     };
     viewCount?: number;
+    lastViewedAt?: Date;
     notes?: string;
+    publicToken?: string;
+    publicTokenCreatedAt?: Date;
+    // Joined creator data
+    creator?: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone: string;
+    };
+}
+
+export interface LeadMessage {
+    id: string;
+    leadId: string;
+    offerId?: string;
+    senderType: 'client' | 'user';
+    content: string;
+    isRead: boolean;
+    createdAt: Date;
 }
 
 export interface CommissionStats {

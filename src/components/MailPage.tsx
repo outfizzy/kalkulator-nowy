@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { LeadForm } from './leads/LeadForm';
-import type { Lead } from '../types';
+import { OfferService } from '../services/database/offer.service';
+import type { Lead, Offer } from '../types';
 
 // Mock Email Data
 // Mock Email Data Removed for Production
@@ -49,6 +50,66 @@ export const MailPage: React.FC = () => {
     const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
     const [aiPrompt, setAiPrompt] = useState(''); // New AI Prompt State
     const [showAiPresets, setShowAiPresets] = useState(false);
+    const [showOfferSelector, setShowOfferSelector] = useState(false);
+    const [recentOffers, setRecentOffers] = useState<Offer[]>([]);
+
+    const toggleOfferSelector = async () => {
+        if (!showOfferSelector) {
+            try {
+                // Fetch basic info of recent offers (lightweight if possible, or just all)
+                // Since we don't have a specialized 'recent' method in Service yet that returns lightweight, 
+                // we'll assume fetching all and slicing is okay or use getOffers with limit if available.
+                // Assuming DatabaseService or just fetching directly via supabase in Service.
+                // OfferService.getOffers() returns all. Let's try to grab from DB directly or add getRecent to Service.
+                // Simplest approach: reuse existing getOffers but valid logic.
+                // Actually, OfferService.getSystemStats uses supabase. 
+                // Let's just fetch directly here for simplicity or use OfferService.
+                const offersData = await OfferService.getOffers();
+                // Checking OfferService: it has `getOffers`.
+                setRecentOffers((offersData || []).slice(0, 5));
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        setShowOfferSelector(!showOfferSelector);
+    };
+
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+    const handleInsertOfferLink = async (offer: Offer) => {
+        try {
+            const token = await OfferService.ensurePublicToken(offer.id);
+            const link = `${window.location.origin}/p/offer/${token}`;
+
+            // German Template requested by user
+            const template = `Exklusiv für Sie vorbereitet:\n📄 Angebot ${offer.offerNumber}: ${link}\n\nBitte öffnen Sie die beigefügte PDF-Datei.\nDas detaillierte Angebot finden Sie im Anhang dieser E-Mail.\n`;
+
+            if (textareaRef.current) {
+                const start = textareaRef.current.selectionStart;
+                const end = textareaRef.current.selectionEnd;
+                const text = composeData.body;
+                const newText = text.substring(0, start) + template + text.substring(end);
+
+                setComposeData(prev => ({ ...prev, body: newText }));
+
+                // Restore cursor position after insert (optional, but nice)
+                setTimeout(() => {
+                    if (textareaRef.current) {
+                        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + template.length;
+                        textareaRef.current.focus();
+                    }
+                }, 0);
+            } else {
+                // Fallback if ref missing (shouldn't happen)
+                setComposeData(prev => ({ ...prev, body: prev.body + (prev.body ? '\n\n' : '') + template }));
+            }
+
+            setShowOfferSelector(false);
+        } catch (error) {
+            console.error(error);
+            toast.error('Błąd generowania linku');
+        }
+    };
 
     const AI_PRESETS = [
         { label: 'Popraw błędy', value: 'Popraw błędy interpunkcyjne, ortograficzne i stylistyczne.' },
@@ -616,6 +677,7 @@ export const MailPage: React.FC = () => {
                                     )}
                                     <div className="relative">
                                         <textarea
+                                            ref={textareaRef}
                                             placeholder="Treść wiadomości..."
                                             value={composeData.body}
                                             onChange={e => setComposeData({ ...composeData, body: e.target.value })}
@@ -635,6 +697,42 @@ export const MailPage: React.FC = () => {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                                     </svg>
                                                 </button>
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={toggleOfferSelector}
+                                                        type="button"
+                                                        className={`p-2 rounded-lg transition-colors ${showOfferSelector ? 'bg-orange-100 text-orange-600' : 'text-slate-400 hover:text-orange-600 hover:bg-orange-50'}`}
+                                                        title="Wstaw Ofertę"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                    </button>
+                                                    {showOfferSelector && (
+                                                        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50">
+                                                            <div className="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs text-slate-500 uppercase tracking-wider">
+                                                                Ostatnie Oferty
+                                                            </div>
+                                                            <div className="max-h-48 overflow-y-auto">
+                                                                {recentOffers.length === 0 ? (
+                                                                    <div className="p-4 text-center text-xs text-slate-400">Brak ofert</div>
+                                                                ) : (
+                                                                    recentOffers.map(offer => (
+                                                                        <button
+                                                                            key={offer.id}
+                                                                            type="button"
+                                                                            onClick={() => handleInsertOfferLink(offer)}
+                                                                            className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-50 text-sm transition-colors"
+                                                                        >
+                                                                            <div className="font-medium text-slate-800">{offer.offerNumber}</div>
+                                                                            <div className="text-xs text-slate-500">{offer.customer.firstName} {offer.customer.lastName}</div>
+                                                                        </button>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <label className="flex items-center gap-2 text-xs font-medium text-slate-500 cursor-pointer">

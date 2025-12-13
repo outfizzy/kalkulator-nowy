@@ -353,7 +353,18 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                     return (
                                         <tr key={offer.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="text-sm font-mono text-slate-500">{offer.offerNumber || offer.id.substring(0, 8)}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-mono text-slate-500">{offer.offerNumber || offer.id.substring(0, 8)}</span>
+                                                    {(offer.viewCount || 0) > 0 && (
+                                                        <div className="flex items-center gap-1 mt-1 text-xs text-blue-600" title={`Ostatnie wyświetlenie: ${offer.lastViewedAt?.toLocaleString()}`}>
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg>
+                                                            <span>{offer.viewCount} wyświetleń</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className="text-sm text-slate-700">{createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</span>

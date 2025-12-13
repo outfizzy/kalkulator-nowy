@@ -4,12 +4,26 @@ import { DatabaseService } from '../../services/database';
 import type { Note } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 
+export interface NoteItem {
+    id: string;
+    content: string;
+    createdAt: Date;
+    user?: {
+        firstName?: string;
+        lastName?: string;
+        avatarUrl?: string;
+    };
+    attachments?: { name: string; path: string }[];
+    type: 'note' | 'client_message' | 'system';
+}
+
 interface NotesListProps {
     entityType: 'lead' | 'customer';
     entityId: string;
+    extraItems?: NoteItem[];
 }
 
-export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId }) => {
+export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId, extraItems = [] }) => {
     const { currentUser } = useAuth();
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
@@ -92,6 +106,20 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId }) =>
         }
     };
 
+    // Merge and sort items
+    const allItems: NoteItem[] = [
+        ...notes.map(n => ({
+            id: n.id,
+            content: n.content,
+            createdAt: n.createdAt,
+            user: n.user,
+            attachments: n.attachments,
+            type: 'note' as const,
+            userId: n.userId // Keep for delete check
+        })),
+        ...extraItems
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
     if (loading) return <div className="p-4 text-center text-slate-400">Ładowanie notatek...</div>;
 
     return (
@@ -145,27 +173,36 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId }) =>
             </div>
 
             <div className="space-y-3">
-                {notes.map(note => (
-                    <div key={note.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                {allItems.map(item => (
+                    <div
+                        key={`${item.type}-${item.id}`}
+                        className={`p-4 rounded-xl border shadow-sm transition-shadow ${item.type === 'client_message'
+                                ? 'bg-purple-50 border-purple-100'
+                                : 'bg-white border-slate-100 hover:shadow-md'
+                            }`}
+                    >
                         <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
-                                {note.user?.avatarUrl ? (
-                                    <img src={note.user.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                                {item.user?.avatarUrl ? (
+                                    <img src={item.user.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
                                 ) : (
-                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500 font-bold">
-                                        {note.user?.firstName?.[0] || 'U'}
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${item.type === 'client_message' ? 'bg-purple-200 text-purple-700' : 'bg-slate-200 text-slate-500'
+                                        }`}>
+                                        {item.type === 'client_message' ? 'K' : (item.user?.firstName?.[0] || 'U')}
                                     </div>
                                 )}
-                                <span className="text-sm font-medium text-slate-700">
-                                    {note.user ? `${note.user.firstName} ${note.user.lastName}` : 'Użytkownik'}
+                                <span className={`text-sm font-medium ${item.type === 'client_message' ? 'text-purple-900' : 'text-slate-700'
+                                    }`}>
+                                    {item.type === 'client_message' ? 'Wiadomość od Klienta' : (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Użytkownik')}
                                 </span>
-                                <span className="text-xs text-slate-400">
-                                    {note.createdAt.toLocaleString()}
+                                <span className={`text-xs ${item.type === 'client_message' ? 'text-purple-400' : 'text-slate-400'
+                                    }`}>
+                                    {item.createdAt.toLocaleString()}
                                 </span>
                             </div>
-                            {currentUser?.id === note.userId && (
+                            {item.type === 'note' && currentUser?.id === (item as any).userId && (
                                 <button
-                                    onClick={() => handleDeleteNote(note.id)}
+                                    onClick={() => handleDeleteNote(item.id)}
                                     className="text-slate-300 hover:text-red-500 transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -175,13 +212,14 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId }) =>
                             )}
                         </div>
 
-                        <div className="text-sm text-slate-600 whitespace-pre-wrap ml-8">
-                            {note.content}
+                        <div className={`text-sm whitespace-pre-wrap ml-8 ${item.type === 'client_message' ? 'text-purple-800' : 'text-slate-600'
+                            }`}>
+                            {item.content}
                         </div>
 
-                        {note.attachments && note.attachments.length > 0 && (
+                        {item.attachments && item.attachments.length > 0 && (
                             <div className="mt-3 ml-8 flex flex-wrap gap-2">
-                                {note.attachments.map((att, idx) => (
+                                {item.attachments.map((att, idx) => (
                                     <a
                                         key={idx}
                                         href={att.path}
@@ -200,7 +238,7 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId }) =>
                     </div>
                 ))}
 
-                {notes.length === 0 && (
+                {allItems.length === 0 && (
                     <div className="text-center py-8 text-slate-400 text-sm">
                         Brak notatek. Dodaj pierwszą!
                     </div>

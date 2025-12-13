@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { Offer } from '../../types';
 import { getOfferEmailHtml } from '../../utils/emailTemplates';
 import { generateOfferPDFData } from '../../utils/pdfGenerator';
+import { OfferService } from '../../services/database/offer.service';
 
 interface SendEmailModalProps {
     isOpen: boolean;
@@ -143,7 +144,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
 
             if (useOfferTemplate && selectedOffer) {
                 // 1. Generate PDF
-                const toastPdf = toast.loading('Generowanie PDF oferty...');
+                toast.loading('Generowanie PDF oferty...', { id: 'pdf-gen' });
                 try {
                     const pdfBase64 = await generateOfferPDFData(selectedOffer);
 
@@ -153,16 +154,28 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                         content: pdfBase64,
                         contentType: 'application/pdf'
                     });
-
-                    // 3. Generate HTML Body
-                    // We pass '#' as url to indicate it's an attachment
-                    finalBody = getOfferEmailHtml([{ number: selectedOffer.offerNumber || selectedOffer.id.substring(0, 8), url: '#' }]);
-
-                    toast.dismiss(toastPdf);
-                } catch (err) {
+                } catch (err: any) {
                     console.error('PDF Gen Error', err);
-                    toast.dismiss(toastPdf);
-                    toast.error('Błąd generowania PDF: ' + (err instanceof Error ? err.message : String(err)));
+                    toast.dismiss('pdf-gen');
+                    const msg = err instanceof Error ? err.message : (err?.message || JSON.stringify(err));
+                    toast.error(`Błąd generowania PDF: ${msg}`);
+                    setLoading(false);
+                    return;
+                }
+
+                // 3. Generate HTML Body
+                try {
+                    // Generate Public Token for the link
+                    const token = await OfferService.ensurePublicToken(selectedOffer.id);
+                    const link = `${window.location.origin}/p/offer/${token}`;
+
+                    finalBody = getOfferEmailHtml([{ number: selectedOffer.offerNumber || selectedOffer.id.substring(0, 8), url: link }]);
+                    toast.dismiss('pdf-gen');
+                } catch (err: any) {
+                    console.error('Token Gen Error', err);
+                    toast.dismiss('pdf-gen');
+                    const msg = err instanceof Error ? err.message : (err?.message || JSON.stringify(err));
+                    toast.error(`Błąd generowania linku: ${msg}`);
                     setLoading(false);
                     return;
                 }

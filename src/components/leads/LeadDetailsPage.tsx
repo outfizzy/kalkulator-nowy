@@ -443,6 +443,47 @@ export const LeadDetailsPage: React.FC = () => {
                                         </div>
                                     )}
 
+                                    {/* Client Activity Widget (New) */}
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                                        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                            <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                            </svg>
+                                            Aktywność Klienta
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {communications.filter(c => c.userId === 'client').length > 0 ? (
+                                                communications.filter(c => c.userId === 'client').slice(0, 3).map((comm) => (
+                                                    <div key={comm.id} className="flex gap-3 items-start p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                                        <div className="mt-1">
+                                                            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-purple-800 font-bold mb-0.5">
+                                                                {new Date(comm.createdAt).toLocaleString()}
+                                                            </div>
+                                                            <div className="text-sm text-purple-900 font-medium">
+                                                                {comm.content}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-sm text-slate-400 italic">Brak aktywności klienta na portalu ofertowym.</div>
+                                            )}
+                                        </div>
+                                        {communications.filter(c => c.userId === 'client').length > 0 && (
+                                            <button
+                                                onClick={() => setActiveTab('communications')}
+                                                className="w-full text-center text-sm text-purple-600 font-medium hover:underline mt-4"
+                                            >
+                                                Zobacz całą historię
+                                            </button>
+                                        )}
+                                    </div>
+
                                     {/* Notes Section with new NotesList */}
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
                                         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -460,7 +501,17 @@ export const LeadDetailsPage: React.FC = () => {
                                             </div>
                                         )}
 
-                                        <NotesList entityType="lead" entityId={lead.id} />
+                                        <NotesList
+                                            entityType="lead"
+                                            entityId={lead.id}
+                                            extraItems={communications.filter(c => c.userId === 'client').map(c => ({
+                                                id: c.id,
+                                                content: c.content || '',
+                                                createdAt: new Date(c.createdAt),
+                                                type: 'client_message',
+                                                user: { firstName: 'Klient' }
+                                            }))}
+                                        />
                                     </div>
                                 </div>
                             </div>

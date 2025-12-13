@@ -54,6 +54,8 @@ import { LeadDetailsPage } from './components/leads/LeadDetailsPage';
 import { MailPage } from './components/MailPage';
 import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
 
+import { PublicOfferPage } from './pages/PublicOfferPage';
+
 // Partner Components
 import { LandingPage } from './components/LandingPage';
 import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
@@ -301,6 +303,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/p/offer/:token" element={<PublicOfferPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 

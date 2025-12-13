@@ -73,9 +73,25 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
         setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
-    const getIcon = (type: Communication['type'], direction: Communication['direction']) => {
+    const getIcon = (type: Communication['type'], direction: Communication['direction'], metadata?: any) => {
+        // Special icon for AI Reports
+        if (metadata?.isSystemNote) {
+            return <span className="text-xl">🤖</span>; // Or a specific SVG if preferred
+        }
+
         switch (type) {
             case 'email':
+                // Check if it's a client activity (view/message)
+                if (direction === 'inbound' && type === 'email') {
+                    return (
+                        <div className="bg-blue-100 p-1 rounded-full">
+                            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </div>
+                    );
+                }
                 return direction === 'inbound' ? (
                     <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                 ) : (
@@ -182,7 +198,7 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
-                                        {getIcon(comm.type, comm.direction)}
+                                        {getIcon(comm.type, comm.direction, comm.metadata)}
                                         <span className="font-bold text-slate-700">
                                             {comm.subject || (comm.type === 'call' ? 'Rozmowa telefoniczna' : 'Notatka')}
                                         </span>
@@ -200,14 +216,35 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                                     {comm.content}
                                 </div>
 
-                                {comm.user && (
-                                    <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                        {comm.user.firstName} {comm.user.lastName}
-                                    </div>
-                                )}
+                                {/* User / Sender Name */}
+                                <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                                    {(comm.user || comm.userId === 'client' || comm.userId === 'system') ? (
+                                        <>
+                                            {comm.userId === 'client' ? (
+                                                <>
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                                                    </svg>
+                                                    <span className="font-semibold text-slate-600">Klient (przez stronę oferty)</span>
+                                                </>
+                                            ) : comm.userId === 'system' ? (
+                                                <>
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <span className="font-semibold text-slate-600">System (Automatyczne)</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                    </svg>
+                                                    {comm.user?.firstName} {comm.user?.lastName}
+                                                </>
+                                            )}
+                                        </>
+                                    ) : null}
+                                </div>
 
                                 {comm.metadata?.attachments && Array.isArray(comm.metadata.attachments) && comm.metadata.attachments.length > 0 && (
                                     <div className="mt-3 pt-3 border-t border-slate-100">

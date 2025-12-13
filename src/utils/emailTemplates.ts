@@ -97,7 +97,11 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
                                         <td align="center">
                                             ${offerLinks.map(link => {
         if (link.url && link.url !== '#') {
-            return `<a href="${link.url}" target="_blank" class="cta-button">📥 Angebot ${link.number} herunterladen</a><br>`;
+            return `
+                <a href="${link.url}" target="_blank" class="cta-button">Angebot ${link.number} ansehen</a><br>
+                <p style="margin-top: 5px; font-size: 13px; color: #6b7280;">Oder über diesen Link öffnen: <a href="${link.url}" style="color: #3b82f6;">${link.url}</a></p>
+                <br>
+                `;
         } else {
             return `
             <div style="background-color: #e0f2fe; border: 1px solid #bae6fd; border-radius: 8px; padding: 15px; margin-bottom: 10px;">

@@ -7,6 +7,8 @@ interface VoiceConfirmationButtonProps {
     customerName: string;
     phoneNumber: string;
     installationDate: string | Date; // Date object or ISO string
+    installationId: string;
+    customerId: string;
     onSuccess?: () => void;
 }
 
@@ -15,6 +17,8 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
     customerName,
     phoneNumber,
     installationDate,
+    installationId,
+    customerId,
     onSuccess
 }) => {
     const [loading, setLoading] = useState(false);
@@ -33,31 +37,30 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
         const toastId = toast.loading('Inicjowanie połączenia AI...');
 
         try {
-            const response = await fetch('/api/voice/initiate-call', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    leadId,
-                    customerName,
+            // Dynamic import to avoid circular dependencies or build issues if not used
+            const { supabase } = await import('../../lib/supabase');
+
+            const { data, error } = await supabase.functions.invoke('vapi-make-call', {
+                body: {
                     phoneNumber,
-                    installationDate
-                })
+                    customerName,
+                    installationDate: installationDate instanceof Date ? installationDate.toISOString() : new Date(installationDate).toISOString(),
+                    // Pass leadId if available, or just standard metadata
+                    leadId,
+                    installationId,
+                    customerId
+                }
             });
 
-            const data = await response.json();
+            if (error) throw error;
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Błąd połączenia');
-            }
-
+            console.log('Vapi Call started:', data);
             toast.success('AI dzwoni do klienta! 🤖📞', { id: toastId });
             if (onSuccess) onSuccess();
 
         } catch (error: any) {
             console.error('Voice Call Error:', error);
-            toast.error(`Błąd: ${error.message}`, { id: toastId });
+            toast.error(`Błąd: ${error.message || 'Nie udało się połączyć'}`, { id: toastId });
         } finally {
             setLoading(false);
         }

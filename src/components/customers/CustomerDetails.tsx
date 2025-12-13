@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
-import type { Customer, Contract, Installation } from '../../types';
+import type { Customer, Contract, Installation, Communication } from '../../types';
+import { NotesList } from '../common/NotesList';
 
 interface RingostatCall {
     id: string;
@@ -23,15 +24,11 @@ interface CustomerDetailsProps {
 
 export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEdit, onBack }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'logistics' | 'communication'>('overview');
-    // Removed unused offers state, using contracts for financials/logistics mainly.
-    // However, if we want to show draft offers, we might need it. 
-    // For now, let's keep offers in stats but not in state list to avoid unused var warning if we don't render them all.
-    // actually we DO render offers in "stats" calculation, but we can fetch them just for stats or render a summary.
-    // Let's keep fetching offers for stats count.
 
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [calls, setCalls] = useState<RingostatCall[]>([]);
+    const [communications, setCommunications] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         totalOffers: 0,
@@ -45,14 +42,16 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
             if (!customer.id) return;
             try {
                 // Parallel fetching for performance
-                const [offersData, contractsData, installationsData] = await Promise.all([
+                const [offersData, contractsData, installationsData, commsData] = await Promise.all([
                     DatabaseService.getCustomerOffers(customer.id),
                     DatabaseService.getCustomerContracts(customer.id),
-                    DatabaseService.getCustomerInstallations(customer.id)
+                    DatabaseService.getCustomerInstallations(customer.id),
+                    DatabaseService.getCommunications(customer.id)
                 ]);
 
                 setContracts(contractsData);
                 setInstallations(installationsData);
+                setCommunications(commsData);
 
                 // Calculate Stats
                 const soldContracts = contractsData.filter(c => c.status === 'signed' || c.status === 'completed');
@@ -89,17 +88,10 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                             };
                             const customerPhone = normalize(customer.phone);
 
-                            console.log('Debug Ringostat: Normalized Customer Phone:', customerPhone);
-                            console.log('Debug Ringostat: Raw Calls:', data.calls.length);
-
                             const customerCalls = data.calls.filter((call: any) => {
                                 const caller = normalize(call.caller);
                                 const callee = normalize(call.callee);
-                                const match = caller.includes(customerPhone) || callee.includes(customerPhone);
-
-                                // Debug logging for first few calls or matches
-                                if (match) console.log('Debug Ringostat: Match found:', call);
-                                return match;
+                                return caller.includes(customerPhone) || callee.includes(customerPhone);
                             });
                             setCalls(customerCalls);
                         }
@@ -125,6 +117,40 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
         } catch (error) {
             console.error('Error updating installation:', error);
             toast.error('Nie udało się zaktualizować montażu');
+        }
+    };
+
+    const handleConfirmInstallation = async (inst: Installation) => {
+        if (!inst.scheduledDate || !customer.phone) {
+            toast.error('Brak daty montażu lub telefonu klienta');
+            return;
+        }
+
+        const toastId = toast.loading('Inicjowanie asystenta AI...');
+
+        try {
+            // Import supabase dynamically or from props if available, but here we need direct access or via service
+            // Ideally we move this to a service, but for now doing it here
+            const { supabase } = await import('../../lib/supabase');
+
+            const { data, error } = await supabase.functions.invoke('vapi-make-call', {
+                body: {
+                    phoneNumber: customer.phone,
+                    customerName: `${customer.firstName} ${customer.lastName}`,
+                    installationDate: new Date(inst.scheduledDate).toLocaleDateString('pl-PL'),
+                    installationTime: 'godziny poranne', // default for now
+                    productName: inst.productSummary
+                }
+            });
+
+            if (error) throw error;
+
+            console.log('Vapi Call started:', data);
+            toast.success('Asystent AI dzwoni do klienta!', { id: toastId });
+
+        } catch (error) {
+            console.error('Error calling Vapi:', error);
+            toast.error('Błąd połączenia z asystentem', { id: toastId });
         }
     };
 
@@ -196,7 +222,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                         { id: 'overview', label: 'Podsumowanie', icon: 'M4 6h16M4 12h16M4 18h7' },
                         { id: 'financials', label: 'Oferty i Umowy', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
                         { id: 'logistics', label: 'Realizacja i Produkty', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-                        { id: 'communication', label: 'Historia Kontaktu', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' }
+                        { id: 'communication', label: 'Komunikacja i Notatki', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -419,6 +445,16 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                             <option value="completed">Zakończono</option>
                                                             <option value="cancelled">Anulowano</option>
                                                         </select>
+
+                                                        {inst.scheduledDate && inst.status === 'scheduled' && (
+                                                            <button
+                                                                onClick={() => handleConfirmInstallation(inst)}
+                                                                className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-purple-200 transition-colors"
+                                                            >
+                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                                                                Potwierdź (AI)
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -434,40 +470,66 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     {/* COMMUNICATION TAB */}
                     {activeTab === 'communication' && (
 
-                        <div>
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="font-bold text-slate-800">Historia Połączeń (Ringostat)</h3>
-                                <div className="text-xs text-slate-500">Ostatnie 3 miesiące</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Notes and Client Messages - NEW */}
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:h-[600px] flex flex-col">
+                                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                    </svg>
+                                    Notatki i Wiadomości
+                                </h3>
+                                <div className="flex-1 overflow-y-auto">
+                                    <NotesList
+                                        entityType="customer"
+                                        entityId={customer.id!}
+                                        extraItems={communications.filter(c => c.userId === 'client').map(c => ({
+                                            id: c.id,
+                                            content: c.content || '',
+                                            createdAt: new Date(c.createdAt),
+                                            type: 'client_message',
+                                            user: { firstName: 'Klient', lastName: '' }
+                                        }))}
+                                    />
+                                </div>
                             </div>
 
-                            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                                {calls.length > 0 ? calls.map(call => (
-                                    <div key={call.id} className="bg-slate-50 p-4 rounded-lg flex items-center justify-between border border-slate-100">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${call.direction === 'incoming' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
-                                                {call.direction === 'incoming' ? '↙' : '↗'}
+                            {/* Ringostat Calls */}
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:h-[600px] flex flex-col">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="font-bold text-slate-800">Historia Połączeń (Ringostat)</h3>
+                                    <div className="text-xs text-slate-500">Ostatnie 3 miesiące</div>
+                                </div>
+
+                                <div className="space-y-2 overflow-y-auto pr-2 flex-1">
+                                    {calls.length > 0 ? calls.map(call => (
+                                        <div key={call.id} className="bg-slate-50 p-4 rounded-lg flex items-center justify-between border border-slate-100">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${call.direction === 'incoming' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                    {call.direction === 'incoming' ? '↙' : '↗'}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-slate-800">
+                                                        {call.direction === 'incoming' ? 'Połączenie przychodzące' : 'Połączenie wychodzące'}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-0.5">
+                                                        {formatDate(call.date)} {new Date(call.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {Math.ceil(call.duration / 60)} min
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="font-bold text-slate-800">
-                                                    {call.direction === 'incoming' ? 'Połączenie przychodzące' : 'Połączenie wychodzące'}
+                                            <div className="flex items-center gap-4">
+                                                <div className={`px-2 py-1 rounded text-xs font-bold ${call.status === 'answered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
                                                 </div>
-                                                <div className="text-xs text-slate-500 mt-0.5">
-                                                    {formatDate(call.date)} {new Date(call.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {Math.ceil(call.duration / 60)} min
-                                                </div>
+                                                {call.recording && (
+                                                    <audio controls src={call.recording} className="h-8 w-48" />
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className={`px-2 py-1 rounded text-xs font-bold ${call.status === 'answered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}
-                                            </div>
-                                            {call.recording && (
-                                                <audio controls src={call.recording} className="h-8 w-48" />
-                                            )}
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="p-8 text-center text-slate-400">Brak historii połączeń</div>
-                                )}
+                                    )) : (
+                                        <div className="p-8 text-center text-slate-400">Brak historii połączeń</div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}

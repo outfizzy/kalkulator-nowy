@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import type { Customer } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { MergeDuplicatesModal } from './MergeDuplicatesModal';
 
 interface CustomerWithStats {
     customer: Customer & { id?: string };
@@ -20,6 +21,7 @@ export const CustomersList: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'contracts' | 'unsigned'>('all');
+    const [showMergeModal, setShowMergeModal] = useState(false);
 
     const loadCustomers = async () => {
         setLoading(true);
@@ -74,15 +76,26 @@ export const CustomersList: React.FC = () => {
                     <h1 className="text-3xl font-bold text-slate-900">Klienci</h1>
                     <p className="text-slate-500 mt-1">Baza klientów, umów i ofert</p>
                 </div>
-                <Link
-                    to="/customers/new"
-                    className="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Dodaj Klienta
-                </Link>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setShowMergeModal(true)}
+                        className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        Znajdź Duplikaty
+                    </button>
+                    <Link
+                        to="/customers/new"
+                        className="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Dodaj Klienta
+                    </Link>
+                </div>
             </div>
 
             {/* Tabs & Search */}
@@ -229,6 +242,15 @@ export const CustomersList: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {showMergeModal && (
+                <MergeDuplicatesModal
+                    onClose={() => setShowMergeModal(false)}
+                    onMergeComplete={() => {
+                        loadCustomers();
+                    }}
+                />
+            )}
         </div>
     );
 };

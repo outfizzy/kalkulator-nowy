@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import type { Offer } from '../types';
 import { getSalesProfile } from './storage';
 import { translate, formatCurrency } from './translations';
+import { LOGO_BASE64 } from './assets';
 
 // COPORATE IDENTITY COLORS (Professional & Modern)
 const COLORS = {
@@ -16,100 +17,25 @@ const COLORS = {
 
 
 
-// Helper to load fonts safely
-export async function loadFonts(doc: jsPDF): Promise<boolean> {
-    const loadFont = async (path: string, name: string, style: string): Promise<boolean> => {
-        try {
-            const response = await fetch(path);
-            if (!response.ok) {
-                console.warn(`Font fetch failed: ${path} ${response.status}`);
-                return false;
-            }
-
-            // Verify content type to avoid loading HTML (SPA fallback)
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('text/html')) {
-                console.warn(`Font fetch returned HTML (SPA fallback?): ${path}`);
-                return false;
-            }
-
-            const blob = await response.blob();
-
-            // Basic size check (fonts should be > 1KB)
-            if (blob.size < 1000) {
-                console.warn(`Font file too small (${blob.size} bytes): ${path}`);
-                return false;
-            }
-
-            const reader = new FileReader();
-
-            return new Promise<boolean>((resolve) => {
-                reader.onloadend = () => {
-                    try {
-                        const base64data = (reader.result as string).split(',')[1];
-                        // Validate base64 data exists
-                        if (!base64data) {
-                            console.warn("Font read resulted in empty data");
-                            resolve(false);
-                            return;
-                        }
-
-                        doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
-                        doc.addFont(`${name}-${style}.ttf`, name, style);
-                        resolve(true);
-                    } catch (e) {
-                        console.warn(`Failed to parse font ${name}-${style}`, e);
-                        resolve(false);
-                    }
-                };
-                reader.onerror = () => resolve(false);
-                reader.readAsDataURL(blob);
-            });
-        } catch (e) {
-            console.warn(`Failed to load font ${name}-${style}`, e);
-            return false; // Silent failure, fallback to standard
-        }
-    };
-
-    try {
-        const results = await Promise.all([
-            loadFont('/fonts/Roboto-Regular.ttf', 'Roboto', 'normal'),
-            loadFont('/fonts/Roboto-Bold.ttf', 'Roboto', 'bold')
-        ]);
-        return results.every(r => r);
-    } catch (e) {
-        console.warn("Global font loading error", e);
-        return false;
-    }
-}
+// (Font loading disabled for stability)
+// (Image loading disabled for stability - using embedded assets)
 
 // Draw Header on every page (Logo + Line)
-function addPageHeader(doc: jsPDF) {
+function addPageHeader(doc: jsPDF, logoBase64: string | null) {
     const pageWidth = doc.internal.pageSize.getWidth();
 
     try {
-        const logoImg = new Image();
-        logoImg.src = '/logo.png';
-        // Add image: x, y, w, h
-        // Wrapped in try-catch to prevent crash if image is invalid
-        try {
-            doc.addImage(logoImg, 'PNG', 140, 10, 50, 12);
-        } catch (err) {
-            console.warn("Logo addImage failed", err);
-            // Verify if image loaded? addImage might fail if src is valid but content isn't loaded yet.
-            // In browser environment, usually we need to wait for onload.
-            // However, jspdf often handles img elements if cached.
-            // Best practice: Fallback text immediately.
-            throw err;
+        if (logoBase64) {
+            doc.addImage(logoBase64, 'PNG', 140, 10, 50, 12);
+        } else {
+            // Text Fallback
+            doc.setFontSize(18);
+            doc.setTextColor(...COLORS.primary);
+            doc.setFont('Helvetica', 'bold');
+            doc.text(sanitizeText('PolenDach24'), 140, 20);
         }
-    } catch {
-        // Fallback text
-        doc.setFontSize(18);
-        doc.setTextColor(...COLORS.primary);
-        // Use standard font safely
-        const font = doc.getFont().fontName === 'Roboto' ? 'Roboto' : 'Helvetica';
-        doc.setFont(font, 'bold');
-        doc.text('PolenDach24', 140, 20);
+    } catch (err) {
+        console.warn("Header generation failed", err);
     }
 
     // Thin line below header area
@@ -139,30 +65,30 @@ function addPageFooter(doc: jsPDF, pageNumber: number) {
 
     // Col 1: Company Address
     doc.setFont(safeFont, 'bold');
-    doc.text('PolenDach24', 20, colY);
+    doc.text(sanitizeText('PolenDach24'), 20, colY);
     doc.setFont(safeFont, 'normal');
-    doc.text('Musterstraße 123', 20, colY + 4);
-    doc.text('12345 Berlin', 20, colY + 8);
-    doc.text('Deutschland', 20, colY + 12);
+    doc.text(sanitizeText('Musterstraße 123'), 20, colY + 4);
+    doc.text(sanitizeText('12345 Berlin'), 20, colY + 8);
+    doc.text(sanitizeText('Deutschland'), 20, colY + 12);
 
     // Col 2: Contact
     doc.setFont(safeFont, 'bold');
-    doc.text('Kontakt', 20 + colW, colY);
+    doc.text(sanitizeText('Kontakt'), 20 + colW, colY);
     doc.setFont(safeFont, 'normal');
-    doc.text('Tel: +49 123 456 789', 20 + colW, colY + 4);
-    doc.text('Email: kontakt@polendach24.de', 20 + colW, colY + 8);
-    doc.text('Web: www.polendach24.de', 20 + colW, colY + 12);
+    doc.text(sanitizeText('Tel: +49 123 456 789'), 20 + colW, colY + 4);
+    doc.text(sanitizeText('Email: kontakt@polendach24.de'), 20 + colW, colY + 8);
+    doc.text(sanitizeText('Web: www.polendach24.de'), 20 + colW, colY + 12);
 
     // Col 3: Bank / Legal
     doc.setFont(safeFont, 'bold');
-    doc.text('Bankverbindung', 20 + (colW * 2), colY);
+    doc.text(sanitizeText('Bankverbindung'), 20 + (colW * 2), colY);
     doc.setFont(safeFont, 'normal');
-    doc.text('Volksbank', 20 + (colW * 2), colY + 4);
-    doc.text('IBAN: DE00 0000 0000 0000 00', 20 + (colW * 2), colY + 8);
-    doc.text('BIC: AAAAAAAAAA', 20 + (colW * 2), colY + 12);
+    doc.text(sanitizeText('Volksbank'), 20 + (colW * 2), colY + 4);
+    doc.text(sanitizeText('IBAN: DE00 0000 0000 0000 00'), 20 + (colW * 2), colY + 8);
+    doc.text(sanitizeText('BIC: AAAAAAAAAA'), 20 + (colW * 2), colY + 12);
 
     // Page count centered bottom
-    doc.text(`Seite ${pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+    doc.text(sanitizeText(`Seite ${pageNumber}`), pageWidth / 2, pageHeight - 5, { align: 'center' });
 }
 
 // Helpers for layout
@@ -177,7 +103,8 @@ export async function generateOfferPDF(offer: Offer) {
     } catch (e) {
         console.error("CRITICAL PDF GENERATION FAILURE", e);
         const msg = e instanceof Error ? e.message : String(e);
-        alert(`Błąd generowania PDF: ${msg}`);
+        const stack = e instanceof Error ? e.stack : '';
+        alert(`Błąd generowania PDF: ${msg}\n\n${stack ? 'Szczegóły w konsoli.' : ''}`);
     }
 }
 
@@ -201,6 +128,19 @@ function safeStr(val: any): string {
     return String(val);
 }
 
+// Sanitize text for standard fonts (strip Polish diacritics)
+function sanitizeText(text: string): string {
+    if (!text) return '';
+    const map: Record<string, string> = {
+        'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+        'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z',
+        '€': 'EUR' // Euro sign often fails in standard fonts
+    };
+    return text.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ€]/g, m => map[m] || m);
+}
+
+// (Removed unused safeText helper)
+
 async function createDocument(offer: Offer): Promise<jsPDF> {
     // 1. SAFE DATA EXTRACTION
     const profile = getSalesProfile();
@@ -209,17 +149,23 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     const doc = new jsPDF('p', 'mm', 'a4');
 
     // 3. FONT LOADING STRATEGY
-    const customFontsLoaded = await loadFonts(doc);
-    const fontFamily = customFontsLoaded ? 'Roboto' : 'Helvetica'; // Fallback to standard font
+    // CRITICAL FIX: Custom fonts are corrupt/HTML. Forcing standard font to prevent crash.
+    // const customFontsLoaded = await loadFonts(doc); 
+    const customFontsLoaded = false;
+    const fontFamily = customFontsLoaded ? 'Roboto' : 'Helvetica';
 
     doc.setFont(fontFamily);
+
+    // 4. IMAGE LOADING
+    // Bypass fetch, use embedded asset
+    const logoBase64 = LOGO_BASE64;
 
     let currentY = CONTENT_START_Y;
 
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // --- PAGE 1 SETUP ---
-    addPageHeader(doc);
+    addPageHeader(doc, logoBase64);
 
     // 1. Sender Line (Tiny above address) - Standard DIN 5008
     doc.setFontSize(6);
@@ -237,7 +183,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // Defensive coding for address
     const compName = safeStr(c.companyName);
     if (compName) {
-        doc.text(compName, MARGIN, addrY);
+        doc.text(sanitizeText(compName), MARGIN, addrY);
         addrY += 5;
     }
 
@@ -248,21 +194,21 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     let recipientName = `${salutation} ${firstName} ${lastName}`.trim();
     if (!recipientName) recipientName = "Kunde"; // Ultimate fallback
 
-    doc.text(recipientName, MARGIN, addrY);
+    doc.text(sanitizeText(recipientName), MARGIN, addrY);
     addrY += 5;
 
     const street = safeStr(c.street);
     const houseNumber = safeStr(c.houseNumber);
-    doc.text(`${street} ${houseNumber}`.trim(), MARGIN, addrY);
+    doc.text(sanitizeText(`${street} ${houseNumber}`.trim()), MARGIN, addrY);
     addrY += 5;
 
     const postalCode = safeStr(c.postalCode);
     const city = safeStr(c.city);
-    doc.text(`${postalCode} ${city}`.trim(), MARGIN, addrY);
+    doc.text(sanitizeText(`${postalCode} ${city}`.trim()), MARGIN, addrY);
     addrY += 5;
 
     const country = safeStr(c.country) || 'Deutschland';
-    doc.text(country, MARGIN, addrY);
+    doc.text(sanitizeText(country), MARGIN, addrY);
 
     // 3. Info Block (Right side)
     const infoX = pageWidth - MARGIN - 70; // 70mm width
@@ -288,13 +234,13 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     doc.text(offerIdStr ? offerIdStr.substring(0, 8).toUpperCase() : '-', infoX + 35, infoY + 12);
 
     const contactName = profile ? `${safeStr(profile.firstName)} ${safeStr(profile.lastName)}` : 'Kundenservice';
-    doc.text(contactName, infoX + 35, infoY + 18);
+    doc.text(sanitizeText(contactName), infoX + 35, infoY + 18);
 
     // 4. Offer Title / Subject
     currentY = 100; // Fixed position usually around 98mm-100mm
     doc.setFontSize(14);
     doc.setFont(fontFamily, 'bold');
-    doc.text(`Angebot #${offerIdStr ? offerIdStr.substring(0, 8).toUpperCase() : ''}`, MARGIN, currentY);
+    doc.text(sanitizeText(`Angebot #${offerIdStr ? offerIdStr.substring(0, 8).toUpperCase() : ''}`), MARGIN, currentY);
 
     doc.setFontSize(11);
     doc.setFont(fontFamily, 'normal');
@@ -303,7 +249,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // Safeguard product model
     const modelId = offer.product ? offer.product.modelId : '';
     const translatedModel = modelId ? translate(modelId, 'models') : 'Unbekanntes Modell';
-    doc.text(`Projekt: Terrassenüberdachung - ${translatedModel}`, MARGIN, currentY);
+    doc.text(sanitizeText(`Projekt: Terrassenüberdachung - ${translatedModel}`), MARGIN, currentY);
 
     // 5. Intro Text
     currentY += 15;
@@ -316,7 +262,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // Check for AI Description
     if (offer.settings?.aiDescription) {
         const aiText = safeStr(offer.settings.aiDescription);
-        const splitText = doc.splitTextToSize(aiText, pageWidth - (MARGIN * 2));
+        const splitText = doc.splitTextToSize(sanitizeText(aiText), pageWidth - (MARGIN * 2));
         doc.text(splitText, MARGIN, currentY);
         // Adjust Y based on lines count
         currentY += (splitText.length * 5) + 5;
@@ -335,11 +281,11 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             }
         }
 
-        doc.text(greeting, MARGIN, currentY);
+        doc.text(sanitizeText(greeting), MARGIN, currentY);
         currentY += 6;
-        doc.text('vielen Dank für Ihre Anfrage und das damit verbundene Interesse an unseren Produkten.', MARGIN, currentY);
+        doc.text(sanitizeText('vielen Dank für Ihre Anfrage und das damit verbundene Interesse an unseren Produkten.'), MARGIN, currentY);
         currentY += 5;
-        doc.text('Gerne unterbreiten wir Ihnen folgendes freibleibendes Angebot:', MARGIN, currentY);
+        doc.text(sanitizeText('Gerne unterbreiten wir Ihnen folgendes freibleibendes Angebot:'), MARGIN, currentY);
     }
 
     currentY += 10;
@@ -425,11 +371,16 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         pos++;
     }
 
+    // Sanitize body to ensure no nulls/undefineds
+    const safeBody = tableBody.filter(row => Array.isArray(row) && row.length === 3);
+
+    console.log('[PDF DEBUG] Table Body:', safeBody);
+
     // Render Table
     autoTable(doc, {
         startY: currentY,
         head: [['Pos.', 'Bezeichnung', 'Gesamtpreis']],
-        body: tableBody,
+        body: safeBody,
         theme: 'plain', // Clean look
         styles: {
             font: fontFamily,
@@ -445,7 +396,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         },
         columnStyles: {
             0: { cellWidth: 15, halign: 'center' },
-            1: { cellWidth: 'auto' }, // Description
+            1: {}, // Auto width (default)
             2: { cellWidth: 40, halign: 'right' }
         },
         didDrawPage: () => {
@@ -462,7 +413,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     if (currentY + 60 > doc.internal.pageSize.getHeight() - 50) {
         doc.addPage();
         currentY = CONTENT_START_Y;
-        addPageHeader(doc); // Add header to new page
+        addPageHeader(doc, logoBase64); // Add header to new page
     }
 
     // 7. Totals Block (Right aligned)
@@ -475,12 +426,12 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     const vat = sellingGross - sellingNet;
 
     doc.setFontSize(10);
-    doc.text('Nettosumme:', totalX, currentY);
-    doc.text(formatCurrency(sellingNet), valX, currentY, { align: 'right' });
+    doc.text(sanitizeText('Nettosumme:'), totalX, currentY);
+    doc.text(sanitizeText(formatCurrency(sellingNet)), valX, currentY, { align: 'right' });
     currentY += 6;
 
-    doc.text('Zzgl. 19% MwSt.:', totalX, currentY);
-    doc.text(formatCurrency(vat), valX, currentY, { align: 'right' });
+    doc.text(sanitizeText('Zzgl. 19% MwSt.:'), totalX, currentY);
+    doc.text(sanitizeText(formatCurrency(vat)), valX, currentY, { align: 'right' });
     currentY += 4;
 
     // Double Line under totals
@@ -491,8 +442,8 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     doc.setFontSize(12);
     doc.setFont(fontFamily, 'bold');
-    doc.text('Gesamtsumme:', totalX, currentY);
-    doc.text(formatCurrency(sellingGross), valX, currentY, { align: 'right' });
+    doc.text(sanitizeText('Gesamtsumme:'), totalX, currentY);
+    doc.text(sanitizeText(formatCurrency(sellingGross)), valX, currentY, { align: 'right' });
 
     // Double line bottom
     currentY += 2;
@@ -508,13 +459,13 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     if (currentY + 100 > doc.internal.pageSize.getHeight() - 50) {
         doc.addPage();
         currentY = CONTENT_START_Y;
-        addPageHeader(doc);
+        addPageHeader(doc, logoBase64);
     }
 
     doc.setFontSize(11);
     doc.setFont(fontFamily, 'bold');
     doc.setTextColor(...COLORS.primary);
-    doc.text('Zahlungsmethoden und Bedingungen', MARGIN, currentY);
+    doc.text(sanitizeText('Zahlungsmethoden und Bedingungen'), MARGIN, currentY);
     currentY += 8;
 
     doc.setFontSize(9);
@@ -535,16 +486,16 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         if (currentY + 15 > doc.internal.pageSize.getHeight() - 40) {
             doc.addPage();
             currentY = CONTENT_START_Y;
-            addPageHeader(doc);
+            addPageHeader(doc, logoBase64);
         }
 
         doc.setFont(fontFamily, 'bold');
-        doc.text(item.t, MARGIN, currentY);
+        doc.text(sanitizeText(item.t), MARGIN, currentY);
         currentY += 4;
 
         doc.setFont(fontFamily, 'normal');
         // Handle multiline text
-        const splitText = doc.splitTextToSize(item.d, pageWidth - (MARGIN * 2));
+        const splitText = doc.splitTextToSize(sanitizeText(item.d), pageWidth - (MARGIN * 2));
         doc.text(splitText, MARGIN, currentY);
         currentY += (splitText.length * 4) + 4;
     });
