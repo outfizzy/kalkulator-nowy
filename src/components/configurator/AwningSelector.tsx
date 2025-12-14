@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { awningsData } from '../../data/awnings';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
+import { PricingService } from '../../services/pricing.service';
 
 interface AwningSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
@@ -26,6 +28,37 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
 
     const data = awningsData[type] as any;
 
+    // --- Dynamic Pricing State ---
+    const [matrix, setMatrix] = useState<any[]>([]);
+    const [supplierCosts, setSupplierCosts] = useState<any[]>([]);
+    const [pricesLoading, setPricesLoading] = useState(false);
+
+    // Fetch dynamic pricing from Supabase
+    useEffect(() => {
+        const fetchPricing = async () => {
+            setPricesLoading(true);
+            try {
+                // 1. Get Matrix
+                const entries = await PricingService.getPriceMatrix(type);
+                setMatrix(entries);
+
+                // 2. Get Product & Supplier Costs
+                const { data: product } = await supabase.from('product_definitions').select('provider').eq('code', type).single();
+
+                if (product?.provider) {
+                    const costs = await PricingService.getSupplierCosts(product.provider);
+                    setSupplierCosts(costs);
+                } else {
+                    setSupplierCosts([]);
+                }
+            } catch (e) {
+                console.error("Pricing fetch error", e);
+            }
+            setPricesLoading(false);
+        };
+        fetchPricing();
+    }, [type]);
+
     // Initialize color and fabric when data changes
     React.useEffect(() => {
         if (data) {
@@ -42,56 +75,93 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
 
     // Calculate Price
     const { totalPrice, breakdown } = useMemo(() => {
+        if (!data) return { totalPrice: 0, breakdown: [] };
+
+        const items: { name: string, price: number }[] = [];
         let total = 0;
-        const items = [];
 
+        // Base Price Calculation
         if (isZipScreen) {
-            // ZIP Screen pricing logic
-            const zipData = data as any;
+            // ZIP Screen pricing logic (Still static for ZIP screen if not seeded? I seeded it!)
+            // Seed bucket: "zip_screen" -> inserted entries.
+            // Check if we use matrix for ZIP screen
 
-            // Find closest width bracket
-            const widths = zipData.widths_mm;
-            const priceWidth = widths.find((w: number) => w >= width) || widths[widths.length - 1];
+            let basePrice = 0;
 
-            // Find closest drop bracket
-            const drops = zipData.drops_mm;
-            const dropIndex = drops.findIndex((d: number) => d >= projection);
-            const finalDropIndex = dropIndex !== -1 ? dropIndex : drops.length - 1;
+            if (matrix.length > 0) {
+                // Dynamic Lookup
+                const price = PricingService.calculateMatrixPrice(matrix, width, projection);
+                basePrice = price || 0;
+            } else {
+                // Fallback Static
+                const zipData = data as any;
+                const widths = zipData.widths_mm;
+                const priceWidth = widths.find((w: number) => w >= width) || widths[widths.length - 1];
+                const drops = zipData.drops_mm;
+                const dropIndex = drops.findIndex((d: number) => d >= projection);
+                const finalDropIndex = dropIndex !== -1 ? dropIndex : drops.length - 1;
+                basePrice = zipData.prices[priceWidth.toString()]?.[finalDropIndex] || 0;
+            }
 
-            // Get price
-            const basePrice = zipData.prices[priceWidth.toString()]?.[finalDropIndex] || 0;
             total += basePrice;
             items.push({
-                name: `Senkrechtmarkise ZIP (${width}x${projection}mm)`,
+                name: `Senkrechtmarkise ZIP(${width}x${projection}mm)`,
                 price: basePrice
             });
 
         } else {
             // Aufdach/Unterdach pricing logic
             const isTwoFields = width > data.limits.max_single_field_width_mm;
-            const pricingData = isTwoFields ? data.two_fields : data.one_field;
 
-            // Find closest width bracket
-            const widths = Object.keys(pricingData.prices).map(Number).sort((a, b) => a - b);
-            const priceWidth = widths.find(w => w >= width) || widths[widths.length - 1];
+            // NOTE: My seed script currently only migrated ONE FIELD prices for awnings.
+            // If isTwoFields is true, we unfortunately must rely on static data for now 
+            // until I improve the seed/schema to differentiate 1-field vs 2-field tables.
 
-            // Find closest projection bracket
-            const projections = pricingData.projection_mm;
-            const projIndex = projections.findIndex((p: number) => p >= projection);
-            const priceProjectionIndex = projIndex !== -1 ? projIndex : projections.length - 1;
+            let basePrice = 0;
 
-            const basePrice = pricingData.prices[priceWidth.toString()]?.[priceProjectionIndex] || 0;
+            if (!isTwoFields && matrix.length > 0) {
+                // Dynamic from DB
+                const price = PricingService.calculateMatrixPrice(matrix, width, projection);
+                basePrice = price || 0;
+            } else {
+                // Static Fallback
+                const pricingData = isTwoFields ? data.two_fields : data.one_field;
+                const widths = Object.keys(pricingData.prices).map(Number).sort((a, b) => a - b);
+                const priceWidth = widths.find(w => w >= width) || widths[widths.length - 1];
+                const projections = pricingData.projection_mm;
+                const projIndex = projections.findIndex((p: number) => p >= projection);
+                const priceProjectionIndex = projIndex !== -1 ? projIndex : projections.length - 1;
+                basePrice = pricingData.prices[priceWidth.toString()]?.[priceProjectionIndex] || 0;
+            }
+
             total += basePrice;
             items.push({
-                name: `${data.type === 'aufdachmarkise_zip' ? 'Markiza Dachowa' : 'Markiza Poddachowa'} (${width}x${projection}mm)`,
+                name: `${data.type === 'aufdachmarkise_zip' ? 'Markiza Dachowa' : 'Markiza Poddachowa'} (${width}x${projection}mm)${isTwoFields ? ' - 2 pola' : ''} `,
                 price: basePrice
             });
+        }
+
+        // Apply Supplier Costs (Automatically adds to total and breakdown)
+        if (supplierCosts.length > 0) {
+            const costResult = PricingService.calculateTotalWithCosts(total, supplierCosts);
+
+            // The service calculates total starting from base. We need diffs.
+            // Actually, calculateTotalWithCosts takes a 'basePrice' and adds costs.
+            // 'total' so far IS the base price for the costs calculation?
+            // Usually additional costs are on top of Product Price.
+            // Yes.
+
+            const costsOnly = costResult.breakdown.filter(b => b.name !== 'Cena Bazowa');
+            costsOnly.forEach(c => {
+                items.push({ name: c.name, price: c.value });
+            });
+            total = costResult.total;
         }
 
         // Special Color
         if (data.colors && !data.colors.standard.includes(color)) {
             total += data.colors.special_color_surcharge_eur;
-            items.push({ name: `Kolor niestandardowy: ${color}`, price: data.colors.special_color_surcharge_eur });
+            items.push({ name: `Kolor niestandardowy: ${color} `, price: data.colors.special_color_surcharge_eur });
         }
 
         // Extras (only for Aufdach/Unterdach)
@@ -103,7 +173,7 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
         }
 
         return { totalPrice: total, breakdown: items };
-    }, [data, type, width, projection, color, extras, isZipScreen]);
+    }, [data, type, width, projection, color, extras, isZipScreen, matrix, supplierCosts]);
 
     const handleAdd = () => {
         const typeName = type === 'aufdachmarkise_zip'
@@ -113,10 +183,10 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
                 : 'Senkrechtmarkise ZIP';
 
         onAdd({
-            id: `awning-${type}`,
+            id: `awning - ${type} `,
             type: 'zipScreen',
             name: typeName,
-            variant: `${color} | ${fabric}`,
+            variant: `${color} | ${fabric} `,
             width,
             depth: projection,
             quantity: 1,
@@ -146,28 +216,28 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
                         <div className="grid grid-cols-3 gap-2">
                             <button
                                 onClick={() => setType('aufdachmarkise_zip')}
-                                className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${type === 'aufdachmarkise_zip'
+                                className={`py - 3 px - 2 rounded - xl border - 2 font - bold text - xs transition - all ${type === 'aufdachmarkise_zip'
                                     ? 'border-accent bg-accent/5 text-accent'
                                     : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                    }`}
+                                    } `}
                             >
                                 Aufdach
                             </button>
                             <button
                                 onClick={() => setType('unterdachmarkise_zip')}
-                                className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${type === 'unterdachmarkise_zip'
+                                className={`py - 3 px - 2 rounded - xl border - 2 font - bold text - xs transition - all ${type === 'unterdachmarkise_zip'
                                     ? 'border-accent bg-accent/5 text-accent'
                                     : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                    }`}
+                                    } `}
                             >
                                 Unterdach
                             </button>
                             <button
                                 onClick={() => setType('zip_screen')}
-                                className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${type === 'zip_screen'
+                                className={`py - 3 px - 2 rounded - xl border - 2 font - bold text - xs transition - all ${type === 'zip_screen'
                                     ? 'border-accent bg-accent/5 text-accent'
                                     : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                    }`}
+                                    } `}
                             >
                                 ZIP Screen
                             </button>
@@ -223,10 +293,10 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
                                     <button
                                         key={s}
                                         onClick={() => setFabric(s)}
-                                        className={`px-3 py-2 rounded-lg text-sm border transition-all ${fabric === s
+                                        className={`px - 3 py - 2 rounded - lg text - sm border transition - all ${fabric === s
                                             ? 'border-accent bg-accent text-white'
                                             : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                            }`}
+                                            } `}
                                     >
                                         {s}
                                     </button>

@@ -3,9 +3,10 @@ import type { Note } from '../../types';
 
 export const NoteService = {
     async getNotes(entityType: 'lead' | 'customer', entityId: string): Promise<Note[]> {
+        // Fix: Join with 'profiles' table instead of abstract 'user' relation which caused PGRST200
         const { data, error } = await supabase
             .from('notes')
-            .select('*, user:user_id(id, first_name, last_name, email, avatar_url)')
+            .select('*, user:profiles(id, first_name, last_name, email, avatar_url)')
             .eq('entity_type', entityType)
             .eq('entity_id', entityId)
             .order('created_at', { ascending: false });
@@ -43,7 +44,8 @@ export const NoteService = {
                 user_id: user.id,
                 attachments: note.attachments || []
             })
-            .select('*, user:user_id(id, first_name, last_name, email, avatar_url)')
+            // Fix join here too
+            .select('*, user:profiles(id, first_name, last_name, email, avatar_url)')
             .single();
 
         if (error) throw error;

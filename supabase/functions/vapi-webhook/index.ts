@@ -42,65 +42,63 @@ serve(async (req) => {
 
                 console.log('Processing tool:', fn.name, args);
 
-                if (fn.name === 'confirmInstallation') {
+                if (fn.name === 'confirmDate') {
                     if (installationId) {
-                        // Update DB to scheduled
-                        await supabase.from('installations')
-                            .update({ status: 'scheduled' })
-                            .eq('id', installationId);
+                        try {
+                            // Update DB to scheduled
+                            await supabase.from('installations')
+                                .update({ status: 'scheduled' })
+                                .eq('id', installationId);
 
-                        // Fetch Owner Details for SMS
-                        let salesRepName = 'Polendach24';
-                        let salesRepPhone = '';
+                            console.log('Installation confirmed:', installationId);
 
-                        const { data: installation } = await supabase
-                            .from('installations')
-                            .select('user_id')
-                            .eq('id', installationId)
-                            .single();
+                            // Fetch Owner Details for SMS
+                            let salesRepName = 'Polendach24';
+                            let salesRepPhone = '';
 
-                        if (installation?.user_id) {
-                            // Try to get profile name
-                            const { data: profile } = await supabase
-                                .from('profiles')
-                                .select('full_name')
-                                .eq('id', installation.user_id)
+                            const { data: installation } = await supabase
+                                .from('installations')
+                                .select('user_id')
+                                .eq('id', installationId)
                                 .single();
 
-                            if (profile?.full_name) salesRepName = profile.full_name;
+                            if (installation?.user_id) {
+                                // Try to get profile name
+                                const { data: profile } = await supabase
+                                    .from('profiles')
+                                    .select('full_name')
+                                    .eq('id', installation.user_id)
+                                    .single();
 
-                            // Try to get phone from Auth User metadata or phone field
-                            const { data: userData } = await supabase.auth.admin.getUserById(installation.user_id);
-                            const user = userData?.user;
-                            if (user) {
-                                salesRepPhone = user.phone || user.user_metadata?.phone || '';
+                                if (profile?.full_name) salesRepName = profile.full_name;
                             }
+
+                            // Log note
+                            await supabase.from('customer_communications').insert({
+                                customer_id: customerId || undefined,
+                                user_id: installation?.user_id,
+                                type: 'call',
+                                direction: 'outbound',
+                                subject: 'Potwierdzenie montażu (AI)',
+                                content: `Klient potwierdził termin montażu telefonicznie.\nWysłano SMS z danymi opiekuna: ${salesRepName} (${salesRepPhone})`,
+                                date: new Date().toISOString(),
+                                metadata: { isSystemNote: true, installationId }
+                            });
+
+                            // Send SMS
+                            await sendSms(metadata.customerName, call.customer?.number, metadata.installationDate, salesRepName, salesRepPhone);
+
+                        } catch (err: any) {
+                            console.error('Error in confirmDate:', err);
                         }
-
-                        // Log note
-                        await supabase.from('customer_communications').insert({
-                            customer_id: customerId || undefined,
-                            user_id: installation?.user_id, // Owner
-                            type: 'call', // System note but visible as call/log
-                            direction: 'outbound',
-                            subject: 'Potwierdzenie montażu (AI)',
-                            content: `Klient potwierdził termin montażu telefonicznie.\nWysłano SMS z danymi opiekuna: ${salesRepName} (${salesRepPhone})`,
-                            date: new Date().toISOString(),
-                            metadata: { isSystemNote: true, installationId }
-                        });
-
-                        // Send SMS
-                        await sendSms(metadata.customerName, call.customer?.number, metadata.installationDate, salesRepName, salesRepPhone);
                     }
-                } else if (fn.name === 'rescheduleInstallation') {
+                } else if (fn.name === 'changeDate') {
                     if (installationId) {
                         const newDate = args.newDate;
-                        // Update DB to pending or rescheduled, save new date if possible
-                        // Depending on schema, we might update scheduledDate directly or add a note
                         await supabase.from('installations')
                             .update({
-                                status: 'pending', // Pending manual review or 'rescheduled'
-                                scheduled_date: newDate ? new Date(newDate).toISOString() : undefined // Try to parse
+                                status: 'verification', // Requires manual check
+                                scheduled_date: newDate ? new Date(newDate).toISOString() : undefined
                             })
                             .eq('id', installationId);
 
@@ -108,20 +106,24 @@ serve(async (req) => {
                             user_id: 'vapi-bot',
                             entity_type: 'installation',
                             entity_id: installationId,
-                            content: `Klient zmienił termin na: ${newDate} (AI).`,
+                            content: `Klient zmienił termin na: ${newDate} (AI). Wymagana weryfikacja w kalendarzu.`,
                             type: 'system'
                         });
 
                         // Send SMS with NEW date
                         await sendSms(metadata.customerName, call.customer?.number, newDate);
                     }
-                } else if (fn.name === 'rejectInstallation') {
+                } else if (fn.name === 'rejectDate') {
                     if (installationId) {
+                        await supabase.from('installations')
+                            .update({ status: 'issue' }) // Flag as issue
+                            .eq('id', installationId);
+
                         await supabase.from('notes').insert({
                             user_id: 'vapi-bot',
                             entity_type: 'installation',
                             entity_id: installationId,
-                            content: `Klient odrzucił/wymaga kontaktu. Powód: ${args.reason}`,
+                            content: `Klient odrzucił/wymaga kontaktu. Powód: ${args.reason}. Status zmieniony na PROBLEM.`,
                             type: 'system'
                         });
                     }
@@ -220,22 +222,39 @@ ${transcript}
 `.trim();
 
                     // Save as 'customer_communication' - standard place for calls
-                    await supabase.from('customer_communications').insert({
-                        customer_id: customerId || undefined, // Must have customer ID
-                        lead_id: undefined, // Could link lead if available
-                        user_id: userId, // The sales rep owner (required by FK)
-                        type: 'call',
-                        direction: 'outbound',
-                        subject: `Raport z rozmowy AI (Sasha) - ${statusPl}`,
-                        content: noteContent,
-                        date: new Date().toISOString(),
-                        metadata: {
-                            isSystemNote: true,
-                            installationId: installationId,
-                            aiStatus: endedReason,
-                            recordingUrl: recording
-                        }
-                    });
+                    const communicationId = metadata.communicationId;
+
+                    if (communicationId) {
+                        // Update existing record
+                        await supabase.from('customer_communications').update({
+                            subject: `Raport z rozmowy AI (Sasha) - ${statusPl}`,
+                            content: noteContent,
+                            metadata: {
+                                isSystemNote: true,
+                                installationId: installationId,
+                                aiStatus: endedReason,
+                                recordingUrl: recording
+                            }
+                        }).eq('id', communicationId);
+                    } else {
+                        // Insert new if no ID passed (fallback)
+                        await supabase.from('customer_communications').insert({
+                            customer_id: customerId || undefined, // Must have customer ID
+                            lead_id: undefined, // Could link lead if available
+                            user_id: userId, // The sales rep owner (required by FK)
+                            type: 'call',
+                            direction: 'outbound',
+                            subject: `Raport z rozmowy AI (Sasha) - ${statusPl}`,
+                            content: noteContent,
+                            date: new Date().toISOString(),
+                            metadata: {
+                                isSystemNote: true,
+                                installationId: installationId,
+                                aiStatus: endedReason,
+                                recordingUrl: recording
+                            }
+                        });
+                    }
 
                     // Also save a fallback note in 'notes' just in case? No, let's stick to one source of truth.
                 } else {
@@ -256,7 +275,7 @@ ${transcript}
         console.error('Webhook Error:', error);
         return new Response(
             JSON.stringify({ error: error.message }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
     }
 });
@@ -269,9 +288,11 @@ async function sendSms(name: string, to: string, dateStr: string, salesRepName?:
 
     try {
         let dateDisplay = dateStr;
+        console.log(`Preparing SMS for ${to} on date: ${dateStr}`);
+
         try {
-            // Try to format nicely if it's a date string
             const d = new Date(dateStr);
+            // ... existing logic ...
             if (!isNaN(d.getTime())) {
                 dateDisplay = d.toLocaleString('pl-PL', {
                     weekday: 'long',

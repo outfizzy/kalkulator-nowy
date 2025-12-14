@@ -20,6 +20,7 @@ import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
 import { OrderRequestManager } from './components/admin/OrderRequestManager';
 import { FuelLogManager } from './components/admin/FuelLogManager';
 import { FailureReportManager } from './components/admin/FailureReportManager';
+import { PricingPage } from './components/admin/PricingPage';
 import { InstallerRequestsPage } from './components/installer/InstallerRequestsPage';
 import { InstallerDashboard } from './components/installer/InstallerDashboard';
 import { InstallationAcceptance } from './components/installer/InstallationAcceptance';
@@ -340,6 +341,7 @@ function App() {
               <Route path="/admin/requests" element={<OrderRequestManager />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
+              <Route path="/admin/pricing" element={<PricingPage />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
 
               {/* CRM & Logistics */}

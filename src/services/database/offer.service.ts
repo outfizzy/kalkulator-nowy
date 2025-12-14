@@ -121,6 +121,27 @@ export const OfferService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // [GUARDRAILS] Check Margin for Sales Reps
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        if (profile?.role === 'sales_rep') {
+            // Margin Percentage comes as 30.0 (percent) or 0.30 (decimal)?
+            // normalizePricing usually ensures standard format.
+            // In pricing.ts calculatePrice returns { marginPercentage: 30 } (percent value).
+            // Let's verify format.
+            // `pricing.ts`: marginPercentage: marginPercentage * 100
+            // So it stores 30, 40, etc.
+
+            const margin = offer.pricing.marginPercentage;
+            if (margin < 30) {
+                throw new Error('MarginGuard: Nie można utworzyć oferty z marżą poniżej 30% (Polityka firmy).');
+            }
+        }
+
         // Ensure customer exists in customers table
         let customerId = offer.customer.id;
         try {
@@ -175,6 +196,28 @@ export const OfferService = {
     },
 
     async updateOffer(id: string, updates: Partial<Offer>): Promise<void> {
+        // [GUARDRAILS] Check Margin for Sales Reps
+        if (updates.pricing) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile?.role === 'sales_rep') {
+                    const margin = updates.pricing.marginPercentage;
+                    // Note: If updates.pricing is partial, we might miss marginPercentage.
+                    // But usually pricing is replaced as a whole object.
+                    // Let's assume updates.pricing is the FULL pricing object if present.
+                    if (typeof margin === 'number' && margin < 30) {
+                        throw new Error('MarginGuard: Nie można zaktualizować oferty z marżą poniżej 30% (Polityka firmy).');
+                    }
+                }
+            }
+        }
+
         // Convert to DB format
         const dbUpdates: any = {};
         if (updates.status) dbUpdates.status = updates.status;

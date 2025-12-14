@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Customer, Offer, Contract, Installation, Lead, Communication } from '../types';
@@ -6,6 +5,9 @@ import { DatabaseService } from '../services/database';
 import { CustomerEditForm } from '../components/crm/CustomerEditForm';
 import { CommunicationTimeline } from '../components/crm/CommunicationTimeline';
 import { VoiceConfirmationButton } from '../components/voice/VoiceConfirmationButton';
+import { CustomerDashboard } from '../components/crm/CustomerDashboard';
+import { supabase } from '../lib/supabase';
+
 
 type Tab = 'overview' | 'leads' | 'offers' | 'contracts' | 'installations' | 'communications' | 'edit' | 'gallery';
 
@@ -22,79 +24,111 @@ export const CustomerDetailsPage: React.FC = () => {
     const [clientInstallations, setClientInstallations] = useState<Installation[]>([]);
     const [communications, setCommunications] = useState<Communication[]>([]);
 
-    useEffect(() => {
-        const loadData = async () => {
-            if (!id) return;
-            setLoading(true);
-            try {
-                const customerData = await DatabaseService.getCustomer(id);
-                if (!customerData) {
-                    console.error('Customer not found');
-                    // navigate(-1); // Or show 404
-                    setLoading(false);
-                    return;
-                }
-                setCustomer(customerData);
-
-                // Load related entities
-                // Note: Ideally DatabaseService would have specific methods for this to avoid fetching ALL and filtering client-side
-                // But re-using existing logic for now for speed and consistency with previous modal
-                const [allLeads, allOffers, allContracts, allInstallations, comms] = await Promise.all([
-                    DatabaseService.getLeads(),
-                    DatabaseService.getOffers(),
-                    DatabaseService.getContracts(),
-                    DatabaseService.getInstallations(),
-                    DatabaseService.getCommunications(id)
-                ]);
-
-                // Filter logic
-                // Filter logic: Match by Email OR (FirstName + LastName + City)
-                const normalize = (str: string | undefined | null) =>
-                    (str || '').toString().toLowerCase().trim();
-                const customerKey = customerData.email
-                    ? normalize(customerData.email)
-                    : `${normalize(customerData.firstName)}_${normalize(customerData.lastName)}_${normalize(customerData.city)}`;
-
-                const isMatch = (c: Partial<Customer> & { firstName?: string; lastName?: string; city?: string; email?: string }) => {
-                    if (customerData.email && c.email) {
-                        return normalize(c.email) === normalize(customerData.email);
-                    }
-                    const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city)}`;
-                    return key === customerKey;
-                };
-
-                const leads = allLeads.filter(l =>
-                    (l.customerId && l.customerId === id) ||
-                    isMatch(l.customerData)
-                ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                setClientLeads(leads);
-
-                const offers = allOffers
-                    .filter(o =>
-                        (o.customer.id && o.customer.id === id) ||
-                        isMatch(o.customer)
-                    )
-                    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-                setClientOffers(offers);
-
-                const offerIds = new Set(offers.map(o => o.id));
-                const contracts = allContracts.filter(c => offerIds.has(c.offerId) || isMatch(c.client));
-                setClientContracts(contracts);
-
-                const installations = allInstallations.filter(i => offerIds.has(i.offerId) || isMatch(i.client));
-                setClientInstallations(installations);
-
-                setCommunications(comms);
-
-            } catch (error) {
-                console.error('Error loading customer data:', error);
-            } finally {
+    const fetchData = React.useCallback(async () => {
+        if (!id) return;
+        setLoading(true);
+        try {
+            const customerData = await DatabaseService.getCustomer(id);
+            if (!customerData) {
+                console.error('Customer not found');
                 setLoading(false);
+                return;
             }
-        };
+            setCustomer(customerData);
 
-        loadData();
+            // Load related entities
+            const [allLeads, allOffers, allContracts, allInstallations, comms] = await Promise.all([
+                DatabaseService.getLeads(),
+                DatabaseService.getOffers(),
+                DatabaseService.getContracts(),
+                DatabaseService.getInstallations(),
+                DatabaseService.getCommunications(id)
+            ]);
+
+            // Filter logic
+            const normalize = (str: string | undefined | null) =>
+                (str || '').toString().toLowerCase().trim();
+            const customerKey = customerData.email
+                ? normalize(customerData.email)
+                : `${normalize(customerData.firstName)}_${normalize(customerData.lastName)}_${normalize(customerData.city)}`;
+
+            const isMatch = (c: Partial<Customer> & { firstName?: string; lastName?: string; city?: string; email?: string }) => {
+                if (customerData.email && c.email) {
+                    return normalize(c.email) === normalize(customerData.email);
+                }
+                const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city)}`;
+                return key === customerKey;
+            };
+
+            const leads = allLeads.filter(l =>
+                (l.customerId && l.customerId === id) ||
+                isMatch(l.customerData)
+            ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setClientLeads(leads);
+
+            const offers = allOffers
+                .filter(o =>
+                    (o.customer.id && o.customer.id === id) ||
+                    isMatch(o.customer)
+                )
+                .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            setClientOffers(offers);
+
+            const offerIds = new Set(offers.map(o => o.id));
+            const contracts = allContracts.filter(c => offerIds.has(c.offerId) || isMatch(c.client));
+            setClientContracts(contracts);
+
+            const installations = allInstallations.filter(i => offerIds.has(i.offerId) || isMatch(i.client));
+            setClientInstallations(installations);
+
+            setCommunications(comms);
+
+        } catch (error) {
+            console.error('Error loading customer data:', error);
+        } finally {
+            setLoading(false);
+        }
     }, [id]);
+
+    useEffect(() => {
+        fetchData();
+
+        // Subscription setup
+        const channel = supabase
+            .channel('customer-details-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'customer_communications',
+                    filter: `customer_id=eq.${id}`
+                },
+                (payload) => {
+                    console.log('Realtime communication update:', payload);
+                    // Refresh communications only for speed
+                    DatabaseService.getCommunications(id!).then(setCommunications);
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'installations'
+                },
+                (payload) => {
+                    console.log('Realtime installation update:', payload);
+                    // Refresh entire data to ensure status update propagates
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [id, fetchData]);
 
     if (loading) {
         return <div className="flex items-center justify-center h-screen">Ładowanie danych klienta...</div>;
@@ -116,18 +150,7 @@ export const CustomerDetailsPage: React.FC = () => {
         return sum;
     }, 0);
 
-    // Fallback revenue calculation from Offers if no contracts (or mixed) for Overview tab
-    const totalRevenue = clientOffers
-        .filter(o => o.status === 'sold')
-        .reduce((sum, o) => {
-            const pricing = o.pricing || { sellingPriceNet: 0, finalPriceNet: 0 };
-            const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
-            const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
-            return sum + (finalNet ?? baseNet);
-        }, 0);
 
-
-    const soldCount = clientOffers.filter(o => o.status === 'sold').length;
 
 
     return (
@@ -353,98 +376,15 @@ export const CustomerDetailsPage: React.FC = () => {
                         )}
 
                         {activeTab === 'overview' && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                    <h3 className="text-sm font-medium text-slate-500 mb-2">Łączna wartość (Netto)</h3>
-                                    <p className="text-3xl font-bold text-slate-800">
-                                        {totalRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                    </p>
-                                    <p className="text-xs text-slate-400 mt-2">Na podstawie sprzedanych ofert</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                    <h3 className="text-sm font-medium text-slate-500 mb-2">Zrealizowane zamówienia</h3>
-                                    <p className="text-3xl font-bold text-slate-800">{soldCount}</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                    <h3 className="text-sm font-medium text-slate-500 mb-2">Aktywne leady / oferty</h3>
-                                    <p className="text-3xl font-bold text-accent">
-                                        {clientLeads.filter(l => ['new', 'contacted', 'negotiation'].includes(l.status)).length} / {clientOffers.filter(o => ['draft', 'sent'].includes(o.status)).length}
-                                    </p>
-                                </div>
-
-                                {/* Client Activity Widget (New - Mirroring LeadDetailsPage) */}
-                                <div className="md:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                                    <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                        </svg>
-                                        Aktywność Klienta
-                                    </h3>
-                                    <div className="space-y-4">
-                                        {communications.filter(c => c.userId === 'client').length > 0 ? (
-                                            communications.filter(c => c.userId === 'client').slice(0, 3).map((comm) => (
-                                                <div key={comm.id} className="flex gap-3 items-start p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                                    <div className="mt-1">
-                                                        <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                                        </svg>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-purple-800 font-bold mb-0.5">
-                                                            {new Date(comm.createdAt).toLocaleString()}
-                                                        </div>
-                                                        <div className="text-sm text-purple-900 font-medium">
-                                                            {comm.content}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="text-sm text-slate-400 italic">Brak aktywności klienta na portalu ofertowym.</div>
-                                        )}
-                                    </div>
-                                    {communications.filter(c => c.userId === 'client').length > 0 && (
-                                        <button
-                                            onClick={() => setActiveTab('communications')}
-                                            className="w-full text-center text-sm text-purple-600 font-medium hover:underline mt-4"
-                                        >
-                                            Zobacz całą historię
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Recent Activity */}
-                                <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-4 border-b border-slate-100 font-semibold text-slate-800">Pozostała historia</div>
-                                    <div className="divide-y divide-slate-100">
-                                        {clientLeads.slice(0, 3).map(lead => (
-                                            <div key={lead.id} className="p-4 hover:bg-slate-50 flex justify-between items-center transition-colors">
-                                                <div>
-                                                    <div className="font-medium text-slate-800">Lead: {lead.status}</div>
-                                                    <div className="text-sm text-slate-500">{new Date(lead.createdAt).toLocaleDateString()}</div>
-                                                </div>
-                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                                    LEAD
-                                                </span>
-                                            </div>
-                                        ))}
-                                        {clientOffers.slice(0, 3).map(offer => (
-                                            <div key={offer.id} className="p-4 hover:bg-slate-50 flex justify-between items-center transition-colors">
-                                                <div>
-                                                    <div className="font-medium text-slate-800">Oferta #{offer.offerNumber || offer.id}</div>
-                                                    <div className="text-sm text-slate-500">{offer.product.modelId} - {new Date(offer.createdAt).toLocaleDateString()}</div>
-                                                </div>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${offer.status === 'sold' ? 'bg-green-100 text-green-700' :
-                                                    offer.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                        'bg-accent-soft text-accent-dark'
-                                                    }`}>
-                                                    {offer.status}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                            <CustomerDashboard
+                                customer={customer}
+                                installations={clientInstallations}
+                                communications={communications}
+                                leads={clientLeads}
+                                offers={clientOffers}
+                                contracts={clientContracts}
+                                onRefresh={fetchData}
+                            />
                         )}
 
                         {activeTab === 'leads' && (

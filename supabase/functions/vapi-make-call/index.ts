@@ -1,92 +1,144 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper functions that were missing
+const formatDate = (date: Date) => {
+    const months = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
+    return `${date.getDate()} ${months[date.getMonth()]}`;
+};
+
+const formatDay = (date: Date) => {
+    const days = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+    return days[date.getDay()];
+};
+
+const getGreeting = () => {
+    const hour = new Date().getHours() + 1; // Adjust for PL time roughly if cleaner not available
+    return (hour < 18) ? 'Dzień dobry' : 'Dobry wieczór';
+};
+
 serve(async (req) => {
-    // Handle CORS preflight requests
+    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
-    // Wrap entire logic in a try-catch to avoid 500 Function Invocation Error
-    // We want to return a 200 OK with { error: ... } so the client can read the JSON body.
-    try {
-        let payload: any = {};
-        try {
-            payload = await req.json();
-        } catch (e) {
-            return new Response(JSON.stringify({ error: "Invalid JSON body", details: e.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
+    let step = 'init';
+    let debugInfo: any = {};
 
-        const { phoneNumber, customerName, installationDate, installationTime, productName, installationId, customerId } = payload;
+    try {
+        step = 'parsing_payload';
+        const payload = await req.json();
+        debugInfo.payload = payload;
+        const { phoneNumber, customerName, installationDate, installationId, customerId, customInstructions, leadId } = payload;
 
         console.log('Received Payload:', JSON.stringify(payload));
 
-        // Environment variables - Hardcoded fallback for logic, but prefer Env
-        const VAPI_PRIVATE_KEY = (Deno.env.get('VAPI_PRIVATE_KEY') || '6e28ccda-fee2-4159-b761-dd1e927d721c').trim();
-        const VAPI_ASSISTANT_ID = (Deno.env.get('VAPI_ASSISTANT_ID') || '5c82ce28-73f7-4942-af4e-814b750104d1').trim();
-        const VAPI_PHONE_NUMBER_ID = (Deno.env.get('VAPI_PHONE_NUMBER_ID') || 'cdfa66bc-7955-49ce-9b58-0409226a0f5c').trim();
-
-        // Debug Log (Masked)
-        console.log('Config Status:', {
-            hasKey: !!VAPI_PRIVATE_KEY,
-            keyLen: VAPI_PRIVATE_KEY ? VAPI_PRIVATE_KEY.length : 0,
-            assistantId: VAPI_ASSISTANT_ID,
-            phoneId: VAPI_PHONE_NUMBER_ID
-        });
-
-        if (!VAPI_PRIVATE_KEY || !VAPI_ASSISTANT_ID || !VAPI_PHONE_NUMBER_ID) {
-            return new Response(JSON.stringify({ error: "Missing Vapi Configuration on Server" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-
         if (!phoneNumber) {
-            return new Response(JSON.stringify({ error: "Missing phoneNumber in payload" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            throw new Error('Missing phoneNumber');
         }
 
-        // Robust E.164 normalization for Poland/Europe
-        // ... (normalization code remains the same)
-        let clean = phoneNumber.replace(/[^\d+]/g, '');
-        if (clean.startsWith('00')) clean = '+' + clean.substring(2);
-        if (clean.startsWith('48') && clean.length === 11) clean = '+' + clean;
-        if (clean.length === 9 && !clean.startsWith('+')) clean = '+48' + clean;
-        if (!clean.startsWith('+')) clean = '+48' + clean;
+        step = 'supabase_client';
+        const supabaseClient = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
 
-        const formattedPhone = clean;
+        step = 'logging_communication';
+        // 1. Create a communication log entry to track this call
+        const { data: commData, error: commError } = await supabaseClient
+            .from('customer_communications')
+            .insert({
+                customer_id: customerId,
+                type: 'call',
+                direction: 'outbound',
+                subject: customInstructions ? 'AI: Rozmowa Niestandardowa' : 'AI: Potwierdzenie montażu',
+                content: 'Inicjowanie połączenia AI...',
+                // user_id: 'vapi-bot', // REMOVED: This causes UUID error if column is uuid type. Leave null or use valid UUID if needed.
+                metadata: {
+                    status: 'initiating',
+                    installationId: installationId,
+                    customInstructions: customInstructions,
+                    actor: 'vapi-bot' // Store actor in metadata instead
+                }
+            })
+            .select()
+            .single();
 
-        // ... (Date logic remains)
-        const getNextBusinessDay = (date: Date, daysToAdd: number = 1) => {
-            const result = new Date(date);
-            result.setDate(result.getDate() + daysToAdd);
-            if (result.getDay() === 6) result.setDate(result.getDate() + 2);
-            if (result.getDay() === 0) result.setDate(result.getDate() + 1);
-            return result;
-        };
+        if (commError) {
+            console.error('Error creating communication log:', commError);
+            debugInfo.commError = commError;
+            // We continue even if log fails, but it's bad practice.
+        }
 
-        const originalDate = new Date(installationDate);
+        const communicationId = commData?.id;
+        debugInfo.communicationId = communicationId;
+
+        step = 'vapi_config';
+        // 2. Prepare Variables
+        const VAPI_PRIVATE_KEY = Deno.env.get('VAPI_PRIVATE_KEY');
+        const VAPI_PHONE_NUMBER_ID = Deno.env.get('VAPI_PHONE_NUMBER_ID');
+
+        if (!VAPI_PRIVATE_KEY || !VAPI_PHONE_NUMBER_ID) {
+            throw new Error(`Missing Vapi Configuration ${!VAPI_PRIVATE_KEY ? 'KEY' : ''} ${!VAPI_PHONE_NUMBER_ID ? 'ID' : ''}`);
+        }
+
+        step = 'parsing_date';
+        // Parse Date
+        let originalDate = new Date();
+        if (installationDate) {
+            originalDate = new Date(installationDate);
+        }
         if (isNaN(originalDate.getTime())) {
-            return new Response(JSON.stringify({ error: "Invalid installationDate format" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            originalDate = new Date(); // Fallback to now if invalid
         }
 
-        const altDate1 = getNextBusinessDay(originalDate, 1);
-        // ... (rest of logic)
+        // Calculate alternatives (simple +1 and +2 days logic for standard flow)
+        const altDate1 = new Date(originalDate); altDate1.setDate(originalDate.getDate() + 1);
 
-        const formatDate = (d: Date) => d.toLocaleString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: 'numeric' });
-        const formatDay = (d: Date) => d.toLocaleString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+        step = 'formatting_phone';
+        // Format Phone Number (ensure E.164)
+        let formattedPhone = phoneNumber.replace(/\s+/g, '');
+        if (!formattedPhone.startsWith('+')) {
+            if (formattedPhone.startsWith('00')) formattedPhone = '+' + formattedPhone.slice(2);
+            else formattedPhone = '+48' + formattedPhone; // Default to PL
+        }
 
-        const getGreeting = () => {
-            // ... existing greeting logic
-            try {
-                const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Warsaw', hour: 'numeric', hour12: false });
-                const hour = parseInt(formatter.format(new Date()));
-                return (hour >= 18 || hour < 5) ? "Dobry wieczór" : "Dzień dobry";
-            } catch (e) { return "Dzień dobry"; }
-        };
+        step = 'constructing_prompt';
+        // 3. Construct Prompts
         const greeting = getGreeting();
+        let systemPrompt = '';
+        let firstMessage = '';
 
-        const systemPrompt = `
+        if (customInstructions) {
+            // --- CUSTOM SCENARIO ---
+            systemPrompt = `
+Jesteś Sashą, profesjonalną koordynatorką w firmie Polendach24. 
+**TON:** Bardzo pozytywny, uśmiechnięty, entuzjastyczny i pomocny.
+Cel: Wykonanie zadania zleconego przez opiekuna klienta.
+
+**TWOJE DANE:**
+- Firma: Polendach24
+- Klient: ${customerName}
+
+**TWOJE ZADANIE (Instrukcja od opiekuna):**
+"${customInstructions}"
+
+**ZASADY:**
+1. Przedstaw się krótko (Sasha z Polendach24).
+2. Przejdź od razu do realizacji zadania.
+3. Bądź uprzejma i pomocna.
+4. Jesteś asystentem AI, ale zachowuj się naturalnie.
+`;
+            firstMessage = `${greeting}, tu Sasha z Polendach24! Dzwonię w sprawie Twojego zamówienia.`;
+        } else {
+            // --- STANDARD CONFIRMATION SCENARIO ---
+            systemPrompt = `
 Jesteś Sashą, profesjonalną koordynatorką w firmie Polendach24. 
 **TON:** Bardzo pozytywny, uśmiechnięty, entuzjastyczny i pomocny.
 Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
@@ -99,6 +151,7 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
 **ZASADY:**
 1. **ODMIANA:** "Dwudziestego marca" (nie "dwudziesty").
 2. **PŁYNNOŚĆ:** Mów ciągiem, nie czekaj na "halo".
+3. **KONTEKST:** Jeśli klient potwierdzi, zapytaj czy ma pytania do opiekuna.
 
 **SCENARIUSZ GŁÓWNY:**
 1. **Ty:** "${greeting}, tu Sasha z Polendach24! Dzwonię potwierdzić montaż na ${formatDate(originalDate)}. Ekipa będzie między 8 a 10 rano. Czy ten termin Państwu odpowiada?"
@@ -109,23 +162,26 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
 - Ty: "Świetnie! Termin potwierdzony. Mam jeszcze pytanie: czy mogę w czymś jeszcze pomóc, albo czy prosi Pan o kontakt swojego przedstawiciela handlowego?"
     - **Klient: "Nie, dziękuję" / "Wszystko OK":**
       - Ty: "Dobrze. W takim razie do zobaczenia przy montażu! Miłego dnia."
-      - **AKCJA:** \`confirmInstallation(confirmed=true, contactRequested=false)\`
+      - **AKCJA:** \`confirmDate(confirmed=true, contactRequested=false)\`
     - **Klient: "Tak, poproszę o kontakt" / "Mam pytanie":**
       - Ty: "Oczywiście, przekażę prośbę do opiekuna. Zadzwoni do Pana. Do zobaczenia!"
-      - **AKCJA:** \`confirmInstallation(confirmed=true, contactRequested=true)\`
+      - **AKCJA:** \`confirmDate(confirmed=true, contactRequested=true)\`
 
 **B. KLIENT PRZEKŁADA:**
 - Ty: "Rozumiem. A czy pasuje ${formatDay(altDate1)}?"
-    - Jeśli ustalisz nową datę -> "Super, zapisane. Do zobaczenia!" -> \`rescheduleInstallation(newDate)\`
+    - Jeśli ustalisz nową datę -> "Super, zapisane. Do zobaczenia!" -> \`changeDate(newDate)\`
 
 **C. ODMOWA:**
-- Ty: "Rozumiem. Poproszę biuro o kontakt. Do usłyszenia." -> \`rejectInstallation("Kontakt")\`
+- Ty: "Rozumiem. Poproszę biuro o kontakt. Do usłyszenia." -> \`rejectDate("Kontakt")\`
 =========================================
 `;
+            firstMessage = `${greeting}, tu Sasha z Polendach24! Dzwonię potwierdzić montaż na ${formatDate(originalDate)}. Ekipa będzie między 8 a 10 rano. Czy ten termin Państwu odpowiada?`;
+        }
 
         const WEBHOOK_URL = 'https://whgjsppyuvglhbdgdark.supabase.co/functions/v1/vapi-webhook';
 
-        console.log('Sending request to Vapi...');
+        step = 'vapi_fetch';
+        // 4. Call Vapi
         const vapiBody = {
             phoneNumberId: VAPI_PHONE_NUMBER_ID,
             customer: {
@@ -133,7 +189,7 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
                 name: customerName,
             },
             assistant: {
-                firstMessage: `${greeting}, tu Sasha z Polendach24! Dzwonię potwierdzić montaż na ${formatDate(originalDate)}. Ekipa będzie między 8 a 10 rano. Czy ten termin Państwu odpowiada?`,
+                firstMessage: firstMessage,
                 firstMessageMode: 'assistant-speaks-first',
                 transcriber: { provider: "deepgram", model: "nova-2", language: "pl" },
                 model: {
@@ -141,18 +197,18 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
                     model: "gpt-4o",
                     messages: [{ role: "system", content: systemPrompt }],
                     tools: [
-                        { type: "function", function: { name: "confirmInstallation", description: "Call when customer confirms the date.", parameters: { type: "object", properties: { confirmed: { type: "boolean" }, contactRequested: { type: "boolean", description: "True if customer wants sales rep to contact them." } }, required: ["confirmed"] } } },
-                        { type: "function", function: { name: "rescheduleInstallation", description: "Call when customer wants to change the date.", parameters: { type: "object", properties: { newDate: { type: "string", description: "The new date requested by customer, e.g. 2025-05-20" } }, required: ["newDate"] } } },
-                        { type: "function", function: { name: "rejectInstallation", description: "Call when customer cancels without new date.", parameters: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } } }
+                        { type: "function", function: { name: "confirmDate", description: "Call when customer confirms the date.", parameters: { type: "object", properties: { confirmed: { type: "boolean" }, contactRequested: { type: "boolean", description: "True if customer wants sales rep to contact them." } }, required: ["confirmed"] } } },
+                        { type: "function", function: { name: "changeDate", description: "Call when customer wants to change the date.", parameters: { type: "object", properties: { newDate: { type: "string", description: "The new date requested by customer, e.g. 2025-05-20" } }, required: ["newDate"] } } },
+                        { type: "function", function: { name: "rejectDate", description: "Call when customer cancels without new date.", parameters: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } } }
                     ]
                 },
                 voice: { provider: "11labs", voiceId: "EXAVITQu4vr4xnSDxMaL", model: "eleven_multilingual_v2", stability: 0.5, similarityBoost: 0.75 },
-                analysis: {
+                analysisPlan: {
                     structuredDataSchema: {
                         type: "object",
                         properties: {
                             installationConfirmed: { type: "boolean", description: "Set to true if the customer confirmed the installation date." },
-                            contactRequested: { type: "boolean", description: "Set to true if the customer explicitly asked for a sales representative to contact them (e.g. 'poproszę o kontakt', 'mam pytania')." }
+                            contactRequested: { type: "boolean", description: "Set to true if the customer explicitly asked for a sales representative to contact them." }
                         },
                         required: ["installationConfirmed", "contactRequested"]
                     }
@@ -163,7 +219,8 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
                 installationId: installationId,
                 customerId: customerId,
                 customerName: customerName,
-                installationDate: installationDate
+                installationDate: installationDate,
+                communicationId: communicationId
             }
         };
 
@@ -176,18 +233,40 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
             body: JSON.stringify(vapiBody)
         });
 
+        step = 'vapi_response';
         const responseData = await response.json();
 
         if (!response.ok) {
             console.error('Vapi API Error:', responseData);
-            return new Response(JSON.stringify({ error: "Vapi API Error", details: responseData }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            if (communicationId) {
+                await supabaseClient.from('customer_communications').update({
+                    content: `Błąd połączenia z Vapi: ${JSON.stringify(responseData)}`,
+                    metadata: { isSystemNote: true, installationId, status: 'failed', error: responseData }
+                }).eq('id', communicationId);
+            }
+            return new Response(JSON.stringify({ error: "Vapi API Error", details: responseData }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Success - update log
+        if (communicationId) {
+            await supabaseClient.from('customer_communications').update({
+                content: `Połączenie nawiązane. Vapi ID: ${responseData.id}`,
+                metadata: { isSystemNote: true, installationId, status: 'sent', vapiCallId: responseData.id }
+            }).eq('id', communicationId);
         }
 
         return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (error: any) {
         console.error('Function Critical Error:', error);
-        return new Response(JSON.stringify({ error: "Critical Function Error", message: error.message, stack: error.stack }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Expose detail in the main error string so it's visible in simple UI alerts
+        const summary = `Critical Error at step [${step}]: ${error.message}`;
+        return new Response(JSON.stringify({
+            error: summary,
+            step: step,
+            message: error.message,
+            stack: error.stack,
+            debug: debugInfo
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 });
-

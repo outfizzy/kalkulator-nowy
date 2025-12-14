@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
+import { supabase } from '../../lib/supabase';
+
 interface VoiceConfirmationButtonProps {
     leadId: string | undefined;
     customerName: string;
@@ -22,6 +24,34 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
     onSuccess
 }) => {
     const [loading, setLoading] = useState(false);
+    const [confirmed, setConfirmed] = useState(false);
+
+    React.useEffect(() => {
+        const channel = supabase
+            .channel(`voice-btn-${installationId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'installations',
+                    filter: `id=eq.${installationId}`
+                },
+                (payload) => {
+                    console.log('Installation updated (VoiceButton):', payload);
+                    if (payload.new.status === 'scheduled') {
+                        setConfirmed(true);
+                        setLoading(false);
+                        if (onSuccess) onSuccess();
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [installationId, onSuccess]);
 
     const handleCall = async () => {
         if (!phoneNumber) {
@@ -37,9 +67,6 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
         const toastId = toast.loading('Inicjowanie połączenia AI...');
 
         try {
-            // Dynamic import to avoid circular dependencies or build issues if not used
-            const { supabase } = await import('../../lib/supabase');
-
             const { data, error } = await supabase.functions.invoke('vapi-make-call', {
                 body: {
                     phoneNumber,
@@ -53,18 +80,31 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
             });
 
             if (error) throw error;
+            if (data && data.error) throw new Error(`Server: ${data.error} ${data.details ? JSON.stringify(data.details) : ''}`);
 
             console.log('Vapi Call started:', data);
             toast.success('AI dzwoni do klienta! 🤖📞', { id: toastId });
-            if (onSuccess) onSuccess();
 
         } catch (error: any) {
             console.error('Voice Call Error:', error);
             toast.error(`Błąd: ${error.message || 'Nie udało się połączyć'}`, { id: toastId });
-        } finally {
             setLoading(false);
         }
     };
+
+    if (confirmed) {
+        return (
+            <button
+                disabled
+                className="px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm bg-green-100 text-green-700 cursor-default border border-green-200"
+            >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Potwierdzono (AI)
+            </button>
+        );
+    }
 
     return (
         <button
