@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationsDropdown } from './notifications/NotificationsDropdown';
+import { SalesAssistantWidget } from './ai/SalesAssistantWidget';
 
 export const Layout: React.FC = () => {
     const { currentUser, logout, isAdmin } = useAuth();
@@ -40,11 +41,13 @@ export const Layout: React.FC = () => {
 
                     <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />
                     <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
+                    <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />
                     <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />
                     <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
                     <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
                     {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" />}
                     {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" />}
+                    {isAdmin() && <NavLink to="/admin/pricing" label="Cenniki i Marże" icon="clipboard" />}
                     <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />
                     <NavLink to="/settings" label="Ustawienia" icon="settings" />
                 </nav>
@@ -171,6 +174,9 @@ export const Layout: React.FC = () => {
                     </div>
                 </div>
             </main>
+
+            {/* AI Assistant Widget */}
+            <SalesAssistantWidget />
         </div>
     );
 };
@@ -178,7 +184,7 @@ export const Layout: React.FC = () => {
 interface NavLinkProps {
     to: string;
     label: string;
-    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail';
+    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail' | 'chat';
     onClick?: () => void;
 }
 
@@ -241,6 +247,11 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
         mail: (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+        ),
+        chat: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
         ),
     };

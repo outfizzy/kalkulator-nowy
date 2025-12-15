@@ -31,12 +31,12 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
     // --- Dynamic Pricing State ---
     const [matrix, setMatrix] = useState<any[]>([]);
     const [supplierCosts, setSupplierCosts] = useState<any[]>([]);
-    const [pricesLoading, setPricesLoading] = useState(false);
+    // const [pricesLoading, setPricesLoading] = useState(false);
 
     // Fetch dynamic pricing from Supabase
     useEffect(() => {
         const fetchPricing = async () => {
-            setPricesLoading(true);
+            // setPricesLoading(true);
             try {
                 // 1. Get Matrix
                 const entries = await PricingService.getPriceMatrix(type);
@@ -54,7 +54,7 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
             } catch (e) {
                 console.error("Pricing fetch error", e);
             }
-            setPricesLoading(false);
+            // setPricesLoading(false);
         };
         fetchPricing();
     }, [type]);

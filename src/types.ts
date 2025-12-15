@@ -165,6 +165,7 @@ export interface ProductConfig {
     width: number;
     projection: number;
     postsHeight?: number;
+    snowZone?: SnowZone; // Added for exact price matching
     color: string;
     customColor: boolean; // true if custom RAL color selected
     customColorRAL?: string; // RAL number when custom color is selected

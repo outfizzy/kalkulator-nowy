@@ -1,22 +1,26 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
-// Warning: pdf-parse might not work perfectly in Deno due to node deps.
-// Using a simpler text extractor or just sending raw bytes if OpenAI supported files (it does via Assistants API but costly/slow for this).
-// Better approach for Deno: 'pdf-lib' for manipulation, but extracting text is tricky.
-// Trying 'pdf-parse' via esm.sh which pollyfills node.
-import pdf from "https://esm.sh/pdf-parse@1.1.1";
+import { Buffer } from "node:buffer";
+import process from "node:process";
+
+// Polyfill Node environments for pdf-parse BEFORE importing it
+globalThis.Buffer = Buffer;
+globalThis.process = process;
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
+        // Dynamically import pdf-parse to ensure polyfills are loaded
+        const { default: pdf } = await import("https://esm.sh/pdf-parse@1.1.1");
+
         const formData = await req.formData()
         const file = formData.get('file')
 
@@ -27,26 +31,23 @@ serve(async (req) => {
             )
         }
 
-        // 1. Extract Text from PDF
-        // Note: buffer() returns ArrayBuffer, pdf-parse needs Buffer (Node)
-        const arrayBuffer = await file.arrayBuffer()
-        const buffer = new Uint8Array(arrayBuffer)
+        console.log("File received:", file.name, file.size);
 
-        // pdf-parse relies on Node 'Buffer'. We might need a polyfill or just pass the Uint8Array if it accepts.
-        // Documentation says it accepts Buffer.
-        // Let's try to extract text. If this fails, I might need to use a different strategy (e.g. OpenAI Vision by sending screenshots from frontend, but frontend PDF->Image is also heavy).
-        // Let's assume for now the PDF is text-selectable.
+        // 1. Extract Text from PDF
+        const arrayBuffer = await file.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer); // Use Node Buffer
 
         let textContent = "";
         try {
+            console.log("Starting PDF Parse...");
             const data = await pdf(buffer);
             textContent = data.text;
+            console.log("PDF Parsed, length:", textContent.length);
         } catch (e) {
             console.error("PDF Parse Error:", e);
-            // Fallback: If pdf-parse fails in Deno, we might need an external service or a different lib.
-            // For this task, I'll proceed hoping it works or return mock if it fails for testing.
+            // Return detailed error to client
             return new Response(
-                JSON.stringify({ error: 'Failed to read PDF text. Ensure it is a text PDF.' }),
+                JSON.stringify({ error: `PDF Parse Failed: ${e.message || e}` }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
             )
         }
@@ -56,6 +57,11 @@ serve(async (req) => {
 
         // 2. Call OpenAI
         const apiKey = Deno.env.get('OPENAI_API_KEY')
+        if (!apiKey) {
+            throw new Error("Missing OPENAI_API_KEY");
+        }
+
+        console.log("Calling OpenAI...");
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -75,6 +81,11 @@ serve(async (req) => {
             {
                "confidence": 0-100,
                "detected_product_name": "string",
+               "detected_attributes": {
+                   "snow_zone": "1" | "2" | "3" | null,
+                   "roof_type": "polycarbonate" | "glass" | null,
+                   "mounting": "wall" | "free" | null
+               },
                "entries": [
                   { "width_mm": number, "projection_mm": number, "price": number }
                ]
@@ -85,6 +96,10 @@ serve(async (req) => {
             - "Projection" (or Drop/Ausfall/Tiefe) is the side header (1500, 2000, 2500...).
             - Prices are numbers (eur). Remove currency symbols.
             - Provide at least 20 detectable entries if possible.
+            - Detect Attributes from title or context:
+                - Snow Zone: Look for "Schneelast", "Snow Load", "Zone 1", "Zone 2", "Zone 3/SK3". Map to "1", "2", or "3".
+                - Roof Type: Look for "VSG", "Glas", "Glass" -> "glass"; "Poly", "Polycarbonat" -> "polycarbonate".
+                - Mounting: "Wandmontage" -> "wall", "Freistehend" -> "free".
             - Do not include explanatory text, only the JSON.`
                     },
                     {
@@ -96,12 +111,12 @@ serve(async (req) => {
             }),
         })
 
-        const aiData = await response.json()
-
-        if (aiData.error) {
-            throw new Error(aiData.error.message)
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenAI API Error: ${response.status} ${errText}`);
         }
 
+        const aiData = await response.json()
         const content = JSON.parse(aiData.choices[0].message.content);
 
         return new Response(
@@ -110,8 +125,9 @@ serve(async (req) => {
         )
 
     } catch (error) {
+        console.error("Global Error:", error);
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: `Function Error: ${error.message}` }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
     }

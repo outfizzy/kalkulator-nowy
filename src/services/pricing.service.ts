@@ -6,11 +6,27 @@ export interface PriceMatrixEntry {
     price: number;
 }
 
+export interface PriceTable {
+    id: string;
+    name: string;
+    product_definition_id: string;
+    is_active: boolean;
+    attributes: Record<string, string>; // e.g. { "snow_zone": "3" }
+}
+
+export interface AdditionalCost {
+    id: string;
+    name: string;
+    cost_type: 'fixed' | 'per_m' | 'per_item' | 'percentage';
+    value: number;
+    attributes: Record<string, string>;
+}
+
 export const PricingService = {
     /**
-     * Fetch pricing matrix for a specific product code (e.g. 'trendstyle', 'aufdachmarkise_zip')
+     * Fetch pricing matrix for a specific product code, considering attributes (e.g. Snow Zone)
      */
-    async getPriceMatrix(productCode: string): Promise<PriceMatrixEntry[]> {
+    async getPriceMatrix(productCode: string, contextAttributes: Record<string, string> = {}): Promise<PriceMatrixEntry[]> {
         // 1. Get Product Definition ID
         const { data: product } = await supabase
             .from('product_definitions')
@@ -23,27 +39,48 @@ export const PricingService = {
             return [];
         }
 
-        // 2. Get Active Price Table
-        // For now, simple logic: get the most recently created active table
-        const { data: table } = await supabase
+        // 2. Get All Active Price Tables for Product
+        const { data: tables } = await supabase
             .from('price_tables')
-            .select('id')
+            .select('*')
             .eq('product_definition_id', product.id)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .eq('is_active', true);
 
-        if (!table) {
-            console.error(`No active price table for: ${productCode}`);
+        if (!tables || tables.length === 0) {
+            console.error(`No active price tables for: ${productCode}`);
             return [];
         }
 
-        // 3. Get Matrix Entries
+        // 3. Find Best Match Table
+        // Logic: Find table where ALL table attributes match the contextAttributes.
+        // If multiple match, pick the most specific one (most attributes).
+        // If none match specific attributes, fall back to "Base" table (empty attributes).
+
+        const bestMatch = tables.sort((a, b) => {
+            // Sort by number of attributes (descending) to prioritize more specific tables
+            const aKeys = Object.keys(a.attributes || {});
+            const bKeys = Object.keys(b.attributes || {});
+            return bKeys.length - aKeys.length;
+        }).find(table => {
+            const tableAttrs = table.attributes || {};
+            const keys = Object.keys(tableAttrs);
+
+            // Check if all table attributes are present and matching in context
+            return keys.every(key => contextAttributes[key] == tableAttrs[key]);
+        });
+
+        if (!bestMatch) {
+            console.warn(`No matching table found for attributes:`, contextAttributes);
+            return [];
+        }
+
+        console.log(`[Pricing] Selected Table: ${bestMatch.name}`, bestMatch.attributes);
+
+        // 4. Get Matrix Entries for the matched table
         const { data } = await supabase
             .from('price_matrix_entries')
             .select('*')
-            .eq('price_table_id', table.id);
+            .eq('price_table_id', bestMatch.id);
 
         return data || [];
     },
@@ -76,6 +113,33 @@ export const PricingService = {
             .eq('provider', provider)
             .eq('is_active', true);
         return data || [];
+    },
+
+    async getAdditionalCosts(productCode: string, contextAttributes: Record<string, string> = {}): Promise<AdditionalCost[]> {
+        // Get Product ID
+        const { data: product } = await supabase
+            .from('product_definitions')
+            .select('id')
+            .eq('code', productCode)
+            .single();
+
+        if (!product) return [];
+
+        const { data } = await supabase
+            .from('additional_costs')
+            .select('*')
+            .eq('product_definition_id', product.id)
+            .eq('is_active', true);
+
+        if (!data) return [];
+
+        // Filter costs that apply to current context
+        return data.filter(cost => {
+            const costAttrs = cost.attributes || {};
+            const keys = Object.keys(costAttrs);
+            // If cost has condition (e.g. post_height=3000), context must match
+            return keys.every(key => contextAttributes[key] == costAttrs[key]);
+        });
     },
 
     calculateTotalWithCosts(basePrice: number, costs: any[]): { total: number, breakdown: any[] } {

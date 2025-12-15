@@ -54,6 +54,7 @@ import { LeadForm } from './components/leads/LeadForm';
 import { LeadDetailsPage } from './components/leads/LeadDetailsPage';
 import { MailPage } from './components/MailPage';
 import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
+import { AIAssistantPage } from './components/admin/AIAssistantPage';
 
 import { PublicOfferPage } from './pages/PublicOfferPage';
 
@@ -354,7 +355,9 @@ function App() {
               <Route path="/leads" element={<LeadsList />} />
               <Route path="/leads/new" element={<LeadForm />} />
               <Route path="/leads/:id" element={<LeadDetailsPage />} />
+              <Route path="/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/mail" element={<MailPage />} />
+              <Route path="/ai-assistant" element={<AIAssistantPage />} />
             </Route>
 
 

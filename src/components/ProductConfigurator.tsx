@@ -18,6 +18,7 @@ import ultrastyleData from '../data/ultrastyle_full.json';
 import carportData from '../data/carport_full.json';
 import { formatCurrency } from '../utils/translations';
 import { toast } from 'react-hot-toast';
+import { PricingService, type AdditionalCost } from '../services/pricing.service';
 
 // === OFFER BASKET TYPES ===
 interface ExternalOfferItem {
@@ -55,6 +56,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         width: 3000,
         projection: 2500,
         postsHeight: 2500,
+        snowZone: '1', // Default to Zone 1
         color: 'RAL 7016',
         customColor: false,
         customColorRAL: '',
@@ -65,6 +67,68 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         addons: [],
         selectedAccessories: []
     });
+
+    // Dynamic Pricing state
+    const [dynamicBasePrice, setDynamicBasePrice] = useState<number>(0);
+    const [priceLoading, setPriceLoading] = useState(false);
+    const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
+
+    // Fetch Price when attributes change
+    useEffect(() => {
+        const calculatePrice = async () => {
+            if (!config.modelId) return;
+            setPriceLoading(true);
+
+            try {
+                // 1. Prepare Attributes Context
+                const attributes: Record<string, string> = {
+                    snow_zone: config.snowZone || '1',
+                    roof_type: config.roofType, // 'polycarbonate' or 'glass'
+                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'free',
+                    // Add other attributes if needed (e.g. post height range)
+                };
+
+                // 2. Get Matrix Price
+                const matrix = await PricingService.getPriceMatrix(config.modelId, attributes);
+                let price = 0;
+
+                if (matrix.length > 0) {
+                    price = PricingService.calculateMatrixPrice(matrix, config.width, config.projection);
+                } else {
+                    // Fallback to old logic (static JSON files) if no table found
+                    // ... (Using existing hook logic roughly)
+                    // For now, let's keep the hook but trigger re-calc
+                }
+
+                if (price > 0) {
+                    setDynamicBasePrice(price);
+                } else {
+                    // Keep old logic if 0 (backward compatibility)
+                }
+
+                // 3. Get Additional Costs (Surcharges for this specific variant)
+                const surcharges = await PricingService.getAdditionalCosts(config.modelId, attributes);
+                // Filter surcharges that apply (some might be automatable, others are manual options?)
+                // Actually the AdditionalCostsManager defines them. 
+                // We typically just ADD them if they are mandatory? 
+                // Or are they options the user selects?
+                // The prompt implied "wygodne dodawanie" -> adding variables.
+                // Assuming simple surcharges for now (like fixed variants).
+                // If they are specific surcharges (e.g. "Surcharge for 3m posts"), we might automate it
+                // if we detect the condition.
+                // For now just logging them or storing them.
+                setAdditionalCosts(surcharges);
+
+            } catch (err) {
+                console.error("Pricing error", err);
+            } finally {
+                setPriceLoading(false);
+            }
+        };
+
+        const timeoutId = setTimeout(calculatePrice, 500); // Debounce
+        return () => clearTimeout(timeoutId);
+    }, [config.modelId, config.width, config.projection, config.snowZone, config.roofType, config.installationType]);
 
     // === EXTERNAL ITEMS BASKET ===
     const [externalItems, setExternalItems] = useState<ExternalOfferItem[]>(initialExternalItems);
@@ -114,6 +178,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories' | 'floor'>('sliding');
 
     const basePrice = useMemo(() => {
+        // If we have a dynamic price from the Matrix Service, use it!
+        if (dynamicBasePrice > 0) return dynamicBasePrice;
+
         if (!config.modelId) return 0;
 
         let data: any = null;
@@ -141,13 +208,32 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         });
 
         return product ? product.price_eur : 0;
-    }, [config.modelId, config.width, config.projection, config.installationType]);
+    }, [config.modelId, config.width, config.projection, config.installationType, dynamicBasePrice]);
+
+    const additionalCostsTotal = useMemo(() => {
+        if (!additionalCosts || additionalCosts.length === 0) return 0;
+
+        let sum = 0;
+        const currentBasePrice = dynamicBasePrice > 0 ? dynamicBasePrice : basePrice;
+
+        additionalCosts.forEach(cost => {
+            if (cost.cost_type === 'fixed') {
+                sum += Number(cost.value);
+            } else if (cost.cost_type === 'percentage') {
+                sum += currentBasePrice * (Number(cost.value) / 100);
+            }
+        });
+        return sum;
+    }, [additionalCosts, basePrice, dynamicBasePrice]);
 
     const totalPrice = useMemo(() => {
         const addonsTotal = config.addons.reduce((sum, a) => sum + a.price, 0);
-        const accessoriesTotal = config.selectedAccessories?.reduce((sum, a) => sum + a.price * (a.quantity || 1), 0) || 0;
-        return basePrice + addonsTotal + accessoriesTotal;
-    }, [basePrice, config.addons, config.selectedAccessories]);
+        const accessoriesTotal = (config.selectedAccessories || []).reduce((sum, a) => sum + (a.price * a.quantity), 0);
+        // External Items Total
+        const extTotal = externalItems.reduce((sum, item) => sum + item.sellingPrice, 0);
+
+        return basePrice + addonsTotal + accessoriesTotal + extTotal + additionalCostsTotal;
+    }, [basePrice, config.addons, config.selectedAccessories, externalItems, additionalCostsTotal]);
 
     // --- Logic & Calculations ---
 
@@ -586,28 +672,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     placeholder="np. 4000x3000mm, RAL 7016, LED..."
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cena zakupu (€)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={externalForm.purchasePrice || ''}
-                                                        onChange={e => setExternalForm({ ...externalForm, purchasePrice: Number(e.target.value) })}
-                                                        className="w-full p-2 border border-slate-200 rounded-lg"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cena sprzedaży (€) *</label>
-                                                    <input
-                                                        type="number"
-                                                        value={externalForm.sellingPrice || ''}
-                                                        onChange={e => setExternalForm({ ...externalForm, sellingPrice: Number(e.target.value) })}
-                                                        className="w-full p-2 border border-slate-200 rounded-lg font-bold"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                            </div>
                                             <button
                                                 onClick={handleAddExternalItem}
                                                 className={`w-full py-3 rounded-xl font-bold text-white ${showExternalForm === 'selt'
@@ -812,6 +876,34 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
+
+                                    {/* Snow Zone Selection */}
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 md:p-5 rounded-xl border border-blue-200 col-span-1 md:col-span-2">
+                                        <label className="block text-xs md:text-sm font-bold text-blue-800 mb-3 md:mb-4 flex items-center gap-2">
+                                            <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                            </svg>
+                                            Strefa Śniegowa (Obciążenie)
+                                        </label>
+                                        <div className="flex gap-2 md:gap-4">
+                                            {(['1', '2', '3'] as const).map(zone => (
+                                                <button
+                                                    key={zone}
+                                                    onClick={() => setConfig({ ...config, snowZone: zone })}
+                                                    className={`flex-1 py-3 md:py-4 px-2 md:px-4 rounded-xl border-2 transition-all relative overflow-hidden ${config.snowZone === zone
+                                                        ? 'border-blue-600 bg-blue-600 text-white shadow-lg ring-2 ring-blue-300'
+                                                        : 'border-blue-200 bg-white text-blue-700 hover:border-blue-400'
+                                                        }`}
+                                                >
+                                                    <div className="text-xs font-semibold opacity-80 uppercase tracking-widest mb-1">Strefa</div>
+                                                    <div className="text-2xl md:text-3xl font-black">{zone}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="mt-3 text-[10px] md:text-xs text-blue-600 text-center">
+                                            Wybór strefy (1, 2 lub 3) wpływa na wzmocnienia konstrukcji i cenę końcową.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -1245,12 +1337,51 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             </div>
                         )}
 
+                        {/* Additional Costs (Surcharges) */}
+                        {additionalCosts.length > 0 && (
+                            <div className="space-y-3 pb-6 border-b border-slate-100">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dopłaty Systemowe</span>
+                                <div className="space-y-2">
+                                    {additionalCosts.map(cost => {
+                                        let costValue = 0;
+                                        if (cost.cost_type === 'fixed') {
+                                            costValue = Number(cost.value);
+                                        } else {
+                                            const base = dynamicBasePrice > 0 ? dynamicBasePrice : basePrice;
+                                            costValue = base * (Number(cost.value) / 100);
+                                        }
+                                        return (
+                                            <div key={cost.id} className="flex justify-between text-sm">
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-600 transition-colors" title={cost.name}>
+                                                        {cost.name}
+                                                    </span>
+                                                    {Object.keys(cost.attributes || {}).length > 0 && (
+                                                        <span className="text-[10px] text-slate-400">
+                                                            (Wymagane przez: {Object.values(cost.attributes).join(', ')})
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(costValue)}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Total Price */}
                         <div className="space-y-1 pt-2">
                             <div className="flex justify-between items-baseline">
                                 <span className="text-slate-500 text-sm">Cena Netto</span>
-                                <span className="font-bold text-slate-700 text-lg">
-                                    {formatCurrency(totalPrice)}
+                                <span className="font-bold text-slate-700 text-lg flex items-center gap-2">
+                                    {priceLoading && (
+                                        <svg className="animate-spin h-5 w-5 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    )}
+                                    {priceLoading ? 'Liczenie...' : formatCurrency(totalPrice)}
                                 </span>
                             </div>
                         </div>

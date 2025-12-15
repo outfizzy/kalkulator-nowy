@@ -10,11 +10,12 @@ const IconPlus = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" 
 
 import { MatrixEditor } from './PricingMatrixEditor';
 import { SupplierCostsManager } from './SupplierCostsManager';
-import { SimulationService, SimulationReport } from '../../services/simulation.service';
+import { SimulationService, type SimulationReport } from '../../services/simulation.service';
+import { AdditionalCostsManager } from './AdditionalCostsManager';
 import { formatCurrency } from '../../utils/translations';
 
 export const PricingPage = () => {
-    const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs'>('tables');
+    const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs' | 'surcharges'>('tables');
     const [priceTables, setPriceTables] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingTable, setEditingTable] = useState<{ id: string, name: string } | null>(null);
@@ -79,6 +80,21 @@ export const PricingPage = () => {
 
     const [importing, setImporting] = useState(false);
     const [previewData, setPreviewData] = useState<any>(null);
+    const [importAttributes, setImportAttributes] = useState<{ key: string, value: string }[]>([]);
+
+    const addAttribute = () => {
+        setImportAttributes([...importAttributes, { key: '', value: '' }]);
+    };
+
+    const updateAttribute = (index: number, field: 'key' | 'value', val: string) => {
+        const newAttrs = [...importAttributes];
+        newAttrs[index][field] = val;
+        setImportAttributes(newAttrs);
+    };
+
+    const removeAttribute = (index: number) => {
+        setImportAttributes(importAttributes.filter((_, i) => i !== index));
+    };
 
     const handleFileUpload = async (file: File) => {
         setImporting(true);
@@ -105,6 +121,24 @@ export const PricingPage = () => {
                 } else {
                     setSelectedProductId('new');
                     setNewProductName(data.detected_product_name);
+                }
+            }
+
+            // Auto-fill attributes
+            if (data.detected_attributes) {
+                const newAttrs: { key: string, value: string }[] = [];
+                if (data.detected_attributes.snow_zone) {
+                    newAttrs.push({ key: 'snow_zone', value: String(data.detected_attributes.snow_zone) });
+                }
+                if (data.detected_attributes.roof_type) {
+                    newAttrs.push({ key: 'roof_type', value: data.detected_attributes.roof_type });
+                }
+                if (data.detected_attributes.mounting) {
+                    newAttrs.push({ key: 'mounting', value: data.detected_attributes.mounting });
+                }
+                if (newAttrs.length > 0) {
+                    setImportAttributes(newAttrs);
+                    toast.success(`Wykryto atrybuty: ${newAttrs.map(a => `${a.key}=${a.value}`).join(', ')}`);
                 }
             }
 
@@ -160,6 +194,7 @@ export const PricingPage = () => {
             name: name,
             product_definition_id: finalProductId,
             type: 'matrix',
+            attributes: importAttributes.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}),
             is_active: false // Start inactive so user can check
         }).select().single();
 
@@ -185,6 +220,7 @@ export const PricingPage = () => {
             setPreviewData(null);
             setNewProductName('');
             setSelectedProductId('');
+            setImportAttributes([]);
             setActiveTab('tables');
             fetchPriceTables();
         }
@@ -213,41 +249,83 @@ export const PricingPage = () => {
                             <pre className="text-xs">{JSON.stringify(previewData.entries.slice(0, 5), null, 2)} ... i więcej</pre>
                         </div>
 
-                        <div className="mb-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Przypisz do produktu:</label>
-                                <select
-                                    value={selectedProductId}
-                                    onChange={(e) => setSelectedProductId(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-md"
-                                >
-                                    <option value="" disabled>-- Wybierz produkt --</option>
-                                    <option value="new">+ Stwórz nowy produkt</option>
-                                    <optgroup label="Istniejące produkty">
-                                        {products.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </optgroup>
-                                </select>
+                        {/* Import Preview & Configuration */}
+                        <div className="bg-white p-6 rounded-xl border border-slate-200">
+                            <h3 className="text-lg font-bold mb-4">Konfiguracja Cennika</h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Produkt</label>
+                                    <select
+                                        value={selectedProductId}
+                                        onChange={(e) => setSelectedProductId(e.target.value)}
+                                        className="w-full p-2 border border-slate-300 rounded-lg"
+                                    >
+                                        <option value="">-- Wybierz produkt --</option>
+                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                        <option value="new">+ Utwórz nowy produkt (wykryto: {previewData.detected_product_name})</option>
+                                    </select>
+                                </div>
+
+                                {selectedProductId === 'new' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Nazwa Nowego Produktu</label>
+                                        <input
+                                            type="text"
+                                            value={newProductName}
+                                            onChange={(e) => setNewProductName(e.target.value)}
+                                            className="w-full p-2 border border-slate-300 rounded-lg"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
-                            {selectedProductId === 'new' && (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nazwa nowego produktu:</label>
-                                    <input
-                                        type="text"
-                                        value={newProductName}
-                                        onChange={(e) => setNewProductName(e.target.value)}
-                                        className="w-full p-2 border border-slate-300 rounded-md"
-                                        placeholder="np. Nowa Markiza 2025"
-                                    />
+                            {/* Attributes Section */}
+                            <div className="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h4 className="text-sm font-bold text-slate-700">Warianty / Atrybuty (Exact Match)</h4>
+                                    <button onClick={addAttribute} className="text-xs text-accent hover:underline">+ Dodaj atrybut</button>
                                 </div>
-                            )}
-                        </div>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Jeśli ta tabela dotyczy konkretnego wariantu (np. tylko 1 strefa śniegowa), dodaj to tutaj.
+                                </p>
 
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => setPreviewData(null)} className="px-4 py-2 border rounded">Anuluj</button>
-                            <button onClick={saveImport} className="px-4 py-2 bg-green-600 text-white rounded font-bold">Zapisz jako Cennik</button>
+                                <div className="space-y-2">
+                                    {importAttributes.map((attr, idx) => (
+                                        <div key={idx} className="flex gap-2">
+                                            <input
+                                                placeholder="Nazwa (np. snow_zone)"
+                                                value={attr.key}
+                                                onChange={(e) => updateAttribute(idx, 'key', e.target.value)}
+                                                className="flex-1 p-2 text-sm border rounded"
+                                                list="attribute-keys"
+                                            />
+                                            <input
+                                                placeholder="Wartość (np. 1)"
+                                                value={attr.value}
+                                                onChange={(e) => updateAttribute(idx, 'value', e.target.value)}
+                                                className="flex-1 p-2 text-sm border rounded"
+                                            />
+                                            <button onClick={() => removeAttribute(idx)} className="text-red-500 p-2 hover:bg-red-50 rounded">×</button>
+                                        </div>
+                                    ))}
+                                    <datalist id="attribute-keys">
+                                        <option value="snow_zone">Strefa Śniegowa (1/2/3)</option>
+                                        <option value="roof_type">Typ Dachu (poly/glass)</option>
+                                        <option value="mounting">Montaż (wall/free)</option>
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => setPreviewData(null)} className="px-4 py-2 text-slate-600">Anuluj</button>
+                                <button
+                                    onClick={saveImport}
+                                    className="px-6 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700"
+                                >
+                                    Zapisz Cennik
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -289,7 +367,13 @@ export const PricingPage = () => {
                     onClick={() => setActiveTab('costs')}
                     className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'costs' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-600'}`}
                 >
-                    Koszty Dodatkowe
+                    Koszty Dostawców (Logistyka)
+                </button>
+                <button
+                    onClick={() => setActiveTab('surcharges')}
+                    className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'surcharges' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-600'}`}
+                >
+                    Cennik Dopłat (Exact)
                 </button>
             </div>
 
@@ -302,6 +386,7 @@ export const PricingPage = () => {
                                 <th className="p-4 text-xs font-bold text-slate-500 uppercase">Nazwa</th>
                                 <th className="p-4 text-xs font-bold text-slate-500 uppercase">Produkt</th>
                                 <th className="p-4 text-xs font-bold text-slate-500 uppercase">Ważny od</th>
+                                <th className="p-4 text-xs font-bold text-slate-500 uppercase">Warianty</th>
                                 <th className="p-4 text-xs font-bold text-slate-500 uppercase">Status</th>
                                 <th className="p-4 text-xs font-bold text-slate-500 uppercase text-right">Akcje</th>
                             </tr>
@@ -320,6 +405,18 @@ export const PricingPage = () => {
                                         </td>
                                         <td className="p-4 text-slate-500 text-sm">
                                             {table.valid_from ? format(new Date(table.valid_from), 'd MMM yyyy', { locale: pl }) : '-'}
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-wrap gap-1">
+                                                {table.attributes && Object.entries(table.attributes).map(([key, val]) => (
+                                                    <span key={key} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">
+                                                        {key}: <strong>{val as string}</strong>
+                                                    </span>
+                                                ))}
+                                                {(!table.attributes || Object.keys(table.attributes).length === 0) && (
+                                                    <span className="text-xs text-slate-400 italic">Baza (Domyślny)</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4">
                                             <button
@@ -418,6 +515,7 @@ export const PricingPage = () => {
             )}
 
             {activeTab === 'costs' && <SupplierCostsManager />}
+            {activeTab === 'surcharges' && <AdditionalCostsManager />}
 
             {activeTab === 'import' && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
