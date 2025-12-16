@@ -252,7 +252,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         try {
             const ext = file.name.split('.').pop();
             const fileName = `component_${tableId}_${groupName.replace(/\s+/g, '_')}_${Date.now()}.${ext}`;
-            const { data, error } = await supabase.storage.from('product-images').upload(fileName, file);
+            const { error } = await supabase.storage.from('product-images').upload(fileName, file);
 
             if (error) throw error;
 

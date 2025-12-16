@@ -98,6 +98,52 @@ export const PricingService = {
         }));
     },
 
+    /**
+     * Fetch component lists (tables tagged with table_type="component_list")
+     */
+    async getComponentLists(contextAttributes: Record<string, string> = {}): Promise<{ table: PriceTable, entries: PriceMatrixEntry[] }[]> {
+        // Fetch tables that have table_type = 'component_list'
+        // Supabase JSONB filtering: attributes->>'table_type' = 'component_list'
+        const { data: tables } = await supabase
+            .from('price_tables')
+            .select('*, product:product_definitions(name, code)')
+            .eq('is_active', true)
+        // Ideally we filter by JSON, but Supabase JS filter syntax for JSON is .filter('attributes->>table_type', 'eq', 'component_list')
+        // or we fetch all active and filter in JS if volume is low.
+        // Let's try explicit filter if possible, or JS filter.
+        // .eq('attributes->>table_type', 'component_list') // This syntax might not work directly in all client versions without textSearch
+        // Let's fetch all active and filter in JS for safety/speed unless volume is huge.
+
+        if (!tables) return [];
+
+        const componentTables = tables.filter(t => t.attributes && t.attributes['table_type'] === 'component_list');
+
+        if (componentTables.length === 0) return [];
+
+        // Fetch entries for these tables
+        const tableIds = componentTables.map(t => t.id);
+        const { data: entries } = await supabase
+            .from('price_matrix_entries')
+            .select('*')
+            .in('price_table_id', tableIds);
+
+        const entriesByTable = (entries || []).reduce((acc: any, curr: any) => {
+            if (!acc[curr.price_table_id]) acc[curr.price_table_id] = [];
+            acc[curr.price_table_id].push({
+                ...curr,
+                structure_price: curr.structure_price || curr.price,
+                glass_price: curr.glass_price || 0,
+                properties: curr.properties || {}
+            });
+            return acc;
+        }, {});
+
+        return componentTables.map(table => ({
+            table,
+            entries: entriesByTable[table.id] || []
+        }));
+    },
+
     async getTableConfig(productCode: string, contextAttributes: Record<string, string> = {}): Promise<{ config: any, attributes: any }> {
         // 1. Get Product Definition
         const { data: product } = await supabase

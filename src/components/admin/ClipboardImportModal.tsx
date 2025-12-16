@@ -22,10 +22,12 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
     const [mountingType, setMountingType] = useState<'wall' | 'free'>('wall');
     const [manufacturer, setManufacturer] = useState<'Aluxe' | 'Deponti' | 'Inny'>('Aluxe');
     const [productHint, setProductHint] = useState<string>('');
+    const [tableType, setTableType] = useState<'standard' | 'component_list'>('standard');
 
     // Templates definition
     const applyTemplate = (type: 'glass' | 'poly' | 'carport' | 'carport_tin') => {
         if (parsedRows.length === 0) return;
+        setTableType('standard'); // Reset to standard
         const maxCols = Math.max(...parsedRows.map(r => r.length));
 
         // Default clean slate
@@ -125,6 +127,7 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
 
     const applyComponentTemplate = () => {
         if (parsedRows.length === 0) return;
+        setTableType('component_list'); // Tag as component list
         const maxCols = Math.max(...parsedRows.map(r => r.length));
 
         // Template: Name | Width | Unit | Price
@@ -152,6 +155,43 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
 
     const applyMatrixTemplate = (contextType?: string) => {
         if (parsedRows.length < 2) return;
+        setTableType('standard'); // Matrix is always standard pricing
+
+        // Robust Number Parser for EU formats (1.234,56 or 1 234,56 or 2.000)
+        const parseEurNumber = (str: string) => {
+            if (!str) return NaN;
+            // Remove spaces (common thousands separator)
+            let clean = str.replace(/\s+/g, '');
+            // Clean other noise (keep digits, dot, comma, minus)
+            clean = clean.replace(/[^\d.,-]/g, '');
+
+            if (!clean) return NaN;
+
+            // Case 1: "1.234,56" or "1234,56" (Comma is decimal)
+            if (clean.includes(',')) {
+                // If standard EU format, remove dots (thousands), replace comma with dot
+                return parseFloat(clean.replace(/\./g, '').replace(',', '.'));
+            }
+
+            // Case 2: "1.234" (Dot only) - Ambiguous
+            // If it ends with exactly 3 digits, assume it's thousands separator (e.g. 2.000mm)
+            // Unless it's small value like 1.234 (price)? 
+            // In our context (Dimensions/Prices):
+            // Dimensions > 500. Prices usually > 10.
+            if (clean.includes('.')) {
+                const parts = clean.split('.');
+                const lastPart = parts[parts.length - 1];
+
+                // Heuristic: If 3 decimals and value < 50 interpreted normally, treat as thousands.
+                const normalVal = parseFloat(clean);
+                if (lastPart.length === 3 && normalVal < 50) {
+                    return parseFloat(clean.replace(/\./g, ''));
+                }
+                return normalVal;
+            }
+
+            return parseFloat(clean);
+        };
 
         // 1. Identify Header Row (Projections)
         let headerRowIdx = -1;
@@ -160,8 +200,10 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         // Try to find the header row
         for (let i = 0; i < Math.min(5, parsedRows.length); i++) {
             const row = parsedRows[i];
-            const numbers = row.map(c => parseFloat(c.replace(/[^\d.,]/g, '').replace(',', '.'))).filter(n => !isNaN(n) && n > 500);
-            if (numbers.length >= 2) { // Changed to >= 2 to allow smaller matrices
+            // Use robust parser
+            const numbers = row.map(c => parseEurNumber(c)).filter(n => !isNaN(n) && n > 500);
+
+            if (numbers.length >= 2) {
                 headerRowIdx = i;
                 headerProjections = numbers;
                 break;
@@ -169,12 +211,21 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         }
 
         if (headerRowIdx === -1) {
-            toast.error('Nie znaleziono wiersza nagłówkowego z wymiarami.');
-            return;
+            // Fallback for ZIP Screen / Awnings
+            const isZip = contextType === 'zip_screen' || contextType === 'aufdachmarkise_zip' || contextType === 'unterdachmarkise_zip';
+            if (isZip) {
+                // Provide wider range for Awnings if needed, but 1000-3000 is safe default for ZIPs
+                // For Awnings it might be 2000-6000? 
+                // Let's assume standard set if verification failed
+                headerProjections = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000];
+                toast('Nie wykryto nagłówka - użyto standardowych wysokości ZIP (1000-3000). Sprawdź czy to poprawne!', { icon: 'ℹ️' });
+            } else {
+                toast.error('Nie znaleziono wiersza nagłówkowego z wymiarami (>500). Sprawdź format (np. 2000, 2500...).');
+                return;
+            }
+        } else {
+            console.log('Detected Matrix Header:', headerProjections);
         }
-
-        const headerRow = parsedRows[headerRowIdx];
-        console.log('Detected Matrix Header:', headerRow);
 
         // 2. Flatten Data
         const flattenedRows: string[][] = [];
@@ -184,28 +235,39 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             if (i === headerRowIdx) continue;
 
             const row = parsedRows[i];
-            if (row.length < headerProjections.length + 1) continue;
+            const allLargeNumbers: number[] = [];
 
-            const widthStr = row[0];
-            const width = parseFloat(widthStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+            for (let k = 0; k < row.length; k++) {
+                const cell = row[k];
+                if (['€', 'EUR', 'PLN', 'zł'].includes(cell.trim())) continue;
 
-            if (isNaN(width) || width < 500) continue;
+                const val = parseEurNumber(cell);
+                if (!isNaN(val) && val > 10) { // Threshold > 10 excludes fixings (2,3)
+                    allLargeNumbers.push(val);
+                }
+            }
 
-            const offset = row.length - headerProjections.length;
-            if (offset < 1) continue;
+            // check count
+            const expectedCount = headerProjections.length + 1;
 
-            for (let j = 0; j < headerProjections.length; j++) {
-                const priceIdx = j + offset;
-                if (priceIdx >= row.length) break;
+            if (allLargeNumbers.length >= expectedCount) {
+                // Take LAST expectedCount numbers (Price columns + 1 Width column before them)
+                const relevantNumbers = allLargeNumbers.slice(-expectedCount);
+                const width = relevantNumbers[0];
+                const prices = relevantNumbers.slice(1);
 
-                const priceRaw = row[priceIdx];
-                const projection = headerProjections[j];
+                if (width < 500) continue; // Width sanity check
 
-                flattenedRows.push([
-                    width.toString(),
-                    projection.toString(),
-                    priceRaw
-                ]);
+                for (let j = 0; j < prices.length; j++) {
+                    const priceVal = prices[j];
+                    const projection = headerProjections[j];
+
+                    flattenedRows.push([
+                        width.toString(),
+                        projection.toString(),
+                        priceVal.toString()
+                    ]);
+                }
             }
         }
 
@@ -218,11 +280,11 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             ];
             setColumnConfigs(newConfigs);
 
-            // Auto-select manufacturer for Awnings if context provided
+            // Auto-select manufacturer
             if (contextType === 'aufdachmarkise_zip' || contextType === 'unterdachmarkise_zip') {
-                setManufacturer('Aluxe'); // Default to Aluxe for these
-                setProductHint(contextType);
-                toast.success(`Przekształcono macierz dla: ${contextType === 'aufdachmarkise_zip' ? 'Aufdach' : 'Unterdach'}.`);
+                setManufacturer('Aluxe');
+                setProductHint(contextType); // preserve specific type
+                toast.success(`Przekształcono macierz dla: ${contextType}`);
             } else if (contextType === 'zip_screen') {
                 setManufacturer('Aluxe');
                 setProductHint(contextType);
@@ -232,7 +294,8 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                 toast.success(`Przekształcono macierz: ${flattenedRows.length} wierszy.`);
             }
         } else {
-            toast.error('Błąd przekształcania macierzy. Sprawdź format.');
+            toast.error('Błąd przekształcania macierzy. Nie dopasowano liczby kolumn do nagłówka.');
+            console.warn('Failed to match rows. Header length:', headerProjections.length, 'Expected numbers per row:', headerProjections.length + 1);
         }
     };
 
@@ -301,8 +364,25 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         // If simple line split gives more consistant rows than token logic (which requires dimensions), use line split
         const lineRows = lines.map(line => {
             const hasTabs = line.includes('\t');
-            const delimiter = hasTabs ? '\t' : / {2,}|;/;
-            return line.split(delimiter).map(c => c.trim()).filter(c => c !== '');
+
+            // Heuristic: If line contains mostly numbers and symbols, allow valid single space splitting.
+            // If it contains text (like "Szkło Mleczne"), stick to 2-spaces or tabs.
+            const isDataLike = /^[\d\s.,€EURzłPLN+%*()-]+$/i.test(line);
+
+            let delimiter: string | RegExp;
+            if (hasTabs) {
+                delimiter = '\t';
+            } else if (isDataLike) {
+                // For number-only rows (headers or data), single space is a valid separator
+                delimiter = /[\s\t]+|;/;
+            } else {
+                // For text-heavy rows, require 2 spaces to avoid splitting phrases
+                delimiter = / {2,}|;/;
+            }
+
+            return line.split(delimiter)
+                .map(c => c.trim())
+                .filter(c => c !== '' && !['€', 'EUR', 'PLN', 'zł'].includes(c));
         });
 
         // Decide which parser to use. 
@@ -868,7 +948,13 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             }
 
             // Pass detected attributes
-            onSave(resultData, { snow_zone: snowZone, mounting_type: mountingType, provider: manufacturer, product_code: productHint });
+            onSave(resultData, {
+                snow_zone: snowZone,
+                mounting_type: mountingType,
+                provider: manufacturer,
+                product_code: productHint,
+                table_type: tableType
+            });
             onClose();
             toast.success(`Zaimportowano ${resultData.length} wierszy!`);
 

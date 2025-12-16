@@ -73,6 +73,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [priceLoading, setPriceLoading] = useState(false);
     const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
 
+    // Component Lists (Imported Components)
+    const [componentLists, setComponentLists] = useState<{ table: any, entries: any[] }[]>([]);
+    const [loadingComponents, setLoadingComponents] = useState(false);
+
     // Fetch Price when attributes change
     useEffect(() => {
         const calculatePrice = async () => {
@@ -152,6 +156,34 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         const timeoutId = setTimeout(calculatePrice, 500); // Debounce
         return () => clearTimeout(timeoutId);
     }, [config.modelId, config.width, config.projection, config.snowZone, config.roofType, config.installationType]);
+
+    // Fetch Component Lists
+    useEffect(() => {
+        const fetchComponents = async () => {
+            if (!config.modelId) return;
+            setLoadingComponents(true);
+            try {
+                // Determine context attributes if needed
+                const attributes: Record<string, string> = {
+                    provider: 'Aluxe' // Or detect based on model
+                };
+                // Fetch all component lists that are active
+                // For now we fetch ALL and maybe filter by provider later? 
+                // Or simply show all available lists regardless of model?
+                // Ideally we should filter by provider or model family if tagged.
+                // But the requirement implies "Imported Component Lists" are generic or manually selected.
+
+                const lists = await PricingService.getComponentLists(attributes);
+                setComponentLists(lists);
+            } catch (error) {
+                console.error("Error fetching component lists:", error);
+            } finally {
+                setLoadingComponents(false);
+            }
+        };
+
+        fetchComponents();
+    }, [config.modelId]);
 
     // === EXTERNAL ITEMS BASKET ===
     const [externalItems, setExternalItems] = useState<ExternalOfferItem[]>(initialExternalItems);
@@ -1225,6 +1257,57 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 );
                                             })}
                                         </div>
+
+                                        {/* Imported Component Lists */}
+                                        {loadingComponents ? (
+                                            <div className="py-8 text-center text-slate-400">Ładowanie komponentów...</div>
+                                        ) : (
+                                            componentLists.length > 0 && (
+                                                <div className="mt-8 pt-8 border-t border-slate-100">
+                                                    <h4 className="text-lg font-bold text-slate-800 mb-6">Dodatkowe Części / Elementy</h4>
+
+                                                    {componentLists.map((list, listIdx) => (
+                                                        <div key={list.table.id || listIdx} className="mb-8">
+                                                            <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">{list.table.name}</h5>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                                {list.entries.map((entry: any, entryIdx: number) => {
+                                                                    const itemName = entry.properties?.name || entry.properties?.description || `Element ${entryIdx + 1}`;
+                                                                    const itemPrice = entry.structure_price || entry.price;
+                                                                    // Unique key for accessories selection
+                                                                    const uniqueName = `[${list.table.name}] ${itemName} ${entry.properties.width ? `(${entry.properties.width}mm)` : ''}`;
+
+                                                                    const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
+                                                                    const qty = selected?.quantity || 0;
+
+                                                                    return (
+                                                                        <div key={entry.id || entryIdx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
+                                                                            <div className="flex justify-between items-start mb-2">
+                                                                                <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
+                                                                                    {itemName}
+                                                                                    {entry.properties.width && <span className="block text-xs text-slate-500">{entry.properties.width} mm</span>}
+                                                                                </div>
+                                                                                <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
+                                                                            </div>
+                                                                            <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
+                                                                                <button
+                                                                                    onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, false)}
+                                                                                    className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+                                                                                >-</button>
+                                                                                <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
+                                                                                <button
+                                                                                    onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, true)}
+                                                                                    className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
+                                                                                >+</button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )
+                                        )}
                                     </div>
                                 )}
                             </div>
