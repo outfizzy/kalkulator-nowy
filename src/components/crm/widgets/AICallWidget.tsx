@@ -58,7 +58,7 @@ export const AICallWidget: React.FC<AICallWidgetProps> = ({
             if (error) throw error;
             if (data && data.error) throw new Error(data.error);
 
-            toast.success('Sasha rozpoczęła rozmowę! 🤖', { id: toastId });
+            toast.success('Leo rozpoczął rozmowę! 🤖', { id: toastId });
             setInstructions('');
         } catch (error: any) {
             console.error('AI Call Error:', error);

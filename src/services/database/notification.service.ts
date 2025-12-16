@@ -17,7 +17,7 @@ export const NotificationService = {
             userId: row.user_id,
             title: row.title,
             message: row.message,
-            isRead: row.read,
+            isRead: row.is_read, // Correct column name
             type: row.type || 'info', // Default to info if missing
             link: row.link,
             createdAt: new Date(row.created_at)
@@ -29,7 +29,7 @@ export const NotificationService = {
             .from('notifications')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .eq('read', false);
+            .eq('is_read', false); // Correct column name
 
         if (error) throw error;
         return count || 0;
@@ -38,7 +38,7 @@ export const NotificationService = {
     async markNotificationAsRead(id: string): Promise<void> {
         const { error } = await supabase
             .from('notifications')
-            .update({ read: true })
+            .update({ is_read: true }) // Correct column name
             .eq('id', id);
 
         if (error) throw error;
@@ -47,7 +47,7 @@ export const NotificationService = {
     async markAllNotificationsAsRead(userId: string): Promise<void> {
         const { error } = await supabase
             .from('notifications')
-            .update({ read: true })
+            .update({ is_read: true }) // Correct column name
             .eq('user_id', userId);
 
         if (error) throw error;

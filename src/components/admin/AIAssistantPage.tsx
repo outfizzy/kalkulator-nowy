@@ -9,7 +9,9 @@ export const AIAssistantPage: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSessionsLoading, setIsSessionsLoading] = useState(true);
+    const [attachedImage, setAttachedImage] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load sessions on mount
     useEffect(() => {
@@ -90,15 +92,31 @@ export const AIAssistantPage: React.FC = () => {
         }
     };
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Maksymalny rozmiar pliku to 5MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setAttachedImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSendMessage = async () => {
-        if (!inputValue.trim() || isLoading) return;
+        if ((!inputValue.trim() && !attachedImage) || isLoading) return;
 
         let targetSessionId = currentSessionId;
 
         // Create session if none exists
         if (!targetSessionId) {
             try {
-                const title = inputValue.slice(0, 30) + (inputValue.length > 30 ? '...' : '');
+                const title = inputValue.slice(0, 30) + (inputValue.length > 30 ? '...' : 'Nowa rozmowa');
                 const newSession = await AIService.createSession(title);
                 setSessions(prev => [newSession, ...prev]);
                 setCurrentSessionId(newSession.id);
@@ -111,11 +129,32 @@ export const AIAssistantPage: React.FC = () => {
         }
 
         const tempContent = inputValue;
+        const tempImage = attachedImage;
+
         setInputValue('');
+        setAttachedImage(null);
 
         // Optimistic UI update
-        const tempMsg: ChatMessage = { role: 'user', content: tempContent };
-        setMessages(prev => [...prev, tempMsg]);
+        // Note: We'll store image in content for display temporarily, or we need a richer message structure in UI too
+        // For simple text display, we might append [Obraz] to text or show it.
+        // Let's assume for now we just show text 'User sent an image' if empty text, 
+        // or actually we should update ChatMessage type in UI to support image?
+        // Ideally yes. For now, let's keep it simple and just send it to backend.
+
+        const tempMsg: ChatMessage = {
+            role: 'user',
+            content: tempContent,
+            // We need to extend ChatMessage interface locally or in service to hold image preview for UI
+            // But let's cheat slightly and append a markdown image tag if it's an image?
+            // "![Obraz](base64...)"
+            // content: tempContent + (tempImage ? `\n\n![Obraz](${tempImage})` : '')
+        };
+
+        // Update local state with image for preview
+        setMessages(prev => [...prev, {
+            ...tempMsg,
+            content: tempContent + (tempImage ? `\n\n![User Image](${tempImage})` : '')
+        }]);
         setIsLoading(true);
         scrollToBottom();
 
@@ -127,7 +166,8 @@ export const AIAssistantPage: React.FC = () => {
             const response = await AIService.sendSessionMessage(
                 targetSessionId!,
                 tempContent,
-                messages // Pass current history (excluding the optimistic one effectively, or simplistic approach)
+                messages, // Pass current history (excluding the optimistic one effectively, or simplistic approach)
+                tempImage || undefined
             );
 
             if (response) {
@@ -229,6 +269,7 @@ export const AIAssistantPage: React.FC = () => {
                             {messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`flex gap-3 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                        {/* Avatar */}
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-600' : 'bg-green-600'}`}>
                                             {msg.role === 'user' ? (
                                                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -236,12 +277,20 @@ export const AIAssistantPage: React.FC = () => {
                                                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                             )}
                                         </div>
-                                        <div className={`rounded-2xl p-4 shadow-sm text-sm leading-relaxed ${msg.role === 'user'
-                                            ? 'bg-blue-600 text-white rounded-tr-none'
-                                            : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
+                                        {/* Bubble */}
+                                        <div className={`rounded-2xl p-4 shadow-sm text-sm leading-relaxed overflow-hidden ${msg.role === 'user'
+                                                ? 'bg-blue-600 text-white rounded-tr-none'
+                                                : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
                                             }`}>
-                                            <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
-                                            {/* Optional: Render tool outputs specially if we structured them, but raw text is fine for MVP */}
+                                            {/* Handle specific image rendering from markdown if we stick to that hack */}
+                                            {msg.content.includes('![User Image](data:image') ? (
+                                                <div>
+                                                    <div className="whitespace-pre-wrap font-medium">{msg.content.split('![User Image]')[0]}</div>
+                                                    <img src={msg.content.match(/\((data:image.*?)\)/)?.[1]} alt="Uploaded" className="mt-2 rounded-lg max-w-full max-h-[300px] object-cover bg-white" />
+                                                </div>
+                                            ) : (
+                                                <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -265,7 +314,35 @@ export const AIAssistantPage: React.FC = () => {
 
                         {/* Input Area */}
                         <div className="p-4 bg-white border-t border-slate-200">
+                            {attachedImage && (
+                                <div className="mb-3 flex items-center gap-2">
+                                    <div className="relative group">
+                                        <img src={attachedImage} alt="Preview" className="h-20 w-20 object-cover rounded-lg border border-slate-200" />
+                                        <button
+                                            onClick={() => setAttachedImage(null)}
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             <div className="max-w-4xl mx-auto flex gap-3">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                                    title="Dodaj zdjęcie"
+                                >
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                </button>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileSelect}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+
                                 <textarea
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
@@ -276,7 +353,7 @@ export const AIAssistantPage: React.FC = () => {
                                 />
                                 <button
                                     onClick={handleSendMessage}
-                                    disabled={isLoading || !inputValue.trim()}
+                                    disabled={isLoading || (!inputValue.trim() && !attachedImage)}
                                     className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 rounded-xl transition-colors flex items-center gap-2 shadow-sm font-medium"
                                 >
                                     <span>Wyślij</span>

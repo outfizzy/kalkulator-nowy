@@ -227,7 +227,7 @@ ${transcript}
                     if (communicationId) {
                         // Update existing record
                         await supabase.from('customer_communications').update({
-                            subject: `Raport z rozmowy AI (Sasha) - ${statusPl}`,
+                            subject: `Raport z rozmowy AI (Leo) - ${statusPl}`,
                             content: noteContent,
                             metadata: {
                                 isSystemNote: true,
@@ -244,7 +244,7 @@ ${transcript}
                             user_id: userId, // The sales rep owner (required by FK)
                             type: 'call',
                             direction: 'outbound',
-                            subject: `Raport z rozmowy AI (Sasha) - ${statusPl}`,
+                            subject: `Raport z rozmowy AI (Leo) - ${statusPl}`,
                             content: noteContent,
                             date: new Date().toISOString(),
                             metadata: {

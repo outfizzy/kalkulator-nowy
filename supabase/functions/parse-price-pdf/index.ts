@@ -1,8 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
+import pdf from "npm:pdf-parse@1.1.1";
 import { Buffer } from "node:buffer";
 import process from "node:process";
 
-// Polyfill Node environments for pdf-parse BEFORE importing it
+// Polyfill Node environments for pdf-parse
 globalThis.Buffer = Buffer;
 globalThis.process = process;
 
@@ -18,9 +19,6 @@ Deno.serve(async (req) => {
     }
 
     try {
-        // Dynamically import pdf-parse to ensure polyfills are loaded
-        const { default: pdf } = await import("https://esm.sh/pdf-parse@1.1.1");
-
         const formData = await req.formData()
         const file = formData.get('file')
 
@@ -33,27 +31,27 @@ Deno.serve(async (req) => {
 
         console.log("File received:", file.name, file.size);
 
-        // 1. Extract Text from PDF
-        const arrayBuffer = await file.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer); // Use Node Buffer
+        // 1. Extract Text from PDF using npm:pdf-parse
+        // This is robust on Supabase Edge Functions (Deno)
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
 
         let textContent = "";
         try {
-            console.log("Starting PDF Parse...");
+            console.log("Starting PDF Parse (npm:pdf-parse)...");
             const data = await pdf(buffer);
             textContent = data.text;
             console.log("PDF Parsed, length:", textContent.length);
-        } catch (e) {
+        } catch (e: any) {
             console.error("PDF Parse Error:", e);
-            // Return detailed error to client
             return new Response(
                 JSON.stringify({ error: `PDF Parse Failed: ${e.message || e}` }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
             )
         }
 
-        // Truncate if too long (GPT-4o limits)
-        const truncatedText = textContent.slice(0, 50000); // 50k chars is plenty for a page
+        // Truncate if too long (GPT-4o Tier 1 limit is 30k TPM. 40k chars ~= 10k tokens. Safe.)
+        const truncatedText = textContent.slice(0, 40000);
 
         // 2. Call OpenAI
         const apiKey = Deno.env.get('OPENAI_API_KEY')
@@ -69,38 +67,55 @@ Deno.serve(async (req) => {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4o',
+                model: 'gpt-4o', // Revert to smart model for accuracy
                 messages: [
                     {
                         role: 'system',
-                        content: `You are a Data Extraction Assistant. 
-            Extract the pricing matrix from the text provided.
-            The text contains a price list for awnings/roofs (Width x Projection).
-            
+                        content: `Jesteś wyspecjalizowanym asystentem AI do strukturyzowania cenników budowlanych (zadaszenia, ogrody zimowe).
+Twoim zadaniem jest przeanalizować tekst PDF i wyciągnąć z niego KOMPLETNE dane cenowe.
+
             Return strictly a JSON object with this structure:
             {
                "confidence": 0-100,
                "detected_product_name": "string",
+               "currency": "EUR" | "PLN",
                "detected_attributes": {
                    "snow_zone": "1" | "2" | "3" | null,
                    "roof_type": "polycarbonate" | "glass" | null,
                    "mounting": "wall" | "free" | null
                },
                "entries": [
-                  { "width_mm": number, "projection_mm": number, "price": number }
-               ]
+                  { 
+                    "width_mm": number, 
+                    "projection_mm": number, 
+                    "price": number, // Total price
+                    "structure_price": number, // Optional: if split
+                    "glass_price": number // Optional: if split
+                  }
+               ],
+               "surcharges": [
+                  { "name": "string", "price": number, "unit": "m2" | "piece" | "lm" | "fixed" | "percent", "category": "glass" | "color" | "other" }
+               ],
+               "notes": "string" // Important calculation rules found
             }
             
             Rules:
-            - "Width" is usually the top header (values like 2000, 2500, 3000...).
-            - "Projection" (or Drop/Ausfall/Tiefe) is the side header (1500, 2000, 2500...).
-            - Prices are numbers (eur). Remove currency symbols.
-            - Provide at least 20 detectable entries if possible.
-            - Detect Attributes from title or context:
-                - Snow Zone: Look for "Schneelast", "Snow Load", "Zone 1", "Zone 2", "Zone 3/SK3". Map to "1", "2", or "3".
-                - Roof Type: Look for "VSG", "Glas", "Glass" -> "glass"; "Poly", "Polycarbonat" -> "polycarbonate".
-                - Mounting: "Wandmontage" -> "wall", "Freistehend" -> "free".
-            - Do not include explanatory text, only the JSON.`
+            1. **Matrix**: "Width" (Maß B) is usually top header, "Projection" (Tiefe/T) side header.
+               - "Preis exkl. Dacheindeckung" -> **structure_price** (Constuction only).
+               - "Glas ... Preis inkl. Dacheindeckung" -> **price** (Total with standard glass).
+               - "Anzahl Felder" -> rafters (fields). "Anzahl Pfosten" -> posts.
+            2. **Surcharges (Dopłaty/Aufpreis)**: Look for columns starting with "Aufpreis" (Surcharge):
+               - "Aufpreis Glas 44.2 matt/ milch" -> Glass Surcharge (category: glass, name: "Matt/Milch").
+               - "Aufpreis Sonnenschutzglas" -> Glass Surcharge (category: glass, name: "Sonnenschutz").
+               - Extract these as surcharges with price and unit (likely per m2 or fixed).
+            3. **Snow Zones (Schneelast)**:
+               - "1" -> "1"
+               - "1&2a" -> "2" (Map combined 1&2a to Zone 2)
+               - "2a&3" -> "3" (Map combined 2a&3 to Zone 3)
+            4. **Currency**: Detect currency (EUR, €, PLN, zł).
+            5. **Data Types**:
+               - Prices: numbers only.
+               - Units: "lfm" -> "lm", "Stk" -> "piece", "qm" -> "m2".`
                     },
                     {
                         role: 'user',

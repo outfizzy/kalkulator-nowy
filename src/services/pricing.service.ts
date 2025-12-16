@@ -4,6 +4,13 @@ export interface PriceMatrixEntry {
     width_mm: number;
     projection_mm: number;
     price: number;
+    structure_price?: number;
+    glass_price?: number;
+    properties?: {
+        rafters?: number;
+        posts?: number;
+        [key: string]: any;
+    };
 }
 
 export interface PriceTable {
@@ -82,7 +89,73 @@ export const PricingService = {
             .select('*')
             .eq('price_table_id', bestMatch.id);
 
-        return data || [];
+        // Ensure format
+        return (data || []).map((d: any) => ({
+            ...d,
+            structure_price: d.structure_price || d.price,
+            glass_price: d.glass_price || 0,
+            properties: d.properties || {}
+        }));
+    },
+
+    async getTableConfig(productCode: string, contextAttributes: Record<string, string> = {}): Promise<{ config: any, attributes: any }> {
+        // 1. Get Product Definition
+        const { data: product } = await supabase
+            .from('product_definitions')
+            .select('id')
+            .eq('code', productCode)
+            .single();
+
+        if (!product) return { config: {}, attributes: {} };
+
+        // 2. Get All Active Tables for this Product
+        const { data: tables } = await supabase
+            .from('price_tables')
+            .select('*')
+            .eq('product_definition_id', product.id)
+            .eq('is_active', true);
+
+        if (!tables || tables.length === 0) return { config: {}, attributes: {} };
+
+        // 3. Find Best Match Table (Reuse logic from getPriceMatrix)
+        const bestMatch = tables.sort((a, b) => {
+            const aKeys = Object.keys(a.attributes || {});
+            const bKeys = Object.keys(b.attributes || {});
+            return bKeys.length - aKeys.length;
+        }).find(table => {
+            const tableAttrs = table.attributes || {};
+            const keys = Object.keys(tableAttrs);
+            return keys.every(key => contextAttributes[key] == tableAttrs[key]);
+        });
+
+        if (!bestMatch) return { config: {}, attributes: {} };
+
+        return { config: bestMatch.configuration || {}, attributes: bestMatch.attributes || {} };
+    },
+
+    /**
+     * Calculates price after applying discount (supports simple "10" or cascaded "10+5+2")
+     */
+    calculateDiscountedPrice(price: number, discountStr?: string): number {
+        if (!discountStr) return price; // Defensive check for empty discount string/number but strict types say string
+        const dStr = String(discountStr).trim();
+        if (!dStr) return price;
+
+        try {
+            const parts = dStr.split('+').map(p => parseFloat(p.trim()));
+            let currentPrice = price;
+
+            // Apply each discount sequentially (cascade)
+            for (const d of parts) {
+                if (!isNaN(d) && d > 0) {
+                    currentPrice = currentPrice * (1 - (d / 100));
+                }
+            }
+            return currentPrice;
+        } catch (e) {
+            console.error('Error calculating discount:', discountStr, e);
+            return price;
+        }
     },
 
     /**
@@ -90,20 +163,55 @@ export const PricingService = {
      * Uses "next size up" logic (standard for awnings/roofs).
      */
     calculateMatrixPrice(matrix: PriceMatrixEntry[], width: number, projection: number): number {
-        if (!matrix || matrix.length === 0) return 0;
+        const entry = this.findMatrixEntry(matrix, width, projection);
+        if (!entry) return 0;
+
+        // If modern split pricing exists, prefer sum of parts
+        if (entry.structure_price !== undefined || entry.glass_price !== undefined) {
+            return (Number(entry.structure_price) || 0) + (Number(entry.glass_price) || 0);
+        }
+
+        return Number(entry.price) || 0;
+    },
+
+    /**
+     * Returns detailed pricing breakdown and technical properties
+     */
+    getDetailedPrice(matrix: PriceMatrixEntry[], width: number, projection: number) {
+        const entry = this.findMatrixEntry(matrix, width, projection);
+        if (!entry) return null;
+
+        const structure = Number(entry.structure_price) || Number(entry.price) || 0;
+        const glass = Number(entry.glass_price) || 0;
+        const total = structure + glass;
+
+        return {
+            total,
+            structure,
+            glass,
+            properties: entry.properties || {}
+        };
+    },
+
+    findMatrixEntry(matrix: PriceMatrixEntry[], width: number, projection: number): PriceMatrixEntry | undefined {
+        if (!matrix || matrix.length === 0) return undefined;
 
         // 1. Filter valid entries (must be capable of handling dimensions)
         const validEntries = matrix.filter(e =>
             e.width_mm >= width && e.projection_mm >= projection
         );
 
-        if (validEntries.length === 0) return 0;
+        if (validEntries.length === 0) return undefined;
 
         // 2. Sort by size (smallest area) to find "Next Size Up"
-        // Heuristic: Width * Projection area
-        validEntries.sort((a, b) => (a.width_mm * a.projection_mm) - (b.width_mm * b.projection_mm));
+        // Heuristic: Width * Projection area, but prioritize Width fit first if Area is close
+        validEntries.sort((a, b) => {
+            const areaA = a.width_mm * a.projection_mm;
+            const areaB = b.width_mm * b.projection_mm;
+            return areaA - areaB;
+        });
 
-        return validEntries[0]?.price || 0;
+        return validEntries[0];
     },
 
     async getSupplierCosts(provider: string): Promise<any[]> {

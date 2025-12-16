@@ -94,10 +94,33 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
                 if (matrix.length > 0) {
                     price = PricingService.calculateMatrixPrice(matrix, config.width, config.projection);
-                } else {
-                    // Fallback to old logic (static JSON files) if no table found
-                    // ... (Using existing hook logic roughly)
-                    // For now, let's keep the hook but trigger re-calc
+                }
+
+                // 2.5 Apply Table Configuration Surcharges (e.g. Free Standing)
+                const { config: tableConfig, attributes: tableAttributes } = await PricingService.getTableConfig(config.modelId, attributes);
+
+                if (config.installationType !== 'wall-mounted' && tableConfig?.free_standing_surcharge?.length > 0) {
+                    // Check Free Standing Surcharge Rule
+                    // Logic: Next Size Up based on Width
+                    // 4000 -> 2478. If width is 3500 -> 2478. If 4500 -> 2776.
+                    const rules = tableConfig.free_standing_surcharge.sort((a: any, b: any) => a.width - b.width);
+                    const rule = rules.find((r: any) => r.width >= config.width);
+
+                    if (rule) {
+                        const surcharge = Number(rule.price) || 0;
+                        price += surcharge;
+                        console.log(`[Pricing] Applied Free Standing Surcharge: +${surcharge} (Rule: ${rule.width}mm)`);
+                    }
+                }
+
+                // NEW: Apply Table Discount (Cascaded)
+                // If the selected table has a discount (e.g. "10+5"), apply it to the calculated price (matrix + surcharges)
+                if (tableAttributes?.discount) {
+                    const originalPrice = price;
+                    price = PricingService.calculateDiscountedPrice(price, tableAttributes.discount);
+                    if (price !== originalPrice) {
+                        console.log(`[Pricing] Applied Discount '${tableAttributes.discount}': ${originalPrice} -> ${price}`);
+                    }
                 }
 
                 if (price > 0) {

@@ -584,9 +584,15 @@ export const PricingPage = () => {
                                                             productId: table.product_definition_id,
                                                             productName: table.product?.name
                                                         })}
-                                                        className="text-sm font-medium text-violet-600 hover:text-violet-800 hover:underline"
+                                                        className="text-sm font-medium text-violet-600 hover:text-violet-800 hover:underline flex items-center gap-1"
                                                     >
                                                         Reguły
+                                                        {table.configuration?.free_standing_surcharge?.length > 0 && (
+                                                            <span className="flex h-2 w-2 relative">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
+                                                            </span>
+                                                        )}
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteTable(table.id, table.name)}
