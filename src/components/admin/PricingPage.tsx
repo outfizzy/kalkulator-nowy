@@ -13,12 +13,17 @@ import { SupplierCostsManager } from './SupplierCostsManager';
 import { SimulationService, type SimulationReport } from '../../services/simulation.service';
 import { AdditionalCostsManager } from './AdditionalCostsManager';
 import { formatCurrency } from '../../utils/translations';
+import { ClipboardImportModal } from './ClipboardImportModal';
+
+import { SurchargeRulesModal } from './SurchargeRulesModal';
 
 export const PricingPage = () => {
     const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs' | 'surcharges'>('tables');
     const [priceTables, setPriceTables] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingTable, setEditingTable] = useState<{ id: string, name: string } | null>(null);
+    const [configTable, setConfigTable] = useState<{ id: string, name: string, config: any, productId?: string, productName?: string } | null>(null);
+    const [showClipboardImport, setShowClipboardImport] = useState(false);
 
     // Simulation State
     const [simulationReport, setSimulationReport] = useState<SimulationReport | null>(null);
@@ -36,6 +41,27 @@ export const PricingPage = () => {
             toast.error('Błąd symulacji: ' + e.message, { id: toastId });
         } finally {
             setIsSimulating(false);
+        }
+    };
+
+    // Delete Price List
+    const handleDeleteTable = async (id: string, name: string) => {
+        if (!window.confirm(`Czy na pewno chcesz usunąć cennik: "${name}"? Tej operacji nie można cofnąć.`)) {
+            return;
+        }
+
+        const toastId = toast.loading('Usuwanie cennika...');
+        // Cascade delete should handle entries if FK is set correctly, but explicit delete is safer
+        // Assuming Postgres FK has ON DELETE CASCADE for table entries.
+
+        const { error } = await supabase.from('price_tables').delete().eq('id', id);
+
+        if (error) {
+            console.error(error);
+            toast.error('Błąd usuwania: ' + error.message, { id: toastId });
+        } else {
+            toast.success('Cennik usunięty', { id: toastId });
+            fetchPriceTables();
         }
     };
 
@@ -108,7 +134,19 @@ export const PricingPage = () => {
                 body: formData
             });
 
-            if (error) throw error;
+            if (error) {
+                // Try to extract useful error message from response body
+                let errorMsg = error.message;
+                if (error.context && typeof error.context.json === 'function') {
+                    try {
+                        const body = await error.context.json();
+                        if (body && body.error) errorMsg = body.error;
+                    } catch (e) {
+                        console.warn('Failed to parse error context', e);
+                    }
+                }
+                throw new Error(errorMsg);
+            }
             if (data.error) throw new Error(data.error);
 
             setPreviewData(data);
@@ -199,7 +237,8 @@ export const PricingPage = () => {
         }).select().single();
 
         if (tErr) {
-            toast.error('Błąd tworzenia tabeli cennika');
+            console.error(tErr);
+            toast.error('Błąd tworzenia tabeli cennika: ' + tErr.message);
             return;
         }
 
@@ -208,14 +247,31 @@ export const PricingPage = () => {
             price_table_id: table.id,
             width_mm: e.width_mm,
             projection_mm: e.projection_mm,
-            price: e.price
+            price: e.price,
+            structure_price: e.structure_price || e.price, // Use detected split or full price
+            glass_price: e.glass_price || 0,
+            properties: e.properties || {} // Support extended properties (fields, posts, area)
         }));
 
         const { error: eErr } = await supabase.from('price_matrix_entries').insert(entries);
 
         if (eErr) {
-            toast.error('Błąd zapisu cen');
+            console.error(eErr);
+            toast.error('Błąd zapisu cen: ' + eErr.message);
         } else {
+            // Success!
+            // Also update the table attributes with detected metadata if needed
+            if (previewData.surcharges || previewData.currency) {
+                await supabase.from('price_tables').update({
+                    attributes: {
+                        ...previewData.detected_attributes,
+                        surcharges: previewData.surcharges,
+                        currency: previewData.currency,
+                        notes: previewData.notes
+                    }
+                }).eq('id', table.id);
+            }
+
             toast.success('Cennik zaimportowany i przypisany!');
             setPreviewData(null);
             setNewProductName('');
@@ -338,16 +394,28 @@ export const PricingPage = () => {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => setShowClipboardImport(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                    >
+                        📋 Import ze Schowka
+                    </button>
+                    <button
                         onClick={() => setActiveTab('import')}
                         className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90"
                     >
-                        <IconUpload /> Importuj PDF (AI)
+                        <IconUpload /> Import PDF (AI)
                     </button>
                     <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
                         <IconPlus /> Nowy Pusty Cennik
                     </button>
                 </div>
             </header>
+
+
+
+            setShowClipboardImport(false);
+            toast.success('Dane wczytane do podglądu. Uzupełnij atrybuty i zapisz.');
+
 
             {/* Tabs */}
             <div className="flex gap-4 border-b border-slate-200">
@@ -379,75 +447,167 @@ export const PricingPage = () => {
 
             {/* CONTENT */}
             {activeTab === 'tables' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase">Nazwa</th>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase">Produkt</th>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase">Ważny od</th>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase">Warianty</th>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase">Status</th>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase text-right">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr><td colSpan={5} className="p-8 text-center text-slate-500">Ładowanie...</td></tr>
-                            ) : priceTables.length === 0 ? (
-                                <tr><td colSpan={5} className="p-8 text-center text-slate-500">Brak cenników. Zaimportuj pierwszy!</td></tr>
-                            ) : (
-                                priceTables.map((table) => (
-                                    <tr key={table.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 font-medium text-slate-900">{table.name}</td>
-                                        <td className="p-4 text-slate-600 badge">
-                                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{table.product?.name || 'Nieznany'}</span>
-                                        </td>
-                                        <td className="p-4 text-slate-500 text-sm">
-                                            {table.valid_from ? format(new Date(table.valid_from), 'd MMM yyyy', { locale: pl }) : '-'}
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="flex flex-wrap gap-1">
-                                                {table.attributes && Object.entries(table.attributes).map(([key, val]) => (
-                                                    <span key={key} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">
-                                                        {key}: <strong>{val as string}</strong>
-                                                    </span>
-                                                ))}
-                                                {(!table.attributes || Object.keys(table.attributes).length === 0) && (
-                                                    <span className="text-xs text-slate-400 italic">Baza (Domyślny)</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4">
-                                            <button
-                                                onClick={() => handleToggleActive(table.id, table.is_active)}
-                                                className={`text-xs font-bold px-2 py-1 rounded-full border ${table.is_active
-                                                    ? 'bg-green-100 text-green-700 border-green-200'
-                                                    : 'bg-slate-100 text-slate-500 border-slate-200'}`}
-                                            >
-                                                {table.is_active ? 'AKTYWNY' : 'NIEAKTYWNY'}
-                                            </button>
-                                        </td>
-                                        <td className="p-4 text-right space-x-2">
-                                            <button
-                                                onClick={() => runSimulation(table.id)}
-                                                disabled={isSimulating}
-                                                className="text-sm font-medium text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-50"
-                                            >
-                                                {isSimulating ? 'Symulowanie...' : 'Symuluj'}
-                                            </button>
-                                            <button
-                                                onClick={() => setEditingTable({ id: table.id, name: table.name })}
-                                                className="text-sm font-medium text-accent hover:text-accent/80 hover:underline"
-                                            >
-                                                Edytuj
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                <div className="space-y-8">
+                    {loading ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">Ładowanie...</div>
+                    ) : priceTables.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">Brak cenników. Zaimportuj pierwszy!</div>
+                    ) : (
+                        Object.entries(
+                            priceTables.reduce((acc: Record<string, any[]>, table) => {
+                                const prodName = table.product?.name || 'Inne / Bez Konfiguracji';
+                                if (!acc[prodName]) acc[prodName] = [];
+                                acc[prodName].push(table);
+                                return acc;
+                            }, {})
+                        ).sort(([a], [b]) => a.localeCompare(b)).map(([productName, tables]) => (
+                            <div key={productName} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="bg-slate-100 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
+                                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                        📦 {productName}
+                                        <span className="text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                                            {tables.length} cenników
+                                        </span>
+                                    </h3>
+                                </div>
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                                        <tr>
+                                            <th className="px-6 py-3 font-semibold">Nazwa Cennika</th>
+                                            <th className="px-6 py-3 font-semibold">Producent</th>
+                                            <th className="px-6 py-3 font-semibold">Aktualizacja</th>
+                                            <th className="px-6 py-3 font-semibold w-32">Rabat Zak.</th>
+                                            <th className="px-6 py-3 font-semibold">Atrybuty</th>
+                                            <th className="px-6 py-3 font-semibold">Status</th>
+                                            <th className="px-6 py-3 font-semibold text-right">Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {tables.map((table) => (
+                                            <tr key={table.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-slate-900">
+                                                    {table.name}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600">
+                                                    {table.attributes?.provider && (
+                                                        <span className={`text-xs px-2 py-1 rounded-full font-bold border ${table.attributes.provider === 'Aluxe' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                                                            table.attributes.provider === 'Deponti' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                                                'bg-slate-100 text-slate-600 border-slate-200'
+                                                            }`}>
+                                                            {table.attributes.provider}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-500 text-sm">
+                                                    {table.created_at ? format(new Date(table.created_at), 'd MMM yyyy', { locale: pl }) : '-'}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {/* Inline Discount Editor */}
+                                                    <div className="flex items-center gap-1 group relative">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="0"
+                                                            className="w-16 px-2 py-1 text-sm border border-slate-200 rounded text-center focus:border-accent focus:outline-none"
+                                                            defaultValue={table.attributes?.discount || ''}
+                                                            onBlur={async (e) => {
+                                                                const val = e.target.value;
+                                                                if (val === table.attributes?.discount) return;
+
+                                                                // Update attributes
+                                                                const newAttrs = { ...table.attributes, discount: val };
+                                                                const { error } = await supabase.from('price_tables').update({ attributes: newAttrs }).eq('id', table.id);
+
+                                                                if (error) {
+                                                                    toast.error('Błąd zapisu rabatu');
+                                                                } else {
+                                                                    toast.success('Zapisano rabat');
+                                                                    fetchPriceTables();
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span className="text-slate-400 text-xs">%</span>
+
+                                                        {/* Calculate Effective Discount Tooltip */}
+                                                        {table.attributes?.discount && table.attributes.discount.includes('+') && (
+                                                            <div className="absolute left-full ml-2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded hidden group-hover:block whitespace-nowrap z-10">
+                                                                Efektywnie: {(() => {
+                                                                    try {
+                                                                        const parts = table.attributes.discount.split('+').map((p: string) => parseFloat(p));
+                                                                        const multiplier = parts.reduce((acc: number, curr: number) => acc * (1 - (curr / 100)), 1);
+                                                                        return ((1 - multiplier) * 100).toFixed(2) + '%';
+                                                                    } catch { return '?'; }
+                                                                })()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {table.attributes && Object.entries(table.attributes).map(([key, val]) => {
+                                                            if (typeof val === 'object') return null;
+                                                            if (key === 'provider') return null; // Already shown in name column
+                                                            if (key === 'discount') return null; // Shown in dedicated column
+                                                            return (
+                                                                <span key={key} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">
+                                                                    {key}: <strong>{val as string}</strong>
+                                                                </span>
+                                                            );
+                                                        })}
+                                                        {(!table.attributes || Object.keys(table.attributes).length === 0) && (
+                                                            <span className="text-xs text-slate-400 italic">Baza (Domyślny)</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <button
+                                                        onClick={() => handleToggleActive(table.id, table.is_active)}
+                                                        className={`text-xs font-bold px-2 py-1 rounded-full border ${table.is_active
+                                                            ? 'bg-green-100 text-green-700 border-green-200'
+                                                            : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+                                                    >
+                                                        {table.is_active ? 'AKTYWNY' : 'NIEAKTYWNY'}
+                                                    </button>
+                                                </td>
+                                                <td className="px-6 py-4 text-right space-x-2">
+                                                    <button
+                                                        onClick={() => runSimulation(table.id)}
+                                                        disabled={isSimulating}
+                                                        className="text-sm font-medium text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-50"
+                                                    >
+                                                        {isSimulating ? 'Symulowanie...' : 'Symuluj'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setConfigTable({
+                                                            id: table.id,
+                                                            name: table.name,
+                                                            config: table.configuration || {},
+                                                            productId: table.product_definition_id,
+                                                            productName: table.product?.name
+                                                        })}
+                                                        className="text-sm font-medium text-violet-600 hover:text-violet-800 hover:underline"
+                                                    >
+                                                        Reguły
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteTable(table.id, table.name)}
+                                                        className="text-sm font-medium text-red-600 hover:text-red-800 hover:underline"
+                                                    >
+                                                        Usuń
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingTable({ id: table.id, name: table.name })}
+                                                        className="text-sm font-medium text-accent hover:text-accent/80 hover:underline"
+                                                    >
+                                                        Edytuj
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))
+                    )}
                 </div>
             )}
 
@@ -542,6 +702,49 @@ export const PricingPage = () => {
                         </span>
                     </label>
                 </div>
+            )}
+
+            {showClipboardImport && (
+                <ClipboardImportModal
+                    onClose={() => setShowClipboardImport(false)}
+                    onSave={(data, attributes) => {
+                        setPreviewData({
+                            detected_product_name: '',
+                            detected_attributes: {
+                                ...attributes // Inject global attributes (snow_zone) from modal
+                            },
+                            entries: data,
+                            currency: 'EUR',
+                            surcharges: [],
+                            notes: 'Zaimportowano ze schowka'
+                        });
+
+                        // Also update importAttributes state for the form
+                        if (attributes) {
+                            const newAttrs: { key: string, value: string }[] = [];
+                            Object.entries(attributes).forEach(([k, v]) => {
+                                if (v) newAttrs.push({ key: k, value: String(v) });
+                            });
+                            setImportAttributes(newAttrs);
+                        }
+
+                        setShowClipboardImport(false);
+                        toast.success('Dane wczytane do podglądu. Uzupełnij atrybuty i zapisz.');
+                    }}
+                />
+            )}
+
+            {configTable && (
+                <SurchargeRulesModal
+                    isOpen={!!configTable}
+                    tableId={configTable.id}
+                    tableName={configTable.name}
+                    initialConfig={configTable.config}
+                    productId={configTable.productId}
+                    productName={configTable.productName}
+                    onClose={() => setConfigTable(null)}
+                    onSave={fetchPriceTables}
+                />
             )}
         </div>
     );
