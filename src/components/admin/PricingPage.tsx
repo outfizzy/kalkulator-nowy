@@ -152,7 +152,17 @@ export const PricingPage = () => {
             setPreviewData(data);
 
             // Try to auto-match product
-            if (data.detected_product_name) {
+            if (data.detected_product_code) {
+                // Try match by exact code match (or prefix)
+                const codeMatch = products.find(p => p.code === data.detected_product_code || (p.code && p.code.startsWith(data.detected_product_code)));
+                if (codeMatch) {
+                    setSelectedProductId(codeMatch.id);
+                } else if (data.detected_product_name) {
+                    // Fallback to name match
+                    const nameMatch = products.find(p => p.name.toLowerCase().includes(data.detected_product_name.toLowerCase()));
+                    if (nameMatch) setSelectedProductId(nameMatch.id);
+                }
+            } else if (data.detected_product_name) {
                 const match = products.find(p => p.name.toLowerCase().includes(data.detected_product_name.toLowerCase()));
                 if (match) {
                     setSelectedProductId(match.id);

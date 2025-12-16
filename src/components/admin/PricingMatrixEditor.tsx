@@ -24,13 +24,20 @@ interface MatrixEntry {
     _isNew?: boolean;
 }
 
+interface ComponentGroup {
+    name: string;
+    entries: MatrixEntry[];
+}
+
 export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, tableName }) => {
     const [entries, setEntries] = useState<MatrixEntry[]>([]);
     const [widths, setWidths] = useState<number[]>([]);
     const [projections, setProjections] = useState<number[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list'); // Default to list as requested
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups'>('list'); // Default to list as requested
+    const [componentGroups, setComponentGroups] = useState<ComponentGroup[]>([]);
+    const [componentImages, setComponentImages] = useState<Record<string, string>>({}); // name -> url
 
     const loadMatrix = async () => {
         setLoading(true);
@@ -52,7 +59,27 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                 properties: d.properties || { rafters: 0, posts: 2 }
             })));
 
-            updateDimensions(data);
+            // Fetch table attributes for images
+            const { data: tableData } = await supabase.from('price_tables').select('attributes').eq('id', tableId).single();
+            if (tableData?.attributes?.component_images) {
+                setComponentImages(tableData.attributes.component_images);
+            }
+
+            // Check if we have grouped data (components)
+            const hasGroups = data.some(d => d.properties?.name);
+            if (hasGroups) {
+                setViewMode('groups');
+                // Group entries
+                const groups: Record<string, MatrixEntry[]> = {};
+                data.forEach(d => {
+                    const name = d.properties?.name || 'Inne';
+                    if (!groups[name]) groups[name] = [];
+                    groups[name].push(d);
+                });
+                setComponentGroups(Object.keys(groups).map(name => ({ name, entries: groups[name] })));
+            } else {
+                updateDimensions(data);
+            }
         }
         setLoading(false);
     };
@@ -220,6 +247,36 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         }
     };
 
+    const handleUploadImage = async (groupName: string, file: File) => {
+        const toastId = toast.loading('Wysyłanie zdjęcia...');
+        try {
+            const ext = file.name.split('.').pop();
+            const fileName = `component_${tableId}_${groupName.replace(/\s+/g, '_')}_${Date.now()}.${ext}`;
+            const { data, error } = await supabase.storage.from('product-images').upload(fileName, file);
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName);
+
+            // Save to table attributes
+            const newImages = { ...componentImages, [groupName]: publicUrl };
+            setComponentImages(newImages);
+
+            // Fetch current attributes first to merge
+            const { data: currentTable } = await supabase.from('price_tables').select('attributes').eq('id', tableId).single();
+            const currentAttrs = currentTable?.attributes || {};
+
+            await supabase.from('price_tables').update({
+                attributes: { ...currentAttrs, component_images: newImages }
+            }).eq('id', tableId);
+
+            toast.success('Zdjęcie dodane!', { id: toastId });
+        } catch (e: any) {
+            console.error(e);
+            toast.error('Błąd wysyłania: ' + e.message, { id: toastId });
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col">
@@ -236,29 +293,38 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                             />
                             <span className="text-xs text-slate-400">(kliknij by edytować)</span>
                         </div>
-                        <div className="flex gap-2 text-sm mt-1">
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={`px-2 py-0.5 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
-                            >
-                                Widok Listy (Szczegółowy)
-                            </button>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`px-2 py-0.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
-                            >
-                                Widok Siatki (Szybki)
-                            </button>
-                        </div>
+                        {viewMode !== 'groups' && (
+                            <div className="flex gap-2 text-sm mt-1">
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`px-2 py-0.5 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
+                                >
+                                    Widok Listy (Szczegółowy)
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`px-2 py-0.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
+                                >
+                                    Widok Siatki (Szybki)
+                                </button>
+                            </div>
+                        )}
+                        {viewMode === 'groups' && (
+                            <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded">Tryb Komponentów (Zgrupowany)</span>
+                        )}
                     </div>
                     <div className="flex gap-2">
-                        <button onClick={() => handleAddDimension('width')} className="px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 font-medium">
-                            + Dodaj Szerokość
-                        </button>
-                        <button onClick={() => handleAddDimension('projection')} className="px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 font-medium">
-                            + Dodaj Wysięg
-                        </button>
-                        <div className="w-px bg-slate-300 mx-2"></div>
+                        {viewMode !== 'groups' && (
+                            <>
+                                <button onClick={() => handleAddDimension('width')} className="px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 font-medium">
+                                    + Dodaj Szerokość
+                                </button>
+                                <button onClick={() => handleAddDimension('projection')} className="px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 font-medium">
+                                    + Dodaj Wysięg
+                                </button>
+                                <div className="w-px bg-slate-300 mx-2"></div>
+                            </>
+                        )}
                         <button onClick={onClose} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg">Anuluj</button>
                         <button
                             onClick={saveChanges}
@@ -276,7 +342,70 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                         <div className="flex justify-center items-center h-full text-slate-400">Ładowanie cennika...</div>
                     ) : (
                         <>
-                            {viewMode === 'grid' ? (
+                            {viewMode === 'groups' ? (
+                                <div className="p-6 space-y-8">
+                                    {componentGroups.map(group => (
+                                        <div key={group.name} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                                                <div className="flex items-center gap-4">
+                                                    <h3 className="font-bold text-lg text-slate-800">{group.name}</h3>
+                                                    {componentImages[group.name] ? (
+                                                        <img src={componentImages[group.name]} alt={group.name} className="h-10 w-10 object-cover rounded border border-slate-300" />
+                                                    ) : (
+                                                        <div className="h-10 w-10 bg-slate-200 rounded flex items-center justify-center text-slate-400 text-xs">Brak foto</div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <label className="cursor-pointer px-3 py-1 bg-white border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm flex items-center gap-1">
+                                                        <span>📷 Zmień zdjęcie</span>
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                            if (e.target.files?.[0]) handleUploadImage(group.name, e.target.files[0]);
+                                                        }} />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div className="p-0">
+                                                <table className="w-full text-left text-sm">
+                                                    <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+                                                        <tr>
+                                                            <th className="p-3 w-1/3">Wymiar / Wariant</th>
+                                                            <th className="p-3 w-32 text-center">Jednostka</th>
+                                                            <th className="p-3 w-32 text-right">Cena</th>
+                                                            <th className="p-3">Uwagi</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {group.entries.map(entry => (
+                                                            <tr key={entry.id || Math.random()} className="hover:bg-slate-50">
+                                                                <td className="p-3 font-medium text-slate-700">
+                                                                    {entry.width_mm > 0 ? `${entry.width_mm} mm` : (entry.properties?.variant || 'Standard')}
+                                                                </td>
+                                                                <td className="p-3 text-center text-slate-500">
+                                                                    {entry.properties?.unit || 'szt.'}
+                                                                </td>
+                                                                <td className="p-3 text-right">
+                                                                    <div className="relative inline-block w-32">
+                                                                        <span className="absolute left-2 top-1.5 text-slate-400 text-xs">€</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={entry.price}
+                                                                            onChange={(e) => handleEntryChange(entry.id, 'price', e.target.value)}
+                                                                            className="w-full pl-6 pr-2 py-1 text-right border border-slate-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3 text-slate-400 text-xs italic">
+                                                                    {entry.id}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : viewMode === 'grid' ? (
                                 <div className="p-4">
                                     <div className="inline-block min-w-full">
                                         <div className="grid gap-px bg-slate-200 border border-slate-300 shadow-sm rounded-lg overflow-hidden"

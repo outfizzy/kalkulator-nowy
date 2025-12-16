@@ -6,7 +6,7 @@ interface ClipboardImportModalProps {
     onSave: (data: any[], attributes?: any) => void;
 }
 
-type ColumnType = 'ignore' | 'width' | 'projection' | 'dimension_attributes' | 'price' | 'structure_price' | 'glass_price' | 'surcharge' | 'notes' | 'fields' | 'posts' | 'area';
+type ColumnType = 'ignore' | 'width' | 'projection' | 'dimension_attributes' | 'price' | 'structure_price' | 'glass_price' | 'surcharge' | 'notes' | 'fields' | 'posts' | 'area' | 'name' | 'unit';
 
 interface ColumnConfig {
     type: ColumnType;
@@ -21,6 +21,7 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
     const [snowZone, setSnowZone] = useState<'1' | '2' | '3'>('1');
     const [mountingType, setMountingType] = useState<'wall' | 'free'>('wall');
     const [manufacturer, setManufacturer] = useState<'Aluxe' | 'Deponti' | 'Inny'>('Aluxe');
+    const [productHint, setProductHint] = useState<string>('');
 
     // Templates definition
     const applyTemplate = (type: 'glass' | 'poly' | 'carport' | 'carport_tin') => {
@@ -122,8 +123,34 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         setColumnConfigs(newConfigs);
     };
 
+    const applyComponentTemplate = () => {
+        if (parsedRows.length === 0) return;
+        const maxCols = Math.max(...parsedRows.map(r => r.length));
 
-    const applyMatrixTemplate = () => {
+        // Template: Name | Width | Unit | Price
+        // Or Name | Width | Price
+        let newConfigs: ColumnConfig[] = Array(maxCols).fill(null).map(() => ({ type: 'ignore' }));
+
+        if (maxCols >= 2) {
+            newConfigs[0] = { type: 'name' };
+            newConfigs[1] = { type: 'width' };
+            // Check for Unit column
+            let priceIdx = 2;
+            if (maxCols >= 4) {
+                // Assume Col 2 is Unit, Col 3 is Price
+                // But wait, user data: Name (0), Dim (1), Unit (2), Price (3)
+                newConfigs[2] = { type: 'unit' };
+                priceIdx = 3;
+            }
+            if (priceIdx < maxCols) newConfigs[priceIdx] = { type: 'price' };
+        }
+
+        setColumnConfigs(newConfigs);
+        toast.success(`Zastosowano szablon: Lista Elementów (${maxCols} kolumn)`);
+    };
+
+
+    const applyMatrixTemplate = (contextType?: string) => {
         if (parsedRows.length < 2) return;
 
         // 1. Identify Header Row (Projections)
@@ -134,7 +161,7 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         for (let i = 0; i < Math.min(5, parsedRows.length); i++) {
             const row = parsedRows[i];
             const numbers = row.map(c => parseFloat(c.replace(/[^\d.,]/g, '').replace(',', '.'))).filter(n => !isNaN(n) && n > 500);
-            if (numbers.length > 5) {
+            if (numbers.length >= 2) { // Changed to >= 2 to allow smaller matrices
                 headerRowIdx = i;
                 headerProjections = numbers;
                 break;
@@ -190,7 +217,20 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                 { type: 'price' }
             ];
             setColumnConfigs(newConfigs);
-            toast.success(`Przekształcono macierz: ${flattenedRows.length} wierszy.`);
+
+            // Auto-select manufacturer for Awnings if context provided
+            if (contextType === 'aufdachmarkise_zip' || contextType === 'unterdachmarkise_zip') {
+                setManufacturer('Aluxe'); // Default to Aluxe for these
+                setProductHint(contextType);
+                toast.success(`Przekształcono macierz dla: ${contextType === 'aufdachmarkise_zip' ? 'Aufdach' : 'Unterdach'}.`);
+            } else if (contextType === 'zip_screen') {
+                setManufacturer('Aluxe');
+                setProductHint(contextType);
+                toast.success('Przekształcono macierz: ZIP Screen.');
+            } else {
+                setProductHint('');
+                toast.success(`Przekształcono macierz: ${flattenedRows.length} wierszy.`);
+            }
         } else {
             toast.error('Błąd przekształcania macierzy. Sprawdź format.');
         }
@@ -704,6 +744,7 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
     const handleSave = () => {
         try {
             const resultData: any[] = [];
+            let currentGroupName = ''; // For stateful lists formatted like "Group Header" then items
 
             // Skip header row usually? Let's check if first row is strictly text headers.
             // For now, iterate all rows and try to parse numbers. If fail, skip (likely header).
@@ -715,6 +756,18 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                     properties: {} // Init properties
                 };
                 let hasValidData = false;
+
+                // Pre-scan for Name column to update group
+                const nameColIdx = columnConfigs.findIndex(c => c.type === 'name');
+                if (nameColIdx !== -1) {
+                    const val = row[nameColIdx];
+                    if (val && val.trim() !== '') {
+                        currentGroupName = val.trim();
+                    }
+                    if (currentGroupName) {
+                        entry.properties.name = currentGroupName;
+                    }
+                }
 
                 columnConfigs.forEach((config, colIndex) => {
                     const cellValue = row[colIndex];
@@ -755,6 +808,16 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                         }
                     } else if (config.type === 'notes') {
                         entry.notes = cellValue;
+                    } else if (config.type === 'name') {
+                        // Handle Name grouping
+                        if (cellValue && cellValue.trim() !== '') {
+                            entry.properties.name = cellValue;
+                            // Update current group name for next iterations
+                            // Note: This logic assumes rows are processed in order and currentGroupName is updated 
+                            // properly in the pre-scan above. This check here is mainly to save it to the entry.
+                        }
+                    } else if (config.type === 'unit') {
+                        entry.properties.unit = cellValue;
                     } else if (config.type === 'fields') {
                         entry.properties.fields_count = numVal;
                     } else if (config.type === 'posts') {
@@ -762,19 +825,17 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                     } else if (config.type === 'area') {
                         entry.properties.area_m2 = numVal;
                     } else if (config.type === 'dimension_attributes') {
-                        // Parse suffix: * = M, ** = L, *** = XL, **** = XL + Steel, + = Steel
+                        // Parse suffix
                         const suffix = typeof cellValue === 'string' ? cellValue : '';
                         let rafter = 'std';
                         let reinforced = false;
 
-                        // Count stars
                         const stars = (suffix.match(/\*/g) || []).length;
                         if (stars === 1) rafter = 'M';
                         if (stars === 2) rafter = 'L';
                         if (stars === 3) rafter = 'XL';
                         if (stars === 4) rafter = 'XL_Steel';
 
-                        // Check plus
                         if (suffix.includes('+')) reinforced = true;
 
                         if (rafter !== 'std') entry.properties.rafter_type = rafter;
@@ -782,8 +843,17 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                     }
                 });
 
-                // Validation: Must have at least width, projection and some price
-                if (hasValidData && entry.width_mm && entry.projection_mm && (entry.price || entry.structure_price)) {
+                // Validation: Must have structure_price OR price.
+                // For Components, width might be Length. Projection = 0.
+                if (hasValidData && (entry.price || entry.structure_price)) {
+                    // Default dims if missing
+                    if (!entry.width_mm && entry.properties.name) entry.width_mm = 0; // Accept 0 width for pure items? 
+                    // Actually database requires NON NULL? schema says width_mm can be null? No, usually required.
+                    // But for components, maybe we map Length to Width.
+
+                    if (!entry.width_mm) entry.width_mm = 0;
+                    if (!entry.projection_mm) entry.projection_mm = 0;
+
                     // Logic to ensure price fields
                     if (!entry.price) entry.price = (entry.structure_price || 0) + (entry.glass_price || 0);
                     if (!entry.structure_price) entry.structure_price = entry.price;
@@ -798,7 +868,7 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             }
 
             // Pass detected attributes
-            onSave(resultData, { snow_zone: snowZone, mounting_type: mountingType, provider: manufacturer });
+            onSave(resultData, { snow_zone: snowZone, mounting_type: mountingType, provider: manufacturer, product_code: productHint });
             onClose();
             toast.success(`Zaimportowano ${resultData.length} wierszy!`);
 
@@ -907,7 +977,13 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
 
                                             <div className="flex gap-1 items-center bg-white p-1 rounded border border-slate-200">
                                                 <span className="text-[10px] text-slate-400 font-bold px-1 uppercase tracking-wider">Rolety</span>
-                                                <button onClick={applyMatrixTemplate} className="px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded hover:bg-purple-100 border border-purple-100">ZIP / Markiza</button>
+                                                <button onClick={() => applyMatrixTemplate('zip_screen')} className="px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded hover:bg-purple-100 border border-purple-100">ZIP Screen</button>
+                                                <button onClick={() => applyMatrixTemplate('aufdachmarkise_zip')} className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded hover:bg-indigo-100 border border-indigo-100">Aufdach (Dachowa)</button>
+                                                <button onClick={() => applyMatrixTemplate('unterdachmarkise_zip')} className="px-2 py-1 bg-teal-50 text-teal-700 text-xs rounded hover:bg-teal-100 border border-teal-100">Unterdach (Poddachowa)</button>
+                                            </div>
+                                            <div className="flex gap-1 items-center bg-white p-1 rounded border border-slate-200">
+                                                <span className="text-[10px] text-slate-400 font-bold px-1 uppercase tracking-wider">Komponenty</span>
+                                                <button onClick={applyComponentTemplate} className="px-2 py-1 bg-gray-50 text-gray-700 text-xs rounded hover:bg-gray-100 border border-gray-100">Lista Części</button>
                                             </div>
                                         </div>
                                     </div>
@@ -944,6 +1020,8 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                                                             <option value="fields">Liczba Pól</option>
                                                             <option value="posts">Liczba Słupów</option>
                                                             <option value="area">Powierzchnia (m²)</option>
+                                                            <option value="name" className="font-bold border-t border-slate-300">Nazwa Elementu (Grupa)</option>
+                                                            <option value="unit">Jednostka (np. Stk)</option>
                                                         </select>
 
                                                         {config.type === 'surcharge' && (
