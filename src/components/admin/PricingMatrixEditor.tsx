@@ -24,10 +24,6 @@ interface MatrixEntry {
     _isNew?: boolean;
 }
 
-interface ComponentGroup {
-    name: string;
-    entries: MatrixEntry[];
-}
 
 export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, tableName }) => {
     const [entries, setEntries] = useState<MatrixEntry[]>([]);
