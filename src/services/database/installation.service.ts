@@ -258,7 +258,8 @@ export const InstallationService = {
                 acceptance: (row as any).acceptance || installationData.acceptance,
                 createdAt: new Date(row.created_at),
                 partsReady: (row as any).parts_ready,
-                expectedDuration: (row as any).expected_duration || 1
+                expectedDuration: (row as any).expected_duration || 1,
+                deliveryDate: (row as any).delivery_date // Map from DB
             };
         });
     },
@@ -387,7 +388,8 @@ export const InstallationService = {
                 teamId: installationData.teamId || (row as { team_id?: string }).team_id,
                 notes: installationData.notes,
                 acceptance: installationData.acceptance,
-                createdAt: new Date(row.created_at)
+                createdAt: new Date(row.created_at),
+                deliveryDate: (row as any).delivery_date // Map from DB
             };
         });
     },

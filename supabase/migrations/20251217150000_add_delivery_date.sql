@@ -1,0 +1,1 @@
+ALTER TABLE installations ADD COLUMN IF NOT EXISTS delivery_date DATE DEFAULT NULL;
