@@ -171,6 +171,42 @@ export const PricingService = {
         });
     },
 
+    /**
+     * Fetch all generic price matrices (type "matrix").
+     * Used for loading DB-based prices for Keilfenster, Walls, etc.
+     */
+    async getMatrixTables(): Promise<{ table: PriceTable, entries: PriceMatrixEntry[] }[]> {
+        const { data: tables } = await supabase
+            .from('price_tables')
+            .select('*, product:product_definitions(name, code)')
+            .eq('is_active', true)
+            .eq('type', 'matrix');
+
+        if (!tables || tables.length === 0) return [];
+
+        const tableIds = tables.map(t => t.id);
+        const { data: entries } = await supabase
+            .from('price_matrix_entries')
+            .select('*')
+            .in('price_table_id', tableIds);
+
+        const entriesByTable = (entries || []).reduce((acc: any, curr: any) => {
+            if (!acc[curr.price_table_id]) acc[curr.price_table_id] = [];
+            acc[curr.price_table_id].push({
+                ...curr,
+                structure_price: curr.structure_price || curr.price,
+                glass_price: curr.glass_price || 0,
+                properties: curr.properties || {}
+            });
+            return acc;
+        }, {});
+
+        return tables.map(table => ({
+            table,
+            entries: entriesByTable[table.id] || []
+        }));
+    },
+
     async getTableConfig(productCode: string, contextAttributes: Record<string, string> = {}): Promise<{ config: any, attributes: any }> {
         // 1. Get Product Definition
         const { data: product } = await supabase

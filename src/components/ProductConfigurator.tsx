@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ProductConfig, SelectedAddon } from '../types';
-import { orangestyleAccessories } from '../data/orangestyle_accessories';
-import { trendstyleAccessories } from '../data/trendstyle_accessories';
+
 import { LightingSelector } from './configurator/LightingSelector';
 import { KeilfensterSelector } from './configurator/KeilfensterSelector';
 import { PanoramaWallSelector } from './configurator/PanoramaWallSelector';
@@ -76,6 +75,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
     // Component Lists (Imported Components)
     const [componentLists, setComponentLists] = useState<{ table: any, entries: any[] }[]>([]);
+    const [matrixTables, setMatrixTables] = useState<{ table: any, entries: any[] }[]>([]);
     const [loadingComponents, setLoadingComponents] = useState(false);
 
     // Fetch Price when attributes change
@@ -88,8 +88,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 // 1. Prepare Attributes Context
                 const attributes: Record<string, string> = {
                     snow_zone: config.snowZone || '1',
-                    roof_type: config.roofType, // 'polycarbonate' or 'glass'
-                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'free',
+                    roof_type: config.roofType, // 'polycarbonate', 'glass', or 'tin'
+                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'freestanding',
                     // Add other attributes if needed (e.g. post height range)
                 };
 
@@ -170,6 +170,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
                 const lists = await PricingService.getComponentLists(attributes);
                 setComponentLists(lists);
+
+                const matrices = await PricingService.getMatrixTables();
+                setMatrixTables(matrices);
             } catch (error) {
                 console.error("Error fetching component lists:", error);
             } finally {
@@ -389,12 +392,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
 
 
-    const accessoryPool = useMemo(() => {
-        if (config.modelId === 'trendstyle' || config.modelId === 'trendstyle_plus') {
-            return trendstyleAccessories;
-        }
-        return orangestyleAccessories;
-    }, [config.modelId]);
+
 
     const handleBasicConfigChange = (name: string, value: any) => {
         setConfig(prev => ({ ...prev, [name]: value }));
@@ -426,7 +424,12 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 }
             }
         } else if (increment) {
-            newAccessories.push({ name: acc.description, price: acc.price_net, quantity: 1 });
+            newAccessories.push({
+                name: acc.description,
+                price: acc.price_net,
+                quantity: 1,
+                attributes: acc.properties || acc.attributes // Save multilingual props
+            });
         }
         setConfig(prev => ({ ...prev, selectedAccessories: newAccessories }));
     };
@@ -992,6 +995,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                             </div>
                                         </div>
                                     </div>
+                                    {config.modelId === 'carport' && (
+                                        <div className="mt-4">
+                                            <div
+                                                onClick={() => handleBasicConfigChange('roofType', 'tin')}
+                                                className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${config.roofType === 'tin' ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}
+                                            >
+                                                <div className="text-2xl mb-2">🏗️</div>
+                                                <div className="font-bold text-slate-900">Blacha Trapezowa</div>
+                                                <div className="text-xs text-slate-500">Standard dla Carportu</div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Sub-options */}
                                     {config.modelId !== 'skystyle' && config.roofType === 'polycarbonate' && (
@@ -1136,6 +1151,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
+                                                    matrixEntries={matrixTables.find(t => t.table.attributes?.system === 'alu_schiebetuer_base')?.entries || []}
                                                 />
                                             )}
                                             {activeWallTab === 'panorama' && (
@@ -1143,6 +1159,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
+                                                    al22List={componentLists.find(l => l.table.attributes?.system === 'AL22')?.entries || []}
+                                                    al23List={componentLists.find(l => l.table.attributes?.system === 'AL23')?.entries || []}
                                                 />
                                             )}
                                             {activeWallTab === 'walls' && (
@@ -1152,6 +1170,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
+                                                    availableItems={componentLists.find(l => l.table.attributes?.system === 'alu_walls')?.entries || []}
+                                                    sideMatrix={matrixTables.find(t => t.table.attributes?.system === 'alu_seitenwand_base')?.entries || []}
+                                                    frontMatrix={matrixTables.find(t => t.table.attributes?.system === 'alu_frontwand_base')?.entries || []}
                                                 />
                                             )}
                                             {activeWallTab === 'keil' && (
@@ -1160,6 +1181,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofDepth={config.projection}
+                                                    availableItems={componentLists.find(l => l.table.attributes?.system === 'keilfenster')?.entries || []}
+                                                    baseMatrix={matrixTables.find(t => t.table.attributes?.system === 'keilfenster_base')?.entries || []}
                                                 />
                                             )}
                                         </div>
@@ -1229,31 +1252,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                             <h4 className="text-lg font-bold text-slate-800 mb-2">Pozostałe akcesoria</h4>
                                             <p className="text-slate-500 text-sm">Dodatkowe elementy wyposażenia i montażu.</p>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {accessoryPool.map((acc, idx) => {
-                                                const selected = config.selectedAccessories?.find(a => a.name === acc.description);
-                                                const qty = selected?.quantity || 0;
-                                                return (
-                                                    <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={acc.description}>{acc.description}</div>
-                                                            <div className="font-bold text-accent text-sm whitespace-nowrap">{acc.price_net} €</div>
-                                                        </div>
-                                                        <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
-                                                            <button
-                                                                onClick={() => toggleAccessory(acc, false)}
-                                                                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                                                            >-</button>
-                                                            <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
-                                                            <button
-                                                                onClick={() => toggleAccessory(acc, true)}
-                                                                className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
-                                                            >+</button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
 
                                         {/* Imported Component Lists */}
                                         {loadingComponents ? (
@@ -1264,7 +1262,23 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     <h4 className="text-lg font-bold text-slate-800 mb-6">Dodatkowe Części / Elementy</h4>
 
                                                     {componentLists
-                                                        .filter(list => !['lighting', 'wpc_floor'].includes(list.table.attributes?.system))
+                                                        .filter(list => {
+                                                            const system = list.table.attributes?.system;
+                                                            // Exclude special systems handled elsewhere
+                                                            if (['lighting', 'wpc_floor', 'AL22', 'AL23', 'alu_walls', 'keilfenster'].includes(system)) return false;
+
+                                                            // Compatibility Logic for Standard Accessories
+                                                            const productCode = list.table.product?.code;
+                                                            if (productCode === 'trendstyle') {
+                                                                return (config.modelId || '').startsWith('trendstyle');
+                                                            }
+                                                            if (productCode === 'orangestyle') {
+                                                                // Fallback for everything else
+                                                                return !(config.modelId || '').startsWith('trendstyle');
+                                                            }
+                                                            // Default include others
+                                                            return true;
+                                                        })
                                                         .map((list, listIdx) => (
                                                             <div key={list.table.id || listIdx} className="mb-8">
                                                                 <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">{list.table.name}</h5>
@@ -1289,12 +1303,12 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                                                 </div>
                                                                                 <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
                                                                                     <button
-                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, false)}
+                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, false)}
                                                                                         className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
                                                                                     >-</button>
                                                                                     <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
                                                                                     <button
-                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, true)}
+                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, true)}
                                                                                         className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
                                                                                     >+</button>
                                                                                 </div>

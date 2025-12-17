@@ -210,6 +210,17 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     const country = safeStr(c.country) || 'Deutschland';
     doc.text(sanitizeText(country), MARGIN, addrY);
 
+    // Determine Locale for PDF Content (Attributes)
+    const normalizedCountry = country.toLowerCase();
+    const locale = (normalizedCountry === 'polska' || normalizedCountry === 'poland' || normalizedCountry === 'pl') ? 'pl' : 'de';
+
+    const getLocalizedText = (item: any, fallback: string) => {
+        if (!item?.attributes) return fallback;
+        if (locale === 'pl' && item.attributes.name_pl) return item.attributes.name_pl;
+        if (locale === 'de' && item.attributes.name_de) return item.attributes.name_de;
+        return fallback;
+    };
+
     // 3. Info Block (Right side)
     const infoX = pageWidth - MARGIN - 70; // 70mm width
     const infoY = currentY + 10;
@@ -325,7 +336,8 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     if (offer.product && offer.product.addons) {
         offer.product.addons.forEach(addon => {
             const variant = safeStr(addon.variant);
-            const name = variant ? `${addon.name} (${variant})` : addon.name;
+            const baseName = getLocalizedText(addon, addon.name);
+            const name = variant ? `${baseName} (${variant})` : baseName;
             tableBody.push([
                 String(pos),
                 safeStr(name),
@@ -337,9 +349,10 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     if (offer.product && offer.product.selectedAccessories) {
         offer.product.selectedAccessories.forEach(acc => {
+            const name = getLocalizedText(acc, acc.name);
             tableBody.push([
                 String(pos),
-                `${acc.quantity}x ${safeStr(acc.name)}`,
+                `${acc.quantity}x ${safeStr(name)}`,
                 formatCurrency(acc.price * acc.quantity)
             ]);
             pos++;
@@ -348,9 +361,10 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     if (offer.product && offer.product.customItems) {
         offer.product.customItems.forEach(item => {
+            const name = getLocalizedText(item, item.name);
             tableBody.push([
                 String(pos),
-                `${item.quantity}x ${safeStr(item.name)}`,
+                `${item.quantity}x ${safeStr(name)}`,
                 formatCurrency(item.price * item.quantity)
             ]);
             pos++;

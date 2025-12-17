@@ -82,7 +82,7 @@ export interface Communication {
 }
 
 export type InstallationType = 'wall-mounted' | 'freestanding';
-export type RoofType = 'polycarbonate' | 'glass';
+export type RoofType = 'polycarbonate' | 'glass' | 'tin';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected';
 
 // --- Leads Types ---
@@ -158,6 +158,7 @@ export interface SelectedAddon {
     flooringColor?: string;
     flooringType?: string;
     installationOption?: 'with-foundation' | 'without-foundation';
+    attributes?: Record<string, any>; // For multilingual names (name_pl, name_de)
 }
 
 export interface ProductConfig {
@@ -179,6 +180,7 @@ export interface ProductConfig {
         name: string;
         price: number;
         quantity: number;
+        attributes?: Record<string, any>; // For multilingual names
     }[];
     customItems?: {
         id: string;
@@ -186,6 +188,7 @@ export interface ProductConfig {
         price: number;
         quantity: number;
         description?: string;
+        attributes?: Record<string, any>; // For multilingual names
     }[];
 }
 

@@ -1,46 +1,103 @@
-import React, { useState } from 'react';
-import { priceKeilfenster, keilfensterData } from '../../data/keilfenster';
+
+import React, { useState, useMemo } from 'react';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
+import { PricingService } from '../../services/pricing.service';
+
+const MIN_HEIGHT_H1 = 39;
 
 interface KeilfensterSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
     maxRoofDepth: number;
+    availableItems: any[];
+    baseMatrix: any[];
 }
 
-export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({ onAdd, onRemove, currentAddons, maxRoofDepth }) => {
+export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
+    onAdd,
+    onRemove,
+    currentAddons,
+    maxRoofDepth,
+    availableItems,
+    baseMatrix
+}) => {
     const existingLeft = currentAddons.find(a => a.id === 'keil-left');
     const existingRight = currentAddons.find(a => a.id === 'keil-right');
-    const existing = existingLeft || existingRight;
 
-    // Parse existing dimensions if available (stored in variant or description usually, but here we might need to rely on defaults if not structured)
-    // For now, we'll stick to defaults or simple parsing if we decide to store it in a structured way later.
-    const [width, setWidth] = useState<number>(existing?.width || maxRoofDepth || 3000);
-    const [height1, setHeight1] = useState<number>(keilfensterData.dimensions.min_height_h1_mm);
+    const [width, setWidth] = useState<number>(existingLeft?.width || maxRoofDepth || 3000);
+    const [height1, setHeight1] = useState<number>(MIN_HEIGHT_H1);
     const [height2, setHeight2] = useState<number>(500);
 
-    const [glass, setGlass] = useState<'clear' | 'mat' | 'ig'>(existing?.variant?.includes('Mat') ? 'mat' : existing?.variant?.includes('IG') ? 'ig' : 'clear');
-    const [specialRal, setSpecialRal] = useState<boolean>(existing?.variant?.includes('RAL') || false);
+    const [glass, setGlass] = useState<'clear' | 'mat' | 'ig'>('clear');
+    const [specialRal, setSpecialRal] = useState<boolean>(false);
+
+    // DB Options State
+    const [selectedDbOptions, setSelectedDbOptions] = useState<Set<string>>(new Set());
+
     const [leftQty, setLeftQty] = useState<number>(existingLeft?.quantity || 0);
     const [rightQty, setRightQty] = useState<number>(existingRight?.quantity || 0);
 
-    // Update heights if we can parse them from existing data (optional improvement for later)
+    const baseUnitPrice = useMemo(() => {
+        // Use DB Matrix
+        if (baseMatrix && baseMatrix.length > 0) {
+            const entry = PricingService.findMatrixEntry(baseMatrix, width, 0); // Projection 0 for width-based tables
+            if (entry) {
+                let price = entry.price;
+                const props = entry.properties || {};
+
+                // Add Surcharges from Matrix Properties
+                if (glass === 'mat') price += (props.surcharge_matt || 0);
+                if (glass === 'ig') price += (props.surcharge_ig || 0);
+
+                // Special RAL logic (if not in matrix, use static rule or check table config)
+                // For now sticking to static +30% rule as it's likely a global rule
+                if (specialRal) price *= 1.30;
+
+                return price;
+            }
+        }
+
+        // Fallback (should not happen if migration worked)
+        return 0;
+    }, [baseMatrix, width, glass, specialRal]);
+
+    const optionsPrice = useMemo(() => {
+        let sum = 0;
+        selectedDbOptions.forEach(id => {
+            const item = availableItems.find(i => i.id === id);
+            if (item) sum += item.price;
+        });
+        return sum;
+    }, [selectedDbOptions, availableItems]);
+
+    const totalUnitPrice = baseUnitPrice + optionsPrice;
+
+    const toggleOption = (id: string) => {
+        const next = new Set(selectedDbOptions);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedDbOptions(next);
+    };
 
     const handleSave = () => {
-        const unitPrice = priceKeilfenster(width, glass, specialRal);
+        const optionsDesc = Array.from(selectedDbOptions)
+            .map(id => availableItems.find(i => i.id === id)?.properties.name)
+            .join(', ');
+
+        const desc = `Wymiary: ${width}mm x ${height1}mm / ${height2}mm. ${optionsDesc ? `Opcje: ${optionsDesc}` : ''}`;
 
         if (leftQty > 0) {
             onAdd({
                 id: 'keil-left',
                 type: 'other',
                 name: 'Keilfenster Lewy',
-                variant: `${glass === 'clear' ? 'Klar' : glass === 'mat' ? 'Mat' : 'IG'} ${specialRal ? '+ RAL' : ''} (${height1}mm / ${height2}mm)`,
+                variant: `${glass} ${specialRal ? '+ RAL' : ''}`,
                 width,
                 quantity: leftQty,
-                price: leftQty * unitPrice,
-                description: `Wymiary: ${width}mm x ${height1}mm (niski) x ${height2}mm (wysoki)`
+                price: leftQty * totalUnitPrice,
+                description: desc
             });
         } else {
             onRemove('keil-left');
@@ -51,92 +108,58 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({ onAdd,
                 id: 'keil-right',
                 type: 'other',
                 name: 'Keilfenster Prawy',
-                variant: `${glass === 'clear' ? 'Klar' : glass === 'mat' ? 'Mat' : 'IG'} ${specialRal ? '+ RAL' : ''} (${height1}mm / ${height2}mm)`,
+                variant: `${glass} ${specialRal ? '+ RAL' : ''}`,
                 width,
                 quantity: rightQty,
-                price: rightQty * unitPrice,
-                description: `Wymiary: ${width}mm x ${height1}mm (niski) x ${height2}mm (wysoki)`
+                price: rightQty * totalUnitPrice,
+                description: desc
             });
         } else {
             onRemove('keil-right');
         }
     };
 
-    // Visualization Logic
-    // Polygon points: 
-    // Bottom-Left: 0, MaxH
-    // Bottom-Right: Width, MaxH
-    // Top-Right: Width, MaxH - h2
-    // Top-Left: 0, MaxH - h1
-
-    // Actually, let's just use a fixed viewbox and map coordinates.
+    // Visualization Props
     const padding = 20;
     const drawHeight = 150;
     const drawWidth = 300;
-
-    // Scale factors
-    const scaleY = drawHeight / Math.max(height1, height2, 500); // minimal height for scaling
-
-    // Coordinates
+    const scaleY = drawHeight / Math.max(height1, height2, 500);
     const x1 = padding;
-    const y1 = padding + drawHeight - (height1 * scaleY); // Top-Left Y
-
+    const y1 = padding + drawHeight - (height1 * scaleY);
     const x2 = padding + drawWidth;
-    const y2 = padding + drawHeight - (height2 * scaleY); // Top-Right Y
-
+    const y2 = padding + drawHeight - (height2 * scaleY);
     const x3 = padding + drawWidth;
-    const y3 = padding + drawHeight; // Bottom-Right Y
-
+    const y3 = padding + drawHeight;
     const x4 = padding;
-    const y4 = padding + drawHeight; // Bottom-Left Y
-
+    const y4 = padding + drawHeight;
     const points = `${x1},${y1} ${x2},${y2} ${x3},${y3} ${x4},${y4}`;
 
     return (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
             <h4 className="font-bold text-slate-800 text-lg mb-4">Keilfenster (Klinowe okno boczne)</h4>
 
+            {(baseMatrix.length === 0) && <div className="p-2 mb-4 bg-yellow-100 text-yellow-800 rounded text-xs">Uwaga: Brak cennika bazowego w DB.</div>}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Controls */}
                 <div className="space-y-5">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Szerokość (mm)</label>
-                        <input
-                            type="number"
-                            value={width}
-                            min={2000}
-                            max={5000}
-                            onChange={e => setWidth(Number(e.target.value))}
-                            className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-accent focus:border-accent"
-                        />
-                        <p className="text-xs text-slate-400 mt-1">Dostępne: 2000 - 5000 mm</p>
+                        <input type="number" value={width} onChange={e => setWidth(Number(e.target.value))} className="w-full border p-2 rounded" />
                     </div>
-
+                    {/* ... Heights ... */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Wysokość Lewa (mm)</label>
-                            <input
-                                type="number"
-                                value={height1}
-                                min={keilfensterData.dimensions.min_height_h1_mm}
-                                max={keilfensterData.dimensions.max_height_h2_mm}
-                                onChange={e => setHeight1(Number(e.target.value))}
-                                className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-accent focus:border-accent"
-                            />
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Wysokość L (mm)</label>
+                            <input type="number" value={height1} onChange={e => setHeight1(Number(e.target.value))} className="w-full border p-2 rounded" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Wysokość Prawa (mm)</label>
-                            <input
-                                type="number"
-                                value={height2}
-                                min={keilfensterData.dimensions.min_height_h1_mm}
-                                max={keilfensterData.dimensions.max_height_h2_mm}
-                                onChange={e => setHeight2(Number(e.target.value))}
-                                className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-accent focus:border-accent"
-                            />
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Wysokość P (mm)</label>
+                            <input type="number" value={height2} onChange={e => setHeight2(Number(e.target.value))} className="w-full border p-2 rounded" />
                         </div>
                     </div>
 
+                    {/* Glass Selection */}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Wariant szkła</label>
                         <div className="flex gap-2">
@@ -158,70 +181,58 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({ onAdd,
 
                     <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <input type="checkbox" checked={specialRal} onChange={e => setSpecialRal(e.target.checked)} className="rounded text-accent focus:ring-accent w-4 h-4" />
-                        <span className="font-medium">Sonder RAL (+{keilfensterData.colors.special_ral_surcharge_percent}%)</span>
+                        <span className="font-medium">Sonder RAL (+30%)</span>
                     </label>
 
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">Lewy (szt.)</label>
-                            <div className="flex items-center">
-                                <button onClick={() => setLeftQty(Math.max(0, leftQty - 1))} className="w-8 h-8 rounded-l-lg border border-slate-300 bg-slate-100 hover:bg-slate-200">-</button>
-                                <input type="number" min={0} value={leftQty} onChange={e => setLeftQty(Number(e.target.value))} className="w-full border-y border-slate-300 h-8 text-center focus:outline-none" />
-                                <button onClick={() => setLeftQty(leftQty + 1)} className="w-8 h-8 rounded-r-lg border border-slate-300 bg-slate-100 hover:bg-slate-200">+</button>
+                    {/* DB Options */}
+                    {availableItems.length > 0 && (
+                        <div className="border-t border-slate-100 pt-4 mt-4">
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Dodatkowe Opcje (z Bazy)</label>
+                            <div className="space-y-2">
+                                {availableItems.map(item => (
+                                    <label key={item.id} className="flex items-center justify-between p-2 border rounded hover:bg-slate-50 cursor-pointer">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedDbOptions.has(item.id)}
+                                                onChange={() => toggleOption(item.id)}
+                                                className="rounded text-accent focus:ring-accent"
+                                            />
+                                            <span className="text-sm">{item.properties.name}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-600">{formatCurrency(item.price)}</span>
+                                    </label>
+                                ))}
                             </div>
                         </div>
+                    )}
+
+                    {/* Quantity */}
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">Prawy (szt.)</label>
-                            <div className="flex items-center">
-                                <button onClick={() => setRightQty(Math.max(0, rightQty - 1))} className="w-8 h-8 rounded-l-lg border border-slate-300 bg-slate-100 hover:bg-slate-200">-</button>
-                                <input type="number" min={0} value={rightQty} onChange={e => setRightQty(Number(e.target.value))} className="w-full border-y border-slate-300 h-8 text-center focus:outline-none" />
-                                <button onClick={() => setRightQty(rightQty + 1)} className="w-8 h-8 rounded-r-lg border border-slate-300 bg-slate-100 hover:bg-slate-200">+</button>
-                            </div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase">Lewy (szt.)</label>
+                            <input type="number" value={leftQty} onChange={e => setLeftQty(Number(e.target.value))} className="w-full border p-2 rounded text-center" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase">Prawy (szt.)</label>
+                            <input type="number" value={rightQty} onChange={e => setRightQty(Number(e.target.value))} className="w-full border p-2 rounded text-center" />
                         </div>
                     </div>
                 </div>
 
-                {/* Visualization & Summary */}
+                {/* Visuals */}
                 <div className="flex flex-col gap-4">
                     <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 flex items-center justify-center min-h-[200px] relative">
-                        <div className="absolute top-2 left-2 text-xs font-bold text-slate-400">PODGLĄD KSZTAŁTU</div>
-
-                        <svg width="100%" height="200" viewBox={`0 0 ${drawWidth + 2 * padding} ${drawHeight + 2 * padding}`} className="drop-shadow-lg">
-                            {/* Grid lines for reference */}
-                            <defs>
-                                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="gray" strokeWidth="0.5" opacity="0.1" />
-                                </pattern>
-                            </defs>
-                            <rect width="100%" height="100%" fill="url(#grid)" />
-
-                            {/* The Shape */}
-                            <polygon
-                                points={points}
-                                fill={glass === 'mat' ? 'rgba(255,255,255,0.9)' : glass === 'ig' ? 'rgba(200, 230, 255, 0.4)' : 'rgba(220, 240, 255, 0.3)'}
-                                stroke="#334155"
-                                strokeWidth="2"
-                            />
-
-                            {/* Dimensions Labels */}
-                            {/* Left Height */}
-                            <text x={x1 - 10} y={(y1 + y4) / 2} textAnchor="end" className="text-[10px] fill-slate-500 font-mono">{height1}mm</text>
-                            {/* Right Height */}
-                            <text x={x2 + 10} y={(y2 + y3) / 2} textAnchor="start" className="text-[10px] fill-slate-500 font-mono">{height2}mm</text>
-                            {/* Width */}
-                            <text x={(x3 + x4) / 2} y={y4 + 15} textAnchor="middle" className="text-[10px] fill-slate-500 font-mono">{width}mm</text>
+                        <svg width="100%" height="200" viewBox={`0 0 ${drawWidth + 2 * padding} ${drawHeight + 2 * padding}`}>
+                            <polygon points={points} fill={glass === 'mat' ? 'rgba(255,255,255,0.9)' : 'rgba(200, 230, 255, 0.4)'} stroke="#334155" strokeWidth="2" />
                         </svg>
                     </div>
-
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                        <div className="text-sm space-y-2">
-                            <div className="flex justify-between"><span className="text-slate-500">Cena jedn.:</span><span className="font-medium">{formatCurrency(priceKeilfenster(width, glass, specialRal))}</span></div>
-                            <div className="flex justify-between pt-2 border-t border-slate-200"><span className="font-bold">Razem:</span><span className="font-bold text-accent text-lg">{formatCurrency(priceKeilfenster(width, glass, specialRal) * (leftQty + rightQty))}</span></div>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="flex justify-between font-bold text-lg mb-4">
+                            <span>Suma:</span>
+                            <span className="text-accent">{formatCurrency(totalUnitPrice * (leftQty + rightQty))}</span>
                         </div>
-                        <button onClick={handleSave} className="w-full mt-4 py-3 rounded-xl font-bold bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20 transition-all hover:scale-[1.02]">
-                            Zapisz Keilfenster
-                        </button>
-                        <p className="text-[10px] text-slate-400 mt-2 text-center">W zestawie: {keilfensterData.options.included.join(', ')}</p>
+                        <button onClick={handleSave} className="w-full py-3 bg-accent text-white rounded-xl font-bold">Zapisz</button>
                     </div>
                 </div>
             </div>

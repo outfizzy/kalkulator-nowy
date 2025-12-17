@@ -1,16 +1,26 @@
+
 import React, { useState, useMemo } from 'react';
-import { aluminiumWallsData, priceAluSchiebetuer, type GlassVariant } from '../../data/aluminium_walls';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
+import { PricingService } from '../../services/pricing.service';
 
 interface SlidingDoorSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
     maxRoofWidth: number;
+    matrixEntries: any[];
 }
 
-export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd, onRemove, currentAddons, maxRoofWidth }) => {
+type GlassVariant = 'klar' | 'matt' | 'ig';
+
+export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
+    onAdd,
+    onRemove,
+    currentAddons,
+    maxRoofWidth,
+    matrixEntries
+}) => {
     const existing = currentAddons.find(a => a.id === 'alu-schiebetuer');
 
     const [width, setWidth] = useState<number>(existing?.width || 3000);
@@ -18,7 +28,22 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
     const [glass, setGlass] = useState<GlassVariant>(existing?.variant?.includes('Mat') ? 'matt' : existing?.variant?.includes('IG') ? 'ig' : 'klar');
     const [quantity, setQuantity] = useState<number>(existing?.quantity || 0);
 
-    const { price, config } = useMemo(() => priceAluSchiebetuer(width, glass), [width, glass]);
+    const priceData = useMemo(() => {
+        if (!matrixEntries || matrixEntries.length === 0) return { price: 0, config: 'N/A' };
+
+        const entry = PricingService.findMatrixEntry(matrixEntries, width, 0);
+        if (!entry) return { price: 0, config: 'N/A' };
+
+        let price = entry.price;
+        const props = entry.properties || {};
+
+        if (glass === 'matt') price += (props.surcharge_matt || 0);
+        if (glass === 'ig') price += (props.surcharge_ig || 0);
+
+        return { price, config: props.config || 'Standard' };
+    }, [width, glass, matrixEntries]);
+
+    const { price, config } = priceData;
     const totalPrice = price * quantity;
 
     const handleSave = () => {
@@ -47,7 +72,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h4 className="font-bold text-slate-800 text-lg">Szyby przesuwne w ramie (Alu Schiebetüren)</h4>
-                    <p className="text-sm text-slate-500">Feld (panel) do {aluminiumWallsData.aluminium_schiebetueren.limits.feldbreite_max_mm} mm</p>
+                    <p className="text-sm text-slate-500">System przesuwny w ramie aluminiowej</p>
                 </div>
                 <div className="text-right">
                     {existingAddon && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">Wybrano</span>}
@@ -201,18 +226,12 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({ onAdd,
                     >
                         {existingAddon ? 'Zaktualizuj Ofertę' : `Dodaj do Oferty (+${formatCurrency(totalPrice)})`}
                     </button>
-                </div>
-            </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 mb-2 font-semibold">Dostępne warianty:</p>
-                <div className="flex flex-wrap gap-2">
-                    {aluminiumWallsData.aluminium_schiebetueren.products.map(p => (
-                        <span key={p.width_mm} className={`text-[10px] px-2 py-1 rounded border transition-colors ${width === p.width_mm ? 'bg-accent text-white border-accent' : 'bg-slate-50 text-slate-500 border-slate-200'
-                            }`}>
-                            {p.width_mm}mm ({p.configuration})
-                        </span>
-                    ))}
+                    {(!matrixEntries || matrixEntries.length === 0) && (
+                        <div className="mt-2 text-center text-xs text-red-500">
+                            Uwaga: Brak cennika w bazie danych!
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

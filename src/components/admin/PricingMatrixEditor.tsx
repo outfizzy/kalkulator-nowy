@@ -109,7 +109,17 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                 } else if (field.startsWith('prop_')) {
                     // Update property
                     const propName = field.replace('prop_', '');
-                    updated.properties = { ...updated.properties, [propName]: value };
+                    const newProps = { ...updated.properties, [propName]: value };
+
+                    // Sync legacy name if changing translations
+                    if (propName === 'name_pl' || propName === 'name_de') {
+                        const pl = propName === 'name_pl' ? value : (newProps.name_pl || '');
+                        const de = propName === 'name_de' ? value : (newProps.name_de || '');
+                        // Format: "NamePL (NameDE)" if DE exists, else just "NamePL"
+                        newProps.name = de ? `${pl} (${de})` : pl;
+                    }
+
+                    updated.properties = newProps;
                 } else {
                     // Direct field update
                     // @ts-ignore
@@ -379,7 +389,13 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                 <table className="w-full text-left text-sm">
                                                     <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                                                         <tr>
-                                                            <th className="p-3 w-1/3">Nazwa / Wariant</th>
+                                                            <th className="p-3 w-1/3">
+                                                                <div className="flex gap-2 text-xs uppercase text-slate-400">
+                                                                    <span className="flex-1">PL</span>
+                                                                    <span className="flex-1">DE (Opcjonalne)</span>
+                                                                </div>
+                                                                Nazwa Produktu
+                                                            </th>
                                                             <th className="p-3 w-1/4">Opis (Admin)</th>
                                                             <th className="p-3 w-24 text-center">Jednostka</th>
                                                             <th className="p-3 w-32 text-right">Cena</th>
@@ -390,13 +406,22 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                         {group.entries.map(entry => (
                                                             <tr key={entry.id || Math.random()} className="hover:bg-slate-50 group-row">
                                                                 <td className="p-3">
-                                                                    <input
-                                                                        type="text"
-                                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-accent focus:outline-none"
-                                                                        value={entry.properties?.name || ''}
-                                                                        onChange={(e) => handleEntryChange(entry.id, 'prop_name', e.target.value)}
-                                                                        placeholder="Nazwa elementu"
-                                                                    />
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <input
+                                                                            type="text"
+                                                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-accent focus:outline-none font-medium"
+                                                                            value={entry.properties?.name_pl || entry.properties?.name || ''}
+                                                                            onChange={(e) => handleEntryChange(entry.id, 'prop_name_pl', e.target.value)}
+                                                                            placeholder="Nazwa (PL)"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            className="w-full text-sm text-slate-500 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-accent focus:outline-none italic"
+                                                                            value={entry.properties?.name_de || ''}
+                                                                            onChange={(e) => handleEntryChange(entry.id, 'prop_name_de', e.target.value)}
+                                                                            placeholder="Nazwa (DE)"
+                                                                        />
+                                                                    </div>
                                                                 </td>
                                                                 <td className="p-3">
                                                                     <input
