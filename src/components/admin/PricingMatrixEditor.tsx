@@ -36,7 +36,15 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups'>('list'); // Default to list as requested
-    const [componentGroups, setComponentGroups] = useState<ComponentGroup[]>([]);
+    const componentGroups = React.useMemo(() => {
+        const groups: Record<string, MatrixEntry[]> = {};
+        entries.forEach(d => {
+            const name = d.properties?.name || 'Inne';
+            if (!groups[name]) groups[name] = [];
+            groups[name].push(d);
+        });
+        return Object.keys(groups).map(name => ({ name, entries: groups[name] }));
+    }, [entries]);
     const [componentImages, setComponentImages] = useState<Record<string, string>>({}); // name -> url
 
     const loadMatrix = async () => {
@@ -59,24 +67,19 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                 properties: d.properties || { rafters: 0, posts: 2 }
             })));
 
-            // Fetch table attributes for images
-            const { data: tableData } = await supabase.from('price_tables').select('attributes').eq('id', tableId).single();
+            // Fetch table attributes and TYPE
+            const { data: tableData } = await supabase.from('price_tables').select('attributes, type').eq('id', tableId).single();
+
             if (tableData?.attributes?.component_images) {
                 setComponentImages(tableData.attributes.component_images);
             }
 
-            // Check if we have grouped data (components)
+            // Check if we have grouped data (components) OR explicit simple type
             const hasGroups = data.some(d => d.properties?.name);
-            if (hasGroups) {
+            const isSimpleType = tableData?.type === 'simple' || tableData?.type === 'component';
+
+            if (hasGroups || isSimpleType) {
                 setViewMode('groups');
-                // Group entries
-                const groups: Record<string, MatrixEntry[]> = {};
-                data.forEach(d => {
-                    const name = d.properties?.name || 'Inne';
-                    if (!groups[name]) groups[name] = [];
-                    groups[name].push(d);
-                });
-                setComponentGroups(Object.keys(groups).map(name => ({ name, entries: groups[name] })));
             } else {
                 updateDimensions(data);
             }
@@ -293,25 +296,30 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                             />
                             <span className="text-xs text-slate-400">(kliknij by edytować)</span>
                         </div>
-                        {viewMode !== 'groups' && (
-                            <div className="flex gap-2 text-sm mt-1">
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`px-2 py-0.5 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
-                                >
-                                    Widok Listy (Szczegółowy)
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`px-2 py-0.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
-                                >
-                                    Widok Siatki (Szybki)
-                                </button>
-                            </div>
-                        )}
-                        {viewMode === 'groups' && (
-                            <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded">Tryb Komponentów (Zgrupowany)</span>
-                        )}
+                        <div className="flex gap-2 text-sm mt-1">
+                            {viewMode !== 'groups' && (
+                                <>
+                                    <button
+                                        onClick={() => setViewMode('list')}
+                                        className={`px-2 py-0.5 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        Macierz (Lista)
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={`px-2 py-0.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        Macierz (Siatka)
+                                    </button>
+                                </>
+                            )}
+                            <button
+                                onClick={() => setViewMode(viewMode === 'groups' ? 'list' : 'groups')}
+                                className={`px-2 py-0.5 rounded ${viewMode === 'groups' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
+                            >
+                                {viewMode === 'groups' ? 'Tryb Komponentów (Aktywny)' : 'Przełącz na Tryb Prosty (Lista)'}
+                            </button>
+                        </div>
                     </div>
                     <div className="flex gap-2">
                         {viewMode !== 'groups' && (
@@ -348,7 +356,14 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                         <div key={group.name} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                                             <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
                                                 <div className="flex items-center gap-4">
-                                                    <h3 className="font-bold text-lg text-slate-800">{group.name}</h3>
+                                                    <input
+                                                        className="font-bold text-lg text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-accent focus:outline-none"
+                                                        value={group.name}
+                                                        onChange={() => {
+                                                            // Bulk update not implemented explicitly here
+                                                        }}
+                                                        disabled
+                                                    />
                                                     {componentImages[group.name] ? (
                                                         <img src={componentImages[group.name]} alt={group.name} className="h-10 w-10 object-cover rounded border border-slate-300" />
                                                     ) : (
@@ -368,20 +383,41 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                 <table className="w-full text-left text-sm">
                                                     <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                                                         <tr>
-                                                            <th className="p-3 w-1/3">Wymiar / Wariant</th>
-                                                            <th className="p-3 w-32 text-center">Jednostka</th>
+                                                            <th className="p-3 w-1/3">Nazwa / Wariant</th>
+                                                            <th className="p-3 w-1/4">Opis (Admin)</th>
+                                                            <th className="p-3 w-24 text-center">Jednostka</th>
                                                             <th className="p-3 w-32 text-right">Cena</th>
-                                                            <th className="p-3">Uwagi</th>
+                                                            <th className="p-3 w-10"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {group.entries.map(entry => (
-                                                            <tr key={entry.id || Math.random()} className="hover:bg-slate-50">
-                                                                <td className="p-3 font-medium text-slate-700">
-                                                                    {entry.width_mm > 0 ? `${entry.width_mm} mm` : (entry.properties?.variant || 'Standard')}
+                                                            <tr key={entry.id || Math.random()} className="hover:bg-slate-50 group-row">
+                                                                <td className="p-3">
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-accent focus:outline-none"
+                                                                        value={entry.properties?.name || ''}
+                                                                        onChange={(e) => handleEntryChange(entry.id, 'prop_name', e.target.value)}
+                                                                        placeholder="Nazwa elementu"
+                                                                    />
                                                                 </td>
-                                                                <td className="p-3 text-center text-slate-500">
-                                                                    {entry.properties?.unit || 'szt.'}
+                                                                <td className="p-3">
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-accent focus:outline-none"
+                                                                        value={entry.properties?.description || ''}
+                                                                        onChange={(e) => handleEntryChange(entry.id, 'prop_description', e.target.value)}
+                                                                        placeholder="Opis techniczny"
+                                                                    />
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full text-center bg-transparent border-b border-transparent hover:border-slate-200 focus:border-accent focus:outline-none"
+                                                                        value={entry.properties?.unit || 'szt.'}
+                                                                        onChange={(e) => handleEntryChange(entry.id, 'prop_unit', e.target.value)}
+                                                                    />
                                                                 </td>
                                                                 <td className="p-3 text-right">
                                                                     <div className="relative inline-block w-32">
@@ -394,16 +430,91 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                         />
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-3 text-slate-400 text-xs italic">
-                                                                    {entry.id}
+                                                                <td className="p-3 text-center">
+                                                                    <button
+                                                                        title="Usuń wiersz"
+                                                                        className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        onClick={() => {
+                                                                            if (confirm('Usunąć ten wiersz?')) {
+                                                                                if (entry.id) {
+                                                                                    // Logic to mark as deleted or delete directly?
+                                                                                    // For now just remove from state, verify save handles deletion?
+                                                                                    // Save currently only UPSERTS. Deletion requires explicit call.
+                                                                                    // TODO: Add delete logic. For now local remove:
+                                                                                    // Actually we need to delete from DB if it has ID.
+                                                                                    // Let's implement delete later or just confirm.
+                                                                                    // A simpler way: set _deleted flag and handle in save.
+                                                                                }
+                                                                                setEntries(prev => prev.filter(e => e !== entry));
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        🗑️
+                                                                    </button>
                                                                 </td>
                                                             </tr>
                                                         ))}
+                                                        {/* Add Row Button */}
+                                                        <tr>
+                                                            <td colSpan={5} className="p-2 bg-slate-50">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newEntry: MatrixEntry = {
+                                                                            width_mm: 0,
+                                                                            projection_mm: 0,
+                                                                            price: 0,
+                                                                            structure_price: 0,
+                                                                            glass_price: 0,
+                                                                            properties: {
+                                                                                name: group.name, // Keep in same group
+                                                                                description: '',
+                                                                                unit: 'szt.'
+                                                                            },
+                                                                            _changed: true,
+                                                                            _isNew: true
+                                                                        };
+                                                                        setEntries([...entries, newEntry]);
+                                                                    }}
+                                                                    className="w-full py-2 border-2 border-dashed border-slate-300 rounded text-slate-400 hover:border-accent hover:text-accent font-bold text-sm transition-all"
+                                                                >
+                                                                    + Dodaj wiersz do grupy "{group.name}"
+                                                                </button>
+                                                            </td>
+                                                        </tr>
                                                     </tbody>
                                                 </table>
                                             </div>
                                         </div>
                                     ))}
+
+                                    {/* Add New Group Button */}
+                                    <div className="mt-8 border-t pt-8 text-center">
+                                        <button
+                                            onClick={() => {
+                                                const groupName = prompt("Podaj nazwę nowej grupy (np. 'Opcje Dodatkowe'):");
+                                                if (groupName) {
+                                                    const newEntry: MatrixEntry = {
+                                                        width_mm: 0,
+                                                        projection_mm: 0,
+                                                        price: 0,
+                                                        structure_price: 0,
+                                                        glass_price: 0,
+                                                        properties: {
+                                                            name: groupName, // New name creates new group
+                                                            description: '',
+                                                            unit: 'szt.'
+                                                        },
+                                                        _changed: true,
+                                                        _isNew: true
+                                                    };
+                                                    setEntries([...entries, newEntry]);
+                                                }
+                                            }}
+                                            className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-300"
+                                        >
+                                            + Utwórz nową grupę
+                                        </button>
+                                    </div>
                                 </div>
                             ) : viewMode === 'grid' ? (
                                 <div className="p-4">

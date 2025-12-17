@@ -1,20 +1,32 @@
 -- Migration to seed Lighting and WPC Flooring components
 
--- 1. Lighting Options
+-- 1. Create/Ensure "Oświetlenie i Ogrzewanie" Product
 DO $$
 DECLARE
   v_product_id uuid;
   v_table_id uuid;
 BEGIN
-  -- Link to Trendstyle as a representative parent (lighting fits all)
-  SELECT id INTO v_product_id FROM product_definitions WHERE code = 'trendstyle' LIMIT 1;
+  INSERT INTO product_definitions (name, code, category, provider, description)
+  VALUES ('Oświetlenie i Ogrzewanie', 'oswietlenie_ogrzewanie', 'accessory', 'Inny', 'Kategoria grupująca opcje oświetlenia i ogrzewania')
+  ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_product_id;
 
   IF v_product_id IS NOT NULL THEN
-    INSERT INTO price_tables (name, product_definition_id, is_active, configuration, attributes)
-    VALUES ('Oświetlenie i Ogrzewanie (Szablon)', v_product_id, true, '{}'::jsonb, '{"table_type": "component_list", "system": "lighting"}'::jsonb)
-    RETURNING id INTO v_table_id;
+    -- Try to find existing table first
+    SELECT id INTO v_table_id FROM price_tables WHERE name = 'Oświetlenie i Ogrzewanie (Szablon)' LIMIT 1;
 
     IF v_table_id IS NOT NULL THEN
+        -- Update existing to new product
+        UPDATE price_tables SET product_definition_id = v_product_id WHERE id = v_table_id;
+    ELSE
+        -- Insert new
+        INSERT INTO price_tables (name, product_definition_id, is_active, configuration, attributes)
+        VALUES ('Oświetlenie i Ogrzewanie (Szablon)', v_product_id, true, '{}'::jsonb, '{"table_type": "component_list", "system": "lighting"}'::jsonb)
+        RETURNING id INTO v_table_id;
+    END IF;
+
+    IF v_table_id IS NOT NULL THEN
+        DELETE FROM price_matrix_entries WHERE price_table_id = v_table_id;
         INSERT INTO price_matrix_entries (price_table_id, width_mm, projection_mm, price, properties) VALUES
         (v_table_id, 0, 0, 150.00, '{"name": "LED Spot (szt.)", "description": "LED Spots Punktowe", "unit": "piece"}'),
         (v_table_id, 0, 0, 80.00,  '{"name": "LED Listwa (mb)", "description": "LED Listwa Taśma", "unit": "meter"}'),
@@ -23,19 +35,33 @@ BEGIN
   END IF;
 END $$;
 
--- 2. WPC Flooring Options
+-- 2. Create/Ensure "Systemy Podłogowe" Product
 DO $$
 DECLARE
   v_product_id uuid;
   v_table_id uuid;
 BEGIN
-  SELECT id INTO v_product_id FROM product_definitions WHERE code = 'trendstyle' LIMIT 1;
+  INSERT INTO product_definitions (name, code, category, provider, description)
+  VALUES ('Systemy Podłogowe', 'systemy_podlogowe', 'other', 'Inny', 'Kategoria grupująca systemy podłogowe WPC')
+  ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_product_id;
+
   IF v_product_id IS NOT NULL THEN
-    INSERT INTO price_tables (name, product_definition_id, is_active, configuration, attributes)
-    VALUES ('Podłoga WPC (Szablon)', v_product_id, true, '{}'::jsonb, '{"table_type": "component_list", "system": "wpc_floor"}'::jsonb)
-    RETURNING id INTO v_table_id;
+    -- Try to find existing table first
+    SELECT id INTO v_table_id FROM price_tables WHERE name = 'Podłoga WPC (Szablon)' LIMIT 1;
 
     IF v_table_id IS NOT NULL THEN
+        -- Update existing to new product
+        UPDATE price_tables SET product_definition_id = v_product_id WHERE id = v_table_id;
+    ELSE
+        -- Insert new
+        INSERT INTO price_tables (name, product_definition_id, is_active, configuration, attributes)
+        VALUES ('Podłoga WPC (Szablon)', v_product_id, true, '{}'::jsonb, '{"table_type": "component_list", "system": "wpc_floor"}'::jsonb)
+        RETURNING id INTO v_table_id;
+    END IF;
+
+    IF v_table_id IS NOT NULL THEN
+        DELETE FROM price_matrix_entries WHERE price_table_id = v_table_id;
         INSERT INTO price_matrix_entries (price_table_id, width_mm, projection_mm, price, properties) VALUES
         -- Flooring Types (Price per m2)
         (v_table_id, 0, 0, 80.00,  '{"name": "Deska Standard (m2)", "description": "WPC Standard (Komorowa)", "unit": "m2", "type": "material"}'),

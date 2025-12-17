@@ -14,14 +14,15 @@ import { SimulationService, type SimulationReport } from '../../services/simulat
 import { AdditionalCostsManager } from './AdditionalCostsManager';
 import { formatCurrency } from '../../utils/translations';
 import { ClipboardImportModal } from './ClipboardImportModal';
-
 import { SurchargeRulesModal } from './SurchargeRulesModal';
+import { DuplicateTableModal } from './DuplicateTableModal';
 
 export const PricingPage = () => {
     const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs' | 'surcharges'>('tables');
     const [priceTables, setPriceTables] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingTable, setEditingTable] = useState<{ id: string, name: string } | null>(null);
+    const [duplicatingTable, setDuplicatingTable] = useState<{ id: string, name: string } | null>(null);
     const [configTable, setConfigTable] = useState<{ id: string, name: string, config: any, productId?: string, productName?: string } | null>(null);
     const [showClipboardImport, setShowClipboardImport] = useState(false);
 
@@ -51,8 +52,6 @@ export const PricingPage = () => {
         }
 
         const toastId = toast.loading('Usuwanie cennika...');
-        // Cascade delete should handle entries if FK is set correctly, but explicit delete is safer
-        // Assuming Postgres FK has ON DELETE CASCADE for table entries.
 
         const { error } = await supabase.from('price_tables').delete().eq('id', id);
 
@@ -62,6 +61,26 @@ export const PricingPage = () => {
         } else {
             toast.success('Cennik usunięty', { id: toastId });
             fetchPriceTables();
+        }
+    };
+
+    const handleCreateEmptyTable = async () => {
+        const name = prompt('Podaj nazwę nowego cennika (np. Oświetlenie LED):');
+        if (!name) return;
+
+        const { data, error } = await supabase.from('price_tables').insert({
+            name: name,
+            type: 'simple',
+            is_active: false
+        }).select().single();
+
+        if (error) {
+            console.error(error);
+            toast.error('Błąd tworzenia: ' + error.message);
+        } else {
+            toast.success('Utworzono nowy cennik');
+            fetchPriceTables();
+            setEditingTable({ id: data.id, name: data.name });
         }
     };
 
@@ -135,7 +154,6 @@ export const PricingPage = () => {
             });
 
             if (error) {
-                // Try to extract useful error message from response body
                 let errorMsg = error.message;
                 if (error.context && typeof error.context.json === 'function') {
                     try {
@@ -151,14 +169,11 @@ export const PricingPage = () => {
 
             setPreviewData(data);
 
-            // Try to auto-match product
             if (data.detected_product_code) {
-                // Try match by exact code match (or prefix)
                 const codeMatch = products.find(p => p.code === data.detected_product_code || (p.code && p.code.startsWith(data.detected_product_code)));
                 if (codeMatch) {
                     setSelectedProductId(codeMatch.id);
                 } else if (data.detected_product_name) {
-                    // Fallback to name match
                     const nameMatch = products.find(p => p.name.toLowerCase().includes(data.detected_product_name.toLowerCase()));
                     if (nameMatch) setSelectedProductId(nameMatch.id);
                 }
@@ -172,7 +187,6 @@ export const PricingPage = () => {
                 }
             }
 
-            // Auto-fill attributes
             if (data.detected_attributes) {
                 const newAttrs: { key: string, value: string }[] = [];
                 if (data.detected_attributes.snow_zone) {
@@ -205,7 +219,6 @@ export const PricingPage = () => {
         let finalProductId = selectedProductId;
         let finalProductName = '';
 
-        // Handle "New Product" creation
         if (selectedProductId === 'new') {
             if (!newProductName) {
                 toast.error('Podaj nazwę nowego produktu');
@@ -214,8 +227,8 @@ export const PricingPage = () => {
             const code = newProductName.toLowerCase().replace(/[^a-z0-9]/g, '_');
             const { data: newProd, error: pErr } = await supabase.from('product_definitions').insert({
                 name: newProductName,
-                code: code + '_' + Date.now(), // Ensure uniqueness
-                category: 'awning', // Default, maybe ask?
+                code: code + '_' + Date.now(),
+                category: 'awning',
                 provider: 'Inny'
             }).select().single();
 
@@ -226,7 +239,6 @@ export const PricingPage = () => {
             finalProductId = newProd.id;
             finalProductName = newProductName;
         } else {
-            // Existing
             finalProductName = products.find(p => p.id === selectedProductId)?.name || '';
         }
 
@@ -243,7 +255,7 @@ export const PricingPage = () => {
             product_definition_id: finalProductId,
             type: 'matrix',
             attributes: importAttributes.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}),
-            is_active: false // Start inactive so user can check
+            is_active: false
         }).select().single();
 
         if (tErr) {
@@ -252,15 +264,14 @@ export const PricingPage = () => {
             return;
         }
 
-        // 2. Insert Entries
         const entries = previewData.entries.map((e: any) => ({
             price_table_id: table.id,
             width_mm: e.width_mm,
             projection_mm: e.projection_mm,
             price: e.price,
-            structure_price: e.structure_price || e.price, // Use detected split or full price
+            structure_price: e.structure_price || e.price,
             glass_price: e.glass_price || 0,
-            properties: e.properties || {} // Support extended properties (fields, posts, area)
+            properties: e.properties || {}
         }));
 
         const { error: eErr } = await supabase.from('price_matrix_entries').insert(entries);
@@ -269,8 +280,6 @@ export const PricingPage = () => {
             console.error(eErr);
             toast.error('Błąd zapisu cen: ' + eErr.message);
         } else {
-            // Success!
-            // Also update the table attributes with detected metadata if needed
             if (previewData.surcharges || previewData.currency) {
                 await supabase.from('price_tables').update({
                     attributes: {
@@ -299,6 +308,19 @@ export const PricingPage = () => {
                     tableId={editingTable.id}
                     tableName={editingTable.name}
                     onClose={() => setEditingTable(null)}
+                />
+            )}
+
+            {duplicatingTable && (
+                <DuplicateTableModal
+                    tableId={duplicatingTable.id}
+                    sourceTableName={duplicatingTable.name}
+                    products={products}
+                    onClose={() => setDuplicatingTable(null)}
+                    onSuccess={() => {
+                        fetchPriceTables();
+                        setDuplicatingTable(null);
+                    }}
                 />
             )}
 
@@ -415,17 +437,14 @@ export const PricingPage = () => {
                     >
                         <IconUpload /> Import PDF (AI)
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+                    <button
+                        onClick={handleCreateEmptyTable}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
                         <IconPlus /> Nowy Pusty Cennik
                     </button>
                 </div>
             </header>
-
-
-
-            setShowClipboardImport(false);
-            toast.success('Dane wczytane do podglądu. Uzupełnij atrybuty i zapisz.');
-
 
             {/* Tabs */}
             <div className="flex gap-4 border-b border-slate-200">
@@ -597,12 +616,12 @@ export const PricingPage = () => {
                                                         className="text-sm font-medium text-violet-600 hover:text-violet-800 hover:underline flex items-center gap-1"
                                                     >
                                                         Reguły
-                                                        {table.configuration?.free_standing_surcharge?.length > 0 && (
-                                                            <span className="flex h-2 w-2 relative">
-                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
-                                                            </span>
-                                                        )}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDuplicatingTable({ id: table.id, name: table.name })}
+                                                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                    >
+                                                        Kopiuj
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteTable(table.id, table.name)}
@@ -727,7 +746,7 @@ export const PricingPage = () => {
                         setPreviewData({
                             detected_product_name: '',
                             detected_attributes: {
-                                ...attributes // Inject global attributes (snow_zone) from modal
+                                ...attributes
                             },
                             entries: data,
                             currency: 'EUR',
@@ -735,7 +754,6 @@ export const PricingPage = () => {
                             notes: 'Zaimportowano ze schowka'
                         });
 
-                        // Also update importAttributes state for the form
                         if (attributes) {
                             const newAttrs: { key: string, value: string }[] = [];
                             Object.entries(attributes).forEach(([k, v]) => {
