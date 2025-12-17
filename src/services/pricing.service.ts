@@ -116,7 +116,11 @@ export const PricingService = {
 
         if (!tables) return [];
 
-        const componentTables = tables.filter(t => t.attributes && t.attributes['table_type'] === 'component_list');
+        const componentTables = tables.filter(t =>
+            (t.attributes && t.attributes['table_type'] === 'component_list') ||
+            t.type === 'simple' ||
+            t.type === 'component'
+        );
 
         if (componentTables.length === 0) return [];
 
