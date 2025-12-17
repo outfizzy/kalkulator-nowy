@@ -53,9 +53,9 @@ export const BacklogSidebar: React.FC<BacklogSidebarProps> = ({
     return (
         <div className="flex flex-col h-full bg-slate-50 border-r border-slate-200 w-80">
             {/* Header */}
-            <div className="p-4 border-b border-slate-200 bg-white">
+            <div className="p-4 border-b border-slate-200 bg-white border-l-4 border-l-indigo-500">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-slate-800">Do zaplanowania</h3>
+                    <h3 className="font-bold text-slate-800">Do zaplanowania 📋</h3>
                     <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">
                         {filtered.length}
                     </span>

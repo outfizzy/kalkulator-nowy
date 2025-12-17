@@ -152,7 +152,7 @@ export const InstallationPlanner: React.FC = () => {
     }
 
     return (
-        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-100 relative">
+        <div className="flex h-[85vh] overflow-hidden bg-slate-100 relative">
             {/* Mobile Overlay */}
             {isSidebarOpen && window.innerWidth <= 768 && (
                 <div
