@@ -211,17 +211,61 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         }
 
         if (headerRowIdx === -1) {
-            // Fallback for ZIP Screen / Awnings
-            const isZip = contextType === 'zip_screen' || contextType === 'aufdachmarkise_zip' || contextType === 'unterdachmarkise_zip';
-            if (isZip) {
-                // Provide wider range for Awnings if needed, but 1000-3000 is safe default for ZIPs
-                // For Awnings it might be 2000-6000? 
-                // Let's assume standard set if verification failed
-                headerProjections = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000];
-                toast('Nie wykryto nagłówka - użyto standardowych wysokości ZIP (1000-3000). Sprawdź czy to poprawne!', { icon: 'ℹ️' });
+            // Failed to find explicit header row. try to infer from data.
+            // 1. Gather stats on large numbers count per row
+            const counts = new Map<number, number>();
+            let maxCount = 0;
+            let mostFrequentCount = 0;
+
+            for (let i = 0; i < parsedRows.length; i++) {
+                const row = parsedRows[i];
+                const nums = row.map(c => parseEurNumber(c)).filter(n => !isNaN(n) && n > 10);
+                if (nums.length > 2) { // Only consider rows with meaningful data
+                    const count = nums.length;
+                    counts.set(count, (counts.get(count) || 0) + 1);
+                    if (counts.get(count)! > maxCount) {
+                        maxCount = counts.get(count)!;
+                        mostFrequentCount = count;
+                    }
+                }
+            }
+
+            if (mostFrequentCount > 2) {
+                // Infer header structure
+                // expect mostFrequentCount numbers. 1 is Width, rest are Prices.
+                // Generate dummy header or try to use standard logic?
+                // Price columns count
+                const priceCols = mostFrequentCount - 1;
+
+                // Fallback Awnings/ZIP standard projections logic
+                // If it looks like 6 columns, maybe it's 2500-5000? 
+                // If 9 columns, maybe 1000-3000?
+                // But safer to just create placeholders if we can't be sure, OR use the contextType hints.
+
+                if (priceCols === 6) {
+                    headerProjections = [2500, 3000, 3500, 4000, 4500, 5000];
+                    toast('Wykryto 6 kolumn cenowych. Zastosowano standardowy nagłówek (2500-5000).', { icon: '🤖' });
+                } else if (priceCols === 9) {
+                    headerProjections = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000];
+                    toast('Wykryto 9 kolumn cenowych. Zastosowano standardowy nagłówek ZIP (1000-3000).', { icon: '🤖' });
+                } else {
+                    // Generic fallback
+                    headerProjections = Array(priceCols).fill(0).map((_, i) => (i + 1) * 500 + 2000); // arbitrary
+                    toast(`Wykryto ${priceCols} kolumn cenowych. Zastosowano domyślne nagłówki. Sprawdź wartości!`, { icon: '⚠️' });
+                }
+
+                console.log('Inferred Matrix Header:', headerProjections);
+
             } else {
-                toast.error('Nie znaleziono wiersza nagłówkowego z wymiarami (>500). Sprawdź format (np. 2000, 2500...).');
-                return;
+                // Double fallback for ZIP Screen if inference failed
+                const isZip = contextType === 'zip_screen' || contextType === 'aufdachmarkise_zip' || contextType === 'unterdachmarkise_zip';
+                if (isZip) {
+                    headerProjections = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000];
+                    toast('Nie wykryto nagłówka ani danych - użyto standard ZIP (1000-3000).', { icon: 'ℹ️' });
+                } else {
+                    toast.error('Nie znaleziono wiersza nagłówkowego ani spójnych danych. Upewnij się, że zaznaczyłeś tabelę.');
+                    return;
+                }
             }
         } else {
             console.log('Detected Matrix Header:', headerProjections);
@@ -229,8 +273,10 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
 
         // 2. Flatten Data
         const flattenedRows: string[][] = [];
+        let skippedRowsCount = 0;
+        let lastFailureReason = '';
 
-        // Iterate data rows (skip header)
+        // Iterate data rows (skip header if explicit)
         for (let i = 0; i < parsedRows.length; i++) {
             if (i === headerRowIdx) continue;
 
@@ -268,6 +314,11 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                         priceVal.toString()
                     ]);
                 }
+            } else {
+                if (allLargeNumbers.length > 0) {
+                    skippedRowsCount++;
+                    lastFailureReason = `Wiersz ma ${allLargeNumbers.length} liczb, oczekiwano ${expectedCount}`;
+                }
             }
         }
 
@@ -283,8 +334,8 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             // Auto-select manufacturer
             if (contextType === 'aufdachmarkise_zip' || contextType === 'unterdachmarkise_zip') {
                 setManufacturer('Aluxe');
-                setProductHint(contextType); // preserve specific type
-                toast.success(`Przekształcono macierz dla: ${contextType}`);
+                setProductHint(contextType);
+                toast.success(`Przekształcono macierz: ${flattenedRows.length} poz. (${contextType})`);
             } else if (contextType === 'zip_screen') {
                 setManufacturer('Aluxe');
                 setProductHint(contextType);
@@ -294,8 +345,8 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                 toast.success(`Przekształcono macierz: ${flattenedRows.length} wierszy.`);
             }
         } else {
-            toast.error('Błąd przekształcania macierzy. Nie dopasowano liczby kolumn do nagłówka.');
-            console.warn('Failed to match rows. Header length:', headerProjections.length, 'Expected numbers per row:', headerProjections.length + 1);
+            toast.error(`Błąd: Nie dopasowano danych. ${lastFailureReason || 'Sprawdź czy zaznaczyłeś całą tabelę.'}`);
+            console.warn('Matrix transform failed.', lastFailureReason);
         }
     };
 

@@ -101,7 +101,7 @@ export const PricingService = {
     /**
      * Fetch component lists (tables tagged with table_type="component_list")
      */
-    async getComponentLists(contextAttributes: Record<string, string> = {}): Promise<{ table: PriceTable, entries: PriceMatrixEntry[] }[]> {
+    async getComponentLists(_contextAttributes: Record<string, string> = {}): Promise<{ table: PriceTable, entries: PriceMatrixEntry[] }[]> {
         // Fetch tables that have table_type = 'component_list'
         // Supabase JSONB filtering: attributes->>'table_type' = 'component_list'
         const { data: tables } = await supabase
@@ -138,10 +138,31 @@ export const PricingService = {
             return acc;
         }, {});
 
-        return componentTables.map(table => ({
-            table,
-            entries: entriesByTable[table.id] || []
-        }));
+        return componentTables.map(table => {
+            const tableDiscount = table.attributes?.['discount'];
+            const rawEntries = entriesByTable[table.id] || [];
+
+            const processedEntries = rawEntries.map((entry: any) => {
+                const price = entry.price || 0;
+                const structure = entry.structure_price || price;
+                const glass = entry.glass_price || 0;
+
+                return {
+                    ...entry,
+                    // Apply discount if present
+                    price: this.calculateDiscountedPrice(price, tableDiscount),
+                    structure_price: this.calculateDiscountedPrice(structure, tableDiscount),
+                    glass_price: this.calculateDiscountedPrice(glass, tableDiscount),
+                    // Keep original for reference if needed
+                    original_price: price,
+                };
+            });
+
+            return {
+                table,
+                entries: processedEntries
+            };
+        });
     },
 
     async getTableConfig(productCode: string, contextAttributes: Record<string, string> = {}): Promise<{ config: any, attributes: any }> {
@@ -221,8 +242,74 @@ export const PricingService = {
     },
 
     /**
-     * Returns detailed pricing breakdown and technical properties
-     */
+    * Calculates extra costs (surcharges) based on table configuration and user selections.
+    * Returns total surcharge value and detailed list of applied surcharges.
+    */
+    calculateSurcharges(
+        basePrice: number,
+        width: number,
+        projection: number,
+        tableConfig: any,
+        selections: {
+            mountingType?: string;
+            roofType?: string;
+            // Add other relevant selections here
+        }
+    ): { total: number, items: { name: string, price: number }[] } {
+        let totalSurcharge = 0;
+        const items: { name: string, price: number }[] = [];
+
+        if (!tableConfig) {
+            return { total: 0, items: [] };
+        }
+
+        // Helper to parse price string/number
+        const normalizePrice = (val: any) => {
+            if (typeof val === 'number') return val;
+            if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0;
+            return 0;
+        };
+
+        // 1. Free Standing Surcharge (Montaż Wolnostojący)
+        if (selections.mountingType === 'free_standing' && tableConfig.free_standing_surcharge) {
+            const rules = Array.isArray(tableConfig.free_standing_surcharge)
+                ? tableConfig.free_standing_surcharge
+                : [tableConfig.free_standing_surcharge]; // Handle single object legacy
+
+            for (const rule of rules) {
+                // Check logic (if rule matches context, e.g. width/projection range? For now assume global)
+                let price = 0;
+                const ruleValue = normalizePrice(rule.value);
+                const ruleType = rule.type; // 'fixed', 'percentage', 'per_m2'
+
+                if (ruleType === 'percentage' || (typeof rule.value === 'string' && rule.value.includes('%'))) {
+                    const pct = ruleValue;
+                    price = basePrice * (pct / 100);
+                } else if (ruleType === 'per_m2') {
+                    const area = (width * projection) / 1000000;
+                    price = ruleValue * area;
+                } else {
+                    // Fixed
+                    price = ruleValue;
+                }
+
+                if (price > 0) {
+                    totalSurcharge += price;
+                    items.push({ name: 'Dopłata: Wolnostojące', price });
+                }
+            }
+        }
+
+        // 2. Glass Surcharge (if distinct from base price)
+        // Note: Usually matrix handles glass via 'glass_price' column. 
+        // This is for EXTRA surcharges defined in config (e.g. "Szkło Mleczne +10%")
+        if (selections.roofType === 'glass' && tableConfig.glass_surcharge) {
+            // Similar logic if needed
+        }
+
+        return { total: totalSurcharge, items };
+    },
+
     getDetailedPrice(matrix: PriceMatrixEntry[], width: number, projection: number) {
         const entry = this.findMatrixEntry(matrix, width, projection);
         if (!entry) return null;

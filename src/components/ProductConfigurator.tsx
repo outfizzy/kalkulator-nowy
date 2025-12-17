@@ -72,6 +72,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [dynamicBasePrice, setDynamicBasePrice] = useState<number>(0);
     const [priceLoading, setPriceLoading] = useState(false);
     const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
+    const [surchargesBreakdown, setSurchargesBreakdown] = useState<{ name: string, price: number }[]>([]);
 
     // Component Lists (Imported Components)
     const [componentLists, setComponentLists] = useState<{ table: any, entries: any[] }[]>([]);
@@ -100,22 +101,25 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     price = PricingService.calculateMatrixPrice(matrix, config.width, config.projection);
                 }
 
-                // 2.5 Apply Table Configuration Surcharges (e.g. Free Standing)
+                // 2.5 Apply Table Configuration Surcharges (e.g. Free Standing, Glass, Color)
                 const { config: tableConfig, attributes: tableAttributes } = await PricingService.getTableConfig(config.modelId, attributes);
 
-                if (config.installationType !== 'wall-mounted' && tableConfig?.free_standing_surcharge?.length > 0) {
-                    // Check Free Standing Surcharge Rule
-                    // Logic: Next Size Up based on Width
-                    // 4000 -> 2478. If width is 3500 -> 2478. If 4500 -> 2776.
-                    const rules = tableConfig.free_standing_surcharge.sort((a: any, b: any) => a.width - b.width);
-                    const rule = rules.find((r: any) => r.width >= config.width);
-
-                    if (rule) {
-                        const surcharge = Number(rule.price) || 0;
-                        price += surcharge;
-                        console.log(`[Pricing] Applied Free Standing Surcharge: +${surcharge} (Rule: ${rule.width}mm)`);
+                const surchargeResult = PricingService.calculateSurcharges(
+                    price,
+                    config.width,
+                    config.projection,
+                    tableConfig,
+                    {
+                        mountingType: config.installationType === 'wall-mounted' ? 'wall' : 'free_standing',
+                        roofType: config.roofType
                     }
+                );
+
+                if (surchargeResult.total > 0) {
+                    price += surchargeResult.total;
+                    console.log('[Pricing] Surcharges applied:', surchargeResult.items);
                 }
+                setSurchargesBreakdown(surchargeResult.items);
 
                 // NEW: Apply Table Discount (Cascaded)
                 // If the selected table has a discount (e.g. "10+5"), apply it to the calculated price (matrix + surcharges)
@@ -135,15 +139,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
                 // 3. Get Additional Costs (Surcharges for this specific variant)
                 const surcharges = await PricingService.getAdditionalCosts(config.modelId, attributes);
-                // Filter surcharges that apply (some might be automatable, others are manual options?)
-                // Actually the AdditionalCostsManager defines them. 
-                // We typically just ADD them if they are mandatory? 
-                // Or are they options the user selects?
-                // The prompt implied "wygodne dodawanie" -> adding variables.
-                // Assuming simple surcharges for now (like fixed variants).
-                // If they are specific surcharges (e.g. "Surcharge for 3m posts"), we might automate it
-                // if we detect the condition.
-                // For now just logging them or storing them.
                 setAdditionalCosts(surcharges);
 
             } catch (err) {
@@ -1437,6 +1432,23 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 {a.quantity}x {a.name}
                                             </span>
                                             <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(a.price * (a.quantity || 1))}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Table Surcharges (Rules) */}
+                        {surchargesBreakdown.length > 0 && (
+                            <div className="space-y-3 pb-6 border-b border-slate-100">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Reguły Cennika</span>
+                                <div className="space-y-2">
+                                    {surchargesBreakdown.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between text-sm">
+                                            <span className="text-slate-600 truncate" title={item.name}>
+                                                {item.name}
+                                            </span>
+                                            <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(item.price)}</span>
                                         </div>
                                     ))}
                                 </div>
