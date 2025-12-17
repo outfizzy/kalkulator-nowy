@@ -1203,6 +1203,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
+                                                    availableItems={componentLists.find(l => l.table.attributes?.system === 'lighting')?.entries || []}
                                                 />
                                             )}
                                         </div>
@@ -1217,6 +1218,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         onRemove={handleAddonRemove}
                                         roofWidth={config.width}
                                         roofDepth={config.projection}
+                                        availableItems={componentLists.find(l => l.table.attributes?.system === 'wpc_floor')?.entries || []}
                                     />
                                 )}
 
@@ -1261,45 +1263,47 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 <div className="mt-8 pt-8 border-t border-slate-100">
                                                     <h4 className="text-lg font-bold text-slate-800 mb-6">Dodatkowe Części / Elementy</h4>
 
-                                                    {componentLists.map((list, listIdx) => (
-                                                        <div key={list.table.id || listIdx} className="mb-8">
-                                                            <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">{list.table.name}</h5>
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                                {list.entries.map((entry: any, entryIdx: number) => {
-                                                                    const itemName = entry.properties?.name || entry.properties?.description || `Element ${entryIdx + 1}`;
-                                                                    const itemPrice = entry.structure_price || entry.price;
-                                                                    // Unique key for accessories selection
-                                                                    const uniqueName = `[${list.table.name}] ${itemName} ${entry.properties.width ? `(${entry.properties.width}mm)` : ''}`;
+                                                    {componentLists
+                                                        .filter(list => !['lighting', 'wpc_floor'].includes(list.table.attributes?.system))
+                                                        .map((list, listIdx) => (
+                                                            <div key={list.table.id || listIdx} className="mb-8">
+                                                                <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">{list.table.name}</h5>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                                    {list.entries.map((entry: any, entryIdx: number) => {
+                                                                        const itemName = entry.properties?.name || entry.properties?.description || `Element ${entryIdx + 1}`;
+                                                                        const itemPrice = entry.structure_price || entry.price;
+                                                                        // Unique key for accessories selection
+                                                                        const uniqueName = `[${list.table.name}] ${itemName} ${entry.properties.width ? `(${entry.properties.width}mm)` : ''}`;
 
-                                                                    const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
-                                                                    const qty = selected?.quantity || 0;
+                                                                        const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
+                                                                        const qty = selected?.quantity || 0;
 
-                                                                    return (
-                                                                        <div key={entry.id || entryIdx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
-                                                                            <div className="flex justify-between items-start mb-2">
-                                                                                <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
-                                                                                    {itemName}
-                                                                                    {entry.properties.width && <span className="block text-xs text-slate-500">{entry.properties.width} mm</span>}
+                                                                        return (
+                                                                            <div key={entry.id || entryIdx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
+                                                                                <div className="flex justify-between items-start mb-2">
+                                                                                    <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
+                                                                                        {itemName}
+                                                                                        {entry.properties.width && <span className="block text-xs text-slate-500">{entry.properties.width} mm</span>}
+                                                                                    </div>
+                                                                                    <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
                                                                                 </div>
-                                                                                <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
+                                                                                <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
+                                                                                    <button
+                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, false)}
+                                                                                        className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+                                                                                    >-</button>
+                                                                                    <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
+                                                                                    <button
+                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, true)}
+                                                                                        className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
+                                                                                    >+</button>
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
-                                                                                <button
-                                                                                    onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, false)}
-                                                                                    className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                                                                                >-</button>
-                                                                                <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
-                                                                                <button
-                                                                                    onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice }, true)}
-                                                                                    className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
-                                                                                >+</button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
+                                                                        );
+                                                                    })}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
                                                 </div>
                                             )
                                         )}

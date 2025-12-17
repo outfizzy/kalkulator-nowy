@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { SelectedAddon } from '../../types';
 
 interface WPCFlooringSelectorProps {
@@ -7,6 +8,7 @@ interface WPCFlooringSelectorProps {
     onRemove: (id: string) => void;
     roofWidth: number;
     roofDepth: number;
+    availableItems: any[]; // DB Entries
 }
 
 const WPC_COLORS = [
@@ -18,40 +20,63 @@ const WPC_COLORS = [
     { id: 'teak', name: 'Teak', hex: '#A1887F' }
 ];
 
-const WPC_TYPES = [
-    { id: 'standard', name: 'Standard (Komorowa)', pricePerM2: 80 },
-    { id: 'premium', name: 'Premium (Pełna)', pricePerM2: 120 },
-    { id: '3d', name: '3D Structure', pricePerM2: 100 }
-];
-
-const INSTALLATION_OPTIONS = [
-    { id: 'without-foundation', name: 'Na profilach (Fundament Klienta)', pricePerM2: 40 },
-    { id: 'with-foundation', name: 'Na profilach + Fundament', pricePerM2: 90 }
-];
-
 export const WPCFlooringSelector: React.FC<WPCFlooringSelectorProps> = ({
     currentAddons,
     onAdd,
     onRemove,
     roofWidth,
-    roofDepth
+    roofDepth,
+    availableItems
 }) => {
+    // Derive options from DB
+    const wpcTypes = useMemo(() => {
+        return availableItems
+            .filter(i => i.properties?.type === 'material')
+            .map(i => ({
+                id: i.id,
+                name: i.properties.name.replace(' (m2)', ''), // Clean name
+                pricePerM2: i.price,
+                description: i.properties.description
+            }));
+    }, [availableItems]);
+
+    const installationOptions = useMemo(() => {
+        return availableItems
+            .filter(i => i.properties?.type === 'installation')
+            .map(i => ({
+                id: i.id,
+                name: i.properties.name.replace(' (m2)', ''),
+                pricePerM2: i.price
+            }));
+    }, [availableItems]);
+
     const existingFloor = currentAddons.find(a => a.type === 'wpc-floor');
 
     const [width, setWidth] = useState(existingFloor?.width || roofWidth);
     const [depth, setDepth] = useState(existingFloor?.depth || roofDepth);
     const [color, setColor] = useState(existingFloor?.flooringColor || WPC_COLORS[0].id);
-    const [type, setType] = useState(existingFloor?.flooringType || WPC_TYPES[0].id);
-    const [installation, setInstallation] = useState<'with-foundation' | 'without-foundation'>(
-        (existingFloor?.installationOption as any) || 'without-foundation'
+
+    // Default to first available type
+    const [typeId, setTypeId] = useState(existingFloor?.flooringType || (wpcTypes[0]?.id || ''));
+    const [installId, setInstallId] = useState(
+        (existingFloor?.installationOption as any) || (installationOptions[0]?.id || '')
     );
+
+    // Update defaults if data loads later
+    useEffect(() => {
+        if (!typeId && wpcTypes.length > 0) setTypeId(wpcTypes[0].id);
+        if (!installId && installationOptions.length > 0) setInstallId(installationOptions[0].id);
+    }, [wpcTypes, installationOptions, typeId, installId]);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Calculate price
     const area = (width / 1000) * (depth / 1000);
-    const typePrice = WPC_TYPES.find(t => t.id === type)?.pricePerM2 || 0;
-    const installPrice = INSTALLATION_OPTIONS.find(i => i.id === installation)?.pricePerM2 || 0;
+    const selectedType = wpcTypes.find(t => t.id === typeId);
+    const selectedInstall = installationOptions.find(i => i.id === installId);
+
+    const typePrice = selectedType?.pricePerM2 || 0;
+    const installPrice = selectedInstall?.pricePerM2 || 0;
     const totalPrice = Math.round(area * (typePrice + installPrice));
 
     const drawVisualization = useCallback(() => {
@@ -89,9 +114,9 @@ export const WPCFlooringSelector: React.FC<WPCFlooringSelectorProps> = ({
         const plankWidthPx = plankWidthMm * scale;
         const gapPx = gapMm * scale;
 
-        const selectedColor = WPC_COLORS.find(c => c.id === color)?.hex || '#8B4513';
+        const selectedColorHex = WPC_COLORS.find(c => c.id === color)?.hex || '#8B4513';
 
-        ctx.fillStyle = selectedColor;
+        ctx.fillStyle = selectedColorHex;
 
         // Vertical planks
         const numPlanks = Math.floor(width / (plankWidthMm + gapMm));
@@ -105,7 +130,7 @@ export const WPCFlooringSelector: React.FC<WPCFlooringSelectorProps> = ({
             // Add texture effect
             ctx.fillStyle = 'rgba(0,0,0,0.1)';
             ctx.fillRect(x, startY, plankWidthPx / 4, drawHeight); // Shadow line
-            ctx.fillStyle = selectedColor; // Reset color
+            ctx.fillStyle = selectedColorHex; // Reset color
         }
 
         // Draw dimensions
@@ -129,20 +154,30 @@ export const WPCFlooringSelector: React.FC<WPCFlooringSelectorProps> = ({
     }, [drawVisualization]);
 
     const handleAdd = () => {
+        if (!selectedType) return;
+
         const addon: SelectedAddon = {
             id: existingFloor?.id || crypto.randomUUID(),
             type: 'wpc-floor',
-            name: `Podłoga WPC ${WPC_TYPES.find(t => t.id === type)?.name}`,
+            name: `Podłoga WPC ${selectedType.name}`,
             width,
             depth,
             price: totalPrice,
             flooringColor: color,
-            flooringType: type,
-            installationOption: installation,
-            description: `Kolor: ${WPC_COLORS.find(c => c.id === color)?.name}, Montaż: ${INSTALLATION_OPTIONS.find(i => i.id === installation)?.name}`
+            flooringType: typeId,
+            installationOption: installId,
+            description: `Kolor: ${WPC_COLORS.find(c => c.id === color)?.name}, Typ: ${selectedType.description}, Montaż: ${selectedInstall?.name || 'Brak'}`
         };
         onAdd(addon);
     };
+
+    if (wpcTypes.length === 0) {
+        return (
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-center text-slate-400 text-sm">
+                Brak dostępnych wariantów podłogi w cenniku.
+            </div>
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -177,19 +212,22 @@ export const WPCFlooringSelector: React.FC<WPCFlooringSelectorProps> = ({
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-slate-700 mb-2">Rodzaj Deski</label>
                         <div className="space-y-2">
-                            {WPC_TYPES.map(t => (
+                            {wpcTypes.map(t => (
                                 <label key={t.id} className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
                                     <div className="flex items-center gap-3">
                                         <input
                                             type="radio"
                                             name="wpc-type"
-                                            checked={type === t.id}
-                                            onChange={() => setType(t.id)}
+                                            checked={typeId === t.id}
+                                            onChange={() => setTypeId(t.id)}
                                             className="w-4 h-4 text-accent focus:ring-accent"
                                         />
-                                        <span className="font-medium">{t.name}</span>
+                                        <div>
+                                            <div className="font-medium">{t.name}</div>
+                                            <div className="text-xs text-slate-500">{t.description}</div>
+                                        </div>
                                     </div>
-                                    <span className="text-sm text-slate-500">{t.pricePerM2} €/m²</span>
+                                    <span className="text-sm text-slate-500 whitespace-nowrap">{t.pricePerM2} €/m²</span>
                                 </label>
                             ))}
                         </div>
@@ -220,14 +258,14 @@ export const WPCFlooringSelector: React.FC<WPCFlooringSelectorProps> = ({
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-slate-700 mb-2">Montaż</label>
                         <div className="space-y-2">
-                            {INSTALLATION_OPTIONS.map(opt => (
+                            {installationOptions.map(opt => (
                                 <label key={opt.id} className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
                                     <div className="flex items-center gap-3">
                                         <input
                                             type="radio"
                                             name="install-opt"
-                                            checked={installation === opt.id as any}
-                                            onChange={() => setInstallation(opt.id as any)}
+                                            checked={installId === opt.id}
+                                            onChange={() => setInstallId(opt.id)}
                                             className="w-4 h-4 text-accent focus:ring-accent"
                                         />
                                         <span className="font-medium">{opt.name}</span>

@@ -18,7 +18,9 @@ export interface PriceTable {
     name: string;
     product_definition_id: string;
     is_active: boolean;
+    type?: 'matrix' | 'simple' | 'component';
     attributes: Record<string, string>; // e.g. { "snow_zone": "3" }
+    configuration?: any;
 }
 
 export interface AdditionalCost {
