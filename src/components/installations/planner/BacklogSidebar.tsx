@@ -119,7 +119,7 @@ export const BacklogSidebar: React.FC<BacklogSidebarProps> = ({
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'}
                             `}
                         >
-                            Zaplanuj ({selectedIds.length})
+                            Zaplanuj 🪄 ({selectedIds.length})
                         </button>
                     )}
                 </div>

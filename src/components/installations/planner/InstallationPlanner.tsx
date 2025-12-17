@@ -103,13 +103,18 @@ export const InstallationPlanner: React.FC = () => {
 
             if (result.updates.length > 0) {
                 // Bulk update (simulated for now, ideally one big query)
-                await Promise.all(result.updates.map(u =>
-                    DatabaseService.updateInstallation(u.id, {
+                await Promise.all(result.updates.map(u => {
+                    const original = installations.find(i => i.id === u.id);
+                    const oldNotes = original?.notes || '';
+                    const newNote = `[Auto: ${u.reason}]`;
+
+                    return DatabaseService.updateInstallation(u.id, {
                         scheduledDate: u.scheduledDate,
                         teamId: u.teamId,
-                        status: 'scheduled'
-                    })
-                ));
+                        status: 'scheduled',
+                        notes: oldNotes ? `${oldNotes}\n${newNote}` : newNote
+                    });
+                }));
 
                 await loadData();
                 toast.success(`Zaplanowano ${result.updates.length} zleceń`, { id: toastId });
@@ -127,29 +132,87 @@ export const InstallationPlanner: React.FC = () => {
         }
     };
 
+    // Layout State
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth > 768) {
+                setIsSidebarOpen(true);
+            } else {
+                setIsSidebarOpen(false);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     if (loading) {
         return <div className="h-full flex items-center justify-center text-slate-500">Ładowanie planera...</div>;
     }
 
     return (
-        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-100">
+        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-100 relative">
+            {/* Mobile Overlay */}
+            {isSidebarOpen && window.innerWidth <= 768 && (
+                <div
+                    className="absolute inset-0 bg-black/50 z-20 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <BacklogSidebar
-                installations={installations.filter(i =>
-                    !i.scheduledDate ||
-                    i.status === 'pending' ||
-                    i.status === 'verification'
+            <div className={`
+                absolute md:relative z-30 h-full bg-white transition-all duration-300 ease-in-out shadow-xl md:shadow-none
+                ${isSidebarOpen ? 'translate-x-0 w-80' : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:overflow-hidden'}
+            `}>
+                <div className="h-full w-80">
+                    <BacklogSidebar
+                        installations={installations.filter(i =>
+                            !i.scheduledDate ||
+                            i.status === 'pending' ||
+                            i.status === 'verification'
+                        )}
+                        onDragStart={handleDragStart}
+                        onAutoSchedule={handleAutoSchedule}
+                        onItemClick={(inst) => setEditingInstallation(inst)}
+                    />
+                </div>
+            </div>
+
+            {/* Toggle Button (Mobile/Desktop) */}
+            <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className={`
+                    absolute bottom-6 left-6 z-40 bg-slate-800 text-white p-3 rounded-full shadow-lg hover:bg-slate-700 transition-all
+                    md:hidden
+                `}
+            >
+                {isSidebarOpen ? (
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                ) : (
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                    </svg>
                 )}
-                onDragStart={handleDragStart}
-                onAutoSchedule={handleAutoSchedule}
-                onItemClick={(inst) => setEditingInstallation(inst)}
-            />
+            </button>
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Toolbar */}
-                <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+                <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0 transition-all">
                     <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="hidden md:flex p-2 hover:bg-slate-100 rounded text-slate-600"
+                            title={isSidebarOpen ? "Zwiń panel" : "Rozwiń panel"}
+                        >
+                            <svg className={`w-5 h-5 transition-transform ${isSidebarOpen ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                            </svg>
+                        </button>
                         <h2 className="font-bold text-slate-800">Plan Montaży</h2>
                         <div className="h-6 w-px bg-slate-200" />
                         <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg">
@@ -207,13 +270,15 @@ export const InstallationPlanner: React.FC = () => {
                 </div>
 
                 {/* Timeline Grid */}
-                <TeamTimeline
-                    teams={teams}
-                    dates={dates}
-                    installations={installations}
-                    onDrop={handleDrop}
-                    onEdit={(inst) => setEditingInstallation(inst)}
-                />
+                <div className="flex-1 overflow-hidden relative flex flex-col">
+                    <TeamTimeline
+                        teams={teams}
+                        dates={dates}
+                        installations={installations}
+                        onDrop={handleDrop}
+                        onEdit={(inst) => setEditingInstallation(inst)}
+                    />
+                </div>
             </div>
 
             {/* Edit Modal */}

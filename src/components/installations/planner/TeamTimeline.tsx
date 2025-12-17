@@ -58,10 +58,10 @@ export const TeamTimeline: React.FC<TeamTimelineProps> = ({
     };
 
     return (
-        <div className="overflow-x-auto flex-1 bg-white">
-            <div className="min-w-max">
+        <div className="overflow-auto flex-1 w-full h-full bg-white relative" style={{ contain: 'paint' }}>
+            <div className="min-w-max relative">
                 {/* Header Row */}
-                <div className="flex border-b border-slate-200 sticky top-0 z-20 bg-white">
+                <div className="flex border-b border-slate-200 sticky top-0 z-20 bg-white shadow-sm">
                     <div className="w-48 p-4 shrink-0 bg-slate-50 border-r border-slate-200 font-bold text-slate-500 text-xs uppercase sticky left-0 z-30">
                         Ekipa
                     </div>

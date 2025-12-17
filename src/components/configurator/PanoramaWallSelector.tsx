@@ -24,7 +24,7 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
     const [width, setWidth] = useState<number>(existing?.width || 3000);
     const [height, setHeight] = useState<number>(existing?.height || 2500);
     const [numTracks, setNumTracks] = useState<number>(existing?.variant ? parseInt(existing.variant) : 3);
-    const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
+
 
     // Switch list based on system
     const activeList = systemType === 'AL22' ? al22List : al23List;
@@ -64,7 +64,7 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
         if (activeList.length === 0) return { totalPrice: 0, breakdown: [] };
 
         let total = 0;
-        const items = [];
+        const items: { name: string, price: number }[] = [];
 
         // 1. Rails (Bottom and Top) - Find by string matching current tracks
         const bottomRail = activeList.find(i =>

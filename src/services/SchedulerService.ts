@@ -20,13 +20,9 @@ export class SchedulerService {
     ): ScheduleSuggestion[] {
         const suggestions: ScheduleSuggestion[] = [];
 
-        if (!targetInstallation.client.coordinates) {
-            return []; // Cannot score without location
-        }
-
         const duration = targetInstallation.expectedDuration || 1;
-        const targetLat = targetInstallation.client.coordinates.lat;
-        const targetLng = targetInstallation.client.coordinates.lng;
+        const targetLat = targetInstallation.client.coordinates?.lat || 0;
+        const targetLng = targetInstallation.client.coordinates?.lng || 0;
 
         // Iterate over next X days
         for (let i = 1; i <= daysToScan; i++) {
@@ -47,7 +43,8 @@ export class SchedulerService {
                         targetLng,
                         dateStr,
                         team.id,
-                        existingInstallations
+                        existingInstallations,
+                        targetInstallation
                     );
 
                     if (score > 0) {
@@ -113,15 +110,50 @@ export class SchedulerService {
         lng: number,
         dateStr: string,
         teamId: string,
-        installations: Installation[]
+        installations: Installation[],
+        targetInstallation?: Installation
     ): { score: number, reason: string, distance?: number } {
 
         // Base score for availability
         let score = 50;
         const reasons: string[] = ['Dostępny termin'];
 
-        // Check surrounding jobs for this team (Cluster bonus)
-        // Check -1 day and +1 day (or same day if we allowed multiple/day but we don't usually)
+        if (lat === 0 && lng === 0) {
+            return { score, reason: 'Brak lokalizacji - termin dostępny' };
+        }
+
+        // --- Delivery Date Logic ---
+        if (targetInstallation?.deliveryDate) {
+            const delivery = new Date(targetInstallation.deliveryDate);
+            const proposed = new Date(dateStr);
+
+            // Reset hours for comparison
+            delivery.setHours(0, 0, 0, 0);
+            proposed.setHours(0, 0, 0, 0);
+
+            if (proposed < delivery) {
+                // Before delivery -> Penalize heavily
+                return {
+                    score: 0,
+                    reason: `Termin przed dostawą (${targetInstallation.deliveryDate})`
+                };
+            } else {
+                // After delivery -> Boost
+                score += 20;
+                reasons.push(`Po dostawie (${targetInstallation.deliveryDate})`);
+            }
+        }
+
+        // --- Delivery Date Check ---
+        // Find the installation object to check delivery date
+        // Note: In optimalSlots loop we have 'targetInstallation' available in scope if we pass it, 
+        // but here we only have lat/lng/date. 
+        // We should probably pass the installation or deliveryDate to calculateScore.
+        // For now, let's assume we need to update the signature of calculateScore.
+
+        // Wait, I need to update the signature first.
+        // Let's abort this specific replacement and do a larger one that updates the method signature.
+
 
         const check = new Date(dateStr);
         const prevDay = new Date(check); prevDay.setDate(check.getDate() - 1);
@@ -153,14 +185,19 @@ export class SchedulerService {
             // Bonus for proximity
             if (minDistance < 20) {
                 score += 40;
-                reasons.push(`Zespół jest ${Math.round(minDistance)}km obok dzień wcześniej/później`);
+                reasons.push(`Zespół jest ${Math.round(minDistance)}km obok (zlec. ${nearbyJobs[0].client.city})`);
             } else if (minDistance < 50) {
                 score += 20;
                 reasons.push(`Zespół w okolicy (${Math.round(minDistance)}km)`);
             }
         } else {
             // No nearby jobs -> Check distance from HQ (Assume center of Poland/Warsaw for now or 52,19)
-            // Or just give standard score
+            // Or check if it's Monday (good for far jobs)
+            const dayOfWeek = check.getDay();
+            if (dayOfWeek === 1) { // Monday
+                score += 5;
+                reasons.push('Poniedziałek (dobry na start trasy)');
+            }
             reasons.push('Start z bazy');
         }
 
@@ -196,7 +233,7 @@ export class SchedulerService {
         teams: InstallationTeam[],
         startDate: Date = new Date(),
         daysToScan: number = 60 // Look further ahead for bulk
-    ): { success: boolean; updates: { id: string; scheduledDate: string; teamId: string }[]; failedIds: string[] } {
+    ): { success: boolean; updates: { id: string; scheduledDate: string; teamId: string; reason: string }[]; failedIds: string[] } {
 
         // 1. Sort installations to schedule? 
         // Strategy: Group by location (Cluster) could be better, but for now specific order or just simple greedy.
@@ -209,7 +246,7 @@ export class SchedulerService {
                 return 0;
             });
 
-        const updates: { id: string; scheduledDate: string; teamId: string }[] = [];
+        const updates: { id: string; scheduledDate: string; teamId: string; reason: string }[] = [];
         const failedIds: string[] = [];
 
         // Virtual timeline including existing jobs + new planned ones
@@ -228,7 +265,8 @@ export class SchedulerService {
                 updates.push({
                     id: inst.id,
                     scheduledDate: bestSlot.date,
-                    teamId: bestSlot.teamId
+                    teamId: bestSlot.teamId,
+                    reason: bestSlot.reason || 'Dostępny termin'
                 });
 
                 // Add to virtual context so next iteration sees it as busy

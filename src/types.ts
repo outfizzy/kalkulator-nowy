@@ -398,6 +398,7 @@ export interface Installation {
     };
     photoUrls?: string[]; // Array of photo URLs from installation
     partsReady?: boolean; // Whether parts are ready for installation
+    deliveryDate?: string; // Estimated or confirmed delivery date (ISO String)
     expectedDuration?: number; // Duration in days (default 1)
 }
 
