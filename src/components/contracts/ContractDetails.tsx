@@ -3,18 +3,23 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { generateInstallationProtocolPDF } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
-import type { Contract, ContractComment, ContractAttachment } from '../../types';
+import type { Contract, ContractComment, ContractAttachment, User } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { UserService } from '../../services/database/user.service';
+import { useAuth } from '../../contexts/AuthContext';
 import { OrderedItemsModule } from './OrderedItemsModule';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { isAdmin } = useAuth();
     const [contract, setContract] = useState<Contract | null>(null);
     const [newComment, setNewComment] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [photos, setPhotos] = useState<string[]>([]);
+    const [hasInstallation, setHasInstallation] = useState(false);
+    const [salesReps, setSalesReps] = useState<User[]>([]);
 
     useEffect(() => {
         if (!id) return;
@@ -26,6 +31,10 @@ export const ContractDetails: React.FC = () => {
                 if (found) {
                     setContract(found);
                     setPhotos(getOfferPhotos(found.offerId));
+
+                    // Check for installation
+                    const installationExists = await DatabaseService.checkInstallationForContract(found.offerId);
+                    setHasInstallation(installationExists);
                 } else {
                     toast.error('Nie znaleziono umowy');
                     navigate('/contracts');
@@ -38,7 +47,12 @@ export const ContractDetails: React.FC = () => {
         };
 
         loadContract();
-    }, [id, navigate]);
+        loadContract();
+
+        if (isAdmin()) {
+            UserService.getSalesReps().then(setSalesReps).catch(console.error);
+        }
+    }, [id, navigate, isAdmin]);
 
     const handleSave = async () => {
         if (!contract) return;
@@ -127,6 +141,80 @@ export const ContractDetails: React.FC = () => {
             toast.error('Błąd dodawania załącznika');
         }
     };
+
+    const handleSignedContractUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!contract || !e.target.files || e.target.files.length === 0) return;
+
+        const file = e.target.files[0];
+        if (file.type !== 'application/pdf') {
+            toast.error('Tylko pliki PDF są dozwolone dla umowy');
+            return;
+        }
+
+        // Simulate file upload - in real app upload to storage
+        const attachment: ContractAttachment = {
+            id: crypto.randomUUID(),
+            name: `UMOWA POPDISANA - ${file.name}`,
+            url: URL.createObjectURL(file), // Temporary local URL
+            type: 'document',
+            createdAt: new Date()
+        };
+
+        const updatedContract: Contract = {
+            ...contract,
+            attachments: [...contract.attachments, attachment],
+            status: 'signed', // Auto-mark as signed when contract uploaded
+            signedAt: new Date() // Set signed date
+        };
+
+        setContract(updatedContract);
+        try {
+            await DatabaseService.updateContract(updatedContract.id, updatedContract);
+            toast.success('Wgrano podpisaną umowę');
+        } catch (error) {
+            console.error('Error updating contract with signed pdf:', error);
+            toast.error('Błąd zapisu');
+        }
+    };
+
+    const handlePlanInstallation = async () => {
+        if (!contract) return;
+
+        if (hasInstallation) {
+            toast.error('Montaż już zaplanowany');
+            return;
+        }
+
+        try {
+            await DatabaseService.createInstallation({
+                offerId: contract.offerId,
+                status: 'pending',
+                client: {
+                    firstName: contract.client.firstName,
+                    lastName: contract.client.lastName,
+                    city: contract.client.city,
+                    address: `${contract.client.street} ${contract.client.houseNumber}`.trim(),
+                    phone: contract.client.phone,
+                },
+                productSummary: `${contract.product.modelId} ${contract.product.width}x${contract.product.projection} mm`,
+                notes: [
+                    contract.requirements.constructionProject ? 'Projekt' : '',
+                    contract.requirements.powerSupply ? 'Prąd' : '',
+                    contract.requirements.foundation ? 'Fundament' : '',
+                    contract.requirements.other
+                ].filter(Boolean).join(', ')
+            });
+
+            setHasInstallation(true);
+            toast.success('Utworzono zlecenie montażu');
+        } catch (error) {
+            console.error('Error creating installation:', error);
+            toast.error('Błąd tworzenia montażu');
+        }
+    };
+
+    // Helper calculations
+
 
     if (!contract) return <div>Ładowanie...</div>;
 
@@ -219,6 +307,59 @@ export const ContractDetails: React.FC = () => {
                         </svg>
                         Drukuj
                     </button>
+                </div>
+            </div>
+
+            {/* Sales Rep and Signer Info - New Section */}
+            <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-6 items-center">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div className="text-xs text-slate-500 font-bold uppercase">Handlowiec (Opiekun)</div>
+                        {isEditing && isAdmin() ? (
+                            <select
+                                value={contract.salesRepId || ''}
+                                onChange={(e) => setContract({ ...contract, salesRepId: e.target.value })}
+                                className="mt-1 p-1 border rounded text-sm min-w-[150px]"
+                            >
+                                <option value="">Wybierz...</option>
+                                {salesReps.map(rep => (
+                                    <option key={rep.id} value={rep.id}>
+                                        {rep.firstName} {rep.lastName}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="font-medium text-slate-800">
+                                {contract.salesRep ? `${contract.salesRep.firstName} ${contract.salesRep.lastName}` : 'Nie przypisano'}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-50 text-green-600 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div className="text-xs text-slate-500 font-bold uppercase">Podpisana Przez</div>
+                        <div className="font-medium text-slate-800">
+                            {contract.signedByUser ? (
+                                <span>{contract.signedByUser.firstName} {contract.signedByUser.lastName}</span>
+                            ) : (
+                                <span className="text-slate-400">-</span>
+                            )}
+                        </div>
+                        {contract.signedAt && (
+                            <div className="text-xs text-slate-400">{new Date(contract.signedAt).toLocaleDateString()}</div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -365,19 +506,106 @@ export const ContractDetails: React.FC = () => {
 
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h3 className="font-bold text-slate-800 mb-4">Finanse</h3>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
+                            {/* Financial Fields - Editable */}
                             <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                 <span className="text-slate-600">Wartość Netto</span>
                                 <span className="font-bold text-slate-800">
                                     {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
                                 </span>
                             </div>
-                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                <span className="text-slate-600">Wartość Brutto</span>
-                                <span className="font-bold text-slate-800">
-                                    {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23} EUR
-                                </span>
-                            </div>
+
+                            {isEditing ? (
+                                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Kwota Brutto (EUR)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23).toFixed(2)}
+                                            onChange={(e) => {
+                                                const newGross = parseFloat(e.target.value);
+                                                if (!isNaN(newGross)) {
+                                                    const newNet = newGross / 1.23;
+                                                    setContract({
+                                                        ...contract,
+                                                        pricing: { ...contract.pricing, finalPriceNet: newNet }
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full p-2 border rounded font-bold text-slate-800"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <div className="w-1/2">
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">Zaliczka %</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={contract.pricing.advancePayment ? Math.round((contract.pricing.advancePayment / ((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23)) * 100) : ''}
+                                                    onChange={(e) => {
+                                                        const percent = parseFloat(e.target.value);
+                                                        if (!isNaN(percent)) {
+                                                            const currentGross = (contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23;
+                                                            const newAdvance = (currentGross * percent) / 100;
+                                                            setContract({
+                                                                ...contract,
+                                                                pricing: { ...contract.pricing, advancePayment: newAdvance }
+                                                            });
+                                                        }
+                                                    }}
+                                                    className="w-full p-2 border rounded pr-6"
+                                                />
+                                                <span className="absolute right-2 top-2 text-slate-400 font-bold">%</span>
+                                            </div>
+                                        </div>
+                                        <div className="w-1/2">
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">Kwota Zaliczki</label>
+                                            <div className="p-2 bg-white border border-slate-200 rounded text-slate-600 font-medium">
+                                                {contract.pricing.advancePayment ? contract.pricing.advancePayment.toFixed(2) : '0.00'} EUR
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Metoda Płatności</label>
+                                        <select
+                                            value={contract.pricing.paymentMethod || 'transfer'}
+                                            onChange={(e) => setContract({
+                                                ...contract,
+                                                pricing: { ...contract.pricing, paymentMethod: e.target.value as any }
+                                            })}
+                                            className="w-full p-2 border rounded"
+                                        >
+                                            <option value="transfer">Przelew</option>
+                                            <option value="cash">Gotówka</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                        <span className="text-slate-600">Wartość Brutto</span>
+                                        <span className="font-bold text-slate-800">
+                                            {((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23).toFixed(2)} EUR
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                        <span className="text-slate-600">Zaliczka ({contract.pricing.advancePayment ? Math.round((contract.pricing.advancePayment / ((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet) * 1.23)) * 100) : 0}%)</span>
+                                        <span className="font-bold text-green-600">
+                                            {contract.pricing.advancePayment?.toFixed(2) || '0.00'} EUR
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                        <span className="text-slate-600">Metoda Płatności</span>
+                                        <span className="font-medium text-slate-800 capitalize">
+                                            {contract.pricing.paymentMethod === 'cash' ? 'Gotówka' : 'Przelew'}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+
                             <div className="flex justify-between items-center py-3 bg-green-50 px-3 rounded-lg mt-2">
                                 <span className="text-green-800 font-medium">Prowizja (5%)</span>
                                 <span className="font-bold text-green-700 text-lg">
@@ -424,6 +652,89 @@ export const ContractDetails: React.FC = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                                 </svg>
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Signed Contract & Installation Section */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Podpisana Umowa i Montaż
+                        </h3>
+
+                        <div className="space-y-4">
+                            {/* PDF Upload */}
+                            <div className="p-4 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center hover:bg-white transition-colors">
+                                <label className="cursor-pointer block">
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={handleSignedContractUpload}
+                                        className="hidden"
+                                    />
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center">
+                                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                            </svg>
+                                        </div>
+                                        <div className="font-bold text-slate-700">Wgraj podpisany skan (PDF)</div>
+                                        <div className="text-xs text-slate-500">Kliknij aby wybrać plik</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Show uploaded signed contracts */}
+                            {contract.attachments.filter(a => a.name.includes('UMOWA') || a.name.includes('podpisan')).length > 0 && (
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Wgrane dokumenty:</h4>
+                                    {contract.attachments.filter(a => a.name.includes('UMOWA') || a.name.includes('podpisan')).map(att => (
+                                        <div key={att.id} className="flex items-center justify-between p-2 bg-green-50 border border-green-100 rounded text-green-800 text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                <span className="truncate max-w-[180px]">{att.name}</span>
+                                            </div>
+                                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-green-700 underline text-xs font-bold">Pobierz</a>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Installation Button */}
+                            <div className="pt-2 border-t border-slate-100">
+                                {hasInstallation ? (
+                                    <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center justify-center gap-2 font-bold">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        Montaż Zaplanowany
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handlePlanInstallation}
+                                        disabled={contract.status !== 'signed'}
+                                        title={contract.status !== 'signed' ? 'Podpisz umowę aby zaplanować montaż' : ''}
+                                        className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-white transition-colors ${contract.status === 'signed'
+                                            ? 'bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg'
+                                            : 'bg-slate-300 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Zaplanuj Montaż
+                                    </button>
+                                )}
+                                {contract.status !== 'signed' && (
+                                    <div className="text-center text-xs text-slate-400 mt-2">
+                                        Wymagany status: Podpisana
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { OrderTasksDashboard } from './OrderTasksDashboard';
 
 export const ManagerDashboard: React.FC = () => {
 
@@ -143,6 +144,10 @@ export const ManagerDashboard: React.FC = () => {
                         <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full opacity-10 ${action.color.includes('gradient') ? 'bg-white' : 'bg-accent'}`} />
                     </Link>
                 ))}
+            </section>
+
+            <section>
+                <OrderTasksDashboard />
             </section>
         </div>
     );

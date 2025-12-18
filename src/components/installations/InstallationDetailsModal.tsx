@@ -5,8 +5,9 @@ import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob 
 import { PhotoGallery } from '../PhotoGallery';
 import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
 import { DatabaseService } from '../../services/database';
+import { InstallationService } from '../../services/database/installation.service';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
+import type { Installation, InstallationTeam, InstallationStatus, User, OrderItem } from '../../types';
 import { SchedulerService, type ScheduleSuggestion } from '../../services/SchedulerService';
 
 interface InstallationDetailsModalProps {
@@ -37,6 +38,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([]);
     const [isThinking, setIsThinking] = useState(false);
     const [allInstallations, setAllInstallations] = useState<Installation[]>([]);
+    const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
@@ -44,18 +46,31 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
         if (isOpen) {
             void (async () => {
                 try {
-                    const [dbTeams, assignedIds, allInstallers, allInst] = await Promise.all([
+                    const [dbTeams, assignedIds, allInstallers, allInst, items, offer] = await Promise.all([
                         DatabaseService.getTeams(),
                         DatabaseService.getAssignmentsForInstallation(installation.id),
                         DatabaseService.getInstallers(),
-                        DatabaseService.getInstallations()
+                        DatabaseService.getInstallations(),
+                        InstallationService.getOrderItems(installation.id),
+                        DatabaseService.getOfferById(installation.offerId) // Fetch offer
                     ]);
+
                     setTeams(dbTeams);
                     setAssignedInstallerIds(assignedIds);
                     setInstallers(allInstallers);
                     setAllInstallations(allInst);
+
+                    // If no items exist, try to sync from config (first time open)
+                    if (items.length === 0 && offer?.product) {
+                        await InstallationService.syncOrderItemsFromConfig(installation.id, offer.product);
+                        const syncedItems = await InstallationService.getOrderItems(installation.id);
+                        setOrderItems(syncedItems);
+                    } else {
+                        setOrderItems(items);
+                    }
+
                 } catch (error) {
-                    console.error('Error loading teams/assignments/installers:', error);
+                    console.error('Error loading teams/assignments/installers/orders:', error);
                 }
             })();
 
@@ -66,6 +81,21 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
             setPhotos(getOfferPhotos(installation.offerId));
         }
     }, [isOpen, installation]);
+
+    const handleOrderItemUpdate = async (item: OrderItem, updates: Partial<OrderItem>) => {
+        try {
+            const updated = await InstallationService.upsertOrderItem({
+                ...item,
+                ...updates,
+                installationId: installation.id
+            });
+            setOrderItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+            toast.success('Zaktualizowano zamówienie');
+        } catch (error) {
+            console.error('Error updating order item:', error);
+            toast.error('Błąd aktualizacji');
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -194,9 +224,13 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                 className="w-full p-2 border border-slate-300 rounded-lg"
                             >
                                 <option value="">-- Nieprzypisana --</option>
-                                {teams.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
+                                {teams
+                                    .filter(t => t.is_active !== false || t.id === formData.teamId)
+                                    .map(t => (
+                                        <option key={t.id} value={t.id}>
+                                            {t.name} {t.is_active === false ? '(Nieaktywna)' : ''}
+                                        </option>
+                                    ))}
                             </select>
                         </div>
                         <div>
@@ -399,6 +433,123 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             {formData.productSummary}
                         </div>
                     </div>
+
+                    {/* Order Items Section */}
+                    {/* Order Items Section */}
+                    {orderItems.length > 0 && (
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-sm font-medium text-slate-700">Status Zamówień (Elementy dodatkowe)</label>
+                                <button
+                                    onClick={() => {
+                                        // Simple prompt for now, or expand to a modal later if needed
+                                        const name = window.prompt("Podaj nazwę elementu:");
+                                        if (name) {
+                                            void (async () => {
+                                                try {
+                                                    await InstallationService.upsertOrderItem({
+                                                        installationId: installation.id,
+                                                        name,
+                                                        type: 'custom',
+                                                        quantity: 1,
+                                                        status: 'pending',
+                                                        isManagerResponsible: true
+                                                    });
+                                                    const items = await InstallationService.getOrderItems(installation.id);
+                                                    setOrderItems(items);
+                                                    toast.success('Dodano element');
+                                                } catch (e) {
+                                                    toast.error('Błąd dodawania');
+                                                }
+                                            })();
+                                        }
+                                    }}
+                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Dodaj pozycję
+                                </button>
+                            </div>
+                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-500 font-medium">
+                                        <tr>
+                                            <th className="px-4 py-2">Nazwa</th>
+                                            <th className="px-4 py-2">Status</th>
+                                            <th className="px-4 py-2">Dostawa</th>
+                                            <th className="px-4 py-2 text-center">Dla Managera</th>
+                                            <th className="px-4 py-2 w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {orderItems.map(item => (
+                                            <tr key={item.id} className="hover:bg-slate-50">
+                                                <td className="px-4 py-2 font-medium text-slate-700">
+                                                    {item.name}
+                                                    {item.quantity > 1 && <span className="text-slate-400 ml-1">x{item.quantity}</span>}
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <select
+                                                        value={item.status}
+                                                        onChange={(e) => handleOrderItemUpdate(item, { status: e.target.value as any })}
+                                                        disabled={readOnly}
+                                                        className={`text-xs font-medium px-2 py-1 rounded-full border-none focus:ring-0 cursor-pointer ${item.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
+                                                            item.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                                                'bg-slate-100 text-slate-600'
+                                                            }`}
+                                                    >
+                                                        <option value="pending">Do zamówienia</option>
+                                                        <option value="ordered">Zamówione</option>
+                                                        <option value="delivered">Dostarczone</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input
+                                                        type="date"
+                                                        value={item.plannedDeliveryDate || ''}
+                                                        onChange={(e) => handleOrderItemUpdate(item, { plannedDeliveryDate: e.target.value })}
+                                                        disabled={readOnly}
+                                                        className="text-xs border-none bg-transparent p-0 text-slate-600 focus:ring-0"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.isManagerResponsible}
+                                                        onChange={(e) => handleOrderItemUpdate(item, { isManagerResponsible: e.target.checked })}
+                                                        disabled={readOnly}
+                                                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('Usunąć pozycję?')) {
+                                                                void (async () => {
+                                                                    try {
+                                                                        await InstallationService.deleteOrderItem(item.id);
+                                                                        setOrderItems(prev => prev.filter(i => i.id !== item.id));
+                                                                        toast.success('Usunięto');
+                                                                    } catch {
+                                                                        toast.error('Błąd');
+                                                                    }
+                                                                })();
+                                                            }
+                                                        }}
+                                                        className="text-slate-400 hover:text-red-500"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Notes */}
                     <div>

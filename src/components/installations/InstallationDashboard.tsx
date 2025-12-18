@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
-import { OfferSearchModal } from './OfferSearchModal';
+import { ManualInstallationModal } from './ManualInstallationModal';
 import { InstallationCalendar } from './InstallationCalendar';
 import { InstallationPlanner } from './planner/InstallationPlanner';
 import { InstallationReports } from './reports/InstallationReports';
@@ -12,18 +12,19 @@ import { groupInstallations, sortInstallations, getStatusLabel, getStatusColor, 
 import type { Installation, InstallationTeam } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { ManagerOrdersWidget } from './ManagerOrdersWidget';
 
 export const InstallationDashboard: React.FC = () => {
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeocoding, setIsGeocoding] = useState(false);
-    const [view, setView] = useState<'planner' | 'list' | 'calendar' | 'contracts' | 'reports'>('planner');
+    const [view, setView] = useState<'planner' | 'list' | 'calendar' | 'contracts' | 'reports' | 'procurement'>('planner');
 
     // Modal State
     const [editingInstallation, setEditingInstallation] = useState<Installation | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
     // Filters & Grouping
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -228,13 +229,13 @@ export const InstallationDashboard: React.FC = () => {
                 </div>
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setIsSearchModalOpen(true)}
+                        onClick={() => setIsManualModalOpen(true)}
                         className="px-4 py-2 bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-2"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        Szukaj Oferty
+                        Dodaj Ręcznie
                     </button>
 
                     <a
@@ -272,7 +273,10 @@ export const InstallationDashboard: React.FC = () => {
                     { id: 'list', label: '📍 Mapa/Lista' },
                     { id: 'calendar', label: '📅 Kalendarz' },
                     { id: 'reports', label: '📈 Raporty' },
-                    { id: 'contracts', label: '📝 Umowy' }
+                    { id: 'calendar', label: '📅 Kalendarz' },
+                    { id: 'reports', label: '📈 Raporty' },
+                    { id: 'contracts', label: '📝 Umowy' },
+                    { id: 'procurement', label: '📦 Zapotrzebowanie' }
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -474,9 +478,13 @@ export const InstallationDashboard: React.FC = () => {
                     <div className="w-full h-full overflow-y-auto bg-white rounded-xl shadow border border-slate-200 p-6">
                         <InstallationReports installations={installations} teams={teams} />
                     </div>
-                ) : (
+                ) : view === 'contracts' ? (
                     <div className="w-full h-full">
                         <ContractBulkSelectionPanel onInstallationsCreated={loadData} />
+                    </div>
+                ) : (
+                    <div className="w-full h-full overflow-y-auto">
+                        <ManagerOrdersWidget />
                     </div>
                 )}
             </div>
@@ -567,9 +575,9 @@ export const InstallationDashboard: React.FC = () => {
                 )
             }
 
-            <OfferSearchModal
-                isOpen={isSearchModalOpen}
-                onClose={() => setIsSearchModalOpen(false)}
+            <ManualInstallationModal
+                isOpen={isManualModalOpen}
+                onClose={() => setIsManualModalOpen(false)}
                 onInstallationCreated={loadData}
             />
         </div >

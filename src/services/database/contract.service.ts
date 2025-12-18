@@ -5,7 +5,7 @@ export const ContractService = {
     async getContracts(): Promise<Contract[]> {
         const { data, error } = await supabase
             .from('contracts')
-            .select('*')
+            .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -29,7 +29,17 @@ export const ContractService = {
             comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: row.contract_data.attachments || [],
             createdAt: new Date(row.created_at),
-            signedAt: row.signed_at ? new Date(row.signed_at) : undefined
+            signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
+            signedBy: row.signed_by,
+            signedByUser: row.signed_profile ? {
+                firstName: row.signed_profile.full_name?.split(' ')[0] || '',
+                lastName: row.signed_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined,
+            salesRepId: row.sales_rep_id,
+            salesRep: row.sales_rep_profile ? {
+                firstName: row.sales_rep_profile.full_name?.split(' ')[0] || '',
+                lastName: row.sales_rep_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
         }));
     },
 
@@ -63,7 +73,8 @@ export const ContractService = {
                 user_id: user.id,
                 contract_data: contractData,
                 status: contract.status,
-                signed_at: contract.signedAt ? contract.signedAt.toISOString() : null
+                signed_at: contract.signedAt ? contract.signedAt.toISOString() : null,
+                sales_rep_id: user.id // Default to creator
             })
             .select()
             .single();
@@ -93,12 +104,24 @@ export const ContractService = {
             // Auto-set signed_at when status changes to 'signed'
             if (contract.status === 'signed' && !current.signedAt) {
                 updates.signed_at = new Date().toISOString();
+                // Also set signed_by if provided (and not already set?) - passed from UI
+                if (contract.signedBy) {
+                    updates.signed_by = contract.signedBy;
+                }
             }
         }
 
-        // 3. Handle explicit signed_at override
+        // 3. Handle explicit signed_at / signed_by override
         if (contract.signedAt) {
             updates.signed_at = contract.signedAt.toISOString();
+        }
+        if (contract.signedBy) {
+            updates.signed_by = contract.signedBy;
+        }
+
+        // Handle sales_rep_id update
+        if (contract.salesRepId) {
+            updates.sales_rep_id = contract.salesRepId;
         }
 
         // 4. Handle contract_data updates with safe JSONB merge
@@ -205,6 +228,8 @@ export const ContractService = {
             .from('contracts')
             .select('*')
             .in('offer_id', offerIds)
+            .in('offer_id', offerIds)
+            .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -228,14 +253,24 @@ export const ContractService = {
             comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: row.contract_data.attachments || [],
             createdAt: new Date(row.created_at),
-            signedAt: row.signed_at ? new Date(row.signed_at) : undefined
+            signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
+            signedBy: row.signed_by,
+            signedByUser: row.signed_profile ? {
+                firstName: row.signed_profile.full_name?.split(' ')[0] || '',
+                lastName: row.signed_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined,
+            salesRepId: row.sales_rep_id,
+            salesRep: row.sales_rep_profile ? {
+                firstName: row.sales_rep_profile.full_name?.split(' ')[0] || '',
+                lastName: row.sales_rep_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
         }));
     },
 
     async findContractByOfferId(offerId: string): Promise<Contract | null> {
         const { data, error } = await supabase
             .from('contracts')
-            .select('*')
+            .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
             .eq('offer_id', offerId)
             .maybeSingle();
 
@@ -261,7 +296,17 @@ export const ContractService = {
             comments: data.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: data.contract_data.attachments || [],
             createdAt: new Date(data.created_at),
-            signedAt: data.signed_at ? new Date(data.signed_at) : undefined
+            signedAt: data.signed_at ? new Date(data.signed_at) : undefined,
+            signedBy: data.signed_by,
+            signedByUser: data.signed_profile ? {
+                firstName: data.signed_profile.full_name?.split(' ')[0] || '',
+                lastName: data.signed_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined,
+            salesRepId: data.sales_rep_id,
+            salesRep: data.sales_rep_profile ? {
+                firstName: data.sales_rep_profile.full_name?.split(' ')[0] || '',
+                lastName: data.sales_rep_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
         };
     },
 
@@ -269,7 +314,7 @@ export const ContractService = {
         // Get all signed contracts
         const { data: contracts, error: contractsError } = await supabase
             .from('contracts')
-            .select('*')
+            .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
             .eq('status', 'signed')
             .order('created_at', { ascending: false });
 
@@ -308,7 +353,17 @@ export const ContractService = {
             comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: row.contract_data.attachments || [],
             createdAt: new Date(row.created_at),
-            signedAt: row.signed_at ? new Date(row.signed_at) : undefined
+            signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
+            signedBy: row.signed_by,
+            signedByUser: row.signed_profile ? {
+                firstName: row.signed_profile.full_name?.split(' ')[0] || '',
+                lastName: row.signed_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined,
+            salesRepId: row.sales_rep_id,
+            salesRep: row.sales_rep_profile ? {
+                firstName: row.sales_rep_profile.full_name?.split(' ')[0] || '',
+                lastName: row.sales_rep_profile.full_name?.split(' ').slice(1).join(' ') || ''
+            } : undefined
         }));
     },
 

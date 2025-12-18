@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
-import type { Customer, Contract, Installation, Communication } from '../../types';
+import type { Customer, Contract, Installation, Communication, InstallationTeam } from '../../types';
 import { NotesList } from '../common/NotesList';
+import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 
 interface RingostatCall {
     id: string;
@@ -24,17 +25,20 @@ interface CustomerDetailsProps {
 
 export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEdit, onBack }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'logistics' | 'communication'>('overview');
-
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
+    const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [calls, setCalls] = useState<RingostatCall[]>([]);
     const [communications, setCommunications] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
+    const [isInstallationModalOpen, setIsInstallationModalOpen] = useState(false);
     const [stats, setStats] = useState({
         totalOffers: 0,
         acceptedOffers: 0,
         totalSoldValue: 0,
-        paidValue: 0
+        paidValue: 0,
+        completedInstallations: 0
     });
 
     useEffect(() => {
@@ -42,28 +46,32 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
             if (!customer.id) return;
             try {
                 // Parallel fetching for performance
-                const [offersData, contractsData, installationsData, commsData] = await Promise.all([
+                const [offersData, contractsData, installationsData, commsData, teamsData] = await Promise.all([
                     DatabaseService.getCustomerOffers(customer.id),
                     DatabaseService.getCustomerContracts(customer.id),
                     DatabaseService.getCustomerInstallations(customer.id),
-                    DatabaseService.getCommunications(customer.id)
+                    DatabaseService.getCommunications(customer.id),
+                    DatabaseService.getTeams()
                 ]);
 
                 setContracts(contractsData);
                 setInstallations(installationsData);
                 setCommunications(commsData);
+                setTeams(teamsData);
 
                 // Calculate Stats
                 const soldContracts = contractsData.filter(c => c.status === 'signed' || c.status === 'completed');
                 const totalSold = soldContracts.reduce((sum, c) => sum + (c.pricing.finalPriceNet || c.pricing.sellingPriceNet || 0), 0);
                 // Approx paid value: advance payments
                 const paid = soldContracts.reduce((sum, c) => sum + (c.pricing.advancePayment || 0), 0);
+                const completedInstallationsCount = installationsData.filter(i => i.status === 'completed').length;
 
                 setStats({
-                    totalOffers: offersData.length, // Used for stats
+                    totalOffers: offersData.length,
                     acceptedOffers: soldContracts.length,
                     totalSoldValue: totalSold,
-                    paidValue: paid
+                    paidValue: paid,
+                    completedInstallations: completedInstallationsCount
                 });
 
                 // Fetch Ringostat Calls (Last 3 months)
@@ -109,16 +117,6 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
         loadData();
     }, [customer.id, customer.phone]);
 
-    const handleUpdateInstallation = async (id: string, updates: Partial<Installation>) => {
-        try {
-            await DatabaseService.updateInstallation(id, updates);
-            setInstallations(prev => prev.map(inst => inst.id === id ? { ...inst, ...updates } : inst));
-            toast.success('Zaktualizowano montaż');
-        } catch (error) {
-            console.error('Error updating installation:', error);
-            toast.error('Nie udało się zaktualizować montażu');
-        }
-    };
 
     const handleConfirmInstallation = async (inst: Installation) => {
         if (!inst.scheduledDate || !customer.phone) {
@@ -203,9 +201,20 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     <div className="text-xs text-slate-400 mt-1">Pozostało: {formatMoney(stats.totalSoldValue - stats.paidValue)}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="text-xs text-slate-500 uppercase font-bold">Liczba Ofert</div>
-                    <div className="text-2xl font-bold text-blue-600 mt-1">{stats.totalOffers}</div>
-                    <div className="text-xs text-slate-400 mt-1">{stats.acceptedOffers} przyjętych</div>
+                    <div className="text-xs text-slate-500 uppercase font-bold">Liczba Ofert / Montaży</div>
+                    <div className="flex justify-between items-end mt-1">
+                        <div>
+                            <span className="text-2xl font-bold text-blue-600">{stats.totalOffers}</span>
+                            <span className="text-xs text-slate-400 ml-1">ofert</span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-xl font-bold text-slate-800">
+                                {/* @ts-ignore */}
+                                {stats.completedInstallations}
+                            </span>
+                            <span className="text-xs text-slate-400 ml-1">zrealiz. montaży</span>
+                        </div>
+                    </div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-xs text-slate-500 uppercase font-bold">Ostatni Kontakt</div>
@@ -309,9 +318,10 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                     <tr>
                                         <th className="p-3 rounded-l-lg">Numer</th>
                                         <th className="p-3">Data</th>
-                                        <th className="p-3">Wartość</th>
+                                        <th className="p-3">Wartość (Netto / Brutto)</th>
                                         <th className="p-3">Zaliczka</th>
                                         <th className="p-3">Metoda</th>
+                                        <th className="p-3">Dokument</th>
                                         <th className="p-3">Status</th>
                                         <th className="p-3 rounded-r-lg text-right">Akcje</th>
                                     </tr>
@@ -321,8 +331,13 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                         <tr key={contract.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-3 font-medium text-slate-900">{contract.contractNumber}</td>
                                             <td className="p-3 text-slate-500">{formatDate(contract.createdAt)}</td>
-                                            <td className="p-3 font-bold text-slate-800">
-                                                {formatMoney(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet || 0)}
+                                            <td className="p-3">
+                                                <div className="font-bold text-slate-800">
+                                                    {formatMoney(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet || 0)}
+                                                </div>
+                                                <div className="text-xs text-slate-400">
+                                                    {formatMoney((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet || 0) * 1.23)} Brutto
+                                                </div>
                                             </td>
                                             <td className="p-3 text-green-600 font-medium">
                                                 {contract.pricing.advancePayment ? (
@@ -334,7 +349,27 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                     </div>
                                                 ) : <span className="text-slate-300">-</span>}
                                             </td>
-                                            <td className="p-3 text-slate-600 capitalize">{contract.pricing.paymentMethod || '-'}</td>
+                                            <td className="p-3 text-slate-600 capitalize">
+                                                {contract.pricing.paymentMethod === 'cash' ? 'Gotówka' : contract.pricing.paymentMethod === 'transfer' ? 'Przelew' : '-'}
+                                            </td>
+                                            <td className="p-3">
+                                                {contract.attachments?.find(a => a.name.includes('UMOWA') || a.name.includes('podpisan')) ? (
+                                                    <a
+                                                        href={contract.attachments.find(a => a.name.includes('UMOWA') || a.name.includes('podpisan'))?.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold flex items-center gap-1 w-fit"
+                                                        title="Pobierz podpisaną umowę"
+                                                    >
+                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                        </svg>
+                                                        PDF
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-slate-300 text-xs">-</span>
+                                                )}
+                                            </td>
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${contract.status === 'signed' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
                                                     {contract.status === 'signed' ? 'Podpisana' : contract.status}
@@ -346,7 +381,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                         </tr>
                                     ))}
                                     {contracts.length === 0 && (
-                                        <tr><td colSpan={7} className="p-8 text-center text-slate-400">Brak umów</td></tr>
+                                        <tr><td colSpan={8} className="p-8 text-center text-slate-400">Brak umów</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -418,53 +453,109 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                             <div className="mt-8">
                                 <h3 className="font-bold text-slate-800 mb-4">Planowane Dostawy / Montaże</h3>
                                 {installations.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {installations.map(inst => (
-                                            <div key={inst.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-white shadow-sm">
-                                                <div className={`w-14 h-14 rounded-lg flex items-center justify-center font-bold flex-col leading-none border ${inst.scheduledDate ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                                                    <input
-                                                        type="date"
-                                                        className="absolute opacity-0 w-14 h-14 cursor-pointer"
-                                                        value={inst.scheduledDate || ''}
-                                                        onChange={(e) => handleUpdateInstallation(inst.id, { scheduledDate: e.target.value })}
-                                                    />
-                                                    <span className="text-lg">{inst.scheduledDate ? new Date(inst.scheduledDate).getDate() : '?'}</span>
-                                                    <span className="text-[10px] uppercase">{inst.scheduledDate ? new Date(inst.scheduledDate).toLocaleString('pl-PL', { month: 'short' }) : 'USTAL'}</span>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="font-bold text-slate-800">{inst.productSummary}</div>
-                                                    <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-                                                        Status:
-                                                        <select
-                                                            value={inst.status}
-                                                            onChange={(e) => handleUpdateInstallation(inst.id, { status: e.target.value as any })}
-                                                            className="text-xs border-none bg-slate-100 rounded px-2 py-0.5 font-bold text-slate-700 cursor-pointer hover:bg-slate-200"
-                                                        >
-                                                            <option value="pending">Oczekuje</option>
-                                                            <option value="scheduled">Zaplanowano</option>
-                                                            <option value="completed">Zakończono</option>
-                                                            <option value="cancelled">Anulowano</option>
-                                                        </select>
+                                    <div className="space-y-4">
+                                        {installations.map(inst => {
+                                            const assignedTeam = teams.find(t => t.id === inst.teamId);
+                                            return (
+                                                <div key={inst.id} className="flex flex-col md:flex-row gap-4 p-4 border border-slate-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                                                    {/* Date & Icon */}
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-14 h-14 rounded-lg flex items-center justify-center font-bold flex-col leading-none border ${inst.scheduledDate ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                                            <span className="text-lg">{inst.scheduledDate ? new Date(inst.scheduledDate).getDate() : '?'}</span>
+                                                            <span className="text-[10px] uppercase">{inst.scheduledDate ? new Date(inst.scheduledDate).toLocaleString('pl-PL', { month: 'short' }) : 'USTAL'}</span>
+                                                        </div>
+                                                    </div>
 
-                                                        {inst.scheduledDate && inst.status === 'scheduled' && (
-                                                            <button
-                                                                onClick={() => handleConfirmInstallation(inst)}
-                                                                className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-purple-200 transition-colors"
-                                                            >
-                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                                                                Potwierdź (AI)
-                                                            </button>
+                                                    {/* Details */}
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="font-bold text-slate-800">{inst.productSummary}</div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedInstallation(inst);
+                                                                        setIsInstallationModalOpen(true);
+                                                                    }}
+                                                                    className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 font-medium hover:bg-blue-100 transition-colors"
+                                                                >
+                                                                    Edytuj / Zmień Ekipę
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Team Info */}
+                                                        {assignedTeam ? (
+                                                            <div className="mt-2 bg-slate-50 p-2 rounded border border-slate-100">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: assignedTeam.color }} />
+                                                                    <span className="text-xs font-bold text-slate-700">{assignedTeam.name}</span>
+                                                                    {assignedTeam.is_active === false && <span className="text-[9px] text-red-500 uppercase font-bold">(Nieaktywna)</span>}
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {assignedTeam.members.map(m => (
+                                                                        <span key={m.id} className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">
+                                                                            {m.firstName} {m.lastName}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-100 inline-block font-medium">
+                                                                ⚠️ Brak przypisanej ekipy
+                                                            </div>
                                                         )}
+
+                                                        <div className="flex items-center gap-3 mt-3">
+                                                            <div className="text-sm text-slate-500 flex items-center gap-2">
+                                                                Status:
+                                                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${inst.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                                    inst.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                                                        inst.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                                                            'bg-slate-100 text-slate-600'
+                                                                    }`}>
+                                                                    {inst.status === 'completed' ? 'Zakończono' :
+                                                                        inst.status === 'scheduled' ? 'Zaplanowano' :
+                                                                            inst.status === 'cancelled' ? 'Anulowano' : 'Oczekuje'}
+                                                                </span>
+                                                            </div>
+
+                                                            {inst.scheduledDate && inst.status === 'scheduled' && (
+                                                                <button
+                                                                    onClick={() => handleConfirmInstallation(inst)}
+                                                                    className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-purple-200 transition-colors"
+                                                                >
+                                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                                                                    Potwierdź (AI)
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div className="text-slate-400 italic">Brak zaplanowanych montaży</div>
                                 )}
                             </div>
                         </div>
+                    )}
+
+                    {/* Installation Modal */}
+                    {selectedInstallation && (
+                        <InstallationDetailsModal
+                            isOpen={isInstallationModalOpen}
+                            installation={selectedInstallation}
+                            onClose={() => setIsInstallationModalOpen(false)}
+                            onUpdate={async () => {
+                                // Reload installations
+                                const data = await DatabaseService.getCustomerInstallations(customer.id!);
+                                setInstallations(data);
+                            }}
+                            onSave={async (updated) => {
+                                await DatabaseService.updateInstallation(updated.id, updated);
+                            }}
+                        />
                     )}
 
                     {/* COMMUNICATION TAB */}

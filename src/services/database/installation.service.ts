@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import type { Installation, User, InstallationTeam } from '../../types';
+import type { Installation, User, InstallationTeam, OrderItem } from '../../types';
 import { UserService } from './user.service';
 
 interface InstallationData {
@@ -502,6 +502,9 @@ export const InstallationService = {
                 id: team.id,
                 name: team.name,
                 color: team.color,
+                is_active: team.is_active,
+                tags: team.tags || [],
+                notes: team.notes || '',
                 members: teamMembers
             };
         });
@@ -544,11 +547,11 @@ export const InstallationService = {
         return (data || []).map(row => (row as { user_id: string }).user_id);
     },
 
-    async createTeam(name: string, color: string, memberIds: string[]): Promise<void> {
+    async createTeam(name: string, color: string, memberIds: string[], tags: string[] = [], notes: string = '', is_active: boolean = true): Promise<void> {
         // 1. Create team
         const { data: team, error: teamError } = await supabase
             .from('teams')
-            .insert({ name, color })
+            .insert({ name, color, tags, notes, is_active })
             .select()
             .single();
 
@@ -569,11 +572,11 @@ export const InstallationService = {
         }
     },
 
-    async updateTeam(id: string, name: string, color: string, memberIds: string[]): Promise<void> {
+    async updateTeam(id: string, name: string, color: string, memberIds: string[], tags: string[] = [], notes: string = '', is_active: boolean = true): Promise<void> {
         // 1. Update team details
         const { error: teamError } = await supabase
             .from('teams')
-            .update({ name, color })
+            .update({ name, color, tags, notes, is_active })
             .eq('id', id);
 
         if (teamError) throw teamError;
@@ -608,5 +611,179 @@ export const InstallationService = {
             .eq('id', id);
 
         if (error) throw error;
-    }
+    },
+
+    // --- Order Management ---
+
+    async getOrderItems(installationId: string): Promise<OrderItem[]> {
+        const { data, error } = await supabase
+            .from('installation_order_items')
+            .select('*')
+            .eq('installation_id', installationId)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        return data.map((item: any) => ({
+            id: item.id,
+            installationId: item.installation_id,
+            name: item.name,
+            type: item.type,
+            quantity: Number(item.quantity),
+            status: item.status,
+            plannedDeliveryDate: item.planned_delivery_date,
+            orderedAt: item.ordered_at ? new Date(item.ordered_at) : undefined,
+            notes: item.notes || '',
+            isManagerResponsible: item.is_manager_responsible,
+            createdAt: new Date(item.created_at),
+            updatedAt: new Date(item.updated_at)
+        }));
+    },
+
+    async getManagerOrderItems(): Promise<(OrderItem & { installation: { client: any; productSummary: string } })[]> {
+        const { data, error } = await supabase
+            .from('installation_order_items')
+            .select(`
+                *,
+                installation:installations (
+                    client,
+                    product_summary
+                )
+            `)
+            .eq('is_manager_responsible', true)
+            .neq('status', 'delivered')
+            .order('planned_delivery_date', { ascending: true });
+
+        if (error) throw error;
+
+        return data.map((item: any) => ({
+            id: item.id,
+            installationId: item.installation_id,
+            name: item.name,
+            type: item.type,
+            quantity: Number(item.quantity),
+            status: item.status,
+            plannedDeliveryDate: item.planned_delivery_date,
+            orderedAt: item.ordered_at ? new Date(item.ordered_at) : undefined,
+            notes: item.notes || '',
+            isManagerResponsible: item.is_manager_responsible,
+            createdAt: new Date(item.created_at),
+            updatedAt: new Date(item.updated_at),
+            installation: {
+                client: item.installation?.client,
+                productSummary: item.installation?.product_summary
+            }
+        }));
+    },
+
+    async upsertOrderItem(item: Partial<OrderItem> & { installationId: string }): Promise<OrderItem> {
+        const payload: any = {
+            installation_id: item.installationId,
+            name: item.name,
+            type: item.type,
+            quantity: item.quantity,
+            status: item.status,
+            planned_delivery_date: item.plannedDeliveryDate,
+            ordered_at: item.orderedAt?.toISOString(),
+            notes: item.notes,
+            is_manager_responsible: item.isManagerResponsible
+        };
+
+        if (item.id) {
+            payload.id = item.id;
+            payload.updated_at = new Date().toISOString();
+        }
+
+        const { data, error } = await supabase
+            .from('installation_order_items')
+            .upsert(payload)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            installationId: data.installation_id,
+            name: data.name,
+            type: data.type,
+            quantity: Number(data.quantity),
+            status: data.status,
+            plannedDeliveryDate: data.planned_delivery_date,
+            orderedAt: data.ordered_at ? new Date(data.ordered_at) : undefined,
+            notes: data.notes || '',
+            isManagerResponsible: data.is_manager_responsible,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at)
+        };
+    },
+
+    async deleteOrderItem(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('installation_order_items')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async syncOrderItemsFromConfig(installationId: string, config: any): Promise<void> {
+        const existingItems = await this.getOrderItems(installationId);
+        const existingNames = new Set(existingItems.map(i => i.name));
+
+        const itemsToCreate: any[] = [];
+
+        // 1. WPC Flooring
+        const flooring = config.addons?.find((a: any) => a.type === 'wpc-floor');
+        if (flooring && !existingNames.has('WPC Flooring')) {
+            itemsToCreate.push({
+                installation_id: installationId,
+                name: 'WPC Flooring',
+                type: 'flooring',
+                quantity: flooring.width && flooring.height ? (flooring.width * flooring.height) / 10000 : 1,
+                is_manager_responsible: true
+            });
+        }
+
+        // 2. Custom Items
+        if (config.customItems) {
+            config.customItems.forEach((item: any) => {
+                const name = `Custom: ${item.name}`;
+                if (!existingNames.has(name)) {
+                    itemsToCreate.push({
+                        installation_id: installationId,
+                        name: name,
+                        type: 'custom',
+                        quantity: item.quantity,
+                        is_manager_responsible: true
+                    });
+                }
+            });
+        }
+
+        // 3. Addons
+        if (config.addons) {
+            config.addons.forEach((addon: any) => {
+                if (addon.type === 'wpc-floor') return;
+                const name = `${addon.name} (${addon.type})`;
+                if (!existingNames.has(name)) {
+                    itemsToCreate.push({
+                        installation_id: installationId,
+                        name: name,
+                        type: 'addon',
+                        quantity: 1,
+                        is_manager_responsible: false
+                    });
+                }
+            });
+        }
+
+        if (itemsToCreate.length > 0) {
+            const { error } = await supabase
+                .from('installation_order_items')
+                .insert(itemsToCreate);
+
+            if (error) console.error('Error syncing order items:', error);
+        }
+    },
 };

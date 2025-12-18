@@ -362,6 +362,9 @@ export interface InstallationTeam {
     id: string;
     name: string;
     color: string; // Hex color for map markers
+    is_active?: boolean; // New: Status
+    tags?: string[]; // New: Skills/Types e.g. ["Electric", "Pergola"]
+    notes?: string; // New: Internal notes
     members: {
         id: string;
         firstName: string;
@@ -459,6 +462,16 @@ export interface Contract {
 
     createdAt: Date;
     signedAt?: Date;
+    signedBy?: string; // User ID
+    signedByUser?: {
+        firstName: string;
+        lastName: string;
+    };
+    salesRepId?: string; // User ID
+    salesRep?: {
+        firstName: string;
+        lastName: string;
+    };
     clientWillContactAt?: Date;
     completedAt?: Date;
 }
@@ -660,4 +673,23 @@ export interface Note {
         email: string;
         avatarUrl?: string;
     };
+}
+
+// --- Order Management Types ---
+
+export type OrderItemStatus = 'pending' | 'ordered' | 'delivered';
+
+export interface OrderItem {
+    id: string;
+    installationId: string;
+    name: string;
+    type: 'flooring' | 'addon' | 'custom' | 'accessory';
+    quantity: number;
+    status: OrderItemStatus;
+    plannedDeliveryDate?: string; // ISO Date
+    orderedAt?: Date;
+    notes?: string;
+    isManagerResponsible: boolean;
+    createdAt: Date;
+    updatedAt: Date;
 }

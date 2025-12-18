@@ -14,7 +14,10 @@ export const TeamManagementPanel: React.FC = () => {
     const [formData, setFormData] = useState({
         name: '',
         color: '#3b82f6',
-        memberIds: [] as string[]
+        memberIds: [] as string[],
+        tags: [] as string[],
+        notes: '',
+        is_active: true
     });
 
     const COLORS = [
@@ -27,6 +30,9 @@ export const TeamManagementPanel: React.FC = () => {
         { name: 'Orange', value: '#f97316' },
         { name: 'Cyan', value: '#06b6d4' },
     ];
+
+    // Skill tags presets
+    const PRESET_TAGS = ['Elektryka', 'Hydraulika', 'Pergole', 'Szkło', 'Markizy', 'VIP'];
 
     useEffect(() => {
         loadData();
@@ -55,14 +61,20 @@ export const TeamManagementPanel: React.FC = () => {
             setFormData({
                 name: team.name,
                 color: team.color,
-                memberIds: team.members.map(m => m.id)
+                memberIds: team.members.map(m => m.id),
+                tags: team.tags || [],
+                notes: team.notes || '',
+                is_active: team.is_active ?? true
             });
         } else {
             setEditingTeam(null);
             setFormData({
                 name: '',
                 color: '#3b82f6',
-                memberIds: []
+                memberIds: [],
+                tags: [],
+                notes: '',
+                is_active: true
             });
         }
         setIsModalOpen(true);
@@ -81,14 +93,20 @@ export const TeamManagementPanel: React.FC = () => {
                     editingTeam.id,
                     formData.name,
                     formData.color,
-                    formData.memberIds
+                    formData.memberIds,
+                    formData.tags,
+                    formData.notes,
+                    formData.is_active
                 );
                 toast.success('Zaktualizowano zespół');
             } else {
                 await DatabaseService.createTeam(
                     formData.name,
                     formData.color,
-                    formData.memberIds
+                    formData.memberIds,
+                    formData.tags,
+                    formData.notes,
+                    formData.is_active
                 );
                 toast.success('Utworzono zespół');
             }
@@ -148,8 +166,8 @@ export const TeamManagementPanel: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {teams.map(team => (
-                    <div key={team.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
-                        <div className="h-2" style={{ backgroundColor: team.color }} />
+                    <div key={team.id} className={`bg-white rounded-xl shadow-sm border ${team.is_active === false ? 'border-red-200 bg-red-50/50' : 'border-slate-200'} overflow-hidden hover:shadow-md transition-shadow`}>
+                        <div className={`h-2 ${team.is_active === false ? 'bg-slate-300' : ''}`} style={{ backgroundColor: team.is_active === false ? undefined : team.color }} />
                         <div className="p-6">
                             <div className="flex justify-between items-start mb-4">
                                 <h3 className="text-lg font-bold text-slate-800">{team.name}</h3>
@@ -191,6 +209,21 @@ export const TeamManagementPanel: React.FC = () => {
                                         <span className="text-xs text-slate-400 italic">Brak członków</span>
                                     )}
                                 </div>
+                                {team.tags && team.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {team.tags.map(tag => (
+                                            <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                {team.is_active === false && (
+                                    <div className="mt-2 text-xs font-bold text-red-500 uppercase flex items-center gap-1">
+                                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                                        Nieaktywna
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -250,6 +283,67 @@ export const TeamManagementPanel: React.FC = () => {
                                         />
                                     ))}
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="flex items-center gap-2 mb-4 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.is_active}
+                                        onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                                        className="w-5 h-5 text-accent border-slate-300 rounded focus:ring-accent"
+                                    />
+                                    <span className="text-sm font-medium text-slate-700">Ekipa Aktywna</span>
+                                </label>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Specjalizacje (Tagi)</label>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {PRESET_TAGS.map(tag => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => {
+                                                const tags = formData.tags.includes(tag)
+                                                    ? formData.tags.filter(t => t !== tag)
+                                                    : [...formData.tags, tag];
+                                                setFormData({ ...formData, tags });
+                                            }}
+                                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${formData.tags.includes(tag)
+                                                ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                                : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                                }`}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Dodaj własny tag (wpisz i wciśnij Enter)"
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const val = e.currentTarget.value.trim();
+                                            if (val && !formData.tags.includes(val)) {
+                                                setFormData({ ...formData, tags: [...formData.tags, val] });
+                                                e.currentTarget.value = '';
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Notatki Wewnętrzne</label>
+                                <textarea
+                                    value={formData.notes}
+                                    onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                    className="w-full p-2 border border-slate-300 rounded-lg h-20 text-sm"
+                                    placeholder="Np. Preferują montaże na południu, mają drabinę 10m..."
+                                />
                             </div>
 
                             <div>

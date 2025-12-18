@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
-    const { isAdmin } = useAuth();
+    const { isAdmin, currentUser } = useAuth();
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -38,7 +38,10 @@ export const ContractsList: React.FC = () => {
 
         try {
             // Pass ONLY status, updateContract will handle the rest safely now
-            await DatabaseService.updateContract(contractId, { status: newStatus });
+            await DatabaseService.updateContract(contractId, {
+                status: newStatus,
+                signedBy: newStatus === 'signed' ? currentUser?.id : undefined
+            });
 
             if (newStatus === 'signed') {
                 toast.success('Umowa podpisana! Możesz teraz utworzyć montaż w sekcji "Planowanie Montaży"');
@@ -110,6 +113,8 @@ export const ContractsList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Klient</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Data Utworzenia</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Handlowiec</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Podpisana</th>
                                     <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Montaż</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Wartość Netto</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Prowizja</th>
@@ -119,7 +124,7 @@ export const ContractsList: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {filteredContracts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
                                             Brak umów spełniających kryteria wyszukiwania
                                         </td>
                                     </tr>
@@ -148,16 +153,29 @@ export const ContractsList: React.FC = () => {
                                                 {new Date(contract.createdAt).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <select
-                                                    value={contract.status}
-                                                    onChange={(e) => handleStatusChange(contract.id, contract, e.target.value as Contract['status'])}
-                                                    className={`px-3 py-1 text-xs font-bold rounded-full border-2 cursor-pointer ${getStatusColor(contract.status)}`}
-                                                >
-                                                    <option value="draft">Szkic</option>
-                                                    <option value="signed">Podpisana</option>
-                                                    <option value="completed">Zakończona</option>
-                                                    <option value="cancelled">Anulowana</option>
-                                                </select>
+                                                <div className="flex flex-col gap-1">
+                                                    <select
+                                                        value={contract.status}
+                                                        onChange={(e) => handleStatusChange(contract.id, contract, e.target.value as Contract['status'])}
+                                                        className={`px-3 py-1 text-xs font-bold rounded-full border-2 cursor-pointer ${getStatusColor(contract.status)}`}
+                                                    >
+                                                        <option value="draft">Szkic</option>
+                                                        <option value="signed">Podpisana</option>
+                                                        <option value="completed">Zakończona</option>
+                                                        <option value="cancelled">Anulowana</option>
+                                                    </select>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                                {contract.salesRep ? `${contract.salesRep.firstName} ${contract.salesRep.lastName}` : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                                {contract.signedByUser ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium">{contract.signedByUser.firstName} {contract.signedByUser.lastName}</span>
+                                                        {contract.signedAt && <span className="text-xs text-slate-400">{new Date(contract.signedAt).toLocaleDateString()}</span>}
+                                                    </div>
+                                                ) : '-'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center">
                                                 {(() => {

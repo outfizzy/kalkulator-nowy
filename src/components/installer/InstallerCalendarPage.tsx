@@ -4,31 +4,34 @@ import { DatabaseService } from '../../services/database';
 import { useTranslation } from '../../contexts/TranslationContext';
 import type { Installation, InstallationTeam } from '../../types';
 import { toast } from 'react-hot-toast';
+import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 
 export const InstallerCalendarPage: React.FC = () => {
     const { t } = useTranslation();
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            // Fetch ALL installations and teams, enabled by the new RLS policy
+            const [dbInstallations, dbTeams] = await Promise.all([
+                DatabaseService.getInstallations(),
+                DatabaseService.getTeams()
+            ]);
+            setInstallations(dbInstallations);
+            setTeams(dbTeams);
+        } catch (error) {
+            console.error('Error loading calendar data:', error);
+            toast.error(t('calendar.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadData = async () => {
-            setLoading(true);
-            try {
-                // Fetch ALL installations and teams, enabled by the new RLS policy
-                const [dbInstallations, dbTeams] = await Promise.all([
-                    DatabaseService.getInstallations(),
-                    DatabaseService.getTeams()
-                ]);
-                setInstallations(dbInstallations);
-                setTeams(dbTeams);
-            } catch (error) {
-                console.error('Error loading calendar data:', error);
-                toast.error(t('calendar.error'));
-            } finally {
-                setLoading(false);
-            }
-        };
         void loadData();
     }, [t]);
 
@@ -54,10 +57,28 @@ export const InstallerCalendarPage: React.FC = () => {
                 <InstallationCalendar
                     installations={installations}
                     teams={teams}
-                    onEdit={() => { }} // Read-only: no edit action
+                    onEdit={(inst) => setSelectedInstallation(inst)}
                 // onDragDrop is undefined, so drag-and-drop is disabled
                 />
             </div>
+
+            {selectedInstallation && (
+                <InstallationDetailsModal
+                    installation={selectedInstallation}
+                    isOpen={true}
+                    onClose={() => setSelectedInstallation(null)}
+                    onUpdate={() => {
+                        void loadData();
+                        setSelectedInstallation(null);
+                    }}
+                    onSave={async (updated) => {
+                        // In read-only mode this shouldn't be called for major updates, 
+                        // but if we allow status updates later, this connects it.
+                        await DatabaseService.updateInstallation(updated.id, updated);
+                    }}
+                    readOnly={true}
+                />
+            )}
         </div>
     );
 };

@@ -19,7 +19,7 @@ export const JobCard: React.FC<JobCardProps> = ({ installation, onDragStart, onC
             className={`
                 bg-white p-3 rounded-lg border shadow-sm cursor-move transition-all hover:shadow-md
                 ${highlight ? 'ring-2 ring-indigo-500 scale-[1.02]' : 'border-slate-200'}
-                ${!isReady ? 'opacity-70 bg-slate-50' : 'hover:border-indigo-300'}
+                ${!isReady ? 'opacity-80 bg-slate-50' : 'border-l-4 border-l-emerald-500 hover:border-indigo-300'}
             `}
         >
             <div className="flex justify-between items-start mb-2">
@@ -28,10 +28,26 @@ export const JobCard: React.FC<JobCardProps> = ({ installation, onDragStart, onC
                     <p className="text-xs text-slate-500">{installation.client.lastName}</p>
                 </div>
                 <div className={`
-                    px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
-                    ${isReady ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}
+                    flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm border
+                    ${isReady
+                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-600 border-amber-200'}
                 `}>
-                    {isReady ? 'GOTOWE' : 'CZEKA'}
+                    {isReady ? (
+                        <>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            GOTOWE
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            CZEKA
+                        </>
+                    )}
                 </div>
             </div>
 
