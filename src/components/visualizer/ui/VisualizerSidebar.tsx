@@ -280,12 +280,14 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                             min={2} max={6} step={1}
                                             onChange={(v: number) => updateConfig('customPostCount', v)}
                                         />
-                                        <RangeControl
-                                            label="Liczba Krokwi"
-                                            value={config.customRafterCount || 5}
-                                            min={3} max={15} step={1}
-                                            onChange={(v: number) => updateConfig('customRafterCount', v)}
-                                        />
+                                        {config.modelId !== 'pergola_bio' && (
+                                            <RangeControl
+                                                label="Liczba Krokwi"
+                                                value={config.customRafterCount || 5}
+                                                min={3} max={15} step={1}
+                                                onChange={(v: number) => updateConfig('customRafterCount', v)}
+                                            />
+                                        )}
 
                                         {/* Post Offsets */}
                                         <div className="pt-2 mt-4 border-t border-slate-100">

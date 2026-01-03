@@ -10,7 +10,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
     // 1. Unpack Dimensions safely (convert mm to m)
     const width = (config.width || 4000) / 1000;
     const depth = (config.projection || 3000) / 1000;
-    const height = (config.frontHeight || 2500) / 1000;
+    const height = (config.postsHeight || config.frontHeight || 2500) / 1000;
 
     // 2. Constants (Meters)
     const postSize = 0.15; // 15cm
@@ -310,22 +310,6 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
 };
 
 // --- HELPER COMPONENTS ---
-
-interface GlassWallSideProps {
-    side: 'left' | 'right';
-    position: [number, number, number];
-    width: number;
-    height: number;
-    material: THREE.Material;
-}
-
-const GlassWallSide: React.FC<GlassWallSideProps> = ({ side: _side, position, width, height, material }) => {
-    return (
-        <group position={position} rotation={[0, Math.PI / 2, 0]} name={`glass-side-${_side}`}>
-            <GlassWallPanel position={[0, 0, 0]} width={width} height={height} material={material} />
-        </group>
-    );
-};
 
 interface GlassWallPanelProps {
     position: [number, number, number];
