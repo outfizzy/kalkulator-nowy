@@ -1,9 +1,11 @@
 import { supabase } from '../../lib/supabase';
+import { TaskService } from './task.service';
 import type { OrderRequest, OrderRequestStatus, OrderItem, OrderItemStatus } from '../../types';
+import { PostgrestError } from '@supabase/supabase-js';
 
 export const OrderService = {
     // --- Order Requests ---
-    async createOrderRequest(request: Omit<OrderRequest, 'id' | 'createdAt' | 'updatedAt' | 'user'>): Promise<{ error: any }> {
+    async createOrderRequest(request: Omit<OrderRequest, 'id' | 'createdAt' | 'updatedAt' | 'user'>): Promise<{ error: PostgrestError | null }> {
         const { error } = await supabase
             .from('order_requests')
             .insert({
@@ -11,15 +13,34 @@ export const OrderService = {
                 item_name: request.itemName,
                 quantity: request.quantity,
                 description: request.description,
+                inventory_item_id: request.inventoryItemId,
                 status: request.status
             });
+
+        if (!error) {
+            // Auto-create a task for the manager
+            try {
+                await TaskService.createTask({
+                    title: `📦 ZAPOTRZEBOWANIE: ${request.itemName} (${request.quantity})`,
+                    description: `Zgłoszono zapotrzebowanie.\nIlość: ${request.quantity}\nOpis: ${request.description || 'Brak'}\nZgłaszający ID: ${request.userId}`,
+                    status: 'pending',
+                    priority: 'medium',
+                    type: 'other',
+                    dueDate: new Date().toISOString(),
+                    userId: request.userId
+                });
+            } catch (taskError) {
+                console.error('Failed to auto-create task for order request:', taskError);
+            }
+        }
+
         return { error };
     },
 
     async getOrderRequests(userId?: string): Promise<OrderRequest[]> {
         let query = supabase
             .from('order_requests')
-            .select('*, user:profiles(full_name)')
+            .select('*')
             .order('created_at', { ascending: false });
 
         if (userId) {
@@ -28,24 +49,41 @@ export const OrderService = {
 
         const { data, error } = await query;
         if (error) throw error;
+        if (!data || data.length === 0) return [];
 
-        return data.map(row => ({
-            id: row.id,
-            userId: row.user_id,
-            itemName: row.item_name,
-            quantity: row.quantity,
-            description: row.description,
-            status: row.status,
-            createdAt: new Date(row.created_at),
-            updatedAt: new Date(row.updated_at),
-            user: row.user ? {
-                firstName: row.user.full_name?.split(' ')[0] || '',
-                lastName: row.user.full_name?.split(' ').slice(1).join(' ') || ''
-            } : undefined
-        }));
+        // Manual join for user profiles
+        const userIds = Array.from(new Set(data.map(r => r.user_id).filter(Boolean)));
+        const profileMap = new Map<string, { full_name: string }>();
+
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', userIds);
+
+            profiles?.forEach(p => profileMap.set(p.id, p));
+        }
+
+        return data.map(row => {
+            const profile = profileMap.get(row.user_id);
+            return {
+                id: row.id,
+                userId: row.user_id,
+                itemName: row.item_name,
+                quantity: row.quantity,
+                description: row.description,
+                status: row.status,
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at),
+                user: profile ? {
+                    firstName: (profile.full_name || '').split(' ')[0] || '',
+                    lastName: (profile.full_name || '').split(' ').slice(1).join(' ') || ''
+                } : undefined
+            };
+        });
     },
 
-    async updateOrderRequestStatus(id: string, status: OrderRequestStatus): Promise<{ error: any }> {
+    async updateOrderRequestStatus(id: string, status: OrderRequestStatus): Promise<{ error: PostgrestError | null }> {
         const { error } = await supabase
             .from('order_requests')
             .update({ status, updated_at: new Date().toISOString() })
@@ -80,7 +118,7 @@ export const OrderService = {
         }));
     },
 
-    async addInstallationItem(item: Omit<OrderItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ data: OrderItem | null, error: any }> {
+    async addInstallationItem(item: Omit<OrderItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ data: OrderItem | null, error: PostgrestError | null }> {
         const { data, error } = await supabase
             .from('installation_order_items')
             .insert({
@@ -118,8 +156,8 @@ export const OrderService = {
         };
     },
 
-    async updateInstallationItem(id: string, updates: Partial<OrderItem>): Promise<{ error: any }> {
-        const dbUpdates: any = {};
+    async updateInstallationItem(id: string, updates: Partial<OrderItem>): Promise<{ error: PostgrestError | null }> {
+        const dbUpdates: Record<string, unknown> = {};
         if (updates.name !== undefined) dbUpdates.name = updates.name;
         if (updates.type !== undefined) dbUpdates.type = updates.type;
         if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
@@ -139,7 +177,7 @@ export const OrderService = {
         return { error };
     },
 
-    async deleteInstallationItem(id: string): Promise<{ error: any }> {
+    async deleteInstallationItem(id: string): Promise<{ error: PostgrestError | null }> {
         const { error } = await supabase
             .from('installation_order_items')
             .delete()

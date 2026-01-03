@@ -64,7 +64,7 @@ export class SchedulerService {
         return suggestions.sort((a, b) => b.score - a.score).slice(0, 5); // Return top 5
     }
 
-    private static isTeamAvailable(
+    static isTeamAvailable(
         teamId: string,
         startDateStr: string,
         duration: number,
@@ -72,27 +72,31 @@ export class SchedulerService {
     ): boolean {
         // Need to check availability for [startDateStr ... startDateStr + duration - 1]
         const start = new Date(startDateStr);
+        // Normalize start to noon to avoid timezone overlaps on midnight
+        start.setHours(12, 0, 0, 0);
 
         for (let d = 0; d < duration; d++) {
             const current = new Date(start);
             current.setDate(start.getDate() + d);
-            const currentStr = current.toISOString().split('T')[0];
+            const currentStr = current.toISOString().slice(0, 10); // YYYY-MM-DD
 
             // Check if ANY installation overlaps with this day for this team
             const conflict = installations.some(inst => {
+                // Must be same team, active status, and have a date
                 if (inst.teamId !== teamId || inst.status === 'cancelled' || !inst.scheduledDate) return false;
 
                 // Check overlap
-                // Inst start
                 const instStart = new Date(inst.scheduledDate);
+                instStart.setHours(12, 0, 0, 0);
                 const instDur = inst.expectedDuration || 1;
 
-                // Check if currentStr is within [instStart, instStart + instDur]
-                // Simplest: generate all dates for inst
+                // Check range [instStart, instEnd] against currentStr
                 for (let k = 0; k < instDur; k++) {
                     const occupiedDate = new Date(instStart);
                     occupiedDate.setDate(instStart.getDate() + k);
-                    if (occupiedDate.toISOString().split('T')[0] === currentStr) {
+                    const occupiedStr = occupiedDate.toISOString().slice(0, 10);
+
+                    if (occupiedStr === currentStr) {
                         return true;
                     }
                 }
@@ -138,30 +142,22 @@ export class SchedulerService {
                     reason: `Termin przed dostawą (${targetInstallation.deliveryDate})`
                 };
             } else {
-                // After delivery -> Boost
-                score += 20;
-                reasons.push(`Po dostawie (${targetInstallation.deliveryDate})`);
+                // After delivery -> Boost slightly to prefer earlier valid dates? Or just neutral.
+                // Actually if it's way after delivery, maybe lower score?
+                // For now, simple check.
+                // reasons.push(`Po dostawie`); 
             }
         }
 
-        // --- Delivery Date Check ---
-        // Find the installation object to check delivery date
-        // Note: In optimalSlots loop we have 'targetInstallation' available in scope if we pass it, 
-        // but here we only have lat/lng/date. 
-        // We should probably pass the installation or deliveryDate to calculateScore.
-        // For now, let's assume we need to update the signature of calculateScore.
-
-        // Wait, I need to update the signature first.
-        // Let's abort this specific replacement and do a larger one that updates the method signature.
-
-
+        // --- Distance Optimization ---
         const check = new Date(dateStr);
         const prevDay = new Date(check); prevDay.setDate(check.getDate() - 1);
         const nextDay = new Date(check); nextDay.setDate(check.getDate() + 1);
 
-        const prevDayStr = prevDay.toISOString().split('T')[0];
-        const nextDayStr = nextDay.toISOString().split('T')[0];
+        const prevDayStr = prevDay.toISOString().slice(0, 10);
+        const nextDayStr = nextDay.toISOString().slice(0, 10);
 
+        // Find jobs for this team on adjacent days
         const nearbyJobs = installations.filter(inst =>
             inst.teamId === teamId &&
             inst.client.coordinates &&
@@ -189,6 +185,9 @@ export class SchedulerService {
             } else if (minDistance < 50) {
                 score += 20;
                 reasons.push(`Zespół w okolicy (${Math.round(minDistance)}km)`);
+            } else {
+                score -= 10; // Penalty for zigzagging far
+                reasons.push(`Zespół daleko (${Math.round(minDistance)}km)`);
             }
         } else {
             // No nearby jobs -> Check distance from HQ (Assume center of Poland/Warsaw for now or 52,19)
@@ -196,13 +195,14 @@ export class SchedulerService {
             const dayOfWeek = check.getDay();
             if (dayOfWeek === 1) { // Monday
                 score += 5;
-                reasons.push('Poniedziałek (dobry na start trasy)');
+                reasons.push('Start tygodnia');
             }
-            reasons.push('Start z bazy');
+            // Prefer earlier dates generally
+            // score += (30 - daysInFuture) ...
         }
 
         return {
-            score,
+            score: Math.max(0, Math.min(100, score)),
             reason: reasons.join(', '),
             distance: minDistance < 9999 ? minDistance : undefined
         };

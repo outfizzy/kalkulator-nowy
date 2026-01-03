@@ -219,7 +219,23 @@ export const OfferService = {
         }
 
         // Convert to DB format
-        const dbUpdates: any = {};
+        const dbUpdates: {
+            status?: Offer['status'];
+            customer_data?: Offer['customer'];
+            product_config?: Offer['product'];
+            pricing?: Offer['pricing'];
+            snow_zone?: Offer['snowZone'];
+            commission?: number;
+            lead_id?: string;
+            client_will_contact_at?: string;
+            settings_data?: Offer['settings'];
+            notes?: string;
+            view_count?: number;
+            updated_at: string;
+        } = {
+            updated_at: new Date().toISOString()
+        };
+
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.customer) dbUpdates.customer_data = updates.customer;
         if (updates.product) dbUpdates.product_config = updates.product;
@@ -232,14 +248,24 @@ export const OfferService = {
         if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
         if (updates.viewCount !== undefined) dbUpdates.view_count = updates.viewCount;
 
-        dbUpdates.updated_at = new Date().toISOString();
-
         const { error } = await supabase
             .from('offers')
             .update(dbUpdates)
             .eq('id', id);
 
         if (error) throw error;
+
+        // Automation: Sync Lead status when Offer is REJECTED
+        if (updates.status === 'rejected') {
+            try {
+                const { data: offerData } = await supabase.from('offers').select('lead_id').eq('id', id).single();
+                if (offerData?.lead_id) {
+                    await supabase.from('leads').update({ status: 'lost' }).eq('id', offerData.lead_id);
+                }
+            } catch (syncError) {
+                console.error('Workflow Automation: Failed to sync Lead status on rejection:', syncError);
+            }
+        }
 
         // Automation: Create Follow-up Task when Offer is SENT
         if (updates.status === 'sent') {
@@ -251,7 +277,8 @@ export const OfferService = {
                     .single();
 
                 if (offerData) {
-                    const customerName = (offerData.customer_data as any)?.lastName || 'Klient';
+                    const customerData = offerData.customer_data as Offer['customer'] | undefined;
+                    const customerName = customerData?.lastName || 'Klient';
                     const title = `Przypomnienie: Oferta ${offerData.offer_number} (${customerName})`;
 
                     const dueDate = new Date();
@@ -282,7 +309,8 @@ export const OfferService = {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     const { data: offerData } = await supabase.from('offers').select('offer_number, customer_data').eq('id', id).single();
-                    const name = (offerData?.customer_data as any)?.lastName || 'Klient';
+                    const customerData = offerData?.customer_data as Offer['customer'] | undefined;
+                    const name = customerData?.lastName || 'Klient';
 
                     await TaskService.createTask({
                         userId: user.id,
@@ -297,6 +325,47 @@ export const OfferService = {
                 }
             } catch (err) {
                 console.error('Failed to create automation task for offer:', err);
+            }
+        }
+
+        // Automation: Create Commission Cost when Offer is Accepted/Sold
+        if (updates.status === 'accepted' || updates.status === 'sold') {
+            try {
+                // 1. Fetch full offer details if needed to get commission
+                const { data: offerData } = await supabase
+                    .from('offers')
+                    .select('customer_id, commission, offer_number, user_id')
+                    .eq('id', id)
+                    .single();
+
+                if (offerData && offerData.commission > 0 && offerData.customer_id) {
+                    // 2. Check if cost already exists to avoid duplicates
+                    const { data: existingCosts } = await supabase
+                        .from('customer_costs')
+                        .select('id')
+                        .eq('source_ref', `offer:${id}`)
+                        .eq('type', 'commission');
+
+                    if (!existingCosts || existingCosts.length === 0) {
+                        // 3. Create Cost Entry
+                        await CustomerService.addCustomerCost({
+                            customer_id: offerData.customer_id,
+                            type: 'commission',
+                            amount: offerData.commission,
+                            currency: 'PLN',
+                            description: `Prowizja od oferty ${offerData.offer_number}`,
+                            date: new Date().toISOString().split('T')[0],
+                            source_ref: `offer:${id}`,
+                            // created_by is handled by RLS or defaulting to auth user, but let's be explicit if service supports it? 
+                            // CustomerService.addCustomerCost doesn't take created_by in param (Omit<..., 'created_at'>), 
+                            // but RLS/Database defaults usually handle auth.uid().
+                        });
+                        console.log(`Commission cost created for offer ${id}`);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to auto-create commission cost:', err);
+                // Don't block the update
             }
         }
     },
@@ -320,7 +389,7 @@ export const OfferService = {
 
         if (!data || data.length === 0) return { winRate: 0, avgMargin: 0, totalOffers: 0 };
 
-        const regionOffers = data.filter((o: any) => {
+        const regionOffers = data.filter((o: { customer_data: Offer['customer'] | null }) => {
             const pc = o.customer_data?.postalCode || '';
             return pc.startsWith(postalCodePrefix);
         });
@@ -328,10 +397,10 @@ export const OfferService = {
         if (regionOffers.length === 0) return { winRate: 0, avgMargin: 0, totalOffers: 0 };
 
         const total = regionOffers.length;
-        const sold = regionOffers.filter((o: any) => o.status === 'sold').length;
+        const sold = regionOffers.filter((o: { status: string }) => o.status === 'sold').length;
         const winRate = (sold / total) * 100;
 
-        const margins = regionOffers.map((o: any) => o.pricing?.marginPercentage || 0);
+        const margins = regionOffers.map((o: { pricing: Offer['pricing'] | null }) => o.pricing?.marginPercentage || 0);
         const avgMargin = margins.reduce((a: number, b: number) => a + b, 0) / total;
 
         return { winRate, avgMargin, totalOffers: total };
@@ -388,7 +457,23 @@ export const OfferService = {
         const { data, error } = await query;
         if (error) throw error;
 
-        return data.map((row: any) => ({
+        return data.map((row: {
+            id: string;
+            offer_number: string;
+            customer_data: Offer['customer'];
+            customer_id: string;
+            product_config: Offer['product'];
+            pricing: Offer['pricing']; // pricing can be complex raw data
+            status: string;
+            snow_zone: Offer['snowZone'];
+            commission: number;
+            created_at: string;
+            updated_at: string;
+            user_id: string;
+            lead_id?: string;
+            client_will_contact_at?: string;
+            settings_data?: Offer['settings'];
+        }) => ({
             id: row.id,
             offerNumber: row.offer_number,
             customer: { ...row.customer_data, id: row.customer_id },

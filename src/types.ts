@@ -19,6 +19,13 @@ export interface EmailConfig {
     openaiKey?: string; // For AI features
 }
 
+export interface AppSettings {
+    key: string;
+    value: unknown;
+    updatedAt: Date;
+    updatedBy?: string;
+}
+
 // User Roles
 export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner' | 'installer';
 
@@ -43,6 +50,14 @@ export interface User {
     substituteUntil?: Date | null;
     preferredLanguage?: 'pl' | 'mo' | 'uk';
     emailConfig?: EmailConfig;
+    hourlyRate?: number;
+    hourlyRateCurrency?: 'PLN' | 'EUR';
+    commissionConfig?: CommissionConfig;
+}
+
+export interface CommissionConfig {
+    enableMarginBonus: boolean;
+    enableVolumeBonus: boolean;
 }
 
 export interface Customer {
@@ -59,6 +74,32 @@ export interface Customer {
     email: string;
     nip?: string; // VAT ID
     country: string; // Default 'Deutschland'
+    lat?: number;
+    lng?: number;
+    representative_id?: string;
+    contract_signer_id?: string;
+    // Joined data
+    representative?: {
+        firstName: string;
+        lastName: string;
+    };
+    contractSigner?: {
+        firstName: string;
+        lastName: string;
+    };
+}
+
+export interface CustomerCost {
+    id: string;
+    customer_id: string;
+    type: 'measurement' | 'commission' | 'material' | 'installation' | 'delivery' | 'other';
+    amount: number;
+    currency: 'PLN' | 'EUR';
+    description?: string;
+    date: string; // ISO Date
+    source_ref?: string;
+    created_at: Date;
+    created_by?: string;
 }
 
 export interface Communication {
@@ -72,7 +113,7 @@ export interface Communication {
     content?: string;
     date: string; // ISO Date
     externalId?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     createdAt: Date;
     // Joined User data
     user?: {
@@ -107,6 +148,7 @@ export interface Lead {
     assignedTo?: string; // User ID
     emailMessageId?: string;
     notes?: string;
+    lostReason?: string; // Reason for losing the lead
     lastContactDate?: Date;
     clientWillContactAt?: Date;
     createdAt: Date;
@@ -143,7 +185,7 @@ export interface SlidingWallModel {
 
 export interface SelectedAddon {
     id: string;
-    type: 'lighting' | 'slidingWall' | 'fixedWall' | 'awning' | 'zipScreen' | 'heater' | 'panorama' | 'wpc-floor' | 'other';
+    type: 'lighting' | 'slidingWall' | 'fixedWall' | 'awning' | 'zipScreen' | 'heater' | 'panorama' | 'wpc-floor' | 'gres-floor' | 'other';
     name: string;
     variant?: string; // e.g., "AL23" or "Spots"
     quantity?: number; // for heaters, spots
@@ -152,13 +194,14 @@ export interface SelectedAddon {
     height?: number; // for screens, walls
     projection?: number; // for awnings
     depth?: number; // for awnings (alternative to projection)
+    location?: 'front' | 'left' | 'right'; // For sliding walls/screens
     price: number;
     description?: string;
     // WPC Flooring specific
     flooringColor?: string;
     flooringType?: string;
     installationOption?: 'with-foundation' | 'without-foundation';
-    attributes?: Record<string, any>; // For multilingual names (name_pl, name_de)
+    attributes?: Record<string, unknown>; // For multilingual names (name_pl, name_de)
 }
 
 export interface ProductConfig {
@@ -171,16 +214,34 @@ export interface ProductConfig {
     customColor: boolean; // true if custom RAL color selected
     customColorRAL?: string; // RAL number when custom color is selected
     roofType: RoofType;
-    polycarbonateType?: 'standard' | 'ir-gold';
-    glassType?: 'standard' | 'mat' | 'sunscreen';
+    imageUrl?: string;
+    polycarbonateType?: 'standard' | 'ir-gold' | 'iq-relax' | 'clear';
+    glassType?: 'standard' | 'mat' | 'sunscreen' | 'heat-protection';
     installationType: InstallationType;
     installationDays?: number;
+    sideWedges?: boolean;
+    postOverlayLeft?: number; // Inset in mm
+    postOverlayRight?: number; // Inset in mm
+    customPostCount?: number; // Manual override
+    customRafterCount?: number; // Manual override
+
+    // Structural Heights (Advanced)
+    rearHeight?: number; // Wall mounting height (mm). If missing, calculated from angle.
+    frontHeight?: number; // Passage height / Post height (mm). Can replace postsHeight.
+
+    // Flooring
+    floorType?: 'wpc' | 'gres'; // wpc = 14cm planks, gres = 60x60 tiles
+
+    // Post Positioning
+    postOffsets?: number[]; // Manual offset (mm) for each post from its default equidistant position.
+
+    ledCount?: number; // Spots per rafter
     addons: SelectedAddon[];
     selectedAccessories?: {
         name: string;
         price: number;
         quantity: number;
-        attributes?: Record<string, any>; // For multilingual names
+        attributes?: Record<string, unknown>; // For multilingual names
     }[];
     customItems?: {
         id: string;
@@ -188,8 +249,22 @@ export interface ProductConfig {
         price: number;
         quantity: number;
         description?: string;
-        attributes?: Record<string, any>; // For multilingual names
+        attributes?: Record<string, unknown>; // For multilingual names
     }[];
+    // Visualizer 3.0 Context
+    contextConfig?: {
+        hasWall: boolean;
+        wallHeight: number; // mm, default 3000
+        wallColor: string; // Hex
+        wallMaterial: 'plaster' | 'brick' | 'wood';
+        floorMaterial: 'concrete' | 'grass' | 'tiles' | 'wood';
+        doorPosition: number; // mm offset from center (0 = center)
+        windowPosition?: number; // mm offset
+        showDecor: boolean;
+    };
+    // Pergola Specific
+    lamellaAngle?: number; // 0-135 degrees
+    moduleCount?: number; // Number of modules (sections)
 }
 
 export interface InstallationCostResult {
@@ -221,6 +296,20 @@ export interface PricingResult {
     // Cost Tracking
     orderCosts?: number; // Manual input for additional costs
     measurementCost?: number; // Calculated/Cached measurement cost
+
+    // Debug Info (transient)
+    _debuginfo?: unknown;
+    transportConfig?: TransportSettings; // Snapshot of settings used
+}
+
+export interface TransportSettings {
+    ratePerKm: number;
+    baseLocation: {
+        name: string;
+        postalCode: string;
+        lat: number;
+        lng: number;
+    };
 }
 
 export interface Offer {
@@ -240,7 +329,7 @@ export interface Offer {
     clientWillContactAt?: Date;
     settings?: {
         aiDescription?: string;
-        [key: string]: any;
+        [key: string]: unknown;
     };
     viewCount?: number;
     lastViewedAt?: Date;
@@ -326,11 +415,17 @@ export interface MeasurementReport {
     odometerStart: number;
     odometerEnd: number;
     totalKm: number;
-    withDriver: boolean;
-    carIssues: string;
-
+    is_active: boolean;
+    currency: string;
+    variant_config?: {
+        roofType: 'glass' | 'polycarbonate' | 'other';
+        snowZone?: string;
+        subtype?: string;
+    };
     // Report Description
     reportDescription?: string; // Optional report-level description
+    withDriver?: boolean;
+    carIssues?: string;
 
     // Visits
     visits: Visit[];
@@ -356,30 +451,50 @@ export interface CommissionHistoryItem {
 
 // --- Installation Module Types ---
 
-export type InstallationStatus = 'pending' | 'scheduled' | 'completed' | 'issue' | 'cancelled' | 'verification';
+export type InstallationStatus = 'pending' | 'scheduled' | 'confirmed' | 'completed' | 'issue' | 'cancelled' | 'verification';
 
 export interface InstallationTeam {
     id: string;
     name: string;
-    color: string; // Hex color for map markers
-    is_active?: boolean; // New: Status
-    tags?: string[]; // New: Skills/Types e.g. ["Electric", "Pergola"]
-    notes?: string; // New: Internal notes
-    members: {
-        id: string;
-        firstName: string;
-        lastName: string;
-    }[];
+    members: { id: string; firstName: string; lastName: string }[];
+    vehicle?: string;
+    color: string;
+    isActive: boolean;
+    workingDays?: number[]; // 1=Monday, 7=Sunday
+    tags?: string[];
+    notes?: string;
+    fuelConsumption?: number; // L/100km
+    vehicleMaintenanceRate?: number; // Cost per km
+}
+
+export interface TeamUnavailability {
+    id: string;
+    teamId: string;
+    startDate: string; // ISO Date YYYY-MM-DD
+    endDate: string; // ISO Date YYYY-MM-DD
+    reason?: string;
+    createdAt: Date;
 }
 
 export interface Installation {
     id: string;
-    offerId: string; // Link to the original offer
+    offerId?: string; // Link to the original offer (optional for custom installations)
+    contractNumber?: string; // e.g. "UM/2025/12/001"
+    customerId?: string; // Link to Customers table
+    sourceType?: 'contract' | 'service' | 'manual';
+    sourceId?: string; // ID of the source contract/ticket
+    title?: string; // For manual tasks
+    customerFeedback?: {
+        rejectedDates?: string[];
+        requestedDates?: string[];
+        notes?: string;
+    };
     client: {
         firstName: string;
         lastName: string;
         city: string;
         address: string;
+        postalCode?: string;
         phone: string;
         coordinates?: {
             lat: number;
@@ -388,6 +503,7 @@ export interface Installation {
     };
     productSummary: string; // e.g., "Trendstyle 4000x3000"
     status: InstallationStatus;
+    partsStatus?: 'pending' | 'partial' | 'all_delivered' | 'none';
     scheduledDate?: string; // ISO Date string
     teamId?: string; // Assigned team ID
     team?: InstallationTeam; // Assigned team details
@@ -403,6 +519,20 @@ export interface Installation {
     partsReady?: boolean; // Whether parts are ready for installation
     deliveryDate?: string; // Estimated or confirmed delivery date (ISO String)
     expectedDuration?: number; // Duration in days (default 1)
+    // Profitability
+    hotelCost?: number;
+    consumablesCost?: number;
+    additionalCosts?: number;
+}
+
+export interface InstallationWorkLog {
+    id: string;
+    installationId: string;
+    startTime: string; // ISO Date
+    endTime?: string; // ISO Date
+    userIds: string[];
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 // --- Contracts Module Types ---
@@ -438,6 +568,7 @@ export interface OrderedItem {
     details?: string;
     status: 'pending' | 'ordered' | 'delivered';
     plannedDeliveryDate?: string; // ISO date string
+    orderedAt?: string; // ISO date string
     purchaseCost?: number; // Cost in EUR, visible only to admin
 }
 
@@ -467,13 +598,14 @@ export interface Contract {
         firstName: string;
         lastName: string;
     };
-    salesRepId?: string; // User ID
+    salesRepId?: string;
     salesRep?: {
         firstName: string;
         lastName: string;
     };
     clientWillContactAt?: Date;
     completedAt?: Date;
+    installation_days_estimate?: number; // Estimated number of days for installation, set by Sales Rep
 }
 
 // Centralized photo storage tied to offer
@@ -574,6 +706,7 @@ export interface OrderRequest {
     itemName: string;
     quantity: number;
     description?: string;
+    inventoryItemId?: string; // Link to inventory
     status: OrderRequestStatus;
     createdAt: Date;
     updatedAt: Date;
@@ -609,11 +742,34 @@ export interface FuelLog {
     };
 }
 
+// --- Procurement / Logistics Types ---
+
+export interface ProcurementItem {
+    id: string; // Unified view ID (e.g. "contract_xyz")
+    sourceType: 'contract' | 'installation' | 'inventory';
+    sourceId: string;
+    itemId: string;
+
+    referenceNumber: string;
+    clientName: string;
+    clientCity?: string;
+
+    itemName: string;
+    category: string;
+    status: string; // Union of all status types
+    plannedDeliveryDate?: string | null;
+    delivery_week?: string; // New field for estimated week (e.g. 2026-W01)
+    confirmed_delivery_date?: string | null; // New field for exact date
+    purchaseCost: number;
+    createdAt: string;
+    ownerId?: string;
+}
+
 // --- Tasks Module Types ---
 
-export type TaskStatus = 'pending' | 'completed' | 'cancelled';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high';
-export type TaskType = 'task' | 'call' | 'email' | 'meeting';
+export type TaskType = 'task' | 'call' | 'email' | 'meeting' | 'other';
 
 export interface Task {
     id: string;
@@ -648,7 +804,7 @@ export interface Notification {
     link?: string;
     isRead: boolean;
     createdAt: Date;
-    metadata?: any;
+    metadata?: unknown;
 }
 
 export interface NoteAttachment {
@@ -692,4 +848,55 @@ export interface OrderItem {
     isManagerResponsible: boolean;
     createdAt: Date;
     updatedAt: Date;
+}
+
+// --- Service & Complaints Types ---
+
+export type ServiceTicketStatus = 'new' | 'open' | 'scheduled' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
+export type ServiceTicketPriority = 'low' | 'medium' | 'high' | 'critical';
+export type ServiceTicketType = 'leak' | 'electrical' | 'visual' | 'mechanical' | 'other';
+
+export interface ServiceTicketTask {
+    id: string;
+    label: string;
+    completed: boolean;
+}
+
+export interface ServiceTicketHistory {
+    id: string;
+    ticketId: string;
+    changedBy?: string;
+    changeType: 'status' | 'note' | 'assignment' | 'task' | 'info';
+    oldValue?: string;
+    newValue?: string;
+    createdAt: Date;
+    // Joined user
+    user?: {
+        firstName: string;
+        lastName: string;
+    };
+}
+
+export interface ServiceTicket {
+    id: string;
+    ticketNumber: string;
+    clientId: string;
+    contractId?: string;
+    installationId?: string;
+    status: ServiceTicketStatus;
+    priority: ServiceTicketPriority;
+    type: ServiceTicketType;
+    description: string;
+    resolutionNotes?: string;
+    scheduledDate?: string;
+    assignedTeamId?: string;
+    tasks?: ServiceTicketTask[]; // New field
+    photos: string[];
+    createdAt: Date;
+    updatedAt: Date;
+    // Joined data
+    client?: Customer;
+    contract?: Contract;
+    installation?: Installation;
+    assignedTeam?: InstallationTeam;
 }

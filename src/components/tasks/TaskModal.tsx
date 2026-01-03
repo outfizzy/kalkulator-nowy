@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
-import type { Task, TaskPriority, TaskStatus, TaskType } from '../../types';
+import { UserService } from '../../services/database/user.service';
+import type { Task, TaskPriority, TaskStatus, TaskType, User } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface TaskModalProps {
@@ -18,6 +19,7 @@ interface TaskModalProps {
 export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, initialData, onSuccess }) => {
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [assignableUsers, setAssignableUsers] = useState<User[]>([]);
 
     // Form State
     const [title, setTitle] = useState('');
@@ -28,6 +30,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
     const [type, setType] = useState<TaskType>('task');
     const [status, setStatus] = useState<TaskStatus>('pending');
     const [assigneeId, setAssigneeId] = useState('');
+
+    const canAssign = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+
+    useEffect(() => {
+        if (isOpen && canAssign) {
+            UserService.getAllUsers().then(users => {
+                const activeUsers = users.filter(u => u.status !== 'blocked');
+                setAssignableUsers(activeUsers);
+            }).catch(err => console.error('Error fetching users:', err));
+        }
+    }, [isOpen, canAssign]);
 
     useEffect(() => {
         if (isOpen) {
@@ -76,6 +89,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
             let dueDateTime: string | undefined = undefined;
             if (dueDate) {
                 const dateTimeStr = dueTime ? `${dueDate}T${dueTime}:00` : `${dueDate}T12:00:00`;
+                // Simple ISO conversion, ignoring timezone complexities for now or assuming local
                 dueDateTime = new Date(dateTimeStr).toISOString();
             }
 
@@ -86,7 +100,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                 priority,
                 type,
                 status,
-                userId: assigneeId || currentUser?.id || '', // Fallback to current user
+                userId: assigneeId || currentUser?.id || '',
                 leadId: task?.leadId || initialData?.leadId,
                 customerId: task?.customerId || initialData?.customerId
             };
@@ -134,6 +148,25 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                             autoFocus
                         />
                     </div>
+
+                    {/* Assignee (Admin/Manager only) */}
+                    {canAssign && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Przypisz do</label>
+                            <select
+                                value={assigneeId}
+                                onChange={(e) => setAssigneeId(e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:border-accent outline-none bg-white"
+                            >
+                                <option value={currentUser?.id}>Ja ({currentUser?.firstName} {currentUser?.lastName})</option>
+                                {assignableUsers.filter(u => u.id !== currentUser?.id).map(user => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.firstName} {user.lastName} ({user.role === 'sales_rep' ? 'Handlowiec' : user.role})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     {/* Type & Priority Row */}
                     <div className="grid grid-cols-2 gap-4">
@@ -197,21 +230,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                         />
                     </div>
 
-                    {/* Status (Only in Edit) */}
-                    {task && (
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select
-                                value={status}
-                                onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:border-accent outline-none bg-white"
-                            >
-                                <option value="pending">Do zrobienia</option>
-                                <option value="completed">Zakończone</option>
-                                <option value="cancelled">Anulowane</option>
-                            </select>
-                        </div>
-                    )}
+                    {/* Status (Always visible now, or just edit?) - Let's allow setting status on create too if needed, but usually pending */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                        <select
+                            value={status}
+                            onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:border-accent outline-none bg-white"
+                        >
+                            <option value="pending">Do zrobienia</option>
+                            <option value="in_progress">W trakcie</option>
+                            <option value="completed">Zakończone</option>
+                            <option value="cancelled">Anulowane</option>
+                        </select>
+                    </div>
                 </form>
 
                 <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl">

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import type { Customer } from '../types';
+import type { Customer, User } from '../types';
 import { getSnowZone } from '../utils/snowZones';
 import { DatabaseService } from '../services/database';
+import { UserService } from '../services/database/user.service';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CustomerFormProps {
     onComplete: (customer: Customer, snowZone: any) => void;
@@ -27,28 +29,47 @@ const normalizeCustomer = (raw: Partial<Customer> | any): Customer => {
         phone: (raw.phone || '').toString(),
         email: (raw.email || '').toString(),
         country: (raw.country || 'Deutschland').toString(),
+        representative_id: raw.representative_id || undefined,
+        contract_signer_id: raw.contract_signer_id || undefined,
     };
 };
 
 export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialData, submitLabel }) => {
-    const [customer, setCustomer] = useState<Customer>(normalizeCustomer(initialData || {}));
+    const { currentUser } = useAuth();
+    const [customer, setCustomer] = useState<Customer>(() => {
+        const normalized = normalizeCustomer(initialData || {});
+        // Default representative to current user if new customer (and user is logged in)
+        if (!initialData?.id && !normalized.representative_id && currentUser) {
+            normalized.representative_id = currentUser.id;
+        }
+        return normalized;
+    });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [previousCustomers, setPreviousCustomers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
 
-    // Load previous customers on mount
+    // Load previous customers and users on mount
     useEffect(() => {
-        const loadCustomers = async () => {
+        const loadData = async () => {
             try {
-                const customers = await DatabaseService.getUniqueCustomers();
+                const [customers, allUsers] = await Promise.all([
+                    DatabaseService.getUniqueCustomers(),
+                    UserService.getAllUsers()
+                ]);
                 setPreviousCustomers(customers);
+                // Filter users to only show relevant roles for assignment (Admins, Sales Reps, Partners)
+                const relevantUsers = allUsers.filter(u =>
+                    ['admin', 'sales_rep', 'partner', 'manager'].includes(u.role) && u.status === 'active'
+                );
+                setUsers(relevantUsers);
             } catch (error) {
-                console.error('Error loading customers:', error);
+                console.error('Error loading data:', error);
             }
         };
-        loadCustomers();
+        loadData();
     }, []);
 
     // Close dropdown when clicking outside
@@ -93,7 +114,11 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
     };
 
     const handleClearSelection = () => {
-        setCustomer(normalizeCustomer({}));
+        const reset = normalizeCustomer({});
+        if (currentUser) {
+            reset.representative_id = currentUser.id;
+        }
+        setCustomer(reset);
         setSearchQuery('');
         setShowDropdown(false);
     };
@@ -378,6 +403,51 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
                                 placeholder="kunde@example.de"
                             />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Section 4: Assignments (New) */}
+                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                        <span className="text-2xl">🤝</span>
+                        <h3 className="text-xl font-bold text-slate-800">Przypisania</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Opiekun / Przedstawiciel</label>
+                            <select
+                                name="representative_id"
+                                value={customer.representative_id || ''}
+                                onChange={handleChange}
+                                className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-white"
+                            >
+                                <option value="">-- Wybierz opiekuna --</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.firstName} {u.lastName} ({u.role})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">Osoba odpowiedzialna za kontakt z klientem.</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Osoba Podpisująca Umowę</label>
+                            <select
+                                name="contract_signer_id"
+                                value={customer.contract_signer_id || ''}
+                                onChange={handleChange}
+                                className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-white"
+                            >
+                                <option value="">-- Wybierz osobę --</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.firstName} {u.lastName} ({u.role})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">Osoba z firmy, która podpisze umowę.</p>
                         </div>
                     </div>
                 </section>

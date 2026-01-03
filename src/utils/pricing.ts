@@ -1,4 +1,4 @@
-import type { ProductConfig, PricingResult, SnowZoneInfo, ProductModel } from '../types';
+import type { ProductConfig, PricingResult, SnowZoneInfo, ProductModel, TransportSettings } from '../types';
 import catalogData from '../data/catalog.json';
 import { orangestylePricing, type PricingEntry } from '../data/orangestyle_pricing';
 import { trendstylePricingEntries, trendstylePlusPricingEntries } from '../data/trendstyle_pricing';
@@ -30,7 +30,8 @@ export function calculatePrice(
     config: ProductConfig,
     marginPercentage: number,
     snowZone?: SnowZoneInfo,
-    customerPostalCode?: string
+    customerPostalCode?: string,
+    transportConfig?: TransportSettings
 ): PricingResult {
     // 1. Calculate Base Price (Roof)
     let basePrice = 0;
@@ -339,9 +340,14 @@ export function calculatePrice(
     // 3. Calculate Installation Costs (if applicable)
     let installationCosts = undefined;
     if (config.installationDays && config.installationDays > 0 && customerPostalCode) {
-        const distance = calculateDistanceFromGubin(customerPostalCode);
+        // Use configured base location or default (Gubin)
+        const baseLocation = transportConfig?.baseLocation;
+        const distance = calculateDistanceFromGubin(customerPostalCode, baseLocation);
+
         if (distance) {
-            installationCosts = calculateInstallationCosts(config.installationDays, distance);
+            // Use configured rate or default (0.50)
+            const ratePerKm = transportConfig?.ratePerKm;
+            installationCosts = calculateInstallationCosts(config.installationDays, distance, ratePerKm);
         }
     }
 
@@ -384,6 +390,7 @@ export function calculatePrice(
         sellingPriceGross,
         installationCosts,
         numberOfFields,
-        numberOfPosts
+        numberOfPosts,
+        transportConfig // Pass settings back for reference in snapshot
     };
 }

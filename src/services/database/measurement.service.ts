@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import type { Measurement, MeasurementReport } from '../../types';
+import { GeocodingService } from '../GeocodingService';
 
 
 // We don't import InstallationService avoiding circular deps if possible.
@@ -75,8 +76,29 @@ export const MeasurementService = {
             visits: data.measurements_snapshot,
             signedContractsCount: 0,
             offerIds: [],
+            is_active: true,
+            currency: 'PLN',
             createdAt: new Date(data.created_at)
         };
+    },
+
+    async updateMeasurementReport(id: string, updates: Partial<MeasurementReport>): Promise<void> {
+        const dbUpdates: any = {};
+        if (updates.carPlate) dbUpdates.car_plate = updates.carPlate;
+        if (updates.odometerStart !== undefined) dbUpdates.odometer_start = updates.odometerStart;
+        if (updates.odometerEnd !== undefined) dbUpdates.odometer_end = updates.odometerEnd;
+        if (updates.totalKm !== undefined) dbUpdates.total_km = updates.totalKm;
+        if (updates.withDriver !== undefined) dbUpdates.with_driver = updates.withDriver;
+        if (updates.carIssues !== undefined) dbUpdates.car_issues = updates.carIssues;
+        if (updates.reportDescription !== undefined) dbUpdates.report_description = updates.reportDescription;
+        if (updates.visits) dbUpdates.measurements_snapshot = updates.visits;
+
+        const { error } = await supabase
+            .from('measurement_reports')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
     },
 
     async getMeasurementReports(filters?: { userId?: string; dateFrom?: string; dateTo?: string }): Promise<MeasurementReport[]> {
@@ -112,6 +134,8 @@ export const MeasurementService = {
             visits: row.measurements_snapshot || [],
             signedContractsCount: (row.measurements_snapshot || []).filter((v: any) => v.outcome === 'signed').length,
             offerIds: [],
+            is_active: true,
+            currency: 'PLN',
             createdAt: new Date(row.created_at)
         }));
     },
@@ -161,6 +185,18 @@ export const MeasurementService = {
         locationLat?: number;
         locationLng?: number;
     }): Promise<Measurement> {
+
+        // Auto-Geocode if missing location data
+        if (!measurement.locationLat || !measurement.locationLng) {
+            if (measurement.customerAddress) {
+                const coords = await GeocodingService.search(measurement.customerAddress);
+                if (coords) {
+                    measurement.locationLat = coords.lat;
+                    measurement.locationLng = coords.lng;
+                }
+            }
+        }
+
         const { data, error } = await supabase
             .from('measurements')
             .insert({
@@ -285,6 +321,8 @@ export const MeasurementService = {
             visits: row.data.visits || [],
             signedContractsCount: row.data.signedContractsCount,
             offerIds: row.data.offerIds || [],
+            is_active: true,
+            currency: 'PLN',
             createdAt: new Date(row.created_at)
         }));
     },
@@ -332,6 +370,8 @@ export const MeasurementService = {
             visits: data.data.visits || [],
             signedContractsCount: data.data.signedContractsCount,
             offerIds: data.data.offerIds || [],
+            is_active: true,
+            currency: 'PLN',
             createdAt: new Date(data.created_at)
         };
     },

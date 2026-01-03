@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/database';
 import { toast } from 'react-hot-toast';
-import type { User } from '../types';
+import type { User, CommissionConfig } from '../types';
+import { CommissionSettingsModal } from './admin/CommissionSettingsModal';
 
 export const UserManagementPage: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'internal' | 'partners'>('internal');
+    const [selectedUserForCommission, setSelectedUserForCommission] = useState<User | null>(null);
 
     const loadUsers = async () => {
         try {
@@ -71,9 +73,10 @@ export const UserManagementPage: React.FC = () => {
             await DatabaseService.deleteUser(user.id);
             toast.success('Użytkownik został usunięty');
             await loadUsers();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error deleting user:', error);
-            toast.error('Błąd usuwania użytkownika');
+            const message = error instanceof Error ? error.message : 'Błąd usuwania użytkownika';
+            toast.error(message);
         }
     };
 
@@ -154,23 +157,57 @@ export const UserManagementPage: React.FC = () => {
     }
 
 
-    const handleSetCommissionRate = async (user: User) => {
+    const handleSetCommissionRate = (user: User) => {
+        setSelectedUserForCommission(user);
+    };
+
+    const handleSaveCommission = async (userId: string, rate: number, config: CommissionConfig) => {
+        await DatabaseService.updateCommissionRate(userId, rate);
+        await DatabaseService.updateCommissionConfig(userId, config);
+        await loadUsers();
+    };
+
+    const handleSetHourlyRate = async (user: User) => {
         try {
-            const currentRate = user.commissionRate ? (user.commissionRate * 100) : 5;
-            const input = window.prompt(`Prowizja podstawowa dla ${user.firstName} ${user.lastName} (%):`, currentRate.toString());
+            const currentRate = user.hourlyRate || 0;
+            const currentCurrency = user.hourlyRateCurrency || 'PLN';
+            const input = window.prompt(
+                `Stawka godzinowa dla ${user.firstName} ${user.lastName}\nWpisz kwotę lub format "KWOTA WALUTA" (np. 50 lub 50 EUR):`,
+                `${currentRate} ${currentCurrency}`
+            );
+
             if (input === null) return;
-            const normalized = input.replace(',', '.');
+
+            // Basic parsing
+            const parts = input.trim().toUpperCase().split(/\s+/);
+            let rateStr = parts[0];
+            let currency = parts[1] || 'PLN';
+
+            // Handle if user typed "EUR 50"
+            if (isNaN(parseFloat(rateStr.replace(',', '.'))) && !isNaN(parseFloat(currency.replace(',', '.')))) {
+                [rateStr, currency] = [currency, rateStr];
+            }
+
+            const normalized = rateStr.replace(',', '.');
             const value = parseFloat(normalized);
-            if (isNaN(value) || value < 0 || value > 100) {
-                toast.error('Nieprawidłowa prowizja. Podaj wartość od 0 do 100.');
+
+            // Validate currency
+            if (currency !== 'PLN' && currency !== 'EUR') {
+                toast.error('Nieznana waluta. Użyj PLN lub EUR.');
                 return;
             }
-            await DatabaseService.updateCommissionRate(user.id, value / 100);
-            toast.success('Zaktualizowano prowizję');
+
+            if (isNaN(value) || value < 0) {
+                toast.error('Nieprawidłowa stawka.');
+                return;
+            }
+
+            await DatabaseService.updateHourlyRate(user.id, value, currency as 'PLN' | 'EUR');
+            toast.success(`Zaktualizowano stawkę: ${value} ${currency}`);
             await loadUsers();
         } catch (error) {
-            console.error('Error updating commission rate:', error);
-            toast.error('Błąd aktualizacji prowizji');
+            console.error('Error updating hourly rate:', error);
+            toast.error('Błąd aktualizacji stawki');
         }
     };
 
@@ -391,6 +428,20 @@ export const UserManagementPage: React.FC = () => {
                                 </div>
                             </div>
 
+                            {activeTab === 'internal' && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-slate-500">Stawka (/h):</div>
+                                    <div className="font-medium text-slate-900 text-right">
+                                        <button
+                                            onClick={() => handleSetHourlyRate(user)}
+                                            className="text-accent font-bold"
+                                        >
+                                            {user.hourlyRate ? `${user.hourlyRate} ${user.hourlyRateCurrency || 'PLN'}` : 'Ustaw'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {activeTab === 'partners' && (
                                 <>
                                     <div className="grid grid-cols-2 gap-2">
@@ -528,6 +579,11 @@ export const UserManagementPage: React.FC = () => {
                                         Prowizja
                                     </th>
                                 )}
+                                {activeTab === 'internal' && (
+                                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                        Stawka (h)
+                                    </th>
+                                )}
                                 {activeTab === 'partners' && (
                                     <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                         Marża B2B
@@ -604,6 +660,20 @@ export const UserManagementPage: React.FC = () => {
                                             ) : (
                                                 <span className="text-slate-400">-</span>
                                             )}
+                                        </td>
+                                    )}
+                                    {activeTab === 'internal' && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                            <button
+                                                onClick={() => handleSetHourlyRate(user)}
+                                                className="hover:text-accent transition-colors flex items-center gap-1"
+                                                title="Kliknij aby zmienić"
+                                            >
+                                                {user.hourlyRate ? `${user.hourlyRate} ${user.hourlyRateCurrency || 'PLN'}` : 'Ustaw'}
+                                                <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            </button>
                                         </td>
                                     )}
                                     {activeTab === 'partners' && (
@@ -691,6 +761,13 @@ export const UserManagementPage: React.FC = () => {
                     Brak użytkowników w tej kategorii
                 </div>
             )}
+
+            <CommissionSettingsModal
+                isOpen={!!selectedUserForCommission}
+                onClose={() => setSelectedUserForCommission(null)}
+                user={selectedUserForCommission}
+                onSave={handleSaveCommission}
+            />
         </div>
     );
 };

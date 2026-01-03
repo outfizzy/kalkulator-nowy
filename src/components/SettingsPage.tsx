@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import type { User } from '../types';
+import type { User, EmailConfig } from '../types';
 import { DatabaseService } from '../services/database';
+import { SettingsService } from '../services/database/settings.service';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { GlobalSettingsPanel } from './admin/GlobalSettingsPanel';
 
 export const SettingsPage: React.FC = () => {
     const { currentUser } = useAuth();
@@ -17,6 +19,19 @@ export const SettingsPage: React.FC = () => {
         substituteUntil: null
     });
     const [availableSubstitutes, setAvailableSubstitutes] = useState<User[]>([]);
+
+    // Global Settings (Admin Only)
+    const [bueroConfig, setBueroConfig] = useState<EmailConfig>({
+        smtpHost: 'serwer2426445.home.pl',
+        smtpPort: 587,
+        smtpUser: 'buero@polendach24.de',
+        smtpPassword: '',
+        imapHost: 'serwer2426445.home.pl',
+        imapPort: 993,
+        imapUser: 'buero@polendach24.de',
+        imapPassword: '',
+        signature: ''
+    });
 
     useEffect(() => {
         const loadProfileAndCheckDb = async () => {
@@ -72,10 +87,35 @@ export const SettingsPage: React.FC = () => {
             } catch (err) {
                 console.error('Error loading substitutes:', err);
             }
+
+            // 4. Load Global Settings (Admin Only)
+            if (currentUser.role === 'admin') {
+                try {
+                    const config = await SettingsService.getBueroEmailConfig();
+                    if (config) {
+                        setBueroConfig(prev => ({ ...prev, ...config }));
+                    }
+                } catch (err) {
+                    console.error('Error loading global settings:', err);
+                }
+            }
         };
 
         loadProfileAndCheckDb();
     }, [currentUser, profile.email]);
+
+    const handleSaveGlobal = async () => {
+        if (currentUser?.role !== 'admin') return;
+        try {
+            await SettingsService.updateSetting('email_buero', bueroConfig);
+            toast.success('Globalne ustawienia (Biuro) zapisane pomyślnie');
+        } catch (error) {
+            console.error('Error saving global settings:', error);
+            toast.error('Błąd zapisu ustawień globalnych');
+        }
+    };
+
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -182,6 +222,114 @@ export const SettingsPage: React.FC = () => {
                     </div>
                 )}
 
+                {/* Global Email Configuration (Admin Only) */}
+                {currentUser?.role === 'admin' && (
+                    <div className="space-y-8">
+                        <GlobalSettingsPanel />
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl border-l-4 border-l-purple-500">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800">Skrzynka Globalna: Biuro</h3>
+                                    <p className="text-sm text-slate-500 font-mono">buero@polendach24.de</p>
+                                </div>
+                                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">ADMIN ONLY</span>
+                            </div>
+
+                            <div className="bg-purple-50 p-4 rounded-lg text-sm text-purple-800 mb-6">
+                                <p>Te ustawienia dotyczą wspólnej skrzynki pocztowej widocznej dla wszystkich handlowców w zakładce "Biuro (Wspólna)".</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
+                                    <input
+                                        type="text"
+                                        value={bueroConfig.smtpHost || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpHost: e.target.value }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Port SMTP</label>
+                                    <input
+                                        type="number"
+                                        value={bueroConfig.smtpPort || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpPort: parseInt(e.target.value) || 587 }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik SMTP</label>
+                                    <input
+                                        type="text"
+                                        value={bueroConfig.smtpUser || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpUser: e.target.value }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Hasło SMTP</label>
+                                    <input
+                                        type="password"
+                                        value={bueroConfig.smtpPassword || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpPassword: e.target.value }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2 border-t pt-4 mt-2">
+                                    <h4 className="text-sm font-bold text-slate-700 mb-3">Odbieranie (IMAP)</h4>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Host IMAP</label>
+                                    <input
+                                        type="text"
+                                        value={bueroConfig.imapHost || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapHost: e.target.value }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Port IMAP</label>
+                                    <input
+                                        type="number"
+                                        value={bueroConfig.imapPort || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapPort: parseInt(e.target.value) || 993 }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik IMAP</label>
+                                    <input
+                                        type="text"
+                                        value={bueroConfig.imapUser || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapUser: e.target.value }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Hasło IMAP</label>
+                                    <input
+                                        type="password"
+                                        value={bueroConfig.imapPassword || ''}
+                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapPassword: e.target.value }))}
+                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-8 flex justify-end">
+                                <button
+                                    onClick={handleSaveGlobal}
+                                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-lg shadow-purple-600/20 transition-colors"
+                                >
+                                    Zapisz Ustawienia Biura
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Dane Osobowe</h3>

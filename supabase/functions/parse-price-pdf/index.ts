@@ -20,38 +20,136 @@ Deno.serve(async (req) => {
 
     try {
         const formData = await req.formData()
-        const file = formData.get('file')
+        const imageFile = formData.get('image');
+        let requestContent: any[] = [];
+        let systemPrompt = '';
 
-        if (!file) {
-            return new Response(
-                JSON.stringify({ error: 'No file uploaded' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-            )
+        if (imageFile) {
+            console.log("Image received, size:", imageFile.size);
+            const arrayBuffer = await imageFile.arrayBuffer();
+            const base64 = Buffer.from(arrayBuffer).toString('base64');
+            const dataUrl = `data:${imageFile.type};base64,${base64}`;
+
+            systemPrompt = `Jesteś wyspecjalizowanym asystentem AI vision do analizy tabel cenowych (zadaszenia, ogrody zimowe).
+Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego dane w formacie JSON.
+
+            CRITICAL: Return strictly a JSON object with this structure:
+            {
+               "confidence": 0-100,
+               "tables": [
+                   {
+                       "detected_product_name": "string",
+                       "currency": "EUR" | "PLN",
+                       "detected_attributes": {
+                           "snow_zone": "1" | "2" | "3" | null,
+                           "roof_type": "polycarbonate" | "glass" | null,
+                           "mounting": "wall" | "free" | null
+                       },
+                       "entries": [
+                          { 
+                            "width_mm": number, 
+                            "projection_mm": number, 
+                            "price": number, 
+                            "structure_price": number, 
+                            "glass_price": number,
+                            "properties": {
+                                "posts_count": number | null,
+                                "fields_count": number | null,
+                                "surcharges": { "name": string, "price": number }[]
+                            }
+                          }
+                       ],
+                       "notes": "string"
+                   }
+               ]
+            }
+            
+            Rules:
+            1. **Columns Mapping**:
+               - "Maß" / Dimensions -> width_mm, projection_mm
+               - "Preis" -> price (If multiple, pick the 'Included' or 'Base' price)
+               - "Anzahl Pfosten" -> properties.posts_count
+               - "Anzahl Felder" -> properties.fields_count
+               - "Aufpreis" / Surcharge columns -> Add to properties.surcharges array (e.g. { name: "milk_glass", price: 50 })
+            2. **SPLIT INTELLIGENTLY**: If the image contains data for both "Polycarbonate" and "Glass" (e.g. separate columns or sections), create TWO separate entries in the 'tables' array. One for 'polycarbonate', one for 'glass'.
+            3. **Matrix**: Look for Width (top header) and Projection (side header) or vice versa.
+            4. **Context**: Use heuristics. "VSG" = Glass. "Stegplatten"/"Poly" = Polycarbonate.
+            5. **Currency**: Detect currency symbol (€, PLN) in headers.`;
+
+            requestContent = [
+                { type: "text", text: "Analyze this pricing table image. Extract Dimensions, Prices, Structural Specs (Posts/Fields), and Surcharges." },
+                {
+                    type: "image_url",
+                    image_url: {
+                        url: dataUrl
+                    }
+                }
+            ];
+        } else {
+            // 1. Valid PDF Text Extraction (Legacy / Full File)
+            const file = formData.get('file');
+            if (!file) {
+                return new Response(
+                    JSON.stringify({ error: 'No file or image uploaded' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                )
+            }
+
+            console.log("File received:", file.name, file.size);
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            let textContent = "";
+            try {
+                console.log("Starting PDF Parse (npm:pdf-parse)...");
+                const data = await pdf(buffer);
+                textContent = data.text;
+                console.log("PDF Parsed, length:", textContent.length);
+            } catch (e: any) {
+                console.error("PDF Parse Error:", e);
+                return new Response(
+                    JSON.stringify({ error: `PDF Parse Failed: ${e.message || e}` }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+                )
+            }
+
+            const truncatedText = textContent.slice(0, 40000);
+            requestContent = [{ type: "text", text: truncatedText }];
+
+            systemPrompt = `Jesteś wyspecjalizowanym asystentem AI do strukturyzowania cenników budowlanych (zadaszenia, ogrody zimowe).
+            Twoim zadaniem jest przeanalizować tekst PDF i wyciągnąć z niego KOMPLETNE dane cenowe.
+            
+            CRITICAL: Return strictly a JSON object with this structure:
+            {
+               "confidence": 0-100,
+               "tables": [
+                   {
+                       "detected_product_name": "string",
+                       "currency": "EUR" | "PLN",
+                       "detected_attributes": {
+                           "snow_zone": "1" | "2" | "3" | null,
+                           "roof_type": "polycarbonate" | "glass" | null,
+                           "mounting": "wall" | "free" | null
+                       },
+                       "entries": [
+                          { 
+                            "width_mm": number, 
+                            "projection_mm": number, 
+                            "price": number,
+                            "structure_price": number,
+                            "glass_price": number
+                          }
+                       ],
+                       "surcharges": [ ... ],
+                       "notes": "string"
+                   }
+               ]
+            }
+            
+            Rules:
+            1. **FIND ALL**: Look for multiple tables in the text (e.g. "Trendstyle Poly", "Trendstyle Glass", "Premium"). Create a separate entry in 'tables' for each.
+            2. **SPLIT**: Separately categorize Polycarbonate vs Glass.`;
         }
-
-        console.log("File received:", file.name, file.size);
-
-        // 1. Extract Text from PDF using npm:pdf-parse
-        // This is robust on Supabase Edge Functions (Deno)
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        let textContent = "";
-        try {
-            console.log("Starting PDF Parse (npm:pdf-parse)...");
-            const data = await pdf(buffer);
-            textContent = data.text;
-            console.log("PDF Parsed, length:", textContent.length);
-        } catch (e: any) {
-            console.error("PDF Parse Error:", e);
-            return new Response(
-                JSON.stringify({ error: `PDF Parse Failed: ${e.message || e}` }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-            )
-        }
-
-        // Truncate if too long (GPT-4o Tier 1 limit is 30k TPM. 40k chars ~= 10k tokens. Safe.)
-        const truncatedText = textContent.slice(0, 40000);
 
         // 2. Call OpenAI
         const apiKey = Deno.env.get('OPENAI_API_KEY')
@@ -67,59 +165,15 @@ Deno.serve(async (req) => {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4o', // Revert to smart model for accuracy
+                model: 'gpt-4o',
                 messages: [
                     {
                         role: 'system',
-                        content: `Jesteś wyspecjalizowanym asystentem AI do strukturyzowania cenników budowlanych (zadaszenia, ogrody zimowe).
-Twoim zadaniem jest przeanalizować tekst PDF i wyciągnąć z niego KOMPLETNE dane cenowe.
-
-            Return strictly a JSON object with this structure:
-            {
-               "confidence": 0-100,
-               "detected_product_name": "string",
-               "currency": "EUR" | "PLN",
-               "detected_attributes": {
-                   "snow_zone": "1" | "2" | "3" | null,
-                   "roof_type": "polycarbonate" | "glass" | null,
-                   "mounting": "wall" | "free" | null
-               },
-               "entries": [
-                  { 
-                    "width_mm": number, 
-                    "projection_mm": number, 
-                    "price": number, // Total price
-                    "structure_price": number, // Optional: if split
-                    "glass_price": number // Optional: if split
-                  }
-               ],
-               "surcharges": [
-                  { "name": "string", "price": number, "unit": "m2" | "piece" | "lm" | "fixed" | "percent", "category": "glass" | "color" | "other" }
-               ],
-               "notes": "string" // Important calculation rules found
-            }
-            
-            Rules:
-            1. **Matrix**: "Width" (Maß B) is usually top header, "Projection" (Tiefe/T) side header.
-               - "Preis exkl. Dacheindeckung" -> **structure_price** (Constuction only).
-               - "Glas ... Preis inkl. Dacheindeckung" -> **price** (Total with standard glass).
-               - "Anzahl Felder" -> rafters (fields). "Anzahl Pfosten" -> posts.
-            2. **Surcharges (Dopłaty/Aufpreis)**: Look for columns starting with "Aufpreis" (Surcharge):
-               - "Aufpreis Glas 44.2 matt/ milch" -> Glass Surcharge (category: glass, name: "Matt/Milch").
-               - "Aufpreis Sonnenschutzglas" -> Glass Surcharge (category: glass, name: "Sonnenschutz").
-               - Extract these as surcharges with price and unit (likely per m2 or fixed).
-            3. **Snow Zones (Schneelast)**:
-               - "1" -> "1"
-               - "1&2a" -> "2" (Map combined 1&2a to Zone 2)
-               - "2a&3" -> "3" (Map combined 2a&3 to Zone 3)
-            4. **Currency**: Detect currency (EUR, €, PLN, zł).
-            5. **Data Types**:
-               - Prices: numbers only.
-               - Units: "lfm" -> "lm", "Stk" -> "piece", "qm" -> "m2".`
+                        content: systemPrompt
                     },
                     {
                         role: 'user',
-                        content: truncatedText
+                        content: requestContent
                     }
                 ],
                 response_format: { type: "json_object" }

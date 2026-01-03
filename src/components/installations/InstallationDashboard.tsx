@@ -3,8 +3,7 @@ import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
 import { ManualInstallationModal } from './ManualInstallationModal';
-import { InstallationCalendar } from './InstallationCalendar';
-import { InstallationPlanner } from './planner/InstallationPlanner';
+import { UnifiedInstallationCalendar } from './UnifiedInstallationCalendar';
 import { InstallationReports } from './reports/InstallationReports';
 import { ContractBulkSelectionPanel } from './ContractBulkSelectionPanel';
 import { GroupingControls } from './GroupingControls';
@@ -12,14 +11,15 @@ import { groupInstallations, sortInstallations, getStatusLabel, getStatusColor, 
 import type { Installation, InstallationTeam } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
-import { ManagerOrdersWidget } from './ManagerOrdersWidget';
+
 
 export const InstallationDashboard: React.FC = () => {
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
+
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeocoding, setIsGeocoding] = useState(false);
-    const [view, setView] = useState<'planner' | 'list' | 'calendar' | 'contracts' | 'reports' | 'procurement'>('planner');
+    const [view, setView] = useState<'list' | 'calendar' | 'contracts' | 'reports'>('calendar');
 
     // Modal State
     const [editingInstallation, setEditingInstallation] = useState<Installation | null>(null);
@@ -38,19 +38,48 @@ export const InstallationDashboard: React.FC = () => {
 
     const loadData = async () => {
         try {
-            const [dbInstallations, dbTeams, dbInstallers, dbSalesReps] = await Promise.all([
+            const results = await Promise.allSettled([
                 DatabaseService.getInstallations(),
                 DatabaseService.getTeams(),
+                // DatabaseService.getAllTeamUnavailability(),
                 DatabaseService.getInstallers(),
                 DatabaseService.getSalesReps()
             ]);
-            setInstallations(dbInstallations);
-            setTeams(dbTeams);
-            setInstallers(dbInstallers);
-            setSalesReps(dbSalesReps);
+
+            const [
+                installationsResult,
+                teamsResult,
+                // unavailabilityResult, // Unused
+                installersResult,
+                salesRepsResult
+            ] = results;
+
+            // Log any errors
+            results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    const services = ['Installations', 'Teams', 'Unavailability', 'Installers', 'SalesReps'];
+                    console.error(`Error loading ${services[index]}:`, result.reason);
+                }
+            });
+
+            if (installationsResult.status === 'fulfilled') setInstallations(installationsResult.value);
+            if (teamsResult.status === 'fulfilled') setTeams(teamsResult.value);
+            if (installersResult.status === 'fulfilled') setInstallers(installersResult.value);
+            if (salesRepsResult.status === 'fulfilled') setSalesReps(salesRepsResult.value);
+
+            // If critical data failed (Installations or Teams), show error toast
+            if (installationsResult.status === 'rejected' || teamsResult.status === 'rejected') {
+                const failedServices = [];
+                if (installationsResult.status === 'rejected') failedServices.push('Montaże');
+                if (teamsResult.status === 'rejected') failedServices.push('Ekipy');
+
+                // Show specific error in toast
+                toast.error(`Błąd wczytywania: ${failedServices.join(', ')}`);
+                console.error('Critical data failed to load');
+            }
         } catch (error) {
-            console.error('Error loading installations:', error);
-            toast.error('Błąd ładowania montaży');
+            console.error('Error loading installations dashboard data:', error);
+            toast.error('Wystąpił nieoczekiwany błąd podczas ładowania danych');
         }
     };
 
@@ -173,28 +202,7 @@ export const InstallationDashboard: React.FC = () => {
         void loadData();
     };
 
-    const handleDragDrop = async (installationId: string, newDate: string, teamId: string) => {
-        try {
-            const installation = installations.find(i => i.id === installationId);
-            if (!installation) return;
 
-            // Optimistic update
-            // We can't easily update the state directly because it's fetched from DB
-            // But we can show a toast
-
-            await DatabaseService.updateInstallation(installationId, {
-                scheduledDate: newDate,
-                teamId,
-                status: 'scheduled'
-            });
-
-            toast.success('Przeniesiono montaż');
-            loadData(); // Refresh data
-        } catch (error) {
-            console.error('Error moving installation:', error);
-            toast.error('Błąd podczas przenoszenia montażu');
-        }
-    };
 
     const filteredInstallations = installations.filter(inst => {
         if (filterStatus === 'all') return true;
@@ -213,11 +221,7 @@ export const InstallationDashboard: React.FC = () => {
         unassigned: installations.filter(i => !i.teamId).length
     };
 
-    // Combine Teams and Sales Reps for Calendar View
-    const calendarResources: InstallationTeam[] = [
-        ...teams
-        // Sales Reps removed from calendar view as requested
-    ];
+
 
     return (
         <div className="space-y-6 pb-20">
@@ -269,14 +273,10 @@ export const InstallationDashboard: React.FC = () => {
             {/* View Tabs */}
             <div className="bg-slate-100 p-1 rounded-full flex gap-1 self-start">
                 {[
-                    { id: 'planner', label: '📅 Planer' },
+                    { id: 'calendar', label: '📅 Kalendarz (Unified)' },
                     { id: 'list', label: '📍 Mapa/Lista' },
-                    { id: 'calendar', label: '📅 Kalendarz' },
                     { id: 'reports', label: '📈 Raporty' },
-                    { id: 'calendar', label: '📅 Kalendarz' },
-                    { id: 'reports', label: '📈 Raporty' },
-                    { id: 'contracts', label: '📝 Umowy' },
-                    { id: 'procurement', label: '📦 Zapotrzebowanie' }
+                    { id: 'contracts', label: '📝 Umowy' }
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -317,9 +317,12 @@ export const InstallationDashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 flex gap-4 min-h-0">
-                {view === 'planner' ? (
+                {view === 'calendar' ? (
                     <div className="w-full h-full bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
-                        <InstallationPlanner />
+                        <UnifiedInstallationCalendar
+                            onEdit={handleEdit}
+                            onCreateManual={() => setIsManualModalOpen(true)}
+                        />
                     </div>
                 ) : view === 'list' ? (
                     <>
@@ -465,15 +468,6 @@ export const InstallationDashboard: React.FC = () => {
                             />
                         </div>
                     </>
-                ) : view === 'calendar' ? (
-                    <div className="h-[calc(100vh-300px)] w-full">
-                        <InstallationCalendar
-                            installations={filteredInstallations}
-                            teams={calendarResources}
-                            onEdit={handleEdit}
-                            onDragDrop={handleDragDrop}
-                        />
-                    </div>
                 ) : view === 'reports' ? (
                     <div className="w-full h-full overflow-y-auto bg-white rounded-xl shadow border border-slate-200 p-6">
                         <InstallationReports installations={installations} teams={teams} />
@@ -483,8 +477,9 @@ export const InstallationDashboard: React.FC = () => {
                         <ContractBulkSelectionPanel onInstallationsCreated={loadData} />
                     </div>
                 ) : (
-                    <div className="w-full h-full overflow-y-auto">
-                        <ManagerOrdersWidget />
+                    <div className="w-full h-full">
+                        {/* Default or empty state if needed, or redirect */}
+                        <div className="p-8 text-center text-slate-400">Wybierz widok</div>
                     </div>
                 )}
             </div>

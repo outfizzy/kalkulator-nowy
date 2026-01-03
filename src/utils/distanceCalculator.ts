@@ -6,8 +6,10 @@ interface Coordinates {
     lng: number;
 }
 
-// Gubin coordinates (66-620)
-const GUBIN_COORDS: Coordinates = {
+// Default Base Location (Gubin)
+export const DEFAULT_BASE_LOCATION = {
+    name: 'Gubin',
+    postalCode: '66-620',
     lat: 51.9494,
     lng: 14.7242
 };
@@ -39,7 +41,16 @@ const GERMAN_POSTAL_REGIONS: Record<string, Coordinates> = {
     '60': { lat: 50.1109, lng: 8.6821 },
     '61': { lat: 50.1109, lng: 8.6821 },
 
-    // Add more regions as needed
+    // Add more regions as needed - extending to cover more of Germany
+    '01': { lat: 51.0504, lng: 13.7373 }, // Dresden
+    '04': { lat: 51.3397, lng: 12.3731 }, // Leipzig
+    '99': { lat: 50.9787, lng: 11.0328 }, // Erfurt
+    '30': { lat: 52.3759, lng: 9.7320 }, // Hanover
+    '28': { lat: 53.0793, lng: 8.8017 }, // Bremen
+    '44': { lat: 51.5136, lng: 7.4653 }, // Dortmund
+    '40': { lat: 51.2277, lng: 6.7735 }, // Dusseldorf
+    '70': { lat: 48.7758, lng: 9.1829 }, // Stuttgart
+    '90': { lat: 49.4520, lng: 11.0768 }, // Nuremberg
 };
 
 /**
@@ -93,11 +104,15 @@ function getCoordinatesFromPostalCode(postalCode: string): Coordinates | null {
 }
 
 /**
- * Calculate distance from Gubin to customer location
+ * Calculate distance from Base Location to customer location
  * @param customerPostalCode Customer's German postal code
+ * @param baseLocation Optional base location override (default: Gubin)
  * @returns Estimated distance in kilometers, or null if calculation not possible
  */
-export function calculateDistanceFromGubin(customerPostalCode: string): number | null {
+export function calculateDistanceFromGubin(
+    customerPostalCode: string,
+    baseLocation: { lat: number; lng: number } = DEFAULT_BASE_LOCATION
+): number | null {
     const customerCoords = getCoordinatesFromPostalCode(customerPostalCode);
 
     if (!customerCoords) {
@@ -105,8 +120,8 @@ export function calculateDistanceFromGubin(customerPostalCode: string): number |
     }
 
     const distance = haversineDistance(
-        GUBIN_COORDS.lat,
-        GUBIN_COORDS.lng,
+        baseLocation.lat,
+        baseLocation.lng,
         customerCoords.lat,
         customerCoords.lng
     );
@@ -135,9 +150,13 @@ export interface InstallationCosts {
 // For days 4+: €790 per day
 const DAILY_RATES = [1250, 830, 790]; // First 3 days
 const ADDITIONAL_DAY_RATE = 790; // Day 4 and beyond
-const TRAVEL_RATE = 0.50; // EUR per km (one way)
+const DEFAULT_TRAVEL_RATE = 0.50; // EUR per km (one way)
 
-export function calculateInstallationCosts(days: number, distanceKm: number): InstallationCosts {
+export function calculateInstallationCosts(
+    days: number,
+    distanceKm: number,
+    ratePerKm: number = DEFAULT_TRAVEL_RATE
+): InstallationCosts {
     const validDays = Math.max(0, days); // Allow any number of days
 
     const dailyBreakdown = [];
@@ -150,7 +169,7 @@ export function calculateInstallationCosts(days: number, distanceKm: number): In
         dailyTotal += cost;
     }
 
-    const travelCost = Math.round(distanceKm * TRAVEL_RATE * 100) / 100; // Round to cents
+    const travelCost = Math.round(distanceKm * ratePerKm * 100) / 100; // Round to cents
 
     return {
         days: validDays,

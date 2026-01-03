@@ -26,11 +26,85 @@ export const CustomersList: React.FC = () => {
     const loadCustomers = async () => {
         setLoading(true);
         try {
-            const data = await DatabaseService.getUniqueCustomers();
-            setCustomers(data);
-        } catch (error) {
+            console.log('Fetching customers, contracts, and offers...');
+            const [rawCustomers, rawContracts, rawOffers] = await Promise.all([
+                DatabaseService.getCustomers(),
+                DatabaseService.getContracts(),
+                DatabaseService.getOffers()
+            ]);
+
+            // 1. Map Offer ID -> Customer ID (for linking contracts to customers via offers)
+            const offerToCustomerMap = new Map<string, string>();
+            const customerOfferStats = new Map<string, { count: number; lastDate: Date; latestId: string }>();
+
+            rawOffers.forEach(offer => {
+                const custId = offer.customer?.id;
+                if (!custId) return;
+
+                offerToCustomerMap.set(offer.id, custId);
+
+                // Update Offer Stats
+                const stats = customerOfferStats.get(custId) || { count: 0, lastDate: new Date(0), latestId: '' };
+                stats.count++;
+                if (offer.createdAt > stats.lastDate) {
+                    stats.lastDate = offer.createdAt;
+                    stats.latestId = offer.id;
+                }
+                customerOfferStats.set(custId, stats);
+            });
+
+            // 2. Map Customer ID -> Contract Stats
+            const customerContractStats = new Map<string, { count: number; hasSigned: boolean }>();
+
+            rawContracts.forEach(contract => {
+                // Try to link via Offer first (most reliable FK path)
+                let custId = contract.offerId ? offerToCustomerMap.get(contract.offerId) : undefined;
+
+                // Fallback: Try client.id from contract snapshot
+                if (!custId && contract.client?.id) {
+                    custId = contract.client.id;
+                }
+
+                if (!custId) return;
+
+                const stats = customerContractStats.get(custId) || { count: 0, hasSigned: false };
+                stats.count++;
+
+                // Check for signed status
+                // Status can be 'signed', 'completed', 'paid' - all imply signed contract?
+                // Or purely 'signed'. Let's include 'signed', 'verified', 'completed'.
+                const isSigned = ['signed', 'verified', 'completed', 'paid'].includes(contract.status);
+                if (isSigned) {
+                    stats.hasSigned = true;
+                }
+
+                customerContractStats.set(custId, stats);
+            });
+
+            // 3. Merge into Customers
+            const customersWithStats: CustomerWithStats[] = (rawCustomers || []).map(c => {
+                const cId = c.id!; // ID should exist if fetched from DB
+                const offerStats = customerOfferStats.get(cId) || { count: 0, lastDate: new Date(0), latestId: '' };
+                const contractStats = customerContractStats.get(cId) || { count: 0, hasSigned: false };
+
+                return {
+                    customer: c,
+                    lastOfferDate: offerStats.lastDate,
+                    offerCount: offerStats.count,
+                    latestOfferId: offerStats.latestId,
+                    contractCount: contractStats.count,
+                    hasSignedContract: contractStats.hasSigned
+                };
+            });
+
+            // Sort by Last Activity (Offer Date)
+            customersWithStats.sort((a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime());
+
+            setCustomers(customersWithStats);
+        } catch (error: any) {
             console.error('Error loading customers:', error);
-            toast.error('Nie udało się załadować klientów');
+            console.error('Error details:', error.message, error.details, error.hint);
+            toast.error(`Błąd: ${error.message || 'Nie udało się załadować danych'}`);
         } finally {
             setLoading(false);
         }
@@ -204,7 +278,7 @@ export const CustomersList: React.FC = () => {
                                                     >
                                                         Szczegóły
                                                     </Link>
-                                                    {isAdmin() && item.contractCount === 0 && (
+                                                    {isAdmin() && (
                                                         <button
                                                             onClick={async (e) => {
                                                                 e.preventDefault();

@@ -91,8 +91,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({
             id: msg.attributes.uid,
             subject: parsed.subject,
-            from: parsed.from?.text,
-            to: parsed.to?.text,
+            from: Array.isArray(parsed.from) ? parsed.from.map(a => a.text).join(', ') : parsed.from?.text,
+            to: Array.isArray(parsed.to) ? parsed.to.map(a => a.text).join(', ') : parsed.to?.text,
             date: parsed.date,
             text: parsed.text,
             html: parsed.html || parsed.textAsHtml,

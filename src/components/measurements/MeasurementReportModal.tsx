@@ -9,6 +9,7 @@ interface MeasurementReportModalProps {
     onClose: () => void;
     onSave: () => void;
     currentUserId: string;
+    report?: MeasurementReport;
 }
 
 export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
@@ -16,28 +17,34 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
     measurements,
     onClose,
     onSave,
-    currentUserId
+    currentUserId,
+    report
 }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        carPlate: '',
-        odometerStart: 0,
-        odometerEnd: 0,
-        withDriver: false,
-        carIssues: '',
-        reportDescription: ''
+        carPlate: report?.carPlate || '',
+        odometerStart: report?.odometerStart || 0,
+        odometerEnd: report?.odometerEnd || 0,
+        withDriver: report?.withDriver || false,
+        carIssues: report?.carIssues || '',
+        reportDescription: report?.reportDescription || ''
     });
 
     // Initialize/Auto-calculate total km
     const totalKm = Math.max(0, formData.odometerEnd - formData.odometerStart);
 
     // Prepare visits snapshot from measurements
+    // Prepare visits snapshot from measurements
+    // If editing, we might want to keep the snapshot OR update it?
+    // Let's assume we always refresh from passed measurements for consistency, 
+    // BUT if the report exists, maybe valid visits are already there.
+    // For now, let's use the passed `measurements` prop as the source truth for "what happened today".
     const visitsPreview: Visit[] = measurements.map(m => ({
         id: m.id,
         offerId: m.offerId,
         customerName: m.customerName,
         address: m.customerAddress,
-        productSummary: 'N/A', // Could fetch if needed, relying on snapshot
+        productSummary: 'N/A',
         price: 0,
         outcome: m.status === 'completed' ? 'measured' : 'pending',
         notes: m.notes || ''
@@ -53,23 +60,40 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
 
         setLoading(true);
         try {
-            const report: Omit<MeasurementReport, 'id' | 'createdAt'> = {
-                date: date.toISOString().split('T')[0],
-                salesRepId: currentUserId,
-                carPlate: formData.carPlate,
-                odometerStart: formData.odometerStart,
-                odometerEnd: formData.odometerEnd,
-                totalKm,
-                withDriver: formData.withDriver,
-                carIssues: formData.carIssues,
-                reportDescription: formData.reportDescription,
-                visits: visitsPreview,
-                signedContractsCount: 0, // Calculated on server or explicit input
-                offerIds: measurements.map(m => m.offerId).filter(Boolean) as string[]
-            };
-
-            await DatabaseService.createMeasurementReport(report);
-            toast.success('Raport został utworzony');
+            if (report?.id) {
+                // Update
+                await DatabaseService.updateMeasurementReport(report.id, {
+                    carPlate: formData.carPlate,
+                    odometerStart: formData.odometerStart,
+                    odometerEnd: formData.odometerEnd,
+                    totalKm,
+                    withDriver: formData.withDriver,
+                    carIssues: formData.carIssues,
+                    reportDescription: formData.reportDescription,
+                    visits: visitsPreview, // Update snapshot
+                });
+                toast.success('Raport został zaktualizowany');
+            } else {
+                // Create
+                const newReport: Omit<MeasurementReport, 'id' | 'createdAt'> = {
+                    date: date.toISOString().split('T')[0],
+                    salesRepId: currentUserId,
+                    carPlate: formData.carPlate,
+                    odometerStart: formData.odometerStart,
+                    odometerEnd: formData.odometerEnd,
+                    totalKm,
+                    withDriver: formData.withDriver,
+                    carIssues: formData.carIssues,
+                    reportDescription: formData.reportDescription,
+                    visits: visitsPreview,
+                    signedContractsCount: 0,
+                    offerIds: measurements.map(m => m.offerId).filter(Boolean) as string[],
+                    is_active: true,
+                    currency: 'PLN'
+                };
+                await DatabaseService.createMeasurementReport(newReport);
+                toast.success('Raport został utworzony');
+            }
             onSave();
             onClose();
         } catch (error) {
@@ -206,7 +230,7 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                     Zapisywanie...
                                 </>
                             ) : (
-                                'Utwórz Raport'
+                                report ? 'Zaktualizuj Raport' : 'Utwórz Raport'
                             )}
                         </button>
                     </div>

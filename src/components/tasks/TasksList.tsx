@@ -15,6 +15,21 @@ export const TasksList: React.FC<TasksListProps> = ({ leadId, customerId, refres
     const [loading, setLoading] = useState(true);
     const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    const checkUserRole = async () => {
+        const { data: { user } } = await DatabaseService.supabase.auth.getUser();
+        if (user) {
+            const { data } = await DatabaseService.supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+            if (data?.role === 'admin') {
+                setIsAdmin(true);
+            }
+        }
+    };
 
     const fetchTasks = async () => {
         setLoading(true);
@@ -37,6 +52,7 @@ export const TasksList: React.FC<TasksListProps> = ({ leadId, customerId, refres
     };
 
     useEffect(() => {
+        checkUserRole();
         fetchTasks();
     }, [leadId, customerId, refreshTrigger]);
 
@@ -52,6 +68,20 @@ export const TasksList: React.FC<TasksListProps> = ({ leadId, customerId, refres
             console.error('Error updating task:', error);
             toast.error('Błąd aktualizacji');
             fetchTasks(); // Revert on error
+        }
+    };
+
+    const handleDeleteTask = async (e: React.MouseEvent, taskId: string) => {
+        e.stopPropagation(); // Prevent opening modal
+        if (!window.confirm('Czy na pewno chcesz usunąć to zadanie?')) return;
+
+        try {
+            await DatabaseService.deleteTask(taskId);
+            toast.success('Zadanie usunięte');
+            fetchTasks();
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            toast.error('Błąd usuwania zadania');
         }
     };
 
@@ -93,16 +123,29 @@ export const TasksList: React.FC<TasksListProps> = ({ leadId, customerId, refres
                             </svg>
                         </button>
 
-                        <div className="flex-1 min-w-0" onClick={() => { setSelectedTask(task); setIsModalOpen(true); }}>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { setSelectedTask(task); setIsModalOpen(true); }}>
                             <div className="flex justify-between items-start gap-2">
-                                <h4 className={`text-sm font-medium truncate cursor-pointer ${task.status === 'completed' ? 'text-slate-500 line-through' : 'text-slate-900 group-hover:text-accent'}`}>
+                                <h4 className={`text-sm font-medium truncate ${task.status === 'completed' ? 'text-slate-500 line-through' : 'text-slate-900 group-hover:text-accent'}`}>
                                     {task.title}
                                 </h4>
-                                {task.dueDate && (
-                                    <span className={`text-xs whitespace-nowrap px-1.5 py-0.5 rounded border ${new Date(task.dueDate) < new Date() && task.status !== 'completed' ? 'text-red-600 bg-red-50 border-red-100' : 'text-slate-500 bg-slate-50 border-slate-100'}`}>
-                                        {new Date(task.dueDate).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
-                                    </span>
-                                )}
+                                <div className="flex items-center gap-1">
+                                    {task.dueDate && (
+                                        <span className={`text-xs whitespace-nowrap px-1.5 py-0.5 rounded border ${new Date(task.dueDate) < new Date() && task.status !== 'completed' ? 'text-red-600 bg-red-50 border-red-100' : 'text-slate-500 bg-slate-50 border-slate-100'}`}>
+                                            {new Date(task.dueDate).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                                        </span>
+                                    )}
+                                    {isAdmin && (
+                                        <button
+                                            onClick={(e) => handleDeleteTask(e, task.id)}
+                                            className="ml-2 w-6 h-6 flex items-center justify-center rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Usuń zadanie"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>

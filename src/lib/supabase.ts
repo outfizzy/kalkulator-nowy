@@ -15,6 +15,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
 });
 
+// Helper for JSONB columns
+export type Json =
+    | string
+    | number
+    | boolean
+    | null
+    | { [key: string]: Json | undefined }
+    | Json[];
+
 // Database types
 export type Database = {
     public: {
@@ -23,7 +32,7 @@ export type Database = {
                 Row: {
                     id: string;
                     full_name: string | null;
-                    role: 'admin' | 'user';
+                    role: 'admin' | 'user' | 'sales_rep' | 'manager' | 'partner' | 'installer';
                     status: 'pending' | 'active' | 'blocked';
                     created_at: string;
                     updated_at: string;
@@ -31,12 +40,12 @@ export type Database = {
                 Insert: {
                     id: string;
                     full_name?: string | null;
-                    role?: 'admin' | 'user';
+                    role?: 'admin' | 'user' | 'sales_rep' | 'manager' | 'partner' | 'installer';
                     status?: 'pending' | 'active' | 'blocked';
                 };
                 Update: {
                     full_name?: string | null;
-                    role?: 'admin' | 'user';
+                    role?: 'admin' | 'user' | 'sales_rep' | 'manager' | 'partner' | 'installer';
                     status?: 'pending' | 'active' | 'blocked';
                 };
             };
@@ -45,9 +54,9 @@ export type Database = {
                     id: string;
                     user_id: string;
                     offer_number: string;
-                    customer_data: any;
-                    product_config: any;
-                    pricing: any;
+                    customer_data: Json;
+                    product_config: Json;
+                    pricing: Json;
                     status: string;
                     margin_percentage: number;
                     created_at: string;
@@ -57,16 +66,16 @@ export type Database = {
                     id?: string;
                     user_id: string;
                     offer_number: string;
-                    customer_data: any;
-                    product_config: any;
-                    pricing: any;
+                    customer_data: Json;
+                    product_config: Json;
+                    pricing: Json;
                     status?: string;
                     margin_percentage: number;
                 };
                 Update: {
-                    customer_data?: any;
-                    product_config?: any;
-                    pricing?: any;
+                    customer_data?: Json;
+                    product_config?: Json;
+                    pricing?: Json;
                     status?: string;
                     margin_percentage?: number;
                 };
@@ -79,7 +88,7 @@ export type Database = {
                     last_name: string;
                     email: string | null;
                     phone: string | null;
-                    address: any;
+                    address: Json;
                     notes: string | null;
                     created_at: string;
                 };
@@ -90,7 +99,7 @@ export type Database = {
                     last_name: string;
                     email?: string | null;
                     phone?: string | null;
-                    address?: any;
+                    address?: Json;
                     notes?: string | null;
                 };
                 Update: {
@@ -98,7 +107,7 @@ export type Database = {
                     last_name?: string;
                     email?: string | null;
                     phone?: string | null;
-                    address?: any;
+                    address?: Json;
                     notes?: string | null;
                 };
             };
@@ -107,7 +116,7 @@ export type Database = {
                     id: string;
                     offer_id: string;
                     user_id: string;
-                    contract_data: any;
+                    contract_data: Json;
                     signed_at: string | null;
                     status: string;
                     created_at: string;
@@ -116,12 +125,12 @@ export type Database = {
                     id?: string;
                     offer_id: string;
                     user_id: string;
-                    contract_data: any;
+                    contract_data: Json;
                     signed_at?: string | null;
                     status?: string;
                 };
                 Update: {
-                    contract_data?: any;
+                    contract_data?: Json;
                     signed_at?: string | null;
                     status?: string;
                 };
@@ -134,7 +143,7 @@ export type Database = {
                     scheduled_date: string;
                     installer_name: string | null;
                     status: string;
-                    installation_data: any;
+                    installation_data: Json;
                     created_at: string;
                 };
                 Insert: {
@@ -144,13 +153,13 @@ export type Database = {
                     scheduled_date: string;
                     installer_name?: string | null;
                     status?: string;
-                    installation_data?: any;
+                    installation_data?: Json;
                 };
                 Update: {
                     scheduled_date?: string;
                     installer_name?: string | null;
                     status?: string;
-                    installation_data?: any;
+                    installation_data?: Json;
                 };
             };
             reports: {
@@ -159,7 +168,7 @@ export type Database = {
                     user_id: string;
                     month: string;
                     year: number;
-                    data: any;
+                    data: Json;
                     created_at: string;
                 };
                 Insert: {
@@ -167,10 +176,10 @@ export type Database = {
                     user_id: string;
                     month: string;
                     year: number;
-                    data: any;
+                    data: Json;
                 };
                 Update: {
-                    data?: any;
+                    data?: Json;
                 };
             };
             call_actions: {

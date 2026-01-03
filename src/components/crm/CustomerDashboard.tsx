@@ -175,9 +175,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                                         {comm.content}
                                     </div>
                                     {/* Audio Player if URL exists */}
-                                    {comm.metadata?.recordingUrl && (
+                                    {!!comm.metadata?.recordingUrl && (
                                         <div className="mt-2 pt-2 border-t border-slate-100">
-                                            <audio controls className="w-full h-8" src={comm.metadata.recordingUrl} />
+                                            <audio controls className="w-full h-8" src={comm.metadata.recordingUrl as string} />
                                         </div>
                                     )}
                                 </div>

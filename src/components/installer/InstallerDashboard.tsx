@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from '../../contexts/TranslationContext';
 import { DatabaseService } from '../../services/database';
 import type { Installation } from '../../types';
+import { InstallationTimeTracking } from './InstallationTimeTracking';
 
 export const InstallerDashboard: React.FC = () => {
     const { currentUser } = useAuth();
@@ -150,66 +151,70 @@ export const InstallerDashboard: React.FC = () => {
 
                 {/* Today's Installation Card */}
                 {todayInstallation ? (
-                    <div className="bg-gradient-to-br from-accent to-accent-dark rounded-2xl shadow-lg p-6 text-white">
-                        <div className="flex items-center gap-2 mb-3">
-                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <h2 className="text-xl font-bold">{t('dashboard.todayInstallation')}</h2>
-                        </div>
+                    <>
+                        <InstallationTimeTracking installationId={todayInstallation.id} />
 
-                        <div className="space-y-2 mb-4">
-                            <div className="flex items-start gap-2">
-                                <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        <div className="bg-gradient-to-br from-accent to-accent-dark rounded-2xl shadow-lg p-6 text-white">
+                            <div className="flex items-center gap-2 mb-3">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
-                                <div>
-                                    <p className="font-semibold">{todayInstallation.client.firstName} {todayInstallation.client.lastName}</p>
-                                    <p className="text-sm opacity-90">{todayInstallation.client.phone}</p>
+                                <h2 className="text-xl font-bold">{t('dashboard.todayInstallation')}</h2>
+                            </div>
+
+                            <div className="space-y-2 mb-4">
+                                <div className="flex items-start gap-2">
+                                    <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-semibold">{todayInstallation.client.firstName} {todayInstallation.client.lastName}</p>
+                                        <p className="text-sm opacity-90">{todayInstallation.client.phone}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-2">
+                                    <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-medium">{todayInstallation.client.address}</p>
+                                        <p className="text-sm opacity-90">{todayInstallation.client.city}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                    <p className="text-sm">{todayInstallation.productSummary}</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-2">
-                                <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <div>
-                                    <p className="font-medium">{todayInstallation.client.address}</p>
-                                    <p className="text-sm opacity-90">{todayInstallation.client.city}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                <p className="text-sm">{todayInstallation.productSummary}</p>
+                            {/* Navigation Buttons */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={openGoogleMaps}
+                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-semibold transition-all"
+                                >
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                                    </svg>
+                                    Google Maps
+                                </button>
+                                <button
+                                    onClick={openAppleMaps}
+                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-semibold transition-all"
+                                >
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                                    </svg>
+                                    Apple Maps
+                                </button>
                             </div>
                         </div>
-
-                        {/* Navigation Buttons */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                onClick={openGoogleMaps}
-                                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-semibold transition-all"
-                            >
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                                </svg>
-                                Google Maps
-                            </button>
-                            <button
-                                onClick={openAppleMaps}
-                                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-semibold transition-all"
-                            >
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                                </svg>
-                                Apple Maps
-                            </button>
-                        </div>
-                    </div>
+                    </>
                 ) : (
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-center">
                         <svg className="w-12 h-12 mx-auto text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

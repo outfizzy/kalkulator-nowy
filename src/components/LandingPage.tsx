@@ -92,10 +92,17 @@ export const LandingPage: React.FC = () => {
                 </div>
 
                 {/* Footer */}
-                <div className="mt-16 text-center">
-                    <p className="text-slate-500 text-sm">
-                        © 2024 PolenDach 24. Wszelkie prawa zastrzeżone.
+                <div className="mt-16 text-center space-y-1">
+                    <p className="text-slate-500 text-sm font-medium">
+                        © 2026 PolenDach 24 sc. Wszelkie prawa zastrzeżone.
                     </p>
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-4 text-xs text-slate-600">
+                        <span>Właściciele: Tomasz Fijołek, Mariusz Duź</span>
+                        <span className="hidden md:inline">•</span>
+                        <span>
+                            Kontakt: <a href="mailto:buero@polendach24.de" className="hover:text-accent transition-colors">buero@polendach24.de</a>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

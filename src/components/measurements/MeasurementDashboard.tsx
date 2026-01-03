@@ -8,6 +8,8 @@ import { AddMeasurementFromOffer } from './AddMeasurementFromOffer';
 import { MeasurementRouteView } from './MeasurementRouteView';
 import { CustomerSelector } from './CustomerSelector';
 import type { Customer } from '../../types';
+import { GeocodingService } from '../../services/GeocodingService';
+import { MapPin } from 'lucide-react';
 
 export const MeasurementDashboard: React.FC = () => {
     const { currentUser } = useAuth();
@@ -380,8 +382,28 @@ const MeasurementModal: React.FC<MeasurementModalProps> = ({ measurement, initia
         customerAddress: measurement?.customerAddress || initialData?.customerAddress || '',
         customerPhone: measurement?.customerPhone || initialData?.customerPhone || '',
         status: measurement?.status || 'scheduled',
-        notes: measurement?.notes || initialData?.notes || ''
+        notes: measurement?.notes || initialData?.notes || '',
+        locationLat: measurement?.locationLat || initialData?.locationLat || undefined,
+        locationLng: measurement?.locationLng || initialData?.locationLng || undefined
     });
+
+    const handleGeocode = async () => {
+        if (!formData.customerAddress) {
+            toast.error('Wpisz adres');
+            return;
+        }
+        const coords = await GeocodingService.search(formData.customerAddress);
+        if (coords) {
+            setFormData(prev => ({
+                ...prev,
+                locationLat: coords.lat,
+                locationLng: coords.lng
+            }));
+            toast.success('Znaleziono lokalizację!');
+        } else {
+            toast.error('Nie udało się znaleźć lokalizacji');
+        }
+    };
 
     const [linkedOffer, setLinkedOffer] = useState<Offer | null>(null);
 
@@ -408,7 +430,9 @@ const MeasurementModal: React.FC<MeasurementModalProps> = ({ measurement, initia
             customerPhone: formData.customerPhone || undefined,
             status: formData.status,
             notes: formData.notes || undefined,
-            offerId: initialData?.offerId || measurement?.offerId
+            offerId: initialData?.offerId || measurement?.offerId,
+            locationLat: formData.locationLat,
+            locationLng: formData.locationLng
         });
     };
 
@@ -498,16 +522,24 @@ const MeasurementModal: React.FC<MeasurementModalProps> = ({ measurement, initia
                         />
                     </div>
 
-                    <div>
+                    <div className="relative">
                         <label className="block text-sm font-medium text-slate-600 mb-1">Adres</label>
                         <input
                             type="text"
                             value={formData.customerAddress}
                             onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
-                            className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 focus:border-accent focus:outline-none"
+                            className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 focus:border-accent focus:outline-none pr-10"
                             placeholder="Ulica, miasto"
                             required
                         />
+                        <button
+                            type="button"
+                            onClick={handleGeocode}
+                            className="absolute right-2 top-8 text-slate-400 hover:text-accent p-1"
+                            title="Pobierz lokalizację"
+                        >
+                            <MapPin className="w-5 h-5" />
+                        </button>
                     </div>
 
                     <div>

@@ -135,20 +135,39 @@ export const SalesAssistantWidget = () => {
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4 scroll-smooth">
                         {messages.length === 0 && !isLoading && (
-                            <div className="text-center text-slate-400 mt-10 p-4">
-                                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-500 shadow-sm">
+                            <div className="text-center text-slate-400 mt-6 p-4">
+                                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-600 shadow-sm ring-4 ring-blue-50">
                                     <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                                 </div>
-                                <p className="text-sm font-medium text-slate-600">Cześć {currentUser.firstName}!</p>
-                                <p className="text-xs mt-2 leading-relaxed max-w-[200px] mx-auto">
-                                    Jestem połączony z Twoją bazą danych. Zapytaj mnie o:
-                                    <br /><br />
-                                    📊 Statusy ofert
-                                    <br />
-                                    📅 Montaże w kalendarzu
-                                    <br />
-                                    💰 Ceny produktów
-                                </p>
+                                <h4 className="text-slate-800 font-bold mb-1">Cześć {currentUser.firstName}!</h4>
+                                <p className="text-xs text-slate-500 mb-6">W czym mogę Ci teraz pomóc?</p>
+
+                                <div className="grid gap-2">
+                                    {[
+                                        { icon: '📊', text: 'Podsumuj moją sprzedaż w tym miesiącu' },
+                                        { icon: '📅', text: 'Co mam dzisiaj zaplanowane?' },
+                                        { icon: '🤝', text: 'Pokaż leady wymagające kontaktu' },
+                                        { icon: '💰', text: 'Sprawdź status ostatnich ofert' }
+                                    ].map((prompt, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => {
+                                                setInputValue(prompt.text);
+                                                // Create a slight delay to allow state update then highlight input to show it's ready
+                                                setTimeout(() => {
+                                                    const input = document.querySelector('textarea');
+                                                    if (input) (input as HTMLTextAreaElement).focus();
+                                                    // Ideally we would trigger handleSend here, but for safety (avoid duplicates) 
+                                                    // we just pre-fill. If we want auto-send, we'd need to bypass the keyDown check.
+                                                }, 50);
+                                            }}
+                                            className="text-left bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 p-3 rounded-xl transition-all shadow-sm flex items-center gap-3 text-xs font-medium text-slate-700 group"
+                                        >
+                                            <span className="text-lg grayscale group-hover:grayscale-0 transition-all">{prompt.icon}</span>
+                                            {prompt.text}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
 
@@ -165,7 +184,7 @@ export const SalesAssistantWidget = () => {
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
-                                                    a: ({ node, href, children, ...props }) => {
+                                                    a: ({ href, children, ...props }) => {
                                                         const isInternal = href?.startsWith('/');
                                                         return (
                                                             <a
@@ -183,15 +202,15 @@ export const SalesAssistantWidget = () => {
                                                             </a>
                                                         );
                                                     },
-                                                    table: ({ node, ...props }) => (
+                                                    table: (props) => (
                                                         <div className="overflow-x-auto my-2 rounded-lg border border-slate-200">
                                                             <table {...props} className="w-full text-left text-xs" />
                                                         </div>
                                                     ),
-                                                    th: ({ node, ...props }) => (
+                                                    th: (props) => (
                                                         <th {...props} className="bg-slate-50 px-2 py-1 font-semibold text-slate-600 border-b" />
                                                     ),
-                                                    td: ({ node, ...props }) => (
+                                                    td: (props) => (
                                                         <td {...props} className="px-2 py-1 border-b last:border-0" />
                                                     )
                                                 }}
@@ -238,7 +257,8 @@ export const SalesAssistantWidget = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Floating Trigger Button */}
             <button
@@ -259,6 +279,6 @@ export const SalesAssistantWidget = () => {
                     </div>
                 )}
             </button>
-        </div>
+        </div >
     );
 };

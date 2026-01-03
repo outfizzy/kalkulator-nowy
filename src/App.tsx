@@ -1,11 +1,6 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useLocation } from 'react-router-dom';
-import { Toaster, toast } from 'react-hot-toast';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { Layout } from './components/Layout';
-import { CustomerForm } from './components/CustomerForm';
-import { ProductConfigurator } from './components/ProductConfigurator';
-import { OfferSummary } from './components/OfferSummary';
-import { MarginControl } from './components/MarginControl';
 import { OffersList } from './components/OffersList';
 import { SalesDashboard } from './components/SalesDashboard';
 import { SettingsPage } from './components/SettingsPage';
@@ -14,13 +9,22 @@ import { RegisterPage } from './components/RegisterPage';
 import { UserManagementPage } from './components/UserManagementPage';
 import { SalesTeamDashboard } from './components/admin/SalesTeamDashboard';
 import { PartnerOffersPage } from './components/admin/PartnerOffersPage';
+import { ActivityLogsPage } from './components/admin/ActivityLogsPage';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+
+
+
+{/* Customers Module */ }
 import { InstallerManagementPanel } from './components/admin/InstallerManagementPanel';
 import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
-import { OrderRequestManager } from './components/admin/OrderRequestManager';
+
 import { FuelLogManager } from './components/admin/FuelLogManager';
 import { FailureReportManager } from './components/admin/FailureReportManager';
 import { PricingPage } from './components/admin/PricingPage';
+import { InstallationProfitability } from './components/admin/InstallationProfitability';
+import { SystemPermissionsPage } from './components/admin/SystemPermissionsPage';
+import { InventoryDashboard } from './components/inventory/InventoryDashboard';
+import { ServiceDashboard } from './components/service/ServiceDashboard';
 import { InstallerRequestsPage } from './components/installer/InstallerRequestsPage';
 import { InstallerDashboard } from './components/installer/InstallerDashboard';
 import { InstallationAcceptance } from './components/installer/InstallationAcceptance';
@@ -29,9 +33,6 @@ import { InstallerCalendarPage } from './components/installer/InstallerCalendarP
 import { FailureReportForm } from './components/installer/FailureReportForm';
 import { InstallerSettingsPage } from './components/installer/InstallerSettingsPage';
 import { FuelPage } from './components/fuel/FuelPage';
-import { calculatePrice } from './utils/pricing';
-import { calculateCommission } from './utils/commission';
-import { DatabaseService } from './services/database';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReportsList } from './components/reports/ReportsList';
 import { ReportForm } from './components/reports/ReportForm';
@@ -39,6 +40,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
 import { PortfolioDashboard } from './components/installations/PortfolioDashboard';
+import { NewOfferPage } from './pages/NewOfferPage';
 
 import { WalletPage } from './components/admin/WalletPage';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
@@ -47,6 +49,7 @@ import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
+import { ProcurementDashboard } from './components/logistics/ProcurementDashboard';
 import { CustomersList } from './components/customers/CustomersList';
 import { CustomerPage } from './components/customers/CustomerPage';
 import { LeadsList } from './components/leads/LeadsList';
@@ -55,18 +58,21 @@ import { LeadDetailsPage } from './components/leads/LeadDetailsPage';
 import { MailPage } from './components/MailPage';
 import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
 import { AIAssistantPage } from './components/admin/AIAssistantPage';
+import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
+import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
+import { VisualizerPage } from './pages/VisualizerPage';
+import ServiceRequestPage from './pages/public/ServiceRequestPage';
+import { ServiceTicketDetailsPage } from './components/service/ServiceTicketDetailsPage';
 
 import { PublicOfferPage } from './pages/PublicOfferPage';
+import { CallManager } from './components/telephony/CallManager';
+import { TaskBoard } from './components/tasks/TaskBoard';
 
 // Partner Components
 import { LandingPage } from './components/LandingPage';
 import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
 import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
 import { PartnerLayout } from './components/partner/PartnerLayout';
-
-import type { Customer, ProductConfig, Offer, SnowZoneInfo } from './types';
-
-type Step = 'customer' | 'product' | 'summary';
 
 // Protected Route component
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactElement, allowedRoles?: string[] }) {
@@ -110,204 +116,25 @@ function DashboardRouter() {
   return <SalesDashboard />;
 }
 
-function NewOfferPage({ mode = 'standard' }: { mode?: 'standard' | 'partner' }) {
-  const { currentUser } = useAuth();
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-  const initialPhone = searchParams.get('phone');
-
-  // Handle both direct customer object (legacy) and wrapped object with leadId
-  const state = location.state as any;
-  const leadData = (state?.customer || state) as Partial<Customer> | undefined;
-  const leadId = state?.leadId as string | undefined;
-
-  const [step, setStep] = useState<Step>('customer');
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
-  const [product, setProduct] = useState<ProductConfig | null>(null);
-  const [offer, setOffer] = useState<Offer | null>(null);
-
-  // Initialize margin based on mode and user
-  const [margin, setMargin] = useState<number>(() => {
-    if (mode === 'partner') {
-      // We need currentUser accessible here. If currentUser is loaded, great. 
-      // But useAuth might not have it immediately? 
-      // If it's undefined, default to 0.25, then useEffect can update it ONCE.
-      // Hooks rule: don't use hook return in callback if not stable? currentUser changes.
-      return 0.25;
-    }
-    return 0.40;
-  });
 
 
 
-  const handleCustomerComplete = (data: Customer, zone: SnowZoneInfo) => {
-    setCustomer(data);
-    setSnowZone(zone);
-    setStep('product');
-  };
 
-  const handleProductComplete = async (config: ProductConfig) => {
-    setProduct(config);
-
-    if (customer && snowZone && currentUser) {
-      const pricing = calculatePrice(config, margin, snowZone, customer.postalCode);
-
-      try {
-        // Partners might not have soldOffersCount logic or it might be different
-        const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
-
-        // Commission: Use user's individual rate or default 5%
-        const userCommissionRate = currentUser.commissionRate ?? 0.05;
-        const commission = calculateCommission(pricing.sellingPriceNet, pricing.marginPercentage, soldOffersCount, userCommissionRate);
-
-        const newOffer: Omit<Offer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
-          offerNumber: `OFF/${new Date().getFullYear()}/${Math.floor(Math.random() * 10000)}`, // Temp number generation
-          status: 'draft',
-          customer,
-          snowZone,
-          product: config,
-          pricing,
-          commission,
-          leadId, // Pass lead ID if available
-        };
-
-        const savedOffer = await DatabaseService.createOffer(newOffer);
-        toast.success('Oferta utworzona pomyślnie!');
-        setOffer(savedOffer);
-        setStep('summary');
-      } catch (error) {
-        console.error('Error creating offer:', error);
-        toast.error('Błąd podczas tworzenia oferty');
-      }
-    }
-  };
-
-  const handleMarginChange = async (newMargin: number) => {
-    setMargin(newMargin);
-    if (offer && currentUser) {
-      const newPricing = calculatePrice(offer.product, newMargin, offer.snowZone, offer.customer.postalCode);
-
-      try {
-        const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
-        const userCommissionRate = currentUser.commissionRate ?? 0.05;
-        const newCommission = calculateCommission(newPricing.sellingPriceNet, newPricing.marginPercentage, soldOffersCount, userCommissionRate);
-
-        const updatedOffer = {
-          ...offer,
-          pricing: newPricing,
-          commission: newCommission,
-          updatedAt: new Date(),
-        };
-
-        await DatabaseService.updateOffer(offer.id, {
-          pricing: newPricing,
-          commission: newCommission
-        });
-        setOffer(updatedOffer);
-      } catch (error) {
-        console.error('Error updating offer:', error);
-        toast.error('Błąd aktualizacji oferty');
-      }
-    }
-  };
-
-  const handleReset = () => {
-    setStep('customer');
-    setCustomer(null);
-    setSnowZone(null);
-    setProduct(null);
-    setOffer(null);
-    setMargin(mode === 'partner' ? (currentUser?.partnerMargin ?? 0.25) : 0.40);
-  };
-
-  return (
-    <>
-      {/* Progress Indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between relative">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 -z-10" />
-
-          <div className={`flex flex-col items-center gap-2 bg-background px-2 ${step === 'customer' || step === 'product' || step === 'summary' ? 'text-accent' : 'text-slate-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${step === 'customer' ? 'bg-accent text-white' : (step === 'product' || step === 'summary' ? 'bg-accent text-white' : 'bg-slate-200 text-slate-500')}`}>
-              1
-            </div>
-            <span className="text-xs font-medium">Klient</span>
-          </div>
-
-          <div className={`flex flex-col items-center gap-2 bg-background px-2 ${step === 'product' || step === 'summary' ? 'text-accent' : 'text-slate-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${step === 'product' ? 'bg-accent text-white' : (step === 'summary' ? 'bg-accent text-white' : 'bg-slate-200 text-slate-500')}`}>
-              2
-            </div>
-            <span className="text-xs font-medium">Konfiguracja</span>
-          </div>
-
-          <div className={`flex flex-col items-center gap-2 bg-background px-2 ${step === 'summary' ? 'text-accent' : 'text-slate-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${step === 'summary' ? 'bg-accent text-white' : 'bg-slate-200 text-slate-500'}`}>
-              3
-            </div>
-            <span className="text-xs font-medium">Podsumowanie</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="transition-all duration-300 ease-in-out">
-        {step === 'customer' && (
-          <CustomerForm
-            onComplete={handleCustomerComplete}
-            initialData={leadData ? (leadData as Customer) : (initialPhone ? { phone: initialPhone } as Customer : customer || undefined)}
-          />
-        )}
-
-        {step === 'product' && (
-          <ProductConfigurator onComplete={handleProductComplete} initialData={product || undefined} />
-        )}
-
-        {step === 'summary' && offer && (
-          <div className="space-y-6">
-            <div className="print:hidden">
-              {mode === 'partner' ? (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                  <h3 className="text-lg font-semibold text-slate-800">Marża partnera B2B</h3>
-                  <p className="mt-2 text-2xl font-bold text-accent">
-                    {Math.round(margin * 100)}%
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Marża ustalona przez administratora. Ceny w konfiguratorze uwzględniają tę marżę.
-                  </p>
-                </div>
-              ) : (
-                <MarginControl
-                  value={margin}
-                  onChange={handleMarginChange}
-                  purchasePrice={offer.pricing.totalCost}
-                  sellingPrice={offer.pricing.sellingPriceNet}
-                />
-              )}
-            </div>
-
-            <OfferSummary offer={offer} onReset={handleReset} onOfferUpdate={setOffer} />
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
-
+import { ScrollToTop } from './components/ScrollToTop';
 
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/p/offer/:token" element={<PublicOfferPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/reklamation" element={<ServiceRequestPage />} />
 
             {/* Partner Public Routes */}
             <Route path="/partner/login" element={<PartnerLoginPage />} />
@@ -316,7 +143,10 @@ function App() {
             {/* Sales Rep / Admin Routes */}
             <Route element={
               <ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}>
-                <Layout />
+                <>
+                  <CallManager />
+                  <Layout />
+                </>
               </ProtectedRoute>
             }>
               <Route path="/dashboard" element={<DashboardRouter />} />
@@ -339,14 +169,22 @@ function App() {
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
               <Route path="/deliveries" element={<DeliveryCalendar />} />
-              <Route path="/admin/requests" element={<OrderRequestManager />} />
+
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
-              <Route path="/admin/pricing" element={<PricingPage />} />
+              <Route path="admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />
+              <Route path="admin/inventory" element={<ProtectedRoute allowedRoles={['admin', 'office']}><InventoryDashboard /></ProtectedRoute>} />
+              <Route path="admin/logs" element={<ProtectedRoute allowedRoles={['admin']}><ActivityLogsPage /></ProtectedRoute>} />
+              <Route path="/admin/profitability" element={<InstallationProfitability />} />
+              <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><SystemPermissionsPage /></ProtectedRoute>} />
               <Route path="/fuel-logs" element={<FuelPage />} />
+              <Route path="/fuel-logs" element={<FuelPage />} />
+              <Route path="/service" element={<ServiceDashboard />} />
+              <Route path="/service/:id" element={<ServiceTicketDetailsPage />} />
 
               {/* CRM & Logistics */}
               <Route path="/logistics" element={<LogisticsCalendar />} />
+              <Route path="/procurement" element={<ProcurementDashboard />} />
 
               {/* Customers Module */}
               <Route path="/customers" element={<CustomersList />} />
@@ -357,7 +195,12 @@ function App() {
               <Route path="/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/mail" element={<MailPage />} />
+              <Route path="/tasks" element={<TaskBoard />} />
+              <Route path="/tasks" element={<TaskBoard />} />
               <Route path="/ai-assistant" element={<AIAssistantPage />} />
+              <Route path="/admin/tech-assistant" element={<TechnicalAssistant />} />
+              <Route path="/admin/knowledge" element={<KnowledgeBaseManager />} />
+              <Route path="/visualizer" element={<VisualizerPage />} />
             </Route>
 
 

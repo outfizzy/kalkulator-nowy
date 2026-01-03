@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { Measurement } from '../../types';
 import { haversineDistance } from '../../utils/distanceCalculator';
+import { RouteMap } from './RouteMap';
+import { RouteOptimizer } from '../../utils/RouteOptimizer';
+import { toast } from 'react-hot-toast';
 
 interface MeasurementRouteViewProps {
     measurements: Measurement[];
@@ -18,10 +21,12 @@ export const MeasurementRouteView: React.FC<MeasurementRouteViewProps> = ({ meas
             if (a.orderInRoute !== undefined && b.orderInRoute !== undefined) {
                 return a.orderInRoute - b.orderInRoute;
             }
+            // Fallback to coordinates-based sort if everything else fails? No, time is better.
             return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
         });
+        // Check if different to avoid infinite loop if onReorder triggers parent update -> prop update -> effect
         setOrderedMeasurements(sorted);
-    }, [measurements]);
+    }, [measurements]); // Be careful with dependency array
 
     const handleMove = (index: number, direction: 'up' | 'down') => {
         const newOrder = [...orderedMeasurements];
@@ -32,6 +37,20 @@ export const MeasurementRouteView: React.FC<MeasurementRouteViewProps> = ({ meas
         }
         setOrderedMeasurements(newOrder);
         onReorder(newOrder);
+    };
+
+    const handleOptimize = () => {
+        if (orderedMeasurements.length < 2) return;
+
+        try {
+            const optimized = RouteOptimizer.optimize(orderedMeasurements);
+            setOrderedMeasurements(optimized);
+            onReorder(optimized);
+            toast.success('Trasa zoptymalizowana');
+        } catch (e) {
+            console.error(e);
+            toast.error('Błąd optymalizacji');
+        }
     };
 
     const calculateStats = () => {
@@ -62,9 +81,21 @@ export const MeasurementRouteView: React.FC<MeasurementRouteViewProps> = ({ meas
 
     return (
         <div className="space-y-6">
+            <RouteMap measurements={orderedMeasurements} />
+
             <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                <h2 className="text-xl font-bold text-white mb-4">
-                    Trasa: {date.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                <h2 className="text-xl font-bold text-white mb-4 flex justify-between items-center">
+                    <span>Trasa: {date.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                    <button
+                        onClick={handleOptimize}
+                        className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+                        title="Optymalizuj kolejność (Najbliższy Sąsiad)"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Optymalizuj
+                    </button>
                 </h2>
                 <div className="flex gap-6 text-slate-300">
                     <div>

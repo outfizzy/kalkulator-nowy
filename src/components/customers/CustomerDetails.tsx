@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
-import type { Customer, Contract, Installation, Communication, InstallationTeam } from '../../types';
+import type { Customer, Contract, Installation, Communication, InstallationTeam, Lead, Offer } from '../../types';
 import { NotesList } from '../common/NotesList';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
+import { ProfitabilityDashboard } from './ProfitabilityDashboard';
 
 interface RingostatCall {
     id: string;
@@ -24,8 +26,12 @@ interface CustomerDetailsProps {
 }
 
 export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEdit, onBack }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'logistics' | 'communication'>('overview');
+    const { isAdmin } = useAuth();
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'logistics' | 'communication' | 'profitability' | 'leads'>('overview');
     const [contracts, setContracts] = useState<Contract[]>([]);
+    const [offers, setOffers] = useState<Offer[]>([]);
+    const [leads, setLeads] = useState<Lead[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [calls, setCalls] = useState<RingostatCall[]>([]);
@@ -46,18 +52,21 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
             if (!customer.id) return;
             try {
                 // Parallel fetching for performance
-                const [offersData, contractsData, installationsData, commsData, teamsData] = await Promise.all([
+                const [offersData, contractsData, installationsData, commsData, teamsData, leadsData] = await Promise.all([
                     DatabaseService.getCustomerOffers(customer.id),
                     DatabaseService.getCustomerContracts(customer.id),
                     DatabaseService.getCustomerInstallations(customer.id),
                     DatabaseService.getCommunications(customer.id),
-                    DatabaseService.getTeams()
+                    DatabaseService.getTeams(),
+                    DatabaseService.getCustomerLeads(customer.id)
                 ]);
 
+                setOffers(offersData);
                 setContracts(contractsData);
                 setInstallations(installationsData);
                 setCommunications(commsData);
                 setTeams(teamsData);
+                setLeads(leadsData);
 
                 // Calculate Stats
                 const soldContracts = contractsData.filter(c => c.status === 'signed' || c.status === 'completed');
@@ -127,16 +136,17 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
         const toastId = toast.loading('Inicjowanie asystenta AI...');
 
         try {
-            // Import supabase dynamically or from props if available, but here we need direct access or via service
-            // Ideally we move this to a service, but for now doing it here
             const { supabase } = await import('../../lib/supabase');
 
             const { data, error } = await supabase.functions.invoke('vapi-make-call', {
                 body: {
                     phoneNumber: customer.phone,
                     customerName: `${customer.firstName} ${customer.lastName}`,
-                    installationDate: new Date(inst.scheduledDate).toLocaleDateString('pl-PL'),
-                    installationTime: 'godziny poranne', // default for now
+                    installationDate: inst.scheduledDate, // Send raw ISO string (or whatever type it is) for backend parsing
+                    installationId: inst.id,
+                    customerId: customer.id,
+                    // Optional:
+                    // customInstructions: '...', 
                     productName: inst.productSummary
                 }
             });
@@ -180,6 +190,28 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     <button onClick={onBack} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
                         Wróć
                     </button>
+                    {isAdmin() && (
+                        <button
+                            onClick={async () => {
+                                if (window.confirm('Czy na pewno chcesz usunąć tego klienta? Ta operacja jest nieodwracalna.')) {
+                                    try {
+                                        await DatabaseService.deleteCustomer(customer.id!);
+                                        toast.success('Klient został usunięty');
+                                        navigate('/customers');
+                                    } catch (error) {
+                                        console.error('Delete error:', error);
+                                        toast.error('Nie można usunąć klienta (sprawdź powiązania)');
+                                    }
+                                }
+                            }}
+                            className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Usuń
+                        </button>
+                    )}
                     <button onClick={onEdit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -209,7 +241,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                         </div>
                         <div className="text-right">
                             <span className="text-xl font-bold text-slate-800">
-                                {/* @ts-ignore */}
+                                /* @ts-expect-error - ProfitabilityDashboard uses updated Customer type */
                                 {stats.completedInstallations}
                             </span>
                             <span className="text-xs text-slate-400 ml-1">zrealiz. montaży</span>
@@ -230,6 +262,8 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     {[
                         { id: 'overview', label: 'Podsumowanie', icon: 'M4 6h16M4 12h16M4 18h7' },
                         { id: 'financials', label: 'Oferty i Umowy', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                        { id: 'leads', label: 'Szanse (Leady)', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+                        { id: 'profitability', label: 'Rentowność', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
                         { id: 'logistics', label: 'Realizacja i Produkty', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
                         { id: 'communication', label: 'Komunikacja i Notatki', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' }
                     ].map(tab => (
@@ -273,6 +307,44 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Team & Responsibilities - NEW */}
+                            <div className="mt-8">
+                                <h3 className="font-bold text-slate-800 mb-4">Zespół i Odpowiedzialność</h3>
+                                <div className="space-y-4 text-sm">
+                                    <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                            </div>
+                                            <span className="text-slate-500">Opiekun Klienta</span>
+                                        </div>
+                                        <span className={`font-medium ${customer.representative ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                                            {customer.representative
+                                                ? `${customer.representative.firstName} ${customer.representative.lastName}`
+                                                : 'Nie przypisano'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            </div>
+                                            <span className="text-slate-500">Osoba Decyzyjna</span>
+                                        </div>
+                                        <span className={`font-medium ${customer.contractSigner ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                                            {customer.contractSigner
+                                                ? `${customer.contractSigner.firstName} ${customer.contractSigner.lastName}`
+                                                : 'Nie wskazano'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <h3 className="font-bold text-slate-800 mb-4">Ostatnie Aktywności</h3>
                                 <div className="space-y-3">
@@ -313,6 +385,59 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                     + Nowa Oferta
                                 </Link>
                             </div>
+
+                            {/* Offers Table */}
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-500 uppercase mb-2">Oferty ({offers.length})</h4>
+                                <table className="w-full text-left text-sm mb-8">
+                                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                                        <tr>
+                                            <th className="p-3 rounded-l-lg">Numer</th>
+                                            <th className="p-3">Data</th>
+                                            <th className="p-3">Produkt</th>
+                                            <th className="p-3">Wartość</th>
+                                            <th className="p-3">Status</th>
+                                            <th className="p-3 rounded-r-lg text-right">Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {offers.map(offer => (
+                                            <tr key={offer.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="p-3 font-medium text-slate-900">{offer.offerNumber}</td>
+                                                <td className="p-3 text-slate-500">{formatDate(offer.createdAt)}</td>
+                                                <td className="p-3 text-slate-700">{offer.product.modelId.toUpperCase()}</td>
+                                                <td className="p-3">
+                                                    <div className="font-bold text-slate-800">
+                                                        {formatMoney(offer.pricing.finalPriceNet || 0)}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400">
+                                                        {formatMoney((offer.pricing.finalPriceNet || 0) * 1.23)} Brutto
+                                                    </div>
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${offer.status === 'sold' ? 'bg-green-100 text-green-700' :
+                                                        offer.status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                                                            offer.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                                                                'bg-red-100 text-red-700'
+                                                        }`}>
+                                                        {offer.status === 'sold' ? 'Zaakceptowana' :
+                                                            offer.status === 'sent' ? 'Wysłana' :
+                                                                offer.status === 'draft' ? 'Szkic' : 'Odrzucona'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    <Link to={`/offers/${offer.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Podgląd</Link>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {offers.length === 0 && (
+                                            <tr><td colSpan={6} className="p-4 text-center text-slate-400">Brak ofert</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <h4 className="text-sm font-bold text-slate-500 uppercase mb-2">Umowy ({contracts.length})</h4>
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
                                     <tr>
@@ -390,31 +515,47 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
 
                     {/* LOGISTICS TAB */}
                     {activeTab === 'logistics' && (
-                        <div className="space-y-6">
-                            {/* Main Products from Contracts */}
-                            <div>
-                                <h3 className="font-bold text-slate-800 mb-4">Główne Produkty (z Umów)</h3>
-                                {contracts.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {contracts.map(contract => (
-                                            <div key={contract.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                                                <div className="absolute top-0 right-0 p-2 bg-slate-100 text-[10px] font-bold text-slate-500 rounded-bl-lg">
-                                                    {contract.contractNumber}
+                        <>
+                            <div className="space-y-6">
+                                {/* Main Products from Contracts */}
+                                <div>
+                                    <h3 className="font-bold text-slate-800 mb-4">Główne Produkty (z Umów)</h3>
+                                    {contracts.length > 0 ? (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {contracts.map(contract => (
+                                                <div key={contract.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 p-2 bg-slate-100 text-[10px] font-bold text-slate-500 rounded-bl-lg">
+                                                        {contract.contractNumber}
+                                                    </div>
+                                                    <div className="font-bold text-lg text-slate-800">{contract.product.modelId.toUpperCase()}</div>
+                                                    <div className="text-sm text-slate-600 mt-1">
+                                                        {contract.product.width} x {contract.product.projection} mm
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-2">
+                                                        <span className="bg-slate-100 px-2 py-1 rounded">Kolor: {contract.product.color}</span>
+                                                        <span className="bg-slate-100 px-2 py-1 rounded">Dach: {contract.product.roofType}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="font-bold text-lg text-slate-800">{contract.product.modelId.toUpperCase()}</div>
-                                                <div className="text-sm text-slate-600 mt-1">
-                                                    {contract.product.width} x {contract.product.projection} mm
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-2">
-                                                    <span className="bg-slate-100 px-2 py-1 rounded">Kolor: {contract.product.color}</span>
-                                                    <span className="bg-slate-100 px-2 py-1 rounded">Dach: {contract.product.roofType}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-slate-400 italic">Brak umów z produktami</div>
-                                )}
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-slate-400 italic">Brak umów z produktami</div>
+                                    )}
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <button
+                                        onClick={() => {
+                                            setIsInstallationModalOpen(true);
+                                            setSelectedInstallation(null); // Create new mode
+                                        }}
+                                        className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Zaplanuj Montaż
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Additional Ordered Items */}
@@ -489,7 +630,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: assignedTeam.color }} />
                                                                     <span className="text-xs font-bold text-slate-700">{assignedTeam.name}</span>
-                                                                    {assignedTeam.is_active === false && <span className="text-[9px] text-red-500 uppercase font-bold">(Nieaktywna)</span>}
+                                                                    {assignedTeam.isActive === false && <span className="text-[9px] text-red-500 uppercase font-bold">(Nieaktywna)</span>}
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-1">
                                                                     {assignedTeam.members.map(m => (
@@ -538,7 +679,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                     <div className="text-slate-400 italic">Brak zaplanowanych montaży</div>
                                 )}
                             </div>
-                        </div>
+                        </>
                     )}
 
                     {/* Installation Modal */}
@@ -556,6 +697,59 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                 await DatabaseService.updateInstallation(updated.id, updated);
                             }}
                         />
+                    )}
+
+
+                    {/* PROFITABILITY TAB */}
+                    {activeTab === 'profitability' && (
+                        <div className="space-y-6">
+                            <LeadsList leads={leadsData || []} customer={customer as Customer & { id: string }} />
+                        </div>
+                    )}
+
+                    {/* LEADS TAB */}
+                    {activeTab === 'leads' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800">Szanse Sprzedaży (Leady)</h3>
+                                {/* Potential Add Lead Button */}
+                            </div>
+                            <div className="space-y-4">
+                                {leads.length > 0 ? leads.map(lead => (
+                                    <div key={lead.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${lead.status === 'new' ? 'bg-blue-500' :
+                                                    lead.status === 'contacted' ? 'bg-yellow-500' :
+                                                        lead.status === 'offer_sent' ? 'bg-purple-500' :
+                                                            lead.status === 'won' ? 'bg-green-500' : 'bg-slate-300'
+                                                    }`} />
+                                                <span className="font-bold text-slate-800">Lead z {lead.source}</span>
+                                                <span className="text-xs text-slate-400 ml-2">{formatDate(lead.createdAt)}</span>
+                                            </div>
+                                            {lead.notes && (
+                                                <div className="mt-2 text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                                                    {lead.notes}
+                                                </div>
+                                            )}
+                                            <div className="mt-2 text-xs text-slate-500">
+                                                Ostatni kontakt: {lead.lastContactDate ? formatDate(lead.lastContactDate) : 'Brak'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${lead.status === 'new' ? 'bg-blue-100 text-blue-700' :
+                                                lead.status === 'won' ? 'bg-green-100 text-green-700' :
+                                                    'bg-slate-100 text-slate-600'
+                                                }`}>
+                                                {lead.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-center p-8 text-slate-400">Brak aktywnych leadów dla tego klienta</div>
+                                )}
+                            </div>
+                        </div>
                     )}
 
                     {/* COMMUNICATION TAB */}

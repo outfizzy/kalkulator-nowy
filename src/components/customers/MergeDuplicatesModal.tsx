@@ -67,9 +67,9 @@ export const MergeDuplicatesModal: React.FC<MergeDuplicatesModalProps> = ({ onCl
                 return next;
             });
             onMergeComplete();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Merge failed', error);
-            toast.error('Wystąpił błąd podczas scalania');
+            toast.error(`Wystąpił błąd: ${error.message || 'Nieznany błąd'}`);
         } finally {
             setProcessing(null);
         }

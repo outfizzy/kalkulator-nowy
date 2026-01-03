@@ -1,5 +1,9 @@
--- Create enum for order item status
-CREATE TYPE order_item_status AS ENUM ('pending', 'ordered', 'delivered');
+-- Create enum for order item status safely
+DO $$ BEGIN
+    CREATE TYPE order_item_status AS ENUM ('pending', 'ordered', 'delivered');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- Create installation_order_items table
 CREATE TABLE IF NOT EXISTS installation_order_items (
@@ -20,13 +24,15 @@ CREATE TABLE IF NOT EXISTS installation_order_items (
 -- Enable RLS
 ALTER TABLE installation_order_items ENABLE ROW LEVEL SECURITY;
 
--- Create policies
+-- Drop existing policies to allow re-running script safely
+DROP POLICY IF EXISTS "Allow read access for authenticated users" ON installation_order_items;
 CREATE POLICY "Allow read access for authenticated users" ON installation_order_items
     FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Allow all access for authenticated users" ON installation_order_items;
 CREATE POLICY "Allow all access for authenticated users" ON installation_order_items
     FOR ALL USING (auth.role() = 'authenticated');
 
--- Create index for faster lookups
-CREATE INDEX idx_order_items_installation_id ON installation_order_items(installation_id);
-CREATE INDEX idx_order_items_manager_responsible ON installation_order_items(is_manager_responsible) WHERE is_manager_responsible = true;
+-- Create index for faster lookups safely
+CREATE INDEX IF NOT EXISTS idx_order_items_installation_id ON installation_order_items(installation_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_manager_responsible ON installation_order_items(is_manager_responsible) WHERE is_manager_responsible = true;

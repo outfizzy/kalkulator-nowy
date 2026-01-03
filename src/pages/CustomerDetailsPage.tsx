@@ -9,7 +9,10 @@ import { CustomerDashboard } from '../components/crm/CustomerDashboard';
 import { supabase } from '../lib/supabase';
 
 
-type Tab = 'overview' | 'leads' | 'offers' | 'contracts' | 'installations' | 'communications' | 'edit' | 'gallery';
+import { TasksList } from '../components/tasks/TasksList';
+import { TaskModal } from '../components/tasks/TaskModal';
+
+type Tab = 'overview' | 'leads' | 'offers' | 'contracts' | 'installations' | 'communications' | 'edit' | 'gallery' | 'tasks';
 
 export const CustomerDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -23,6 +26,8 @@ export const CustomerDetailsPage: React.FC = () => {
     const [clientContracts, setClientContracts] = useState<Contract[]>([]);
     const [clientInstallations, setClientInstallations] = useState<Installation[]>([]);
     const [communications, setCommunications] = useState<Communication[]>([]);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
 
     const fetchData = React.useCallback(async () => {
         if (!id) return;
@@ -53,11 +58,12 @@ export const CustomerDetailsPage: React.FC = () => {
                 : `${normalize(customerData.firstName)}_${normalize(customerData.lastName)}_${normalize(customerData.city)}`;
 
             const isMatch = (c: Partial<Customer> & { firstName?: string; lastName?: string; city?: string; email?: string }) => {
-                if (customerData.email && c.email) {
-                    return normalize(c.email) === normalize(customerData.email);
-                }
-                const key = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city)}`;
-                return key === customerKey;
+                const nameKey = `${normalize(c.firstName)}_${normalize(c.lastName)}_${normalize(c.city)}`;
+
+                const matchesEmail = Boolean(customerData.email && c.email && normalize(c.email) === normalize(customerData.email));
+                const matchesName = nameKey === customerKey;
+
+                return matchesEmail || matchesName;
             };
 
             const leads = allLeads.filter(l =>
@@ -78,7 +84,7 @@ export const CustomerDetailsPage: React.FC = () => {
             const contracts = allContracts.filter(c => offerIds.has(c.offerId) || isMatch(c.client));
             setClientContracts(contracts);
 
-            const installations = allInstallations.filter(i => offerIds.has(i.offerId) || isMatch(i.client));
+            const installations = allInstallations.filter(i => (i.offerId && offerIds.has(i.offerId)) || isMatch(i.client));
             setClientInstallations(installations);
 
             setCommunications(comms);
@@ -166,7 +172,7 @@ export const CustomerDetailsPage: React.FC = () => {
                                 </svg>
                             </button>
                             <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-xl font-bold text-white">
-                                {customer.firstName[0]}{customer.lastName[0]}
+                                {(customer.firstName || '')[0]}{(customer.lastName || '')[0]}
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">{customer.firstName} {customer.lastName}</h1>
@@ -274,6 +280,11 @@ export const CustomerDetailsPage: React.FC = () => {
                             {
                                 id: 'offers', label: `Oferty (${clientOffers.length})`, icon: (
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                                )
+                            },
+                            {
+                                id: 'tasks', label: 'Zadania', icon: (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                                 )
                             },
                             {
@@ -732,9 +743,32 @@ export const CustomerDetailsPage: React.FC = () => {
                                 )}
                             </div>
                         )}
+
+                        {activeTab === 'tasks' && (
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-bold text-slate-800">Zadania</h2>
+                                    <button
+                                        onClick={() => setIsTaskModalOpen(true)}
+                                        className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors flex items-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                                        Nowe Zadanie
+                                    </button>
+                                </div>
+                                <TasksList customerId={customer.id} refreshTrigger={tasksRefreshTrigger} />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
+
+            <TaskModal
+                isOpen={isTaskModalOpen}
+                onClose={() => setIsTaskModalOpen(false)}
+                initialData={{ customerId: customer.id }}
+                onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
+            />
         </div>
     );
 };

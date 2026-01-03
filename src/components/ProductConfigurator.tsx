@@ -87,9 +87,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             try {
                 // 1. Prepare Attributes Context
                 const attributes: Record<string, string> = {
-                    snow_zone: config.snowZone || '1',
+                    snow_zone: config.snowZone ? String(config.snowZone) : '1',
                     roof_type: config.roofType, // 'polycarbonate', 'glass', or 'tin'
                     mounting: config.installationType === 'wall-mounted' ? 'wall' : 'freestanding',
+                    subtype: (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard',
                     // Add other attributes if needed (e.g. post height range)
                 };
 

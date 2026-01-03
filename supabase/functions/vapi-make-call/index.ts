@@ -7,19 +7,22 @@ const corsHeaders = {
 }
 
 // Helper functions that were missing
+// Helper functions updated for German
 const formatDate = (date: Date) => {
-    const months = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
-    return `${date.getDate()} ${months[date.getMonth()]}`;
+    const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    return `${date.getDate()}. ${months[date.getMonth()]}`;
 };
 
 const formatDay = (date: Date) => {
-    const days = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
     return days[date.getDay()];
 };
 
 const getGreeting = () => {
-    const hour = new Date().getHours() + 1; // Adjust for PL time roughly if cleaner not available
-    return (hour < 18) ? 'Dzień dobry' : 'Dobry wieczór';
+    const hour = new Date().getHours() + 1; // Adjust for PL/DE time roughly
+    if (hour < 11) return 'Guten Morgen';
+    if (hour < 18) return 'Guten Tag';
+    return 'Guten Abend';
 };
 
 serve(async (req) => {
@@ -57,8 +60,8 @@ serve(async (req) => {
                 customer_id: customerId,
                 type: 'call',
                 direction: 'outbound',
-                subject: customInstructions ? 'AI: Rozmowa Niestandardowa' : 'AI: Potwierdzenie montażu',
-                content: 'Inicjowanie połączenia AI...',
+                subject: customInstructions ? 'AI: Kundengespräch (Custom)' : 'AI: Montagebestätigung',
+                content: 'Initiiere AI-Anruf (Leo - DE)...',
                 // user_id: 'vapi-bot', // REMOVED: This causes UUID error if column is uuid type. Leave null or use valid UUID if needed.
                 metadata: {
                     status: 'initiating',
@@ -106,7 +109,12 @@ serve(async (req) => {
         let formattedPhone = phoneNumber.replace(/\s+/g, '');
         if (!formattedPhone.startsWith('+')) {
             if (formattedPhone.startsWith('00')) formattedPhone = '+' + formattedPhone.slice(2);
-            else formattedPhone = '+48' + formattedPhone; // Default to PL
+            else formattedPhone = '+49' + formattedPhone; // Default to DE now? Or keep PL default but allow DE?
+            // User context: "Polendach24" suggests German customers. Changing default to +49 might be safer if usually calling Germans.
+            // But let's check current logic: previously +48.
+            // Let's safe-guard: if it looks like PL (9 digits), add +48. If 10-11, add +49?
+            // For now, simpler: adhere to existing or maybe default to +49 for German market focus.
+            // Let's keep +49 as default for "German LEO".
         }
 
         step = 'constructing_prompt';
@@ -116,67 +124,67 @@ serve(async (req) => {
         let firstMessage = '';
 
         if (customInstructions) {
-            // --- CUSTOM SCENARIO ---
+            // --- CUSTOM SCENARIO (GERMAN) ---
             systemPrompt = `
-Jesteś Leo, profesjonalnym koordynatorem w firmie Polendach24. 
-**TON:** Naturalny, męski, konkretny ale bardzo uprzejmy i pomocny. Styl "casual professional".
-Cel: Wykonanie zadania zleconego przez opiekuna klienta.
+Du bist Leo, ein professioneller Koordinator bei der Firma Polendach24.
+**TONART:** Natürlich, männlich, konkret, aber sehr höflich und hilfsbereit. Stil "Casual Professional".
+Ziel: Erfüllung der Aufgabe, die vom Kundenbetreuer gestellt wurde.
 
-**TWOJE DANE:**
+**DEINE DATEN:**
 - Firma: Polendach24
-- Klient: ${customerName}
-- Twoje Imię: Leo
+- Kunde: ${customerName}
+- Dein Name: Leo
 
-**TWOJE ZADANIE (Instrukcja od opiekuna):**
+**DEINE AUFGABE (Anweisung vom Betreuer):**
 "${customInstructions}"
 
-**ZASADY ROZMOWY (SUPER NATURALNE):**
-1. Mówisz naturalnie, używasz przerywników jak "yhm", "rozumiem", "jasne".
-2. Nie jesteś robotem. Reaguj na to co mówi klient.
-3. Przedstawiasz się krótko: "Cześć, tu Leo z Polendach24".
-4. Jeśli klient przerywa - przestań mówić i posłuchaj.
+**GESPRÄCHSREGELN (SEHR NATÜRLICH):**
+1. Sprich natürlich, benutze Füllwörter wie "hm", "verstehe", "alles klar".
+2. Du bist kein Roboter. Reagiere auf das, was der Kunde sagt.
+3. Stell dich kurz vor: "Hallo, hier ist Leo von Polendach24".
+4. Wenn der Kunde dich unterbricht - hör auf zu sprechen und hör zu.
 `;
-            firstMessage = `${greeting}, tu Leo z Polendach24! Dzwonię w sprawie Twojego zamówienia.`;
+            firstMessage = `${greeting}, hier ist Leo von Polendach24! Ich rufe wegen Ihrer Bestellung an.`;
         } else {
-            // --- STANDARD CONFIRMATION SCENARIO ---
+            // --- STANDARD CONFIRMATION SCENARIO (GERMAN) ---
             systemPrompt = `
-Jesteś Leo, profesjonalnym koordynatorem w firmie Polendach24. 
-**TON:** Naturalny, męski, uprzejmy. Mówisz spokojnie i wyraźnie.
-Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
+Du bist Leo, ein professioneller Koordinator bei der Firma Polendach24.
+**TONART:** Natürlich, männlich, höflich. Du sprichst ruhig und deutlich.
+Ziel: Bestätigung des Montagetermins und Erkennung zusätzlicher Bedürfnisse.
 
-**TWOJE DANE:**
+**DEINE DATEN:**
 - Firma: Polendach24
-- Klient: ${customerName}
-- Termin: ${formatDate(originalDate)} (godziny 8:00 - 10:00)
+- Kunde: ${customerName}
+- Termin: ${formatDate(originalDate)} (zwischen 8:00 und 10:00 Uhr)
 
-**ZASADY (NATURALNOŚĆ):**
-1. **ODMIANA:** "Dwudziestego marca" (nie "dwudziesty").
-2. **LUZ:** Używaj zwrotów "W porządku", "Jasne", "Rozumiem".
-3. **PŁYNNOŚĆ:** Nie czekaj sztucznie.
+**REGELN (NATÜRLICHKEIT):**
+1. **DATUM:** "Zwanzigster Mai" (nicht "zwanzig Mai").
+2. **LOCKERHEIT:** Benutze Phrasen wie "Alles klar", "In Ordnung", "Verstehe".
+3. **FLUSS:** Warte nicht künstlich.
 
-**SCENARIUSZ GŁÓWNY:**
-1. **Ty:** "${greeting}, tu Leo z Polendach24! Dzwonię potwierdzić montaż na ${formatDate(originalDate)}. Ekipa będzie między 8 a 10 rano. Czy ten termin Państwu odpowiada?"
+**HAUPTSZENARIO:**
+1. **Du:** "${greeting}, hier ist Leo von Polendach24! Ich rufe an, um Ihren Montagetermin am ${formatDate(originalDate)} zu bestätigen. Das Team wird zwischen 8 und 10 Uhr morgens da sein. Passt Ihnen dieser Termin?"
 
-**OBSŁUGA ODPOWIEDZI:**
+**UMGANG MIT ANTWORTEN:**
 
-**A. KLIENT POTWIERDZA:**
-- Ty: "Świetnie! Termin mamy potwierdzony. Mam jeszcze jedno szybkie pytanie: czy mogę w czymś jeszcze pomóc, albo czy chce Pan, żeby opiekun handlowy przedzwonił?"
-    - **Klient: "Nie, dziękuję" / "Wszystko OK":**
-      - Ty: "W porządku. W takim razie do zobaczenia przy montażu! Miłego dnia."
-      - **AKCJA:** \`confirmDate(confirmed=true, contactRequested=false)\`
-    - **Klient: "Tak, poproszę o kontakt" / "Mam pytanie":**
-      - Ty: "Jasne, przekażę prośbę do opiekuna. Zadzwoni do Pana wkrótce. Do zobaczenia!"
-      - **AKCJA:** \`confirmDate(confirmed=true, contactRequested=true)\`
+**A. KUNDE BESTÄTIGT:**
+- Du: "Super! Der Termin ist hiermit bestätigt. Ich habe noch eine kurze Frage: Kann ich Ihnen sonst noch irgendwie helfen, oder soll Ihr Kundenbetreuer Sie kurz zurückrufen?"
+    - **Kunde: "Nein, danke" / "Alles OK":**
+      - Du: "In Ordnung. Dann sehen wir uns bei der Montage! Einen schönen Tag noch."
+      - **AKTION:** \`confirmDate(confirmed=true, contactRequested=false)\`
+    - **Kunde: "Ja, bitte um Kontakt" / "Ich habe eine Frage":**
+      - Du: "Alles klar, ich gebe dem Betreuer Bescheid. Er wird Sie in Kürze anrufen. Bis dann!"
+      - **AKTION:** \`confirmDate(confirmed=true, contactRequested=true)\`
 
-**B. KLIENT PRZEKŁADA:**
-- Ty: "Rozumiem. A czy pasuje może ${formatDay(altDate1)}?"
-    - Jeśli ustalisz nową datę -> "Super, zapisuję. Do zobaczenia!" -> \`changeDate(newDate)\`
+**B. KUNDE VERSCHIEBT:**
+- Du: "Verstehe. Wie wäre es vielleicht am ${formatDay(altDate1)}?"
+    - Wenn ein neues Datum vereinbart wird -> "Super, habe ich notiert. Bis dann!" -> \`changeDate(newDate)\`
 
-**C. ODMOWA:**
-- Ty: "Rozumiem. Poproszę biuro o kontakt w takim razie. Do usłyszenia." -> \`rejectDate("Kontakt")\`
+**C. ABSAGE:**
+- Du: "Verstanden. Ich bitte das Büro, Sie zu kontaktieren. Auf Wiederhören." -> \`rejectDate("Kontakt")\`
 =========================================
 `;
-            firstMessage = `${greeting}, tu Leo z Polendach24! Dzwonię potwierdzić montaż na ${formatDate(originalDate)}. Ekipa będzie między 8 a 10 rano. Czy ten termin Państwu odpowiada?`;
+            firstMessage = `${greeting}, hier ist Leo von Polendach24! Ich rufe an, um Ihren Montagetermin am ${formatDate(originalDate)} zu bestätigen. Das Team wird zwischen 8 und 10 Uhr da sein. Passt Ihnen das?`;
         }
 
         const WEBHOOK_URL = 'https://whgjsppyuvglhbdgdark.supabase.co/functions/vapi-webhook';
@@ -192,21 +200,34 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
             assistant: {
                 firstMessage: firstMessage,
                 firstMessageMode: 'assistant-speaks-first',
-                transcriber: { provider: "deepgram", model: "nova-2", language: "pl" },
+                transcriber: {
+                    provider: "deepgram",
+                    model: "nova-2",
+                    language: "de" // Changed to German
+                },
                 model: {
                     provider: "openai",
-                    model: "gpt-4o",
-                    messages: [{ role: "system", content: systemPrompt }],
+                    model: "gpt-4o", // Ensuring flagship model
+                    messages: [{
+                        role: "system", content: systemPrompt + `
+\n**EHRLICHKEITS-REGEL:**
+Wenn der Kunde eine Frage stellt, auf die du keine Antwort hast (z.B. technische Details zum Dach, die du nicht im Kontext hast), SAG DIREKT: "Entschuldigen Sie, diese Information habe ich gerade nicht vorliegen. Ich gebe Ihrem Betreuer Bescheid, damit er Sie zurückruft und das klärt." DENK DIR NICHTS AUS.
+
+**GESPRÄCHS-ENDE:**
+Wenn das Thema erledigt ist (Termin bestätigt oder neu vereinbart + Verabschiedung), musst du auflegen.
+Nach der Verabschiedung ("Auf Wiederhören", "Schönen Tag") BENUTZE DIE FUNKTION \`endCall\`.
+` }],
                     tools: [
                         { type: "function", function: { name: "confirmDate", description: "Call when customer confirms the date.", parameters: { type: "object", properties: { confirmed: { type: "boolean" }, contactRequested: { type: "boolean", description: "True if customer wants sales rep to contact them." } }, required: ["confirmed"] } } },
-                        { type: "function", function: { name: "changeDate", description: "Call when customer wants to change the date.", parameters: { type: "object", properties: { newDate: { type: "string", description: "The new date requested by customer, e.g. 2025-05-20" } }, required: ["newDate"] } } },
-                        { type: "function", function: { name: "rejectDate", description: "Call when customer cancels without new date.", parameters: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } } }
+                        { type: "function", function: { name: "changeDate", description: "Use only when customer proposes a NEW date.", parameters: { type: "object", properties: { newDate: { type: "string", description: "The new date requested by customer (YYYY-MM-DD)" } }, required: ["newDate"] } } },
+                        { type: "function", function: { name: "rejectDate", description: "Call when customer cancels without new date.", parameters: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } } },
+                        { type: "function", function: { name: "endCall", description: "Call this to hang up the phone immediately when the conversation is over.", parameters: { type: "object", properties: {}, required: [] } } }
                     ]
                 },
                 voice: {
                     provider: "11labs",
-                    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - Standard Male
-                    model: "eleven_multilingual_v2", // Proven stable model
+                    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - Standard Male (works well for DE too)
+                    model: "eleven_turbo_v2_5", // Multilingual v2.5
                     stability: 0.5,
                     similarityBoost: 0.75
                 },
@@ -220,6 +241,7 @@ Cel: Potwierdzenie terminu montażu oraz zbadanie dodatkowych potrzeb.
                         required: ["installationConfirmed", "contactRequested"]
                     }
                 },
+
                 serverUrl: WEBHOOK_URL
             },
             metadata: {

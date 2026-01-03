@@ -10,9 +10,8 @@ export const TaskService = {
             .from('tasks')
             .select(`
     *,
-    assignee: user_id(
-        first_name,
-        last_name
+    assignee: profiles(
+        full_name
     )
             `)
             .order('due_date', { ascending: true }); // Soonest first
@@ -44,8 +43,8 @@ export const TaskService = {
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
             assignee: row.assignee ? {
-                firstName: row.assignee.first_name,
-                lastName: row.assignee.last_name
+                firstName: (row.assignee.full_name || '').split(' ')[0] || '',
+                lastName: (row.assignee.full_name || '').split(' ').slice(1).join(' ') || ''
             } : undefined
         }));
     },

@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { LeadForm } from './leads/LeadForm';
 import { OfferService } from '../services/database/offer.service';
-import type { Lead, Offer } from '../types';
+import { SettingsService } from '../services/database/settings.service';
+import type { Lead, Offer, EmailConfig } from '../types';
 
 // Mock Email Data
 // Mock Email Data Removed for Production
@@ -37,6 +38,22 @@ interface AttachmentFile {
 
 export const MailPage: React.FC = () => {
     const { currentUser } = useAuth();
+    const [selectedAccount, setSelectedAccount] = useState<'personal' | 'buero'>('personal');
+    const [bueroConfig, setBueroConfig] = useState<EmailConfig | null>(null);
+
+    // Load shared config
+    React.useEffect(() => {
+        const loadSharedConfig = async () => {
+            try {
+                const config = await SettingsService.getBueroEmailConfig();
+                if (config) setBueroConfig(config);
+            } catch (e) {
+                console.error('Failed to load shared email config', e);
+            }
+        };
+        loadSharedConfig();
+    }, []);
+
     const [activeTab, setActiveTab] = useState<MailTab>('inbox');
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
 
@@ -160,15 +177,18 @@ export const MailPage: React.FC = () => {
 
     const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
 
-    // Check if email is configured
-    const isConfigured = !!currentUser?.emailConfig?.smtpHost;
+    // Determine active config based on selection
+    const activeConfig = selectedAccount === 'personal' ? currentUser?.emailConfig : bueroConfig;
+    const isConfigured = !!activeConfig?.smtpHost;
+
     const boxName = activeTab === 'sent' ? 'Sent' : 'INBOX';
-    const CACHE_KEY = `cached_emails_${currentUser?.id}_${boxName}`;
+    const CACHE_KEY = `cached_emails_${selectedAccount}_${currentUser?.id}_${boxName}`;
 
     // Fetch Emails Effect
     React.useEffect(() => {
         const fetchEmails = async () => {
-            if (!currentUser?.emailConfig?.imapHost || (activeTab !== 'inbox' && activeTab !== 'sent')) return;
+            // Skip if no active config or logic
+            if (!activeConfig?.imapHost || (activeTab !== 'inbox' && activeTab !== 'sent')) return;
 
             setLoading(true);
             try {
@@ -176,7 +196,7 @@ export const MailPage: React.FC = () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        config: currentUser.emailConfig,
+                        config: activeConfig,
                         box: boxName
                     })
                 });
@@ -213,9 +233,10 @@ export const MailPage: React.FC = () => {
                 // Clear emails if no cache mismatch to avoid showing inbox in sent
                 setEmails([]);
             }
+
             fetchEmails();
         }
-    }, [currentUser, activeTab, isConfigured, refreshTrigger, boxName]);
+    }, [activeConfig, activeTab, isConfigured, refreshTrigger, boxName, CACHE_KEY]);
 
     const handleSelectEmail = async (uid: number) => {
         setSelectedEmail(null); // Clear previous selection while loading
@@ -225,7 +246,7 @@ export const MailPage: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    config: currentUser?.emailConfig,
+                    config: activeConfig,
                     uid: uid,
                     box: boxName
                 })
@@ -379,7 +400,7 @@ export const MailPage: React.FC = () => {
                     to: composeData.to,
                     subject: composeData.subject,
                     body: finalBody,
-                    config: currentUser?.emailConfig,
+                    config: activeConfig,
                     scheduledAt: scheduleDate ? new Date(scheduleDate).toISOString() : null,
                     userId: currentUser?.id,
                     attachments: attachments.map(a => ({
@@ -425,7 +446,7 @@ export const MailPage: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: fullText,
-                    apiKey: currentUser?.emailConfig?.openaiKey
+                    apiKey: activeConfig?.openaiKey
                 })
             });
 
@@ -466,6 +487,25 @@ export const MailPage: React.FC = () => {
         <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-4">
             {/* 1. Sidebar (Navigation) - Fixed width */}
             <div className="w-full md:w-48 flex flex-col gap-2 flex-shrink-0">
+                <div className="mb-2">
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setSelectedAccount('personal')}
+                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedAccount === 'personal' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            Osobista
+                        </button>
+                        <button
+                            onClick={() => setSelectedAccount('buero')}
+                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedAccount === 'buero' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            Biuro
+                        </button>
+                    </div>
+                </div>
+
                 <button
                     onClick={() => { setActiveTab('compose'); setSelectedEmail(null); }}
                     className={`p-3 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm text-sm ${activeTab === 'compose'

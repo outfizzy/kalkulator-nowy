@@ -6,9 +6,12 @@ import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/off
 import type { Contract, ContractComment, ContractAttachment, User } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { InstallationService } from '../../services/database/installation.service';
 import { UserService } from '../../services/database/user.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { OrderedItemsModule } from './OrderedItemsModule';
+import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
+import type { Installation } from '../../types';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -18,7 +21,11 @@ export const ContractDetails: React.FC = () => {
     const [newComment, setNewComment] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [photos, setPhotos] = useState<string[]>([]);
-    const [hasInstallation, setHasInstallation] = useState(false);
+
+    // Installation State
+    const [installation, setInstallation] = useState<Installation | null>(null);
+    const [isInstallationModalOpen, setIsInstallationModalOpen] = useState(false);
+
     const [salesReps, setSalesReps] = useState<User[]>([]);
 
     useEffect(() => {
@@ -33,8 +40,8 @@ export const ContractDetails: React.FC = () => {
                     setPhotos(getOfferPhotos(found.offerId));
 
                     // Check for installation
-                    const installationExists = await DatabaseService.checkInstallationForContract(found.offerId);
-                    setHasInstallation(installationExists);
+                    const existingInstallation = await InstallationService.getInstallationByOfferId(found.offerId);
+                    setInstallation(existingInstallation);
                 } else {
                     toast.error('Nie znaleziono umowy');
                     navigate('/contracts');
@@ -180,7 +187,7 @@ export const ContractDetails: React.FC = () => {
     const handlePlanInstallation = async () => {
         if (!contract) return;
 
-        if (hasInstallation) {
+        if (installation) {
             toast.error('Montaż już zaplanowany');
             return;
         }
@@ -193,6 +200,7 @@ export const ContractDetails: React.FC = () => {
                     firstName: contract.client.firstName,
                     lastName: contract.client.lastName,
                     city: contract.client.city,
+                    postalCode: contract.client.postalCode,
                     address: `${contract.client.street} ${contract.client.houseNumber}`.trim(),
                     phone: contract.client.phone,
                 },
@@ -202,14 +210,17 @@ export const ContractDetails: React.FC = () => {
                     contract.requirements.powerSupply ? 'Prąd' : '',
                     contract.requirements.foundation ? 'Fundament' : '',
                     contract.requirements.other
-                ].filter(Boolean).join(', ')
+                ].filter(Boolean).join(', '),
+                expectedDuration: contract.installation_days_estimate || 1
             });
 
-            setHasInstallation(true);
+            const newInstallation = await InstallationService.getInstallationByOfferId(contract.offerId);
+            setInstallation(newInstallation);
+            setIsInstallationModalOpen(true);
             toast.success('Utworzono zlecenie montażu');
         } catch (error) {
-            console.error('Error creating installation:', error);
-            toast.error('Błąd tworzenia montażu');
+            console.error('Error creating installation:', JSON.stringify(error, null, 2));
+            toast.error(`Błąd tworzenia montażu: ${(error as any)?.message || 'Nieznany błąd'}`);
         }
     };
 
@@ -607,10 +618,48 @@ export const ContractDetails: React.FC = () => {
                             )}
 
                             <div className="flex justify-between items-center py-3 bg-green-50 px-3 rounded-lg mt-2">
-                                <span className="text-green-800 font-medium">Prowizja (5%)</span>
-                                <span className="font-bold text-green-700 text-lg">
-                                    {contract.commission.toFixed(2)} EUR
-                                </span>
+                                {(() => {
+                                    const netPrice = contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet;
+                                    const effectiveRate = netPrice > 0
+                                        ? (contract.commission / netPrice) * 100
+                                        : 0;
+                                    return (
+                                        <>
+                                            <span className="text-green-800 font-medium">Prowizja ({effectiveRate.toFixed(1)}%)</span>
+                                            <span className="font-bold text-green-700 text-lg">
+                                                {contract.commission.toFixed(2)} EUR
+                                            </span>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* Installation Estimate Field */}
+                            <div className="pt-3 border-t border-slate-100">
+                                <label className="block text-xs font-bold text-slate-500 mb-1">
+                                    Szacowany czas montażu (dni)
+                                    {isEditing && <span className="text-violet-600 ml-1 text-[10px] uppercase font-bold tracking-wider">(Dla Handlowca)</span>}
+                                </label>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="14"
+                                        value={contract.installation_days_estimate || 1}
+                                        onChange={(e) => setContract({
+                                            ...contract,
+                                            installation_days_estimate: parseInt(e.target.value) || 1
+                                        })}
+                                        className="w-full p-2 border border-slate-300 rounded-lg font-medium text-slate-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                                    />
+                                ) : (
+                                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-slate-700 font-medium flex items-center justify-between">
+                                        <span>{contract.installation_days_estimate || 1} dni</span>
+                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -706,13 +755,16 @@ export const ContractDetails: React.FC = () => {
 
                             {/* Installation Button */}
                             <div className="pt-2 border-t border-slate-100">
-                                {hasInstallation ? (
-                                    <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center justify-center gap-2 font-bold">
+                                {installation ? (
+                                    <button
+                                        onClick={() => setIsInstallationModalOpen(true)}
+                                        className="w-full bg-blue-50 hover:bg-blue-100 text-blue-800 p-3 rounded-lg flex items-center justify-center gap-2 font-bold transition-colors"
+                                    >
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                         </svg>
-                                        Montaż Zaplanowany
-                                    </div>
+                                        Zarządzaj Montażem
+                                    </button>
                                 ) : (
                                     <button
                                         onClick={handlePlanInstallation}
@@ -726,10 +778,10 @@ export const ContractDetails: React.FC = () => {
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
-                                        Zaplanuj Montaż
+                                        Utwórz Montaż
                                     </button>
                                 )}
-                                {contract.status !== 'signed' && (
+                                {contract.status !== 'signed' && !installation && (
                                     <div className="text-center text-xs text-slate-400 mt-2">
                                         Wymagany status: Podpisana
                                     </div>
@@ -737,7 +789,6 @@ export const ContractDetails: React.FC = () => {
                             </div>
                         </div>
                     </div>
-
                     {/* Photos Section */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <div className="flex justify-between items-center mb-4">
@@ -828,6 +879,25 @@ export const ContractDetails: React.FC = () => {
                 onUpdate={(items) => setContract({ ...contract, orderedItems: items })}
                 isEditing={isEditing}
             />
+
+            {installation && (
+                <InstallationDetailsModal
+                    installation={installation}
+                    isOpen={isInstallationModalOpen}
+                    onClose={() => setIsInstallationModalOpen(false)}
+                    onUpdate={async () => {
+                        const fresh = await InstallationService.getInstallationByOfferId(contract.offerId);
+                        setInstallation(fresh);
+                    }}
+                    onSave={async (updated) => {
+                        await InstallationService.updateInstallation(updated.id, updated);
+                        const fresh = await InstallationService.getInstallationByOfferId(contract.offerId);
+                        setInstallation(fresh);
+                        setIsInstallationModalOpen(false);
+                        toast.success('Zaktualizowano montaż');
+                    }}
+                />
+            )}
         </div >
     );
 };

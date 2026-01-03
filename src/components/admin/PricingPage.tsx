@@ -16,14 +16,18 @@ import { formatCurrency } from '../../utils/translations';
 import { ClipboardImportModal } from './ClipboardImportModal';
 import { SurchargeRulesModal } from './SurchargeRulesModal';
 import { DuplicateTableModal } from './DuplicateTableModal';
+import { SmartPdfImporter } from './SmartPdfImporter';
+import { TableSettingsModal } from './TableSettingsModal';
+import { TransportSettingsManager } from './TransportSettings';
 
 export const PricingPage = () => {
-    const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs' | 'surcharges'>('tables');
+    const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs' | 'surcharges' | 'transport'>('tables');
     const [priceTables, setPriceTables] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingTable, setEditingTable] = useState<{ id: string, name: string } | null>(null);
     const [duplicatingTable, setDuplicatingTable] = useState<{ id: string, name: string } | null>(null);
     const [configTable, setConfigTable] = useState<{ id: string, name: string, config: any, productId?: string, productName?: string } | null>(null);
+    const [settingsTable, setSettingsTable] = useState<{ id: string, name: string, attributes: any } | null>(null);
     const [showClipboardImport, setShowClipboardImport] = useState(false);
 
     // Simulation State
@@ -111,8 +115,8 @@ export const PricingPage = () => {
     };
 
     const [products, setProducts] = useState<any[]>([]);
-    const [selectedProductId, setSelectedProductId] = useState<string>('');
-    const [newProductName, setNewProductName] = useState<string>('');
+    const [selectedProductId] = useState<string>('');
+
 
     // Fetch products for dropdown
     useEffect(() => {
@@ -123,186 +127,113 @@ export const PricingPage = () => {
         fetchProducts();
     }, []);
 
-    const [importing, setImporting] = useState(false);
+    // Bulk Import Logic
+    const handleBulkImport = async (queueItems: any[]) => {
+        const toastId = toast.loading(`Zapisywanie ${queueItems.length} cenników...`);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const item of queueItems) {
+            try {
+                // 1. Create Price Table
+                const subtypeStr = item.variantConfig.subtype ? ` ${item.variantConfig.subtype}` : '';
+                const zoneStr = item.variantConfig.snowZone ? ` S${item.variantConfig.snowZone}` : '';
+                const tableName = `${item.productName} - ${item.variantConfig.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}${zoneStr}${subtypeStr} (${format(new Date(), 'dd.MM')})`;
+
+                const { data: tableData, error: tableError } = await supabase.from('price_tables').insert({
+                    name: tableName,
+                    product_definition_id: item.productId,
+                    variant_config: item.variantConfig,
+                    type: 'matrix',
+                    is_active: true,
+                    currency: 'EUR' // Default to EUR for now
+                }).select().single();
+
+                if (tableError) throw tableError;
+
+                // 2. Insert Matrix Entries
+                // item.matrixData.data is now array of { width, projection, price, properties }
+                // Note: SmartPdfImporter might wrap it, but based on Edge Function:
+                // If SmartPdfImporter saves `data.tables[0].entries` as `matrixData`, then `e` has properties.
+
+                // We assume SmartPdfImporter passes the `entries` array directly or `matrixData.data` is that array.
+                // Looking at SmartPdfImporter usage: `queueItem.matrixData = dataToUse`.
+                // If dataToUse is `tables[0]`, then `entries = item.matrixData.entries`.
+                // Existing code used `item.matrixData.data`. This implies a mismatch in my mental model or previous code.
+                // I will try to support both `entries` and `data`.
+                const rawEntries = item.matrixData.entries || item.matrixData.data || [];
+
+                const entries = rawEntries.map((e: any) => ({
+                    price_table_id: tableData.id,
+                    width_mm: e.width_mm || e.width, // Support both keys
+                    projection_mm: e.projection_mm || e.projection,
+                    price: e.price,
+                    structure_price: e.structure_price || e.price,
+                    glass_price: e.glass_price || 0,
+                    properties: e.properties || {} // Setup Properties
+                }));
+
+                const { error: entriesError } = await supabase.from('price_matrix_entries').insert(entries);
+                if (entriesError) throw entriesError;
+
+                successCount++;
+            } catch (e) {
+                console.error("Import error for item:", item, e);
+                failCount++;
+            }
+        }
+
+        if (failCount === 0) {
+            toast.success(`Pomyślnie zaimportowano ${successCount} cenników!`, { id: toastId });
+        } else {
+            toast.success(`Zapisano ${successCount}, błędy: ${failCount}`, { id: toastId });
+        }
+
+        setShowClipboardImport(false); // Close modal (reusing state variable or assume Importer is shown via 'activeTab')
+        if (activeTab === 'import') setActiveTab('tables'); // Switch back to tables list
+        fetchPriceTables();
+    };
+
+    // Preview / Manual Import State
     const [previewData, setPreviewData] = useState<any>(null);
     const [importAttributes, setImportAttributes] = useState<{ key: string, value: string }[]>([]);
 
-    const addAttribute = () => {
-        setImportAttributes([...importAttributes, { key: '', value: '' }]);
-    };
-
-    const updateAttribute = (index: number, field: 'key' | 'value', val: string) => {
+    const updateAttribute = (idx: number, field: 'key' | 'value', val: string) => {
         const newAttrs = [...importAttributes];
-        newAttrs[index][field] = val;
+        newAttrs[idx] = { ...newAttrs[idx], [field]: val };
         setImportAttributes(newAttrs);
     };
 
-    const removeAttribute = (index: number) => {
-        setImportAttributes(importAttributes.filter((_, i) => i !== index));
-    };
-
-    const handleFileUpload = async (file: File) => {
-        setImporting(true);
-        const toastId = toast.loading('Analizowanie PDF przez AI... (To może potrwać do 30s)');
-
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const { data, error } = await supabase.functions.invoke('parse-price-pdf', {
-                body: formData
-            });
-
-            if (error) {
-                let errorMsg = error.message;
-                if (error.context && typeof error.context.json === 'function') {
-                    try {
-                        const body = await error.context.json();
-                        if (body && body.error) errorMsg = body.error;
-                    } catch (e) {
-                        console.warn('Failed to parse error context', e);
-                    }
-                }
-                throw new Error(errorMsg);
-            }
-            if (data.error) throw new Error(data.error);
-
-            setPreviewData(data);
-
-            if (data.detected_product_code) {
-                const codeMatch = products.find(p => p.code === data.detected_product_code || (p.code && p.code.startsWith(data.detected_product_code)));
-                if (codeMatch) {
-                    setSelectedProductId(codeMatch.id);
-                } else if (data.detected_product_name) {
-                    const nameMatch = products.find(p => p.name.toLowerCase().includes(data.detected_product_name.toLowerCase()));
-                    if (nameMatch) setSelectedProductId(nameMatch.id);
-                }
-            } else if (data.detected_product_name) {
-                const match = products.find(p => p.name.toLowerCase().includes(data.detected_product_name.toLowerCase()));
-                if (match) {
-                    setSelectedProductId(match.id);
-                } else {
-                    setSelectedProductId('new');
-                    setNewProductName(data.detected_product_name);
-                }
-            }
-
-            if (data.detected_attributes) {
-                const newAttrs: { key: string, value: string }[] = [];
-                if (data.detected_attributes.snow_zone) {
-                    newAttrs.push({ key: 'snow_zone', value: String(data.detected_attributes.snow_zone) });
-                }
-                if (data.detected_attributes.roof_type) {
-                    newAttrs.push({ key: 'roof_type', value: data.detected_attributes.roof_type });
-                }
-                if (data.detected_attributes.mounting) {
-                    newAttrs.push({ key: 'mounting', value: data.detected_attributes.mounting });
-                }
-                if (newAttrs.length > 0) {
-                    setImportAttributes(newAttrs);
-                    toast.success(`Wykryto atrybuty: ${newAttrs.map(a => `${a.key}=${a.value}`).join(', ')}`);
-                }
-            }
-
-            toast.success('Pomyślnie przeanalizowano plik!', { id: toastId });
-        } catch (err: any) {
-            console.error(err);
-            toast.error(`Błąd: ${err.message}`, { id: toastId });
-        } finally {
-            setImporting(false);
-        }
+    const removeAttribute = (idx: number) => {
+        setImportAttributes(importAttributes.filter((_, i) => i !== idx));
     };
 
     const saveImport = async () => {
         if (!previewData) return;
-
-        let finalProductId = selectedProductId;
-        let finalProductName = '';
-
-        if (selectedProductId === 'new') {
-            if (!newProductName) {
-                toast.error('Podaj nazwę nowego produktu');
-                return;
-            }
-            const code = newProductName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-            const { data: newProd, error: pErr } = await supabase.from('product_definitions').insert({
-                name: newProductName,
-                code: code + '_' + Date.now(),
-                category: 'awning',
-                provider: 'Inny'
-            }).select().single();
-
-            if (pErr) {
-                toast.error('Błąd tworzenia produktu: ' + pErr.message);
-                return;
-            }
-            finalProductId = newProd.id;
-            finalProductName = newProductName;
-        } else {
-            finalProductName = products.find(p => p.id === selectedProductId)?.name || '';
-        }
-
-        if (!finalProductId) {
-            toast.error('Wybierz produkt!');
-            return;
-        }
-
-        const name = prompt('Podaj nazwę dla tego cennika (np. Cennik 2025):', `Cennik ${finalProductName} ${new Date().getFullYear()}`);
-        if (!name) return;
-
-        const { data: table, error: tErr } = await supabase.from('price_tables').insert({
-            name: name,
-            product_definition_id: finalProductId,
-            type: 'matrix',
-            attributes: importAttributes.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}),
-            is_active: false
-        }).select().single();
-
-        if (tErr) {
-            console.error(tErr);
-            toast.error('Błąd tworzenia tabeli cennika: ' + tErr.message);
-            return;
-        }
-
-        const entries = previewData.entries.map((e: any) => ({
-            price_table_id: table.id,
-            width_mm: e.width_mm,
-            projection_mm: e.projection_mm,
-            price: e.price,
-            structure_price: e.structure_price || e.price,
-            glass_price: e.glass_price || 0,
-            properties: e.properties || {}
-        }));
-
-        const { error: eErr } = await supabase.from('price_matrix_entries').insert(entries);
-
-        if (eErr) {
-            console.error(eErr);
-            toast.error('Błąd zapisu cen: ' + eErr.message);
-        } else {
-            if (previewData.surcharges || previewData.currency) {
-                await supabase.from('price_tables').update({
-                    attributes: {
-                        ...previewData.detected_attributes,
-                        surcharges: previewData.surcharges,
-                        currency: previewData.currency,
-                        notes: previewData.notes
-                    }
-                }).eq('id', table.id);
-            }
-
-            toast.success('Cennik zaimportowany i przypisany!');
-            setPreviewData(null);
-            setNewProductName('');
-            setSelectedProductId('');
-            setImportAttributes([]);
-            setActiveTab('tables');
-            fetchPriceTables();
-        }
+        const variants: any = {};
+        importAttributes.forEach(a => {
+            if (a.key && a.value) variants[a.key] = a.value;
+        });
+        const pId = selectedProductId || previewData.detected_product_name;
+        const pName = products.find(p => p.id === pId)?.name || 'Nieznany Produkt';
+        const queueItem = {
+            id: Date.now().toString(),
+            matrixData: previewData,
+            productId: pId,
+            productName: pName,
+            variantConfig: {
+                roofType: variants.roof_type || previewData.detected_attributes?.roof_type || 'polycarbonate',
+                snowZone: variants.snow_zone || previewData.detected_attributes?.snow_zone || '1',
+                subtype: variants.subtype || undefined
+            },
+            sourceFile: 'Clipboard'
+        };
+        await handleBulkImport([queueItem]); // Reuse bulk logic
+        setPreviewData(null);
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
             {editingTable && (
                 <MatrixEditor
                     tableId={editingTable.id}
@@ -324,55 +255,26 @@ export const PricingPage = () => {
                 />
             )}
 
-            {/* Import Preview Modal */}
             {previewData && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
-                        <h3 className="text-xl font-bold mb-4">Podgląd Importu AI</h3>
-                        <p className="mb-4 text-sm text-slate-500">
-                            Wykryto {previewData.entries.length} pozycji cenowych.
-                            Pewność: {previewData.confidence}%.
-                        </p>
-                        <div className="bg-slate-50 p-4 rounded mb-4 overflow-auto max-h-60 border border-slate-200">
-                            <pre className="text-xs">{JSON.stringify(previewData.entries.slice(0, 5), null, 2)} ... i więcej</pre>
-                        </div>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 space-y-6">
+                            <h3 className="text-xl font-bold">Weryfikacja Importu (Schowek)</h3>
 
-                        {/* Import Preview & Configuration */}
-                        <div className="bg-white p-6 rounded-xl border border-slate-200">
-                            <h3 className="text-lg font-bold mb-4">Konfiguracja Cennika</h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Produkt</label>
-                                    <select
-                                        value={selectedProductId}
-                                        onChange={(e) => setSelectedProductId(e.target.value)}
-                                        className="w-full p-2 border border-slate-300 rounded-lg"
-                                    >
-                                        <option value="">-- Wybierz produkt --</option>
-                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                        <option value="new">+ Utwórz nowy produkt (wykryto: {previewData.detected_product_name})</option>
-                                    </select>
-                                </div>
-
-                                {selectedProductId === 'new' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Nazwa Nowego Produktu</label>
-                                        <input
-                                            type="text"
-                                            value={newProductName}
-                                            onChange={(e) => setNewProductName(e.target.value)}
-                                            className="w-full p-2 border border-slate-300 rounded-lg"
-                                        />
-                                    </div>
-                                )}
+                            <div className="p-4 bg-slate-50 rounded-lg space-y-2">
+                                <p><strong>Liczba wierszy:</strong> {previewData.entries?.length || 0}</p>
+                                <p><strong>Wykryte atrybuty:</strong> {JSON.stringify(previewData.detected_attributes)}</p>
                             </div>
 
-                            {/* Attributes Section */}
-                            <div className="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div>
                                 <div className="flex justify-between items-center mb-2">
-                                    <h4 className="text-sm font-bold text-slate-700">Warianty / Atrybuty (Exact Match)</h4>
-                                    <button onClick={addAttribute} className="text-xs text-accent hover:underline">+ Dodaj atrybut</button>
+                                    <label className="font-semibold">Atrybuty Wariantu</label>
+                                    <button
+                                        onClick={() => setImportAttributes([...importAttributes, { key: '', value: '' }])}
+                                        className="text-sm text-blue-600 hover:text-blue-700"
+                                    >
+                                        + Dodaj atrybut
+                                    </button>
                                 </div>
                                 <p className="text-xs text-slate-500 mb-3">
                                     Jeśli ta tabela dotyczy konkretnego wariantu (np. tylko 1 strefa śniegowa), dodaj to tutaj.
@@ -400,6 +302,7 @@ export const PricingPage = () => {
                                     <datalist id="attribute-keys">
                                         <option value="snow_zone">Strefa Śniegowa (1/2/3)</option>
                                         <option value="roof_type">Typ Dachu (poly/glass)</option>
+                                        <option value="subtype">Podtyp (np. VSG Clear)</option>
                                         <option value="mounting">Montaż (wall/free)</option>
                                     </datalist>
                                 </div>
@@ -472,314 +375,356 @@ export const PricingPage = () => {
                 >
                     Cennik Dopłat (Exact)
                 </button>
+                <button
+                    onClick={() => setActiveTab('transport')}
+                    className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'transport' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-600'}`}
+                >
+                    Transport i Baza
+                </button>
             </div>
 
             {/* CONTENT */}
-            {activeTab === 'tables' && (
-                <div className="space-y-8">
-                    {loading ? (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">Ładowanie...</div>
-                    ) : priceTables.length === 0 ? (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">Brak cenników. Zaimportuj pierwszy!</div>
-                    ) : (
-                        Object.entries(
-                            priceTables.reduce((acc: Record<string, any[]>, table) => {
-                                const prodName = table.product?.name || 'Inne / Bez Konfiguracji';
-                                if (!acc[prodName]) acc[prodName] = [];
-                                acc[prodName].push(table);
-                                return acc;
-                            }, {})
-                        ).sort(([a], [b]) => a.localeCompare(b)).map(([productName, tables]) => (
-                            <div key={productName} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="bg-slate-100 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
-                                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                        📦 {productName}
-                                        <span className="text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                                            {tables.length} cenników
-                                        </span>
-                                    </h3>
+            {
+                activeTab === 'tables' && (
+                    <div className="space-y-8">
+                        {loading ? (
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">Ładowanie...</div>
+                        ) : priceTables.length === 0 ? (
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">Brak cenników. Zaimportuj pierwszy!</div>
+                        ) : (
+                            Object.entries(
+                                priceTables.reduce((acc: Record<string, any[]>, table) => {
+                                    const prodName = table.product?.name || 'Inne / Bez Konfiguracji';
+                                    if (!acc[prodName]) acc[prodName] = [];
+                                    acc[prodName].push(table);
+                                    return acc;
+                                }, {})
+                            ).sort(([a], [b]) => a.localeCompare(b)).map(([productName, tables]) => (
+                                <div key={productName} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div className="bg-slate-100 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
+                                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                            📦 {productName}
+                                            <span className="text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                                                {tables.length} cenników
+                                            </span>
+                                        </h3>
+                                    </div>
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                                            <tr>
+                                                <th className="px-6 py-3 font-semibold">Nazwa Cennika</th>
+                                                <th className="px-6 py-3 font-semibold">Producent</th>
+                                                <th className="px-6 py-3 font-semibold">Aktualizacja</th>
+                                                <th className="px-6 py-3 font-semibold w-32">Rabat Zak.</th>
+                                                <th className="px-6 py-3 font-semibold">Atrybuty</th>
+                                                <th className="px-6 py-3 font-semibold">Status</th>
+                                                <th className="px-6 py-3 font-semibold text-right">Akcje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {tables.map((table) => (
+                                                <tr key={table.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                                        {table.name}
+                                                        {table.variant_config?.roofType && (
+                                                            <div className="flex gap-1 mt-1">
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${table.variant_config.roofType === 'glass' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                                    {table.variant_config.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}
+                                                                </span>
+                                                                {table.variant_config.snowZone && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-bold border border-purple-200">
+                                                                        S{table.variant_config.snowZone}
+                                                                    </span>
+                                                                )}
+                                                                {table.variant_config.subtype && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                                                        {table.variant_config.subtype}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-600">
+                                                        {table.attributes?.provider && (
+                                                            <span className={`text-xs px-2 py-1 rounded-full font-bold border ${table.attributes.provider === 'Aluxe' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                                                                table.attributes.provider === 'Deponti' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                                                    'bg-slate-100 text-slate-600 border-slate-200'
+                                                                }`}>
+                                                                {table.attributes.provider}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-500 text-sm">
+                                                        {table.created_at ? format(new Date(table.created_at), 'd MMM yyyy', { locale: pl }) : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {/* Inline Discount Editor */}
+                                                        <div className="flex items-center gap-1 group relative">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="0"
+                                                                className="w-16 px-2 py-1 text-sm border border-slate-200 rounded text-center focus:border-accent focus:outline-none"
+                                                                defaultValue={table.attributes?.discount || ''}
+                                                                onBlur={async (e) => {
+                                                                    const val = e.target.value;
+                                                                    if (val === table.attributes?.discount) return;
+
+                                                                    // Update attributes
+                                                                    const newAttrs = { ...table.attributes, discount: val };
+                                                                    const { error } = await supabase.from('price_tables').update({ attributes: newAttrs }).eq('id', table.id);
+
+                                                                    if (error) {
+                                                                        toast.error('Błąd zapisu rabatu');
+                                                                    } else {
+                                                                        toast.success('Zapisano rabat');
+                                                                        fetchPriceTables();
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span className="text-slate-400 text-xs">%</span>
+
+                                                            {/* Calculate Effective Discount Tooltip */}
+                                                            {table.attributes?.discount && table.attributes.discount.includes('+') && (
+                                                                <div className="absolute left-full ml-2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded hidden group-hover:block whitespace-nowrap z-10">
+                                                                    Efektywnie: {(() => {
+                                                                        try {
+                                                                            const parts = table.attributes.discount.split('+').map((p: string) => parseFloat(p));
+                                                                            const multiplier = parts.reduce((acc: number, curr: number) => acc * (1 - (curr / 100)), 1);
+                                                                            return ((1 - multiplier) * 100).toFixed(2) + '%';
+                                                                        } catch { return '?'; }
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {table.attributes && Object.entries(table.attributes).map(([key, val]) => {
+                                                                if (typeof val === 'object') return null;
+                                                                if (key === 'provider') return null; // Already shown in name column
+                                                                if (key === 'discount') return null; // Shown in dedicated column
+                                                                return (
+                                                                    <span key={key} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">
+                                                                        {key}: <strong>{val as string}</strong>
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                            {(!table.attributes || Object.keys(table.attributes).length === 0) && (
+                                                                <span className="text-xs text-slate-400 italic">Baza (Domyślny)</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <button
+                                                            onClick={() => handleToggleActive(table.id, table.is_active)}
+                                                            className={`text-xs font-bold px-2 py-1 rounded-full border ${table.is_active
+                                                                ? 'bg-green-100 text-green-700 border-green-200'
+                                                                : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+                                                        >
+                                                            {table.is_active ? 'AKTYWNY' : 'NIEAKTYWNY'}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button
+                                                            onClick={() => runSimulation(table.id)}
+                                                            disabled={isSimulating}
+                                                            className="text-sm font-medium text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-50"
+                                                        >
+                                                            {isSimulating ? 'Symulowanie...' : 'Symuluj'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSettingsTable({
+                                                                id: table.id,
+                                                                name: table.name,
+                                                                attributes: table.attributes || {}
+                                                            })}
+                                                            className="text-sm font-medium text-slate-500 hover:text-slate-800 hover:underline flex items-center gap-1"
+                                                        >
+                                                            Ustawienia
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setConfigTable({
+                                                                id: table.id,
+                                                                name: table.name,
+                                                                config: table.configuration || {},
+                                                                productId: table.product_definition_id,
+                                                                productName: table.product?.name
+                                                            })}
+                                                            className="text-sm font-medium text-violet-600 hover:text-violet-800 hover:underline flex items-center gap-1"
+                                                        >
+                                                            Reguły
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDuplicatingTable({ id: table.id, name: table.name })}
+                                                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                        >
+                                                            Kopiuj
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteTable(table.id, table.name)}
+                                                            className="text-sm font-medium text-red-600 hover:text-red-800 hover:underline"
+                                                        >
+                                                            Usuń
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingTable({ id: table.id, name: table.name })}
+                                                            className="text-sm font-medium text-accent hover:text-accent/80 hover:underline"
+                                                        >
+                                                            Edytuj
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                            ))
+                        )}
+                    </div>
+                )
+            }
+
+            {/* Simulation Results Modal */}
+            {
+                simulationReport && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold">Raport Symulacji Zmiany Cen</h3>
+                                <button onClick={() => setSimulationReport(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                <div className="bg-slate-50 p-4 rounded text-center">
+                                    <div className="text-sm text-slate-500">Przeanalizowano</div>
+                                    <div className="text-2xl font-bold text-slate-900">{simulationReport.totalOffers} ofert</div>
+                                </div>
+                                <div className="bg-slate-50 p-4 rounded text-center">
+                                    <div className="text-sm text-slate-500">Średnia zmiana</div>
+                                    <div className={`text-2xl font-bold ${simulationReport.avgChangePercent > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {simulationReport.avgChangePercent > 0 ? '+' : ''}{simulationReport.avgChangePercent.toFixed(2)}%
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 p-4 rounded text-center">
+                                    <div className="text-sm text-slate-500">Różnica wartości (Total)</div>
+                                    <div className={`text-2xl font-bold ${simulationReport.totalDiffValue > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {simulationReport.totalDiffValue > 0 ? '+' : ''}{formatCurrency(simulationReport.totalDiffValue)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 border-b">
                                         <tr>
-                                            <th className="px-6 py-3 font-semibold">Nazwa Cennika</th>
-                                            <th className="px-6 py-3 font-semibold">Producent</th>
-                                            <th className="px-6 py-3 font-semibold">Aktualizacja</th>
-                                            <th className="px-6 py-3 font-semibold w-32">Rabat Zak.</th>
-                                            <th className="px-6 py-3 font-semibold">Atrybuty</th>
-                                            <th className="px-6 py-3 font-semibold">Status</th>
-                                            <th className="px-6 py-3 font-semibold text-right">Akcje</th>
+                                            <th className="p-3 font-semibold">Oferta</th>
+                                            <th className="p-3 font-semibold">Stara Cena Bazowa</th>
+                                            <th className="p-3 font-semibold">Nowa Cena Bazowa</th>
+                                            <th className="p-3 font-semibold text-right">Różnica</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {tables.map((table) => (
-                                            <tr key={table.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-900">
-                                                    {table.name}
+                                        {simulationReport.results.map((r) => (
+                                            <tr key={r.offerId} className="hover:bg-slate-50">
+                                                <td className="p-3">
+                                                    <div className="font-medium">{r.offerNumber}</div>
+                                                    <div className="text-slate-500 text-xs">{r.customerName}</div>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-600">
-                                                    {table.attributes?.provider && (
-                                                        <span className={`text-xs px-2 py-1 rounded-full font-bold border ${table.attributes.provider === 'Aluxe' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                                                            table.attributes.provider === 'Deponti' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                                                'bg-slate-100 text-slate-600 border-slate-200'
-                                                            }`}>
-                                                            {table.attributes.provider}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-500 text-sm">
-                                                    {table.created_at ? format(new Date(table.created_at), 'd MMM yyyy', { locale: pl }) : '-'}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {/* Inline Discount Editor */}
-                                                    <div className="flex items-center gap-1 group relative">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="0"
-                                                            className="w-16 px-2 py-1 text-sm border border-slate-200 rounded text-center focus:border-accent focus:outline-none"
-                                                            defaultValue={table.attributes?.discount || ''}
-                                                            onBlur={async (e) => {
-                                                                const val = e.target.value;
-                                                                if (val === table.attributes?.discount) return;
-
-                                                                // Update attributes
-                                                                const newAttrs = { ...table.attributes, discount: val };
-                                                                const { error } = await supabase.from('price_tables').update({ attributes: newAttrs }).eq('id', table.id);
-
-                                                                if (error) {
-                                                                    toast.error('Błąd zapisu rabatu');
-                                                                } else {
-                                                                    toast.success('Zapisano rabat');
-                                                                    fetchPriceTables();
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span className="text-slate-400 text-xs">%</span>
-
-                                                        {/* Calculate Effective Discount Tooltip */}
-                                                        {table.attributes?.discount && table.attributes.discount.includes('+') && (
-                                                            <div className="absolute left-full ml-2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded hidden group-hover:block whitespace-nowrap z-10">
-                                                                Efektywnie: {(() => {
-                                                                    try {
-                                                                        const parts = table.attributes.discount.split('+').map((p: string) => parseFloat(p));
-                                                                        const multiplier = parts.reduce((acc: number, curr: number) => acc * (1 - (curr / 100)), 1);
-                                                                        return ((1 - multiplier) * 100).toFixed(2) + '%';
-                                                                    } catch { return '?'; }
-                                                                })()}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {table.attributes && Object.entries(table.attributes).map(([key, val]) => {
-                                                            if (typeof val === 'object') return null;
-                                                            if (key === 'provider') return null; // Already shown in name column
-                                                            if (key === 'discount') return null; // Shown in dedicated column
-                                                            return (
-                                                                <span key={key} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">
-                                                                    {key}: <strong>{val as string}</strong>
-                                                                </span>
-                                                            );
-                                                        })}
-                                                        {(!table.attributes || Object.keys(table.attributes).length === 0) && (
-                                                            <span className="text-xs text-slate-400 italic">Baza (Domyślny)</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <button
-                                                        onClick={() => handleToggleActive(table.id, table.is_active)}
-                                                        className={`text-xs font-bold px-2 py-1 rounded-full border ${table.is_active
-                                                            ? 'bg-green-100 text-green-700 border-green-200'
-                                                            : 'bg-slate-100 text-slate-500 border-slate-200'}`}
-                                                    >
-                                                        {table.is_active ? 'AKTYWNY' : 'NIEAKTYWNY'}
-                                                    </button>
-                                                </td>
-                                                <td className="px-6 py-4 text-right space-x-2">
-                                                    <button
-                                                        onClick={() => runSimulation(table.id)}
-                                                        disabled={isSimulating}
-                                                        className="text-sm font-medium text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-50"
-                                                    >
-                                                        {isSimulating ? 'Symulowanie...' : 'Symuluj'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setConfigTable({
-                                                            id: table.id,
-                                                            name: table.name,
-                                                            config: table.configuration || {},
-                                                            productId: table.product_definition_id,
-                                                            productName: table.product?.name
-                                                        })}
-                                                        className="text-sm font-medium text-violet-600 hover:text-violet-800 hover:underline flex items-center gap-1"
-                                                    >
-                                                        Reguły
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDuplicatingTable({ id: table.id, name: table.name })}
-                                                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                                                    >
-                                                        Kopiuj
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteTable(table.id, table.name)}
-                                                        className="text-sm font-medium text-red-600 hover:text-red-800 hover:underline"
-                                                    >
-                                                        Usuń
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setEditingTable({ id: table.id, name: table.name })}
-                                                        className="text-sm font-medium text-accent hover:text-accent/80 hover:underline"
-                                                    >
-                                                        Edytuj
-                                                    </button>
+                                                <td className="p-3 text-slate-500">{formatCurrency(r.oldPrice)}</td>
+                                                <td className="p-3 font-medium">{formatCurrency(r.newPrice)}</td>
+                                                <td className={`p-3 text-right font-bold ${r.diffValue > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {r.diffValue > 0 ? '+' : ''}{formatCurrency(r.diffValue)} ({r.diffPercent.toFixed(1)}%)
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                        ))
-                    )}
-                </div>
-            )}
 
-            {/* Simulation Results Modal */}
-            {simulationReport && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold">Raport Symulacji Zmiany Cen</h3>
-                            <button onClick={() => setSimulationReport(null)} className="text-slate-400 hover:text-slate-600">✕</button>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 mb-6">
-                            <div className="bg-slate-50 p-4 rounded text-center">
-                                <div className="text-sm text-slate-500">Przeanalizowano</div>
-                                <div className="text-2xl font-bold text-slate-900">{simulationReport.totalOffers} ofert</div>
+                            <div className="mt-6 flex justify-end">
+                                <button onClick={() => setSimulationReport(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded font-medium">Zamknij raport</button>
                             </div>
-                            <div className="bg-slate-50 p-4 rounded text-center">
-                                <div className="text-sm text-slate-500">Średnia zmiana</div>
-                                <div className={`text-2xl font-bold ${simulationReport.avgChangePercent > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    {simulationReport.avgChangePercent > 0 ? '+' : ''}{simulationReport.avgChangePercent.toFixed(2)}%
-                                </div>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded text-center">
-                                <div className="text-sm text-slate-500">Różnica wartości (Total)</div>
-                                <div className={`text-2xl font-bold ${simulationReport.totalDiffValue > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    {simulationReport.totalDiffValue > 0 ? '+' : ''}{formatCurrency(simulationReport.totalDiffValue)}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 border-b">
-                                    <tr>
-                                        <th className="p-3 font-semibold">Oferta</th>
-                                        <th className="p-3 font-semibold">Stara Cena Bazowa</th>
-                                        <th className="p-3 font-semibold">Nowa Cena Bazowa</th>
-                                        <th className="p-3 font-semibold text-right">Różnica</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {simulationReport.results.map((r) => (
-                                        <tr key={r.offerId} className="hover:bg-slate-50">
-                                            <td className="p-3">
-                                                <div className="font-medium">{r.offerNumber}</div>
-                                                <div className="text-slate-500 text-xs">{r.customerName}</div>
-                                            </td>
-                                            <td className="p-3 text-slate-500">{formatCurrency(r.oldPrice)}</td>
-                                            <td className="p-3 font-medium">{formatCurrency(r.newPrice)}</td>
-                                            <td className={`p-3 text-right font-bold ${r.diffValue > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                {r.diffValue > 0 ? '+' : ''}{formatCurrency(r.diffValue)} ({r.diffPercent.toFixed(1)}%)
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="mt-6 flex justify-end">
-                            <button onClick={() => setSimulationReport(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded font-medium">Zamknij raport</button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {activeTab === 'costs' && <SupplierCostsManager />}
             {activeTab === 'surcharges' && <AdditionalCostsManager />}
+            {activeTab === 'transport' && <TransportSettingsManager />}
 
-            {activeTab === 'import' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
-                    <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <IconUpload />
-                    </div>
-                    <h2 className="text-xl font-bold text-slate-900 mb-2">Wgraj Cennik PDF</h2>
-                    <p className="text-slate-500 max-w-md mx-auto mb-8">
-                        Nasza sztuczna inteligencja przeanalizuje dokument, wykryje tabelki z cenami i pozwoli Ci je zweryfikować przed zapisaniem.
-                    </p>
-
-                    <label className="inline-block relative">
-                        <input
-                            type="file"
-                            accept=".pdf"
-                            className="hidden"
-                            disabled={importing}
-                            onChange={(e) => {
-                                if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+            {
+                activeTab === 'import' && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-[800px] overflow-hidden">
+                        <SmartPdfImporter
+                            onClose={() => setActiveTab('tables')}
+                            products={products}
+                            onExtractSuccess={(queueItems) => {
+                                handleBulkImport(queueItems);
                             }}
                         />
-                        <span className={`px-6 py-3 bg-accent text-white rounded-lg font-bold cursor-pointer hover:bg-accent/90 shadow-md ${importing ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            {importing ? 'Analizowanie...' : 'Wybierz plik z dysku'}
-                        </span>
-                    </label>
-                </div>
-            )}
+                    </div>
+                )
+            }
 
-            {showClipboardImport && (
-                <ClipboardImportModal
-                    onClose={() => setShowClipboardImport(false)}
-                    onSave={(data, attributes) => {
-                        setPreviewData({
-                            detected_product_name: '',
-                            detected_attributes: {
-                                ...attributes
-                            },
-                            entries: data,
-                            currency: 'EUR',
-                            surcharges: [],
-                            notes: 'Zaimportowano ze schowka'
-                        });
-
-                        if (attributes) {
-                            const newAttrs: { key: string, value: string }[] = [];
-                            Object.entries(attributes).forEach(([k, v]) => {
-                                if (v) newAttrs.push({ key: k, value: String(v) });
+            {
+                showClipboardImport && (
+                    <ClipboardImportModal
+                        onClose={() => setShowClipboardImport(false)}
+                        onSave={(data, attributes) => {
+                            setPreviewData({
+                                detected_product_name: '',
+                                detected_attributes: {
+                                    ...attributes
+                                },
+                                entries: data,
+                                currency: 'EUR',
+                                surcharges: [],
+                                notes: 'Zaimportowano ze schowka'
                             });
-                            setImportAttributes(newAttrs);
-                        }
 
-                        setShowClipboardImport(false);
-                        toast.success('Dane wczytane do podglądu. Uzupełnij atrybuty i zapisz.');
-                    }}
-                />
-            )}
+                            if (attributes) {
+                                const newAttrs: { key: string, value: string }[] = [];
+                                Object.entries(attributes).forEach(([k, v]) => {
+                                    if (v) newAttrs.push({ key: k, value: String(v) });
+                                });
+                                setImportAttributes(newAttrs);
+                            }
 
-            {configTable && (
-                <SurchargeRulesModal
-                    isOpen={!!configTable}
-                    tableId={configTable.id}
-                    tableName={configTable.name}
-                    initialConfig={configTable.config}
-                    productId={configTable.productId}
-                    productName={configTable.productName}
-                    onClose={() => setConfigTable(null)}
-                    onSave={fetchPriceTables}
-                />
-            )}
-        </div>
+                            setShowClipboardImport(false);
+                            toast.success('Dane wczytane do podglądu. Uzupełnij atrybuty i zapisz.');
+                        }}
+                    />
+                )
+            }
+
+            {
+                configTable && (
+                    <SurchargeRulesModal
+                        isOpen={!!configTable}
+                        tableId={configTable.id}
+                        tableName={configTable.name}
+                        initialConfig={configTable.config}
+                        productId={configTable.productId}
+                        productName={configTable.productName}
+                        onClose={() => setConfigTable(null)}
+                        onSave={fetchPriceTables}
+                    />
+                )
+            }
+
+            {
+                settingsTable && (
+                    <TableSettingsModal
+                        isOpen={!!settingsTable}
+                        tableId={settingsTable.id}
+                        tableName={settingsTable.name}
+                        initialAttributes={settingsTable.attributes}
+                        onClose={() => setSettingsTable(null)}
+                        onSave={fetchPriceTables}
+                    />
+                )
+            }
+        </div >
     );
 };

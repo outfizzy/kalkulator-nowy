@@ -2,12 +2,31 @@ import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationsDropdown } from './notifications/NotificationsDropdown';
-import { SalesAssistantWidget } from './ai/SalesAssistantWidget';
+import { GlobalSearch } from './GlobalSearch';
+import { AIAssistantSidebar } from './AIAssistantSidebar';
 
 export const Layout: React.FC = () => {
-    const { currentUser, logout, isAdmin } = useAuth();
+    const { currentUser, logout, isAdmin, hasPermission } = useAuth();
     const navigate = useNavigate();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+    const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setGlobalSearchOpen(true);
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+                e.preventDefault();
+                setAiSidebarOpen(prev => !prev);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const handleLogout = () => {
         logout();
@@ -17,7 +36,7 @@ export const Layout: React.FC = () => {
     if (!currentUser) return null;
 
     const userInitials = `${currentUser.firstName[0]}${currentUser.lastName[0]}`;
-    const roleName = isAdmin() ? 'Administrator' : 'Przedstawiciel';
+    const roleName = isAdmin() ? 'Administrator' : 'Użytkownik';
 
     return (
         <div className="min-h-screen bg-background flex">
@@ -31,25 +50,52 @@ export const Layout: React.FC = () => {
                         className="w-full h-auto max-w-[200px] brightness-0 invert"
                     />
                 </div>
-                <nav className="flex-1 px-4 py-4 space-y-2">
-                    <NavLink to="/dashboard" label="Dashboard" icon="dashboard" />
-                    <NavLink to="/mail" label="Poczta" icon="mail" />
-                    <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />
-                    <NavLink to="/leads" label="Leady" icon="users" />
-                    <NavLink to="/offers" label="Lista Ofert" icon="offers" />
-                    <NavLink to="/customers" label="Klienci" icon="users" />
+                <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto custom-scrollbar">
+                    {/* SPRZEDAŻ - Always visible or granular? Let's use permissions */}
+                    {(hasPermission('dashboard') || hasPermission('crm_mail') || hasPermission('crm_tasks') || hasPermission('crm_leads') || hasPermission('crm_clients') || hasPermission('offers_create') || hasPermission('ai_assistant')) && (
+                        <div className="space-y-1">
+                            <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sprzedaż</div>
+                            {hasPermission('dashboard') && <NavLink to="/dashboard" label="Dashboard" icon="dashboard" />}
+                            {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" />}
+                            {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" />}
+                            {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" />}
+                            {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" />}
+                            {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />}
+                            {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" />}
+                            {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
+                            {/* Visualizer? */}
+                            {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
+                        </div>
+                    )}
 
-                    <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />
-                    <NavLink to="/installations" label="Planowanie Montaży" icon="map" />
-                    <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />
-                    <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />
-                    <NavLink to="/contracts" label="Lista Umów" icon="contracts" />
-                    <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" />
-                    {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" />}
-                    {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" />}
-                    {isAdmin() && <NavLink to="/admin/pricing" label="Cenniki i Marże" icon="clipboard" />}
-                    <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />
-                    <NavLink to="/settings" label="Ustawienia" icon="settings" />
+                    {/* REALIZACJA */}
+                    {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module') || hasPermission('portfolio_map')) && (
+                        <div className="space-y-1">
+                            <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Realizacja</div>
+                            {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" />}
+                            {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />}
+                            {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" />}
+                            {hasPermission('logistics') && <NavLink to="/procurement" label="Logistyka" icon="box" />}
+                            {hasPermission('deliveries') && <NavLink to="/deliveries" label="Dostawy" icon="calendar" />}
+                            {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />}
+                            {hasPermission('service_module') && <NavLink to="/service" label="Serwis" icon="tools" />}
+                        </div>
+                    )}
+
+                    {/* ADMINISTRACJA */}
+                    {(hasPermission('stats_dashboard') || hasPermission('team_management') || hasPermission('partner_management') || hasPermission('pricing_management') || hasPermission('inventory_lite') || hasPermission('system_logs') || hasPermission('system_notifications') || hasPermission('settings_general')) && (
+                        <div className="space-y-1">
+                            <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Administracja</div>
+                            {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />}
+                            {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" />}
+                            {hasPermission('partner_management') && <NavLink to="/admin/partner-offers" label="Partnerzy B2B" icon="clipboard" />}
+                            {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
+                            {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
+                            {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
+                            {hasPermission('system_notifications') && <NavLink to="/admin/notifications" label="Uprawnienia" icon="settings" />}
+                            {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" />}
+                        </div>
+                    )}
                 </nav>
                 <div className="p-4 border-t border-slate-800 space-y-2">
                     <div className="flex items-center gap-3">
@@ -105,6 +151,7 @@ export const Layout: React.FC = () => {
                         <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
                             <NavLink to="/dashboard" label="Dashboard" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/mail" label="Poczta" icon="mail" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/tasks" label="Zadania" icon="check-circle" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/leads" label="Leady" icon="users" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/offers" label="Lista Ofert" icon="offers" onClick={() => setMobileMenuOpen(false)} />
@@ -113,6 +160,7 @@ export const Layout: React.FC = () => {
                             <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
+                            <NavLink to="/service" label="Serwis" icon="tools" onClick={() => setMobileMenuOpen(false)} />
                             <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
                             {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
                             {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
@@ -162,6 +210,24 @@ export const Layout: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-3">
                         <NotificationsDropdown />
+                        {/* Search Trigger */}
+                        <button
+                            onClick={() => setGlobalSearchOpen(true)}
+                            className="hidden md:flex p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Szukaj (Cmd+K)"
+                        >
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </button>
+                        {/* AI Assistant Toggle */}
+                        <button
+                            onClick={() => setAiSidebarOpen(true)}
+                            className="hidden md:flex p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Asystent AI (Cmd+J)"
+                        >
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </button>
                         {/* Mobile logo */}
                         <div className="md:hidden">
                             <img src="/logo.png" alt="PolenDach 24" className="h-8 w-auto" />
@@ -175,8 +241,14 @@ export const Layout: React.FC = () => {
                 </div>
             </main>
 
-            {/* AI Assistant Widget */}
-            <SalesAssistantWidget />
+            {/* AI Assistant Widget - Kept for legacy or specific page usage? Or replace? 
+                Let's keep SalesAssistantWidget if it's the floating button, but we want our new Sidebar.
+                Actually plan said "Sidebar". Let's put Sidebar here.
+            */}
+            <AIAssistantSidebar isOpen={aiSidebarOpen} onClose={() => setAiSidebarOpen(false)} />
+
+            {/* Global Search Modal */}
+            <GlobalSearch isOpen={globalSearchOpen} setIsOpen={setGlobalSearchOpen} />
         </div>
     );
 };
@@ -184,7 +256,7 @@ export const Layout: React.FC = () => {
 interface NavLinkProps {
     to: string;
     label: string;
-    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail' | 'chat';
+    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail' | 'chat' | 'box' | 'list' | 'check-circle' | 'tools' | 'bell';
     onClick?: () => void;
 }
 
@@ -254,6 +326,32 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
         ),
+        box: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+        ),
+        list: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+        ),
+        'check-circle': (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        ),
+        tools: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        ),
+        bell: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+        )
     };
 
     return (
@@ -265,7 +363,7 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
         >
-            {icons[icon]}
+            {icons[icon] || icons['dashboard']}
             {label}
         </Link>
     );

@@ -51,5 +51,25 @@ export const NotificationService = {
             .eq('user_id', userId);
 
         if (error) throw error;
+    },
+
+    async createNotification(
+        userId: string,
+        type: 'info' | 'success' | 'warning' | 'error',
+        title: string,
+        message: string,
+        link?: string,
+        metadata?: any
+    ): Promise<void> {
+        const { error } = await supabase.from('notifications').insert({
+            user_id: userId,
+            type,
+            title,
+            message,
+            link,
+            metadata
+        });
+
+        if (error) throw error;
     }
 };

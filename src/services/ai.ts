@@ -22,7 +22,9 @@ export class AiService {
         if (user?.emailConfig?.openaiKey) return user.emailConfig.openaiKey;
 
         // Fallback to provided key (Temporary/Dev)
-        return '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';
+        // SECURITY ALERT: Removed hardcoded key. 
+        // User must provide key in settings or use env var.
+        return null; // import.meta.env.VITE_OPENAI_API_KEY || null;
     }
 
     static async generateOfferIntro(offer: Offer, user: any): Promise<string> {
@@ -87,7 +89,8 @@ export class AiService {
             product: {
                 model: translate(offer.product.modelId, 'models'),
                 size: `${offer.product.width}mm x ${offer.product.projection}mm`,
-                addons: offer.product.addons.map(a => a.name).join(', ')
+                addons: offer.product.addons.map(a => a.name).join(', '),
+                imageUrl: offer.product.imageUrl
             },
             salesRep: user ? `${user.firstName} ${user.lastName}` : 'PolenDach24 Team'
         };
@@ -107,7 +110,8 @@ export class AiService {
         2. Podziękowanie za rozmowę/zainteresowanie.
         3. Krótkie wspomnienie o zaletach wybranego modelu (${context.product.model}).
         4. Zachęcenie do kontaktu w razie pytań.
-        5. Stopka.
+        5. Jeśli dostępny jest URL zdjęcia (${context.product.imageUrl ? 'Dostępny' : 'Brak'}), wstaw go w treści jako link do wizualizacji/zdjęcia poglądowego ze słowami "Hier sehen Sie Ihr konfiguriertes Modell: [URL]".
+        6. Stopka.
         `;
 
         try {
@@ -135,6 +139,68 @@ export class AiService {
             return data.choices[0]?.message?.content || '';
         } catch (error) {
             console.error("AI Email Generation Error", error);
+            throw error;
+        }
+    }
+
+    static async interpretVisualizerCommand(command: string, currentConfig: any, user: any): Promise<Partial<any>> {
+        const apiKey = await this.getApiKey(user);
+
+        if (!apiKey) {
+            throw new Error("Brak klucza API OpenAI. Skonfiguruj go w ustawieniach profilu.");
+        }
+
+        const SYSTEM_PROMPT = `
+        Jesteś inteligentnym kontrolerem konfiguratora zadaszeń 3D.
+        Twoim zadaniem jest przetłumaczenie poleceń użytkownika (PL/DE/EN) na obiekt JSON aktualizujący konfigurację.
+        
+        SCHEMAT KONFIGURACJI:
+        - modelId: 'trendstyle', 'trendstyle_plus', 'orangestyle', 'topstyle', 'topstyle_xl', 'skystyle'
+        - width: liczba (3000-12000 mm)
+        - projection: liczba (2000-5000 mm)
+        - color: 'RAL 7016', 'RAL 9006', 'RAL 9010', 'RAL 9007', 'RAL 8014'
+        - roofType: 'polycarbonate', 'glass'
+        - installationType: 'wall-mounted', 'freestanding'
+        
+        LOGIKA ZMIAN:
+        1. Jeśli komenda dotyczy dodania dodatku (np. "dodaj markizę"), zwróć: { "_action": "add_addon", "type": "awning" }
+           Typy dodatków: 'awning', 'zipScreen', 'heater', 'lighting', 'wpc-floor', 'slidingWall'.
+        2. Jeśli usunięcie: { "_action": "remove_addon", "type": "..." }
+        3. Jeśli zmiana wymiarów/koloru/modelu: zwróć { "klucz": "wartość" }.
+           Np. "Zmień na biały" -> { "color": "RAL 9010" }.
+           "Szerokość 5 metrów" -> { "width": 5000 }.
+        
+        Zwróć TYLKO poprawny JSON.
+        Aktualna konfiguracja (dla kontekstu): ${JSON.stringify(currentConfig)}
+        `;
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        { role: 'system', content: SYSTEM_PROMPT },
+                        { role: 'user', content: command }
+                    ],
+                    temperature: 0.2,
+                    response_format: { type: "json_object" }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Błąd API OpenAI');
+            }
+
+            const data = await response.json();
+            const content = data.choices[0]?.message?.content;
+            return content ? JSON.parse(content) : {};
+        } catch (error) {
+            console.error("AI Command Error", error);
             throw error;
         }
     }

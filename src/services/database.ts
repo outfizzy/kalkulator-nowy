@@ -14,6 +14,7 @@ import { SupportService } from './database/support.service';
 import { OrderService } from './database/order.service';
 import { NotificationService } from './database/notification.service';
 import { StorageService } from './database/storage.service';
+import { SettingsService } from './database/settings.service';
 
 export const DatabaseService = {
     ...CustomerService,
@@ -31,6 +32,7 @@ export const DatabaseService = {
     ...SupportService,
     ...OrderService,
     ...NotificationService,
+    ...SettingsService,
     normalizePricing
 };
 

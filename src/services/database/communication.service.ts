@@ -102,7 +102,8 @@ export const CommunicationService = {
 
         let messages: any[] = [];
 
-        // 3. Fetch lead_messages related to leads/offers
+        // 3. Fetch lead_messages related to leads/offers (AND related to customer if needed)
+        // We use OR logic to be safe
         if (leadIds.length > 0 || offerIds.length > 0) {
             let query = supabase
                 .from('lead_messages')

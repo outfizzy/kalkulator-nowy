@@ -45,51 +45,184 @@ serve(async (req) => {
                 if (fn.name === 'confirmDate') {
                     if (installationId) {
                         try {
-                            // Update DB to scheduled
-                            await supabase.from('installations')
-                                .update({ status: 'scheduled' })
-                                .eq('id', installationId);
+                            const dateStr = metadata.installationDate;
+                            if (!dateStr) {
+                                throw new Error('No installationDate in metadata');
+                            }
 
-                            console.log('Installation confirmed:', installationId);
+                            // 1. Check Availability (New Logic: Working Days + Vacations + Busy Slots)
+                            const targetDateStr = dateStr;
+                            const targetDate = new Date(targetDateStr);
+                            const targetDayOfWeek = targetDate.getDay() || 7; // 1=Mon, 7=Sun
+                            const targetDateISO = targetDate.toISOString().split('T')[0];
 
-                            // Fetch Owner Details for SMS
-                            let salesRepName = 'Polendach24';
-                            let salesRepPhone = '';
-
-                            const { data: installation } = await supabase
+                            // Fetch current installation
+                            const { data: currentInstallation, error: instError } = await supabase
                                 .from('installations')
-                                .select('user_id')
+                                .select('team_id')
                                 .eq('id', installationId)
                                 .single();
 
-                            if (installation?.user_id) {
-                                // Try to get profile name
-                                const { data: profile } = await supabase
-                                    .from('profiles')
-                                    .select('full_name')
-                                    .eq('id', installation.user_id)
-                                    .single();
+                            if (instError) throw instError;
 
-                                if (profile?.full_name) salesRepName = profile.full_name;
-                            }
+                            // Fetch all active teams with working days
+                            const { data: allTeams, error: teamsError } = await supabase
+                                .from('teams')
+                                .select('id, working_days')
+                                .eq('is_active', true);
 
-                            // Log note
-                            await supabase.from('customer_communications').insert({
-                                customer_id: customerId || undefined,
-                                user_id: installation?.user_id,
-                                type: 'call',
-                                direction: 'outbound',
-                                subject: 'Potwierdzenie montażu (AI)',
-                                content: `Klient potwierdził termin montażu telefonicznie.\nWysłano SMS z danymi opiekuna: ${salesRepName} (${salesRepPhone})`,
-                                date: new Date().toISOString(),
-                                metadata: { isSystemNote: true, installationId }
+                            if (teamsError) throw teamsError;
+
+                            // Fetch unavailability (vacations) for this date
+                            const { data: vacations, error: vacError } = await supabase
+                                .from('team_unavailability')
+                                .select('team_id, reason')
+                                .lte('start_date', targetDateISO)
+                                .gte('end_date', targetDateISO);
+
+                            if (vacError) throw vacError;
+
+                            // Fetch scheduled installations (busy slots) for this date
+                            const { data: busySlots, error: busyError } = await supabase
+                                .from('installations')
+                                .select('id, team_id')
+                                .eq('status', 'scheduled')
+                                .gte('scheduled_date', `${targetDateISO}T00:00:00`)
+                                .lt('scheduled_date', `${targetDateISO}T23:59:59`);
+
+                            if (busyError) throw busyError;
+
+                            // Set of busy/unavailable team IDs
+                            const teamsOnVacation = new Set(vacations?.map(v => v.team_id) || []);
+                            const teamsBusy = new Set(busySlots?.map(s => s.team_id).filter(tid => tid && s.id !== installationId) || []);
+
+                            // Calculate available teams
+                            let availableTeams = (allTeams || []).filter(team => {
+                                const workingDays = team.working_days || [1, 2, 3, 4, 5];
+                                // Check working Day
+                                if (!workingDays.includes(targetDayOfWeek)) return false;
+                                // Check vacation
+                                if (teamsOnVacation.has(team.id)) return false;
+                                // Check busy
+                                if (teamsBusy.has(team.id)) return false;
+
+                                return true;
                             });
 
-                            // Send SMS
-                            await sendSms(metadata.customerName, call.customer?.number, metadata.installationDate, salesRepName, salesRepPhone);
+                            let isAvailable = false;
+                            let rejectionReason = '';
+
+                            if (currentInstallation.team_id) {
+                                // Specific team assigned
+                                const team = allTeams?.find(t => t.id === currentInstallation.team_id);
+                                const isOnVacation = teamsOnVacation.has(currentInstallation.team_id);
+                                const isBusy = teamsBusy.has(currentInstallation.team_id);
+                                const isWorkingDay = team?.working_days ? team.working_days.includes(targetDayOfWeek) : [1, 2, 3, 4, 5].includes(targetDayOfWeek);
+
+                                if (!isWorkingDay) {
+                                    isAvailable = false;
+                                    isAvailable = false;
+                                    rejectionReason = `Das Team arbeitet nicht am ${targetDateISO} (Wochentag: ${targetDayOfWeek}).`;
+                                } else if (isOnVacation) {
+                                    const reason = vacations?.find(v => v.team_id === currentInstallation.team_id)?.reason || 'Urlaub';
+                                    isAvailable = false;
+                                    rejectionReason = `Das Team ist nicht verfügbar: ${reason}.`;
+                                } else if (isBusy) {
+                                    isAvailable = false;
+                                    rejectionReason = `Das Team ist bereits beschäftigt.`;
+                                } else {
+                                    isAvailable = true;
+                                }
+                            } else {
+                                // No team assigned - check if ANY team is available
+                                if (availableTeams.length > 0) {
+                                    isAvailable = true;
+                                } else {
+                                    isAvailable = false;
+                                    rejectionReason = `Keine Teams verfügbar am ${targetDateISO} (Feiertag/Urlaub/Belegt).`;
+                                }
+                            }
+
+                            if (!isAvailable) {
+                                console.log(`Date ${targetDate} unavailable: ${rejectionReason}`);
+
+                                // Mark as issue / verification needed
+                                await supabase.from('installations')
+                                    .update({ status: 'issue' })
+                                    .eq('id', installationId);
+
+                                await supabase.from('notes').insert({
+                                    user_id: 'vapi-bot',
+                                    entity_type: 'installation',
+                                    entity_id: installationId,
+                                    content: `AI próbowało potwierdzić termin ${targetDate}, ale: ${rejectionReason} Oznaczono jako PROBLEM.`,
+                                    type: 'system'
+                                });
+
+                                result = { success: false, message: rejectionReason };
+
+                            } else {
+                                // 2. Update DB to scheduled if free
+                                await supabase.from('installations')
+                                    .update({
+                                        status: 'scheduled',
+                                        scheduled_date: targetDateISO // Ensure date is actually saved
+                                    })
+                                    .eq('id', installationId);
+
+                                console.log('Installation confirmed:', installationId);
+
+                                // Fetch Owner Details for SMS
+                                let salesRepName = 'Polendach24';
+                                let salesRepPhone = '';
+
+                                const { data: installation } = await supabase
+                                    .from('installations')
+                                    .select('user_id')
+                                    .eq('id', installationId)
+                                    .single();
+
+                                if (installation?.user_id) {
+                                    // Try to get profile name
+                                    const { data: profile } = await supabase
+                                        .from('profiles')
+                                        .select('full_name')
+                                        .eq('id', installation.user_id)
+                                        .single();
+
+                                    if (profile?.full_name) salesRepName = profile.full_name;
+                                }
+
+                                // Log note
+                                await supabase.from('customer_communications').insert({
+                                    customer_id: customerId || undefined,
+                                    user_id: installation?.user_id,
+                                    type: 'call',
+                                    direction: 'outbound',
+                                    subject: 'Potwierdzenie montażu (AI)',
+                                    content: `Klient potwierdził termin montażu telefonicznie.\nWysłano SMS z danymi opiekuna: ${salesRepName} (${salesRepPhone})`,
+                                    date: new Date().toISOString(),
+                                    metadata: { isSystemNote: true, installationId }
+                                });
+
+                                // Send SMS
+                                await sendSms(metadata.customerName, call.customer?.number, metadata.installationDate, salesRepName, salesRepPhone);
+
+                                // TODO: Send Email (Requires SMTP/Resend setup)
+                                // Trigger 'send-confirmation-email' function if exists
+
+                                // Success response (German)
+                                result = {
+                                    success: true,
+                                    available: true,
+                                    date: targetDateISO,
+                                    content: `Der Termin ${targetDateISO} ist verfügbar. Sie können ihn bestätigen.`
+                                };
+                            }
 
                         } catch (err: any) {
                             console.error('Error in confirmDate:', err);
+                            result = { success: false, error: err.message };
                         }
                     }
                 } else if (fn.name === 'changeDate') {
@@ -126,7 +259,16 @@ serve(async (req) => {
                             content: `Klient odrzucił/wymaga kontaktu. Powód: ${args.reason}. Status zmieniony na PROBLEM.`,
                             type: 'system'
                         });
+
+                        // Note: Vapi doesn't need detailed reasons in result, but we can give a German confirmation
+                        result = { success: true, message: "Absage/Kontaktanfrage notiert." };
                     }
+                } else if (fn.name === 'endCall') {
+                    // This is a client-side instruction for Vapi to hang up.
+                    // Ideally, Vapi handles the hangup logic if configured in the tool response?
+                    // Or Vapi listens to this tool call and hangs up.
+                    // For now, we just acknowledge it.
+                    console.log('AI requested endCall');
                 }
 
                 results.push({

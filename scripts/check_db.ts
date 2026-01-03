@@ -43,6 +43,21 @@ async function checkData() {
 
     if (profError) console.error('Error fetching installers:', profError);
     else console.log(`Found ${installers?.length} installers`, installers);
+
+    console.log('Checking call_actions relationship...');
+    const { data: actions, error: actionError } = await supabase
+        .from('call_actions')
+        .select('*, user: profiles(full_name)')
+        .limit(5);
+
+    if (actionError) {
+        console.error('Error fetching call_actions with join:', actionError);
+        const { data: raw, error: rawError } = await supabase.from('call_actions').select('*').limit(5);
+        if (rawError) console.error('Error fetching raw call_actions:', rawError);
+        else console.log('Raw call_actions:', raw);
+    } else {
+        console.log('Successfully fetched call_actions with join:', actions);
+    }
 }
 
 checkData();

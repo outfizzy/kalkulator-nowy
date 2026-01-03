@@ -16,15 +16,29 @@ export async function generateInstallationProtocolPDFAsBlob(installation: Instal
 }
 
 // Internal helper to build the PDF document
+// Internal helper to build the PDF document
+import { robotoRegular } from './robotoFont';
+
+// Internal helper to build the PDF document
 async function buildProtocolPDF(installation: Installation): Promise<jsPDF> {
     const doc = new jsPDF();
+
+    // Add font for Polish characters (Roboto)
+    try {
+        doc.addFileToVFS('Roboto-Regular.ttf', robotoRegular);
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+        doc.setFont('Roboto'); // Set as default
+    } catch (e) {
+        console.warn('Failed to load Roboto font, falling back to Helvetica', e);
+    }
+
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
     let yPos = margin;
 
     // Get photos from centralized storage
-    const photos = getOfferPhotos(installation.offerId);
+    const photos = installation.offerId ? getOfferPhotos(installation.offerId) : [];
 
     // **Page 1: Installation Details**
 
@@ -32,96 +46,174 @@ async function buildProtocolPDF(installation: Installation): Promise<jsPDF> {
     const logoPath = '/logo.png';
     try {
         doc.addImage(logoPath, 'PNG', margin, yPos, 40, 15);
-        yPos += 20;
-    } catch (e) {
-        // Logo not found, skip
-        console.warn('Logo not found, skipping in PDF');
+        // yPos += 20; // Don't move Y too much, keep logo aside
+    } catch (err) {
+        console.warn('Error loading logo image', err);
     }
 
-    // Title
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PROTOKÓŁ MONTAŻOWY', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 15;
+    // Header Text
+    doc.setFontSize(18);
+    // Use Roboto if loaded, else fallback
+    doc.setFont('Roboto', 'bold');
+    doc.text('PROTOKÓŁ MONTAŻOWY', pageWidth - margin, yPos + 10, { align: 'right' });
 
-    // Order Number
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Numer zlecenia: ${installation.id}`, margin, yPos);
-    yPos += 10;
+    doc.setFontSize(10);
+    doc.setFont('Roboto', 'normal');
+    const orderRef = installation.id ? installation.id.substring(0, 8).toUpperCase() : '---';
+    doc.text(`Nr zlecenia: ${orderRef}`, pageWidth - margin, yPos + 16, { align: 'right' });
+    doc.text(`Data: ${new Date().toLocaleDateString('pl-PL')}`, pageWidth - margin, yPos + 22, { align: 'right' });
+
+    yPos += 30;
 
     // Divider
     doc.setLineWidth(0.5);
+    doc.setDrawColor(200, 200, 200);
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
 
-    // Client Information
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Dane klienta:', margin, yPos);
-    yPos += 8;
+    // 1. Client & Location
+    doc.setFontSize(12);
+    doc.setFont('Roboto', 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.text('1. DANE KLIENTA I MIEJSCE MONTAŻU', margin + 2, yPos + 6);
+    yPos += 14;
 
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Imię i nazwisko: ${installation.client.firstName} ${installation.client.lastName}`, margin, yPos);
+    doc.setFontSize(10);
+    doc.setFont('Roboto', 'normal');
+    // Using simple substitution for potentially missing chars if font fails, but here we assume font works
+    doc.text(`Klient: ${installation.client.firstName} ${installation.client.lastName}`, margin, yPos);
+    doc.text(`Tel: ${installation.client.phone}`, pageWidth / 2, yPos);
     yPos += 6;
-    doc.text(`Adres: ${installation.client.address}, ${installation.client.city}`, margin, yPos);
-    yPos += 6;
-    doc.text(`Telefon: ${installation.client.phone}`, margin, yPos);
+    doc.text(`Adres: ${installation.client.address}, ${installation.client.city} ${installation.client.postalCode || ''}`, margin, yPos);
     yPos += 12;
 
-    // Installation Details
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Szczegóły montażu:', margin, yPos);
-    yPos += 8;
+    // 2. Installation Scope
+    doc.setFontSize(12);
+    doc.setFont('Roboto', 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.text('2. ZAKRES PRAC I PRODUKTY', margin + 2, yPos + 6);
+    yPos += 14;
 
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setFont('Roboto', 'normal');
 
-    if (installation.scheduledDate) {
-        const date = new Date(installation.scheduledDate);
-        doc.text(`Data montażu: ${date.toLocaleDateString('pl-PL')}`, margin, yPos);
+    // Product Summary
+    doc.text(`Produkt główny:`, margin, yPos);
+    doc.setFont('Roboto', 'bold');
+    const productSplit = doc.splitTextToSize(installation.productSummary || 'Brak danych', pageWidth - margin - 50);
+    doc.text(productSplit, margin + 35, yPos);
+    doc.setFont('Roboto', 'normal');
+    yPos += 6 * productSplit.length + 4;
+
+    // Contract Number (if available) use as ref
+    if (installation.contractNumber) {
+        doc.text(`Umowa nr: ${installation.contractNumber}`, margin, yPos);
         yPos += 6;
     }
 
-    if (installation.teamId) {
-        doc.text(`Przypisana ekipa: ${installation.teamId}`, margin, yPos);
-        yPos += 6;
-    }
-
-    doc.text(`Produkt: ${installation.productSummary}`, margin, yPos);
-    yPos += 6;
     doc.text(`Status: ${getStatusLabel(installation.status)}`, margin, yPos);
+    yPos += 6;
+
+
+    // Add space for manual list check
+    yPos += 4;
+    doc.rect(margin, yPos, 5, 5); doc.text('Konstrukcja', margin + 8, yPos + 4);
+    doc.rect(margin + 40, yPos, 5, 5); doc.text('Pokrycie (Szkło/Poli)', margin + 48, yPos + 4);
+    doc.rect(margin + 90, yPos, 5, 5); doc.text('Dodatki (Markizy/LED)', margin + 98, yPos + 4);
     yPos += 12;
 
-    // Notes/Instructions for Crew
+
+    // 3. Notes
+    doc.setFontSize(12);
+    doc.setFont('Roboto', 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.text('3. UWAGI MONTAŻOWE / BIURO', margin + 2, yPos + 6);
+    yPos += 14;
+
+    doc.setFontSize(10);
+    doc.setFont('Roboto', 'normal');
     if (installation.notes) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Uwagi/Instrukcje dla ekipy:', margin, yPos);
-        yPos += 8;
-
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'normal');
-
-        // Word wrap for notes
         const notesLines = doc.splitTextToSize(installation.notes, pageWidth - 2 * margin);
         doc.text(notesLines, margin, yPos);
-        yPos += notesLines.length * 6;
+        yPos += notesLines.length * 6 + 6;
+    } else {
+        doc.text('Brak uwag.', margin, yPos);
+        yPos += 10;
     }
+
+    // 4. Client Notes
+    doc.setFontSize(12);
+    doc.setFont('Roboto', 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.text('4. UWAGI KLIENTA PO MONTAŻU', margin + 2, yPos + 6);
+    yPos += 14;
+
+    // Dotted lines for client notes
+    for (let i = 0; i < 3; i++) {
+        // jsPDF setLineDash: [dash length, gap length], phase
+        doc.setLineDash([1, 1], 0);
+        doc.line(margin, yPos + 5, pageWidth - margin, yPos + 5);
+        yPos += 8;
+    }
+    doc.setLineDash([], 0); // Reset
+    yPos += 5;
+
+    // 5. Checklist & Signatures
+    doc.setFontSize(12);
+    doc.setFont('Roboto', 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.text('5. ODBIÓR I PODPISY', margin + 2, yPos + 6);
+    yPos += 14;
+
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+
+    // Checkboxes
+    const checkY = yPos;
+    doc.rect(margin, checkY, 4, 4); doc.text('Montaż zakończony', margin + 6, checkY + 3);
+    doc.rect(margin + 50, checkY, 4, 4); doc.text('Teren posprzątany', margin + 56, checkY + 3);
+    doc.rect(margin + 100, checkY, 4, 4); doc.text('Klient poinstruowany', margin + 106, checkY + 3);
+    yPos += 10;
+
+    // Signature Boxes
+    const boxHeight = 35;
+    const boxWidth = (pageWidth - 2 * margin - 10) / 2;
+
+    // Installer Box
+    doc.rect(margin, yPos, boxWidth, boxHeight);
+    doc.setFontSize(8);
+    doc.text('DATA I PODPIS MONTERA', margin + 2, yPos + 4);
+
+    // Client Box
+    doc.rect(margin + boxWidth + 10, yPos, boxWidth, boxHeight);
+    doc.text('DATA I PODPIS KLIENTA (Odbiór prac)', margin + boxWidth + 12, yPos + 4);
+
+    doc.setFontSize(7);
+    doc.text('Podpisując protokół klient potwierdza odbiór ilościowy i jakościowy prac oraz brak uwag do stanu mienia.', margin + boxWidth + 12, yPos + boxHeight - 2, { maxWidth: boxWidth - 4 });
+
+    yPos += boxHeight + 10;
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text('Wygenerowano systemowo | TGA Metal', pageWidth / 2, pageHeight - 10, { align: 'center' });
+
 
     // **Page 2+: Photos (one per page)**
     if (photos && photos.length > 0) {
         for (let i = 0; i < photos.length; i++) {
             doc.addPage();
-
-            // Page header
             doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`Zdjęcie ${i + 1} / ${photos.length}`, pageWidth / 2, margin, { align: 'center' });
+            doc.setTextColor(0);
+            doc.text(`Zdjęcie podglądowe ${i + 1} / ${photos.length}`, pageWidth / 2, margin, { align: 'center' });
 
-            // Add image
+            // Image logic... (simplified for brevity, reuse existing logic if robust)
             try {
                 const photo = photos[i];
                 const imgProps = getImageDimensions(photo, pageWidth - 2 * margin, pageHeight - 2 * margin - 20);
@@ -130,11 +222,8 @@ async function buildProtocolPDF(installation: Installation): Promise<jsPDF> {
                 const yPosImg = margin + 15;
 
                 doc.addImage(photo, 'JPEG', xPos, yPosImg, imgProps.width, imgProps.height);
-            } catch (e) {
-                console.error(`Error adding image ${i + 1} to PDF:`, e);
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.text('Błąd wczytywania zdjęcia', pageWidth / 2, pageHeight / 2, { align: 'center' });
+            } catch (err) {
+                console.warn('Error rendering image in PDF', err);
             }
         }
     }

@@ -294,5 +294,32 @@ export const LeadService = {
             isRead: data.is_read,
             createdAt: new Date(data.created_at)
         };
+    },
+
+    async getCustomerLeads(customerId: string): Promise<Lead[]> {
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching customer leads:', error);
+            throw error;
+        }
+
+        return (data || []).map((lead) => ({
+            ...lead,
+            id: lead.id,
+            assignedTo: lead.assigned_to,
+            status: lead.status as LeadStatus,
+            source: lead.source as LeadSource,
+            createdAt: new Date(lead.created_at),
+            updatedAt: new Date(lead.updated_at),
+            lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
+            clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
+            customerData: lead.customer_data,
+            salesRep: undefined
+        }));
     }
 };

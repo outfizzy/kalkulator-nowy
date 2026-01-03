@@ -10,6 +10,7 @@ interface OfferHeroProps {
 export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, offerNumber }) => {
     // Select image based on model
     const getHeroImage = (modelId: string) => {
+        if (product.imageUrl) return product.imageUrl;
         const id = modelId.toLowerCase();
         if (id.includes('skystyle')) return '/images/skystyle-hero.jpg';
         if (id.includes('trend')) return 'https://images.unsplash.com/photo-1596241913227-23846995662a?auto=format&fit=crop&w=1200&q=80';

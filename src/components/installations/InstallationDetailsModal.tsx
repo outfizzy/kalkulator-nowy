@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { geocodeAddress } from '../../utils/geocoding';
+import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
 import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
-import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
 import { DatabaseService } from '../../services/database';
-import { InstallationService } from '../../services/database/installation.service';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Installation, InstallationTeam, InstallationStatus, User, OrderItem } from '../../types';
+import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
 import { SchedulerService, type ScheduleSuggestion } from '../../services/SchedulerService';
 
 interface InstallationDetailsModalProps {
@@ -38,7 +37,9 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([]);
     const [isThinking, setIsThinking] = useState(false);
     const [allInstallations, setAllInstallations] = useState<Installation[]>([]);
-    const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+
+    const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
+    const [hasConflict, setHasConflict] = useState(false);
 
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
@@ -46,31 +47,19 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
         if (isOpen) {
             void (async () => {
                 try {
-                    const [dbTeams, assignedIds, allInstallers, allInst, items, offer] = await Promise.all([
+                    const [dbTeams, assignedIds, allInstallers, allInst] = await Promise.all([
                         DatabaseService.getTeams(),
                         DatabaseService.getAssignmentsForInstallation(installation.id),
                         DatabaseService.getInstallers(),
-                        DatabaseService.getInstallations(),
-                        InstallationService.getOrderItems(installation.id),
-                        DatabaseService.getOfferById(installation.offerId) // Fetch offer
+                        DatabaseService.getInstallations()
                     ]);
 
                     setTeams(dbTeams);
                     setAssignedInstallerIds(assignedIds);
                     setInstallers(allInstallers);
                     setAllInstallations(allInst);
-
-                    // If no items exist, try to sync from config (first time open)
-                    if (items.length === 0 && offer?.product) {
-                        await InstallationService.syncOrderItemsFromConfig(installation.id, offer.product);
-                        const syncedItems = await InstallationService.getOrderItems(installation.id);
-                        setOrderItems(syncedItems);
-                    } else {
-                        setOrderItems(items);
-                    }
-
                 } catch (error) {
-                    console.error('Error loading teams/assignments/installers/orders:', error);
+                    console.error('Error loading teams/assignments/installers:', error);
                 }
             })();
 
@@ -78,24 +67,43 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                 ...installation,
                 client: { ...installation.client }
             });
-            setPhotos(getOfferPhotos(installation.offerId));
+            setPhotos(installation.offerId ? getOfferPhotos(installation.offerId) : []);
         }
     }, [isOpen, installation]);
 
-    const handleOrderItemUpdate = async (item: OrderItem, updates: Partial<OrderItem>) => {
-        try {
-            const updated = await InstallationService.upsertOrderItem({
-                ...item,
-                ...updates,
-                installationId: installation.id
-            });
-            setOrderItems(prev => prev.map(i => i.id === updated.id ? updated : i));
-            toast.success('Zaktualizowano zamówienie');
-        } catch (error) {
-            console.error('Error updating order item:', error);
-            toast.error('Błąd aktualizacji');
-        }
-    };
+    // Check availability whenever team, date or duration changes
+    useEffect(() => {
+        const checkAvailability = () => {
+            if (formData.teamId && formData.scheduledDate) {
+                // Strict Conflict Check
+                const isAvailable = SchedulerService.isTeamAvailable(
+                    formData.teamId,
+                    formData.scheduledDate,
+                    formData.expectedDuration || 1,
+                    // Filter out CURRENT installation if it's being edited
+                    allInstallations.filter(i => i.id !== installation.id)
+                );
+
+                if (!isAvailable) {
+                    setHasConflict(true);
+                    setAvailabilityWarning('⚠️ KONFLIKT TERMINÓW: Zespół jest już zajęty w tym czasie!');
+                } else {
+                    setHasConflict(false);
+                    // Optional: Check soft availability (e.g. busy but not full blocking?)
+                    // For now, clear warning if no strict conflict.
+                    setAvailabilityWarning(null);
+                }
+            } else {
+                setAvailabilityWarning(null);
+                setHasConflict(false);
+            }
+        };
+
+        const timer = setTimeout(checkAvailability, 500);
+        return () => clearTimeout(timer);
+    }, [formData.teamId, formData.scheduledDate, formData.expectedDuration, allInstallations, installation.id]);
+
+
 
     if (!isOpen) return null;
 
@@ -192,7 +200,63 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
             <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:rounded-xl shadow-xl overflow-y-auto animate-scale-in flex flex-col md:block">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-slate-800">Szczegóły Montażu</h2>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold text-slate-800">Szczegóły Montażu</h2>
+                        {installation.offerId && (
+                            <a
+                                href={`/offers/edit/${installation.offerId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Otwórz Ofertę
+                            </a>
+                        )}
+                        {formData.status === 'scheduled' && (
+                            <button
+                                onClick={() => {
+                                    handleChange('status', 'confirmed');
+                                    toast.success('Status zmieniony na Potwierdzony. Zapisz zmiany.');
+                                }}
+                                className="text-xs bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm animate-pulse-slow font-bold"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Potwierdź Termin
+                            </button>
+                        )}
+                        {formData.status === 'confirmed' && (
+                            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-md border border-green-200 flex items-center gap-1 font-bold">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Termin Potwierdzony
+                            </div>
+                        )}
+                        <button
+                            onClick={async () => {
+                                const toastId = toast.loading('Generowanie protokołu...');
+                                try {
+                                    const { generateInstallationProtocolPDF } = await import('../../utils/installationProtocolPDF');
+                                    await generateInstallationProtocolPDF(formData as Installation);
+                                    toast.success('Pobrano protokół', { id: toastId });
+                                } catch (e) {
+                                    console.error(e);
+                                    toast.error('Błąd generowania PDF', { id: toastId });
+                                }
+                            }}
+                            className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md hover:bg-emerald-100 transition-colors flex items-center gap-1 border border-emerald-200"
+                        >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Pobierz Protokół (PDF)
+                        </button>
+                    </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -212,8 +276,10 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             >
                                 <option value="pending">Oczekujący</option>
                                 <option value="scheduled">Zaplanowany</option>
+                                <option value="confirmed">Potwierdzony</option>
                                 <option value="completed">Zakończony</option>
                                 <option value="issue">Problem</option>
+                                <option value="cancelled">Anulowany</option>
                             </select>
                         </div>
                         <div>
@@ -225,10 +291,10 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             >
                                 <option value="">-- Nieprzypisana --</option>
                                 {teams
-                                    .filter(t => t.is_active !== false || t.id === formData.teamId)
+                                    .filter(t => t.isActive !== false || t.id === formData.teamId)
                                     .map(t => (
                                         <option key={t.id} value={t.id}>
-                                            {t.name} {t.is_active === false ? '(Nieaktywna)' : ''}
+                                            {t.name} {t.isActive === false ? '(Nieaktywna)' : ''}
                                         </option>
                                     ))}
                             </select>
@@ -243,10 +309,18 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             />
                         </div>
                     </div>
+                    {availabilityWarning && (
+                        <div className={`mt-4 p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${hasConflict ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700'}`}>
+                            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            {availabilityWarning}
+                        </div>
+                    )}
 
                     {/* Planning Stats (New) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-purple-50 p-4 rounded-lg border border-purple-100">
-                        <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-purple-50 p-4 rounded-lg border border-purple-100 mb-6">
+                        <div className="flex items-center gap-2 relative">
                             <input
                                 type="checkbox"
                                 id="partsReady"
@@ -257,6 +331,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             <label htmlFor="partsReady" className="font-medium text-slate-800 cursor-pointer">
                                 Materiały skompletowane (Gotowe do montażu)
                             </label>
+
                         </div>
                         <div className="flex items-end gap-2">
                             <div className="flex-grow">
@@ -270,470 +345,10 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                     className="w-full p-2 border border-slate-300 rounded-lg"
                                 />
                             </div>
-                            <button
-                                onClick={handleSuggest}
-                                disabled={isThinking}
-                                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 h-[42px]"
-                            >
-                                {isThinking ? (
-                                    <div className="animate-spin h-4 w-4 border-2 border-white border-b-transparent rounded-full" />
-                                ) : (
-                                    <span>✨ Znajdź termin (AI)</span>
-                                )}
-                            </button>
                         </div>
                     </div>
 
-                    {/* AI Suggestions Panel */}
-                    {suggestions.length > 0 && (
-                        <div className="mt-3 bg-white border border-indigo-100 rounded-lg p-3 shadow-sm animate-in fade-in slide-in-from-top-2">
-                            <h4 className="text-xs font-bold text-indigo-800 uppercase mb-2">Sugerowane Terminy</h4>
-                            <div className="space-y-2">
-                                {suggestions.map((s, idx) => {
-                                    const teamName = teams.find(t => t.id === s.teamId)?.name || 'Nieznany zespół';
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() => applySuggestion(s)}
-                                            className="w-full text-left p-2 hover:bg-indigo-50 rounded border border-slate-100 hover:border-indigo-200 transition-all group"
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <span className="font-bold text-slate-700">{s.date}</span>
-                                                    <span className="mx-2 text-slate-300">|</span>
-                                                    <span className="text-sm text-slate-600">{teamName}</span>
-                                                </div>
-                                                <div className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                                                    {s.score}%
-                                                </div>
-                                            </div>
-                                            <div className="text-xs text-slate-500 mt-1">
-                                                💡 {s.reason}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Installer Assignments */}
-                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Przypisani monterzy</label>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                            {assignedInstallerIds.length === 0 && (
-                                <span className="text-xs text-slate-400">Brak przypisanych monterów</span>
-                            )}
-                            {assignedInstallerIds.map(id => {
-                                const installer = installers.find(i => i.id === id);
-                                if (!installer) return null;
-                                return (
-                                    <span
-                                        key={id}
-                                        className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-slate-200 rounded-full text-xs text-slate-700"
-                                    >
-                                        {installer.firstName} {installer.lastName}
-                                        {canManageAssignments && (
-                                            <button
-                                                type="button"
-                                                onClick={async () => {
-                                                    try {
-                                                        await DatabaseService.unassignInstaller(installation.id, id);
-                                                        setAssignedInstallerIds(prev => prev.filter(x => x !== id));
-                                                        toast.success('Usunięto montera z montażu');
-                                                    } catch (e) {
-                                                        console.error(e);
-                                                        toast.error('Błąd usuwania montera');
-                                                    }
-                                                }}
-                                                className="text-slate-400 hover:text-red-500"
-                                            >
-                                                ✕
-                                            </button>
-                                        )}
-                                    </span>
-                                );
-                            })}
-                        </div>
-                        {canManageAssignments && installers.length > 0 && (
-                            <select
-                                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
-                                defaultValue=""
-                                onChange={async (e) => {
-                                    const installerId = e.target.value;
-                                    if (!installerId) return;
-                                    if (assignedInstallerIds.includes(installerId)) {
-                                        toast('Ten monter jest już przypisany');
-                                        e.target.value = '';
-                                        return;
-                                    }
-                                    try {
-                                        await DatabaseService.assignInstaller(installation.id, installerId);
-                                        setAssignedInstallerIds(prev => [...prev, installerId]);
-                                        toast.success('Przypisano montera');
-                                    } catch (error) {
-                                        console.error(error);
-                                        toast.error('Błąd przypisywania montera');
-                                    } finally {
-                                        e.target.value = '';
-                                    }
-                                }}
-                            >
-                                <option value="">+ Dodaj montera</option>
-                                {installers.map(inst => (
-                                    <option key={inst.id} value={inst.id}>
-                                        {inst.firstName} {inst.lastName}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-
-                    {/* Client Details */}
-                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <h3 className="font-bold text-slate-700 mb-3">Dane Klienta i Lokalizacja</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Imię i Nazwisko</label>
-                                <div className="font-medium">{formData.client?.firstName} {formData.client?.lastName}</div>
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Telefon</label>
-                                <div className="font-medium">{formData.client?.phone}</div>
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Ulica i Numer</label>
-                                <input
-                                    type="text"
-                                    value={formData.client?.address || ''}
-                                    onChange={(e) => handleClientChange('address', e.target.value)}
-                                    className="w-full p-1 border border-slate-300 rounded text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Miasto</label>
-                                <input
-                                    type="text"
-                                    value={formData.client?.city || ''}
-                                    onChange={(e) => handleClientChange('city', e.target.value)}
-                                    className="w-full p-1 border border-slate-300 rounded text-sm"
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
-                            <span>GPS: {formData.client?.coordinates ? `${formData.client.coordinates.lat.toFixed(4)}, ${formData.client.coordinates.lng.toFixed(4)}` : 'Brak'}</span>
-                            {isGeocoding && <span className="text-blue-500">Aktualizowanie...</span>}
-                        </div>
-                    </div>
-
-                    {/* Product Summary */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Produkt</label>
-                        <div className="p-3 bg-slate-100 rounded-lg text-slate-700 text-sm">
-                            {formData.productSummary}
-                        </div>
-                    </div>
-
-                    {/* Order Items Section */}
-                    {/* Order Items Section */}
-                    {orderItems.length > 0 && (
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-slate-700">Status Zamówień (Elementy dodatkowe)</label>
-                                <button
-                                    onClick={() => {
-                                        // Simple prompt for now, or expand to a modal later if needed
-                                        const name = window.prompt("Podaj nazwę elementu:");
-                                        if (name) {
-                                            void (async () => {
-                                                try {
-                                                    await InstallationService.upsertOrderItem({
-                                                        installationId: installation.id,
-                                                        name,
-                                                        type: 'custom',
-                                                        quantity: 1,
-                                                        status: 'pending',
-                                                        isManagerResponsible: true
-                                                    });
-                                                    const items = await InstallationService.getOrderItems(installation.id);
-                                                    setOrderItems(items);
-                                                    toast.success('Dodano element');
-                                                } catch (e) {
-                                                    toast.error('Błąd dodawania');
-                                                }
-                                            })();
-                                        }
-                                    }}
-                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Dodaj pozycję
-                                </button>
-                            </div>
-                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-medium">
-                                        <tr>
-                                            <th className="px-4 py-2">Nazwa</th>
-                                            <th className="px-4 py-2">Status</th>
-                                            <th className="px-4 py-2">Dostawa</th>
-                                            <th className="px-4 py-2 text-center">Dla Managera</th>
-                                            <th className="px-4 py-2 w-10"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {orderItems.map(item => (
-                                            <tr key={item.id} className="hover:bg-slate-50">
-                                                <td className="px-4 py-2 font-medium text-slate-700">
-                                                    {item.name}
-                                                    {item.quantity > 1 && <span className="text-slate-400 ml-1">x{item.quantity}</span>}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        value={item.status}
-                                                        onChange={(e) => handleOrderItemUpdate(item, { status: e.target.value as any })}
-                                                        disabled={readOnly}
-                                                        className={`text-xs font-medium px-2 py-1 rounded-full border-none focus:ring-0 cursor-pointer ${item.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
-                                                            item.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                                                                'bg-slate-100 text-slate-600'
-                                                            }`}
-                                                    >
-                                                        <option value="pending">Do zamówienia</option>
-                                                        <option value="ordered">Zamówione</option>
-                                                        <option value="delivered">Dostarczone</option>
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="date"
-                                                        value={item.plannedDeliveryDate || ''}
-                                                        onChange={(e) => handleOrderItemUpdate(item, { plannedDeliveryDate: e.target.value })}
-                                                        disabled={readOnly}
-                                                        className="text-xs border-none bg-transparent p-0 text-slate-600 focus:ring-0"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={item.isManagerResponsible}
-                                                        onChange={(e) => handleOrderItemUpdate(item, { isManagerResponsible: e.target.checked })}
-                                                        disabled={readOnly}
-                                                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm('Usunąć pozycję?')) {
-                                                                void (async () => {
-                                                                    try {
-                                                                        await InstallationService.deleteOrderItem(item.id);
-                                                                        setOrderItems(prev => prev.filter(i => i.id !== item.id));
-                                                                        toast.success('Usunięto');
-                                                                    } catch {
-                                                                        toast.error('Błąd');
-                                                                    }
-                                                                })();
-                                                            }
-                                                        }}
-                                                        className="text-slate-400 hover:text-red-500"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Notes */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Notatki dla Ekipy</label>
-                        <textarea
-                            value={formData.notes || ''}
-                            onChange={(e) => handleChange('notes', e.target.value)}
-                            placeholder="Np. kod do bramy, uwaga na psa, specyficzne warunki montażu..."
-                            className="w-full p-3 border border-slate-300 rounded-lg h-32 focus:ring-2 focus:ring-accent outline-none resize-none"
-                        />
-                    </div>
-
-                    {/* Photos Section */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Zdjęcia Montażu</label>
-
-                        {/* Upload Button */}
-                        <div className="mb-4">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onChange={(e) => {
-                                    const files = Array.from(e.target.files || []);
-                                    files.forEach(file => {
-                                        const reader = new FileReader();
-                                        reader.onload = (event) => {
-                                            const imageData = event.target?.result as string;
-                                            addOfferPhoto(installation.offerId, imageData);
-                                            setPhotos(getOfferPhotos(installation.offerId));
-                                        };
-                                        reader.readAsDataURL(file);
-                                    });
-                                    e.target.value = ''; // Reset input
-                                }}
-                                className="hidden"
-                                id="photo-upload"
-                            />
-                            <label
-                                htmlFor="photo-upload"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg cursor-pointer transition-colors"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Dodaj Zdjęcia
-                            </label>
-                            <span className="ml-3 text-sm text-slate-500">
-                                {photos.length} {photos.length === 1 ? 'zdjęcie' : 'zdjęć'}
-                            </span>
-                        </div>
-
-                        {/* Photo Gallery */}
-                        <PhotoGallery
-                            photos={photos}
-                            onDelete={(index) => {
-                                removeOfferPhoto(installation.offerId, index);
-                                setPhotos(getOfferPhotos(installation.offerId));
-                                toast.success('Usunięto zdjęcie');
-                            }}
-                        />
-                    </div>
-
-                    {/* Client Acceptance Section */}
-                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Odbiór przez Klienta
-                        </h3>
-
-                        {formData.acceptance ? (
-                            <div className="bg-green-50 text-green-800 p-3 rounded border border-green-200 text-sm">
-                                <p className="font-bold">✅ Montaż odebrany</p>
-                                <p>Przez: {formData.acceptance.clientName}</p>
-                                <p>Data: {new Date(formData.acceptance.acceptedAt).toLocaleString()}</p>
-                                {formData.acceptance.notes && <p className="italic mt-1">"{formData.acceptance.notes}"</p>}
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                <p className="text-sm text-slate-600">
-                                    Potwierdź odbiór prac przez klienta. Status montażu zostanie zmieniony na "Zakończony".
-                                </p>
-                                {!readOnly || (readOnly && formData.status !== 'completed') ? (
-                                    <button
-                                        onClick={async () => {
-                                            if (!window.confirm('Czy na pewno chcesz potwierdzić odbiór prac przez klienta?')) return;
-
-                                            // Check if there are photos for protocol
-                                            const offerPhotos = getOfferPhotos(installation.offerId);
-                                            if (!offerPhotos || offerPhotos.length === 0) {
-                                                if (!window.confirm('Brak zdjęć montażu. Czy chcesz kontynuować bez protokołu?')) {
-                                                    return;
-                                                }
-                                            }
-
-                                            const acceptanceData = {
-                                                acceptedAt: new Date().toISOString(),
-                                                clientName: `${formData.client?.firstName} ${formData.client?.lastName}`,
-                                                notes: 'Potwierdzono w aplikacji montera'
-                                            };
-
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                status: 'completed',
-                                                acceptance: acceptanceData
-                                            }));
-
-                                            // Save immediately
-                                            try {
-                                                setSaving(true);
-                                                await DatabaseService.saveInstallationAcceptance(installation.id, acceptanceData);
-
-                                                // Try to find and save protocol to CRM
-                                                if (offerPhotos && offerPhotos.length > 0) {
-                                                    try {
-                                                        toast.loading('Generowanie protokołu...', { id: 'protocol' });
-
-                                                        // Generate protocol PDF
-                                                        const protocolBlob = await generateInstallationProtocolPDFAsBlob(formData as Installation);
-
-                                                        // Find contract by offer ID
-                                                        const contract = await DatabaseService.findContractByOfferId(installation.offerId);
-
-                                                        if (contract) {
-                                                            // Save protocol to contract attachments
-                                                            await DatabaseService.addProtocolToContract(contract.id, protocolBlob, installation.id);
-                                                            toast.success('Protokół zapisany w CRM!', { id: 'protocol' });
-                                                        } else {
-                                                            toast('Montaż ukończony. Brak powiązanego kontraktu - protokół nie został zapisany w CRM.', {
-                                                                id: 'protocol',
-                                                                icon: '⚠️',
-                                                                duration: 5000
-                                                            });
-                                                        }
-                                                    } catch (protocolError) {
-                                                        console.error('Error saving protocol to CRM:', protocolError);
-                                                        toast.error('Błąd zapisu protokołu w CRM (montaż ukończony)', { id: 'protocol' });
-                                                    }
-                                                }
-
-                                                await onUpdate();
-                                                onClose();
-                                                toast.success('Potwierdzono odbiór!');
-                                            } catch (e) {
-                                                console.error(e);
-                                                toast.error('Błąd zapisu odbioru');
-                                            } finally {
-                                                setSaving(false);
-                                            }
-                                        }}
-                                        disabled={saving}
-                                        className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        {saving ? 'Zapisywanie...' : 'Potwierdź Odbiór Prac'}
-                                    </button>
-                                ) : null}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white md:rounded-b-xl sticky bottom-0 z-10">
-                    {/* Download Protocol PDF Button */}
-                    <button
-                        onClick={() => {
-                            const offerPhotos = getOfferPhotos(installation.offerId);
-                            if (offerPhotos && offerPhotos.length > 0) {
-                                generateInstallationProtocolPDF(formData as Installation);
-                                toast.success('Generowanie protokołu PDF...');
-                            } else {
-                                toast.error('Dodaj zdjęcia przed wygenerowaniem protokołu');
-                            }
-                        }}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                        </svg>
-                        Pobierz Protokół PDF
-                    </button>
-
-                    <div className="flex gap-3">
+                    <div className="flex justify-end gap-3 mt-6">
                         <button
                             onClick={onClose}
                             className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
@@ -742,10 +357,399 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={isGeocoding || saving}
-                            className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50"
+                            disabled={saving || readOnly || hasConflict}
+                            className={`px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center gap-2 ${saving || readOnly || hasConflict ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
+                                }`}
                         >
-                            {isGeocoding ? 'Geokodowanie...' : saving ? 'Zapisywanie...' : 'Zapisz Zmiany'}
+                            {saving ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                                    Zapisywanie...
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Zapisz Zmiany
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* AI Scheduling & Auto-Reschedule */}
+                    <div className="flex flex-col md:flex-row gap-3 mt-6">
+                        <div className="flex-grow">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="date"
+                                    value={formData.scheduledDate || ''}
+                                    onChange={(e) => handleChange('scheduledDate', e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg"
+                                />
+                                <button
+                                    onClick={handleSuggest}
+                                    disabled={isThinking || readOnly}
+                                    className="px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 whitespace-nowrap flex items-center gap-1 transition-all"
+                                >
+                                    {isThinking ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span className="animate-pulse">Analizuję...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                            Sugestie AI
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Suggestions Display */}
+                            {suggestions.length > 0 && (
+                                <div className="mt-3 space-y-2 animate-scale-in">
+                                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                                        ✨ Rekomendowane Terminy
+                                    </h4>
+                                    {suggestions.map((sug, idx) => {
+                                        const teamName = teams.find(t => t.id === sug.teamId)?.name || 'Nieznany Zespół';
+                                        return (
+                                            <button
+                                                key={`${sug.date}-${sug.teamId}-${idx}`}
+                                                onClick={() => applySuggestion(sug)}
+                                                className="w-full text-left p-3 rounded-lg border border-violet-100 bg-violet-50/50 hover:bg-violet-50 hover:border-violet-300 transition-all group relative overflow-hidden"
+                                            >
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="font-semibold text-slate-800 flex items-center gap-2">
+                                                            {new Date(sug.date).toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'long' })}
+                                                            <span className="text-xs bg-white px-2 py-0.5 rounded-full border border-violet-200 text-violet-700">
+                                                                {teamName}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 mt-1 flex items-center gap-1">
+                                                            <svg className="w-3 h-3 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            {sug.reason}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end">
+                                                        <span className={`text-sm font-bold ${sug.score >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                            {Math.round(sug.score)}%
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400">zgodności</span>
+                                                    </div>
+                                                </div>
+                                                {/* Hover effect bar */}
+                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div >
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Przypisani monterzy</label>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {assignedInstallerIds.length === 0 && (
+                                    <span className="text-xs text-slate-400">Brak przypisanych monterów</span>
+                                )}
+                                {assignedInstallerIds.map(id => {
+                                    const installer = installers.find(i => i.id === id);
+                                    if (!installer) return null;
+                                    return (
+                                        <span
+                                            key={id}
+                                            className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-slate-200 rounded-full text-xs text-slate-700"
+                                        >
+                                            {installer.firstName} {installer.lastName}
+                                            {canManageAssignments && (
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        try {
+                                                            await DatabaseService.unassignInstaller(installation.id, id);
+                                                            setAssignedInstallerIds(prev => prev.filter(x => x !== id));
+                                                            toast.success('Usunięto montera z montażu');
+                                                        } catch (e) {
+                                                            console.error(e);
+                                                            toast.error('Błąd usuwania montera');
+                                                        }
+                                                    }}
+                                                    className="text-slate-400 hover:text-red-500"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                            {canManageAssignments && installers.length > 0 && (
+                                <select
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                    defaultValue=""
+                                    onChange={async (e) => {
+                                        const installerId = e.target.value;
+                                        if (!installerId) return;
+                                        if (assignedInstallerIds.includes(installerId)) {
+                                            toast('Ten monter jest już przypisany');
+                                            e.target.value = '';
+                                            return;
+                                        }
+                                        try {
+                                            await DatabaseService.assignInstaller(installation.id, installerId);
+                                            setAssignedInstallerIds(prev => [...prev, installerId]);
+                                            toast.success('Przypisano montera');
+                                        } catch (error) {
+                                            console.error(error);
+                                            toast.error('Błąd przypisywania montera');
+                                        } finally {
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                >
+                                    <option value="">+ Dodaj montera</option>
+                                    {installers.map(inst => (
+                                        <option key={inst.id} value={inst.id}>
+                                            {inst.firstName} {inst.lastName}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+
+                        {/* Client Details */}
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <h3 className="font-bold text-slate-700 mb-3">Dane Klienta i Lokalizacja</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Imię i Nazwisko</label>
+                                    <div className="font-medium">{formData.client?.firstName} {formData.client?.lastName}</div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Telefon</label>
+                                    <div className="font-medium">{formData.client?.phone}</div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Ulica i Numer</label>
+                                    <input
+                                        type="text"
+                                        value={formData.client?.address || ''}
+                                        onChange={(e) => handleClientChange('address', e.target.value)}
+                                        className="w-full p-1 border border-slate-300 rounded text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Miasto</label>
+                                    <input
+                                        type="text"
+                                        value={formData.client?.city || ''}
+                                        onChange={(e) => handleClientChange('city', e.target.value)}
+                                        className="w-full p-1 border border-slate-300 rounded text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
+                                <span>GPS: {formData.client?.coordinates ? `${formData.client.coordinates.lat.toFixed(4)}, ${formData.client.coordinates.lng.toFixed(4)}` : 'Brak'}</span>
+                                {isGeocoding && <span className="text-blue-500">Aktualizowanie...</span>}
+                            </div>
+                        </div>
+
+
+
+                        {/* Notes */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Notatki dla Ekipy</label>
+                            <textarea
+                                value={formData.notes || ''}
+                                onChange={(e) => handleChange('notes', e.target.value)}
+                                placeholder="Np. kod do bramy, uwaga na psa, specyficzne warunki montażu..."
+                                className="w-full p-3 border border-slate-300 rounded-lg h-32 focus:ring-2 focus:ring-accent outline-none resize-none"
+                            />
+                        </div>
+
+                        {/* Photos Section */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Zdjęcia Montażu</label>
+
+                            {/* Upload Button */}
+                            <div className="mb-4">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        files.forEach(file => {
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                                const imageData = event.target?.result as string;
+                                                if (installation.offerId) {
+                                                    addOfferPhoto(installation.offerId, imageData);
+                                                    setPhotos(getOfferPhotos(installation.offerId));
+                                                } else {
+                                                    toast.error('Brak ID oferty - nie można dodać zdjęć (wymagana implementacja dla ręcznych montaży)');
+                                                }
+                                            };
+                                            reader.readAsDataURL(file);
+                                        });
+                                        e.target.value = ''; // Reset input
+                                    }}
+                                    className="hidden"
+                                    id="photo-upload"
+                                />
+                                <label
+                                    htmlFor="photo-upload"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg cursor-pointer transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Dodaj Zdjęcia
+                                </label>
+                                <span className="ml-3 text-sm text-slate-500">
+                                    {photos.length} {photos.length === 1 ? 'zdjęcie' : 'zdjęć'}
+                                </span>
+                            </div>
+
+                            {/* Photo Gallery */}
+                            <PhotoGallery
+                                photos={photos}
+                                onDelete={(index) => {
+                                    if (installation.offerId) {
+                                        removeOfferPhoto(installation.offerId, index);
+                                        setPhotos(getOfferPhotos(installation.offerId));
+                                        toast.success('Usunięto zdjęcie');
+                                    }
+                                }}
+                            />
+                        </div>
+
+                        {/* Client Acceptance Section */}
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Odbiór przez Klienta
+                            </h3>
+
+                            {formData.acceptance ? (
+                                <div className="bg-green-50 text-green-800 p-3 rounded border border-green-200 text-sm">
+                                    <p className="font-bold">✅ Montaż odebrany</p>
+                                    <p>Przez: {formData.acceptance.clientName}</p>
+                                    <p>Data: {new Date(formData.acceptance.acceptedAt).toLocaleString()}</p>
+                                    {formData.acceptance.notes && <p className="italic mt-1">"{formData.acceptance.notes}"</p>}
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-slate-600">
+                                        Potwierdź odbiór prac przez klienta. Status montażu zostanie zmieniony na "Zakończony".
+                                    </p>
+                                    {!readOnly || (readOnly && formData.status !== 'completed') ? (
+                                        <button
+                                            onClick={async () => {
+                                                if (!window.confirm('Czy na pewno chcesz ręcznie potwierdzić montaż? Spowoduje to wysłanie emaila do klienta i zamknięcie zlecenia.')) return;
+
+                                                // Check if there are photos for protocol
+                                                const offerPhotos = installation.offerId ? getOfferPhotos(installation.offerId) : [];
+                                                if (!offerPhotos || offerPhotos.length === 0) {
+                                                    if (!window.confirm('Brak zdjęć montażu. Czy chcesz kontynuować bez protokołu?')) {
+                                                        return;
+                                                    }
+                                                }
+
+                                                const acceptanceData = {
+                                                    acceptedAt: new Date().toISOString(),
+                                                    clientName: `${formData.client?.firstName} ${formData.client?.lastName}`, // Client is still the "accepting party" technically
+                                                    notes: `Zakończono manualnie przez biuro: ${currentUser?.email || 'Admin'}`
+                                                };
+
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    status: 'completed',
+                                                    acceptance: acceptanceData
+                                                }));
+
+                                                // Save immediately
+                                                try {
+                                                    setSaving(true);
+                                                    // Use updateInstallationAcceptance to trigger emails and tasks
+                                                    await DatabaseService.updateInstallationAcceptance(installation.id, acceptanceData);
+
+                                                    // Try to find and save protocol to CRM
+                                                    if (offerPhotos && offerPhotos.length > 0) {
+                                                        try {
+                                                            toast.loading('Generowanie protokołu...', { id: 'protocol' });
+
+                                                            // Generate protocol PDF
+                                                            const protocolBlob = await generateInstallationProtocolPDFAsBlob(formData as Installation);
+
+                                                            // Find contract by offer ID
+                                                            const contract = installation.offerId ? await DatabaseService.findContractByOfferId(installation.offerId) : null;
+
+                                                            if (contract) {
+                                                                // Save protocol to contract attachments
+                                                                await DatabaseService.addProtocolToContract(contract.id, protocolBlob, installation.id);
+                                                                toast.success('Protokół zapisany w CRM!', { id: 'protocol' });
+                                                            } else {
+                                                                toast('Montaż ukończony. Brak powiązanego kontraktu - protokół nie został zapisany w CRM.', {
+                                                                    id: 'protocol',
+                                                                    icon: '⚠️',
+                                                                    duration: 5000
+                                                                });
+                                                            }
+                                                        } catch (protocolError) {
+                                                            console.error('Error saving protocol to CRM:', protocolError);
+                                                            toast.error('Błąd zapisu protokołu w CRM (montaż ukończony)', { id: 'protocol' });
+                                                        }
+                                                    }
+
+                                                    await onUpdate();
+                                                    onClose();
+                                                    toast.success('Zakończono montaż i wysłano powiadomienie!');
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    toast.error('Błąd zapisu odbioru');
+                                                } finally {
+                                                    setSaving(false);
+                                                }
+                                            }}
+                                            disabled={saving}
+                                            className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {saving ? 'Zapisywanie...' : 'Wymuś Zakończenie (Biuro)'}
+                                        </button>
+                                    ) : null}
+                                </div>
+                            )}
+                        </div>
+                    </div >
+
+                    <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white md:rounded-b-xl sticky bottom-0 z-10">
+                        {/* Download Protocol PDF Button */}
+                        <button
+                            onClick={() => {
+                                const offerPhotos = installation.offerId ? getOfferPhotos(installation.offerId) : [];
+                                if (offerPhotos && offerPhotos.length > 0) {
+                                    generateInstallationProtocolPDF(formData as Installation);
+                                    toast.success('Generowanie protokołu PDF...');
+                                } else {
+                                    toast.error('Brak zdjęć montażu do wygenerowania protokołu.');
+                                }
+                            }}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                            Pobierz Protokół PDF
                         </button>
                     </div>
                 </div>

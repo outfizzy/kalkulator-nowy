@@ -1,14 +1,15 @@
 import React from 'react';
 import type { Offer } from '../types';
 import { generateOfferPDF } from '../utils/pdfGenerator';
-import { calculatePrice } from '../utils/pricing';
 import { translations, translate, formatCurrency } from '../utils/translations';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
+import { PricingService } from '../services/pricing.service';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { PricingInsights } from './PricingInsights';
 import { AiService } from '../services/ai';
+import { ProfitabilityAnalysis } from './offers/ProfitabilityAnalysis';
 
 
 interface OfferSummaryProps {
@@ -55,12 +56,22 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                 customItems: [...(offer.product.customItems || []), newItem]
             };
 
-            // Recalculate
+            // Recalculate using Async Pricing Service
             const margin = (offer.pricing.marginPercentage || 40) / 100;
-            const newPricing = calculatePrice(updatedProduct, margin, offer.snowZone, offer.customer.postalCode);
-            // Preserve order costs if any
+
+            // Use PricingService to ensure DB variants are respected
+            const newPricing = await PricingService.calculateOfferPrice(
+                updatedProduct,
+                margin,
+                offer.snowZone,
+                offer.customer.postalCode
+            );
+
+            // Preserve order costs if any (as they might not be in base calc)
             newPricing.orderCosts = offer.pricing.orderCosts;
             newPricing.measurementCost = offer.pricing.measurementCost;
+            // Also preserve installation costs if manual overrides exist? 
+            // For now trusting service calc for installation.
 
             const updatedOffer = {
                 ...offer,
@@ -99,7 +110,13 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
             };
 
             const margin = (offer.pricing.marginPercentage || 40) / 100;
-            const newPricing = calculatePrice(updatedProduct, margin, offer.snowZone, offer.customer.postalCode);
+            const newPricing = await PricingService.calculateOfferPrice(
+                updatedProduct,
+                margin,
+                offer.snowZone,
+                offer.customer.postalCode
+            );
+
             // Preserve costs
             newPricing.orderCosts = offer.pricing.orderCosts;
             newPricing.measurementCost = offer.pricing.measurementCost;
@@ -118,7 +135,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
 
             onOfferUpdate(updatedOffer);
             toast.success('Usunięto pozycję');
-        } catch (e) {
+        } catch {
             toast.error('Błąd usuwania');
         }
     };
@@ -128,7 +145,13 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
         try {
             // Force recalculate and save to be sure
             const margin = (offer.pricing.marginPercentage || 40) / 100;
-            const newPricing = calculatePrice(offer.product, margin, offer.snowZone, offer.customer.postalCode);
+            const newPricing = await PricingService.calculateOfferPrice(
+                offer.product,
+                margin,
+                offer.snowZone,
+                offer.customer.postalCode
+            );
+
             // Preserve costs
             newPricing.orderCosts = offer.pricing.orderCosts;
             newPricing.measurementCost = offer.pricing.measurementCost;
@@ -138,7 +161,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
             });
             toast.success('Oferta zapisana i przeliczona');
             window.location.reload();
-        } catch (e) {
+        } catch {
             toast.error('Błąd zapisu');
         }
     };
@@ -297,7 +320,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                                         await navigator.clipboard.writeText(text);
                                         toast.success('Treść maila skopiowana do schowka!', { id: toastId });
                                         alert("Wygenerowana Treść Maila (Skopiowano do schowka):\n\n" + text);
-                                    } catch (e: any) {
+                                    } catch {
                                         toast.error('Błąd generowania maila', { id: toastId });
                                     }
                                 }}
@@ -538,173 +561,179 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                     </div>
                 )}
 
-                {/* Profitability Analysis - Admin Only - HIDDEN BY DEFAULT AS REQUESTED */}
-                {false && isAdminOrManager && (
-                    <div className="mb-12 bg-slate-800 rounded-xl p-6 text-slate-100 shadow-xl border border-slate-700">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 3.666V14m-1.286-7.544l-2.006 2.158 1.286 1.206v-1.8pxM12 20h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    Analiza Rentowności
-                                </h3>
-                                <p className="text-sm text-slate-400 mt-1">Widoczne tylko dla Administratorów</p>
-                            </div>
+                {/* Profitability Analysis - Admin Only */}
+                {isAdminOrManager && (
+                    <div className="mb-12">
+                        <ProfitabilityAnalysis
+                            offer={offer}
+                            distance={offer.pricing.installationCosts?.travelDistance || 0}
+                            installationDays={offer.pricing.installationCosts?.days || 1}
+                        />
+                    </div>
+                )}
+
+                {isAdminOrManager && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {/* 1. Revenue */}
+                        <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                            <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Przychód Netto</p>
+                            <p className="text-xl font-bold text-white">{formatCurrency(offer.pricing.sellingPriceNet)}</p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {/* 1. Revenue */}
-                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
-                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Przychód Netto</p>
-                                <p className="text-xl font-bold text-white">{formatCurrency(offer.pricing.sellingPriceNet)}</p>
-                            </div>
-
-                            {/* 2. Commissions */}
-                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
-                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Prowizja (5%)</p>
-                                <p className="text-xl font-bold text-red-300">-{formatCurrency(offer.commission)}</p>
-                            </div>
-
-                            {/* 3. Measurement Cost */}
-                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
-                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Koszty Pomiarów</p>
-                                <p className="text-xl font-bold text-red-300">-{formatCurrency(offer.pricing.measurementCost || 0)}</p>
-                                <p className="text-xs text-slate-500 mt-1">Obliczone z raportów (0.50 EUR/km)</p>
-                            </div>
-
-                            {/* 4. Order Costs (Manual) */}
-                            <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
-                                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Koszty Dodatkowe</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="number"
-                                        value={orderCosts}
-                                        onChange={(e) => setOrderCosts(parseFloat(e.target.value) || 0)}
-                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
-                                        placeholder="np. 150"
-                                    />
-                                    <button
-                                        onClick={handleUpdateCosts}
-                                        disabled={isUpdatingCosts}
-                                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
-                                    >
-                                        {isUpdatingCosts ? '...' : 'OK'}
-                                    </button>
-                                </div>
-                            </div>
+                        {/* 2. Commissions */}
+                        <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                            {(() => {
+                                const effectiveRate = offer.pricing.sellingPriceNet > 0
+                                    ? (offer.commission / offer.pricing.sellingPriceNet) * 100
+                                    : 0;
+                                return (
+                                    <>
+                                        <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Prowizja ({effectiveRate.toFixed(1)}%)</p>
+                                        <p className="text-xl font-bold text-red-300">-{formatCurrency(offer.commission)}</p>
+                                    </>
+                                );
+                            })()}
                         </div>
 
-                        {/* Profit Calculation */}
-                        <div className="mt-6 pt-6 border-t border-slate-600">
-                            <div className="flex justify-between items-end">
-                                <div>
-                                    <p className="text-sm text-slate-400 mb-1">Zysk Końcowy (Szacunkowy)</p>
-                                    <p className="text-xs text-slate-500">Przychód - (Produkt + Prowizja + Pomiary + Dodatkowe)</p>
-                                </div>
-                                <div className="text-right">
-                                    {(() => {
-                                        // Simple Profit Calculation
-                                        // Profit = Net Price - Product Base Cost (implied) - Commission - Measurement - Order
-                                        // Wait, we don't know "Product Base Cost" exactly if it's dynamic.
-                                        // Strategy: If we implicitly assume "Margin Value" in pricing IS the gross margin (Price - Product Cost),
-                                        // Then Profit = Margin Value - (Commission + Measurement + Order)
+                        {/* 3. Measurement Cost */}
+                        <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                            <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Koszty Pomiarów</p>
+                            <p className="text-xl font-bold text-red-300">-{formatCurrency(offer.pricing.measurementCost || 0)}</p>
+                            <p className="text-xs text-slate-500 mt-1">Obliczone z raportów (0.50 EUR/km)</p>
+                        </div>
 
-                                        const marginVal = offer.pricing.marginValue || 0;
-                                        const costs = offer.commission + (offer.pricing.measurementCost || 0) + (offer.pricing.orderCosts || 0);
-                                        const finalProfit = marginVal - costs;
-                                        const profitClass = finalProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
-
-                                        return (
-                                            <>
-                                                <p className={`text-3xl font-bold ${profitClass}`}>{formatCurrency(finalProfit)}</p>
-                                                <p className="text-sm text-slate-400">
-                                                    Marża Handlowa: {formatCurrency(marginVal)}
-                                                </p>
-                                            </>
-                                        );
-                                    })()}
-                                </div>
+                        {/* 4. Order Costs (Manual) */}
+                        <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                            <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Koszty Dodatkowe</p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="number"
+                                    value={orderCosts}
+                                    onChange={(e) => setOrderCosts(parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
+                                    placeholder="np. 150"
+                                />
+                                <button
+                                    onClick={handleUpdateCosts}
+                                    disabled={isUpdatingCosts}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {isUpdatingCosts ? '...' : 'OK'}
+                                </button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className="flex justify-end mb-12">
-                    <div className="text-right p-6 bg-slate-50 rounded-xl border border-slate-200 min-w-[300px]">
-                        <p className="text-sm text-slate-500 mb-1">{translations.netPrice}</p>
-                        <p className="text-xl font-semibold text-slate-700 mb-2">
-                            {formatCurrency(offer.pricing.sellingPriceNet)}
-                        </p>
+                {isAdminOrManager && (
+                    <div className="mt-6 pt-6 border-t border-slate-600">
+                        <div className="flex justify-between items-end">
+                            <div>
+                                <p className="text-sm text-slate-400 mb-1">Zysk Końcowy (Szacunkowy)</p>
+                                <p className="text-xs text-slate-500">Przychód - (Produkt + Prowizja + Pomiary + Dodatkowe)</p>
+                            </div>
+                            <div className="text-right">
+                                {(() => {
+                                    // Simple Profit Calculation
+                                    // Profit = Net Price - Product Base Cost (implied) - Commission - Measurement - Order
+                                    // Wait, we don't know "Product Base Cost" exactly if it's dynamic.
+                                    // Strategy: If we implicitly assume "Margin Value" in pricing IS the gross margin (Price - Product Cost),
+                                    // Then Profit = Margin Value - (Commission + Measurement + Order)
 
-                        <div className="border-t border-slate-200 my-2"></div>
+                                    const marginVal = offer.pricing.marginValue || 0;
+                                    const costs = offer.commission + (offer.pricing.measurementCost || 0) + (offer.pricing.orderCosts || 0);
+                                    const finalProfit = marginVal - costs;
+                                    const profitClass = finalProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
 
-                        <p className="text-sm text-slate-500 mb-1">{translations.grossPrice}</p>
-                        <p className="text-4xl font-bold text-primary">
-                            {formatCurrency(offer.pricing.sellingPriceGross)}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">* {translations.vat} 19%</p>
+                                    return (
+                                        <>
+                                            <p className={`text-3xl font-bold ${profitClass}`}>{formatCurrency(finalProfit)}</p>
+                                            <p className="text-sm text-slate-400">
+                                                Marża Handlowa: {formatCurrency(marginVal)}
+                                            </p>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
                     </div>
+                )}
+            </div>
+
+            <div className="flex justify-end mb-12">
+                <div className="text-right p-6 bg-slate-50 rounded-xl border border-slate-200 min-w-[300px]">
+                    <p className="text-sm text-slate-500 mb-1">{translations.netPrice}</p>
+                    <p className="text-xl font-semibold text-slate-700 mb-2">
+                        {formatCurrency(offer.pricing.sellingPriceNet)}
+                    </p>
+
+                    <div className="border-t border-slate-200 my-2"></div>
+
+                    <p className="text-sm text-slate-500 mb-1">{translations.grossPrice}</p>
+                    <p className="text-4xl font-bold text-primary">
+                        {formatCurrency(offer.pricing.sellingPriceGross)}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">* {translations.vat} 19%</p>
                 </div>
+            </div>
 
-                <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center print:hidden">
+            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center print:hidden">
+                <button
+                    onClick={onReset}
+                    className="text-slate-500 hover:text-slate-700 font-medium"
+                >
+                    Neues Angebot
+                </button>
+                <div className="flex gap-3">
+                    {/* Manual Save Button */}
                     <button
-                        onClick={onReset}
-                        className="text-slate-500 hover:text-slate-700 font-medium"
+                        onClick={handleManualSave}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-md transition-colors flex items-center gap-2"
                     >
-                        Neues Angebot
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Zapisz Ofertę
                     </button>
-                    <div className="flex gap-3">
-                        {/* Manual Save Button */}
+                    {/* Contract Conversion Button */}
+                    {offer.status === 'sold' && (
                         <button
-                            onClick={handleManualSave}
-                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-md transition-colors flex items-center gap-2"
+                            onClick={handleCreateContract}
+                            disabled={isCreatingContract}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                            </svg>
-                            Zapisz Ofertę
+                            {isCreatingContract ? 'Tworzenie...' : 'Utwórz Umowę'}
                         </button>
-                        {/* Contract Conversion Button */}
-                        {offer.status === 'sold' && (
-                            <button
-                                onClick={handleCreateContract}
-                                disabled={isCreatingContract}
-                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {isCreatingContract ? 'Tworzenie...' : 'Utwórz Umowę'}
-                            </button>
-                        )}
+                    )}
 
-                        <button
-                            onClick={() => window.print()}
-                            className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium"
-                        >
-                            Drucken
-                        </button>
-                        <button
-                            onClick={handleDownloadPDF}
-                            disabled={isGenerating}
-                            className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isGenerating ? (
-                                <>
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Generiere PDF...
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    PDF Herunterladen
-                                </>
-                            )}
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => window.print()}
+                        className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium"
+                    >
+                        Drucken
+                    </button>
+                    <button
+                        onClick={handleDownloadPDF}
+                        disabled={isGenerating}
+                        className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Generiere PDF...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                PDF Herunterladen
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>

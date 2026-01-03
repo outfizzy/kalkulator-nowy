@@ -13,9 +13,9 @@ export const UserService = {
 
         return data.map(row => ({
             id: row.id,
-            username: row.full_name?.split(' ')[0].toLowerCase() || '',
-            firstName: row.full_name?.split(' ')[0] || '',
-            lastName: row.full_name?.split(' ').slice(1).join(' ') || '',
+            username: (row.full_name || '').split(' ')[0].toLowerCase() || '',
+            firstName: (row.full_name || '').split(' ')[0] || '',
+            lastName: (row.full_name || '').split(' ').slice(1).join(' ') || '',
             email: '',
             role: row.role as User['role'],
             createdAt: new Date(row.created_at),
@@ -25,7 +25,9 @@ export const UserService = {
             companyName: row.company_name || undefined,
             nip: row.nip || undefined,
             partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined,
-            commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined
+            commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined,
+            hourlyRateCurrency: row.hourly_rate_currency,
+            commissionConfig: row.commission_config
         }));
     },
 
@@ -54,11 +56,13 @@ export const UserService = {
             partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined,
             commissionRate: typeof data.commission_rate === 'number' ? data.commission_rate : undefined,
             substituteUserId: data.substitute_user_id,
-            substituteUntil: data.substitute_until ? new Date(data.substitute_until) : undefined
+            substituteUntil: data.substitute_until ? new Date(data.substitute_until) : undefined,
+            hourlyRateCurrency: data.hourly_rate_currency,
+            commissionConfig: data.commission_config
         };
     },
 
-    async checkEmailConfigColumn(userId: string): Promise<{ error: any }> {
+    async checkEmailConfigColumn(userId: string): Promise<{ error: Error | null }> {
         const { error } = await supabase
             .from('profiles')
             .select('email_config, monthly_target, phone')
@@ -125,9 +129,9 @@ export const UserService = {
 
         return data.map(row => ({
             id: row.id,
-            username: row.full_name?.split(' ')[0].toLowerCase() || '',
-            firstName: row.full_name?.split(' ')[0] || '',
-            lastName: row.full_name?.split(' ').slice(1).join(' ') || '',
+            username: (row.full_name || '').split(' ')[0].toLowerCase() || '',
+            firstName: (row.full_name || '').split(' ')[0] || '',
+            lastName: (row.full_name || '').split(' ').slice(1).join(' ') || '',
             email: '',
             role: row.role as User['role'],
             createdAt: new Date(row.created_at),
@@ -137,7 +141,9 @@ export const UserService = {
             companyName: row.company_name || undefined,
             nip: row.nip || undefined,
             partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined,
-            commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined
+            commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined,
+            hourlyRate: typeof row.hourly_rate === 'number' ? row.hourly_rate : undefined,
+            commissionConfig: row.commission_config
         }));
     },
 
@@ -181,6 +187,28 @@ export const UserService = {
         if (error) throw error;
     },
 
+    async updateCommissionConfig(userId: string, config: import('../../types').CommissionConfig): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ commission_config: config, updated_at: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
+    async updateHourlyRate(userId: string, rate: number, currency: 'PLN' | 'EUR' = 'PLN'): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                hourly_rate: rate,
+                hourly_rate_currency: currency,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
     async verifyCurrentPassword(email: string, password: string): Promise<{ error: AuthError | null }> {
         const { error } = await supabase.auth.signInWithPassword({
             email,
@@ -195,12 +223,22 @@ export const UserService = {
     },
 
     async deleteUser(userId: string): Promise<void> {
-        const { error } = await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', userId);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No session');
 
-        if (error) throw error;
+        const response = await fetch('/api/delete-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ userId })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete user');
+        }
     },
 
     async getInstallers(): Promise<User[]> {
@@ -260,6 +298,7 @@ export const UserService = {
     },
 
     async getSalesRepStats(startDate?: Date, endDate?: Date): Promise<import('../../types').SalesRepStat[]> {
+        type SalesRepStatWithMargin = import('../../types').SalesRepStat & { marginSum: number };
         // Fetch offers for stats
         let offersQuery = supabase
             .from('offers')
@@ -288,10 +327,15 @@ export const UserService = {
         const userMap = new Map(users.map(u => [u.id, u]));
 
         // Aggregate stats per user
-        const statsMap = new Map<string, import('../../types').SalesRepStat>();
+        const statsMap = new Map<string, SalesRepStatWithMargin>();
 
-        // Process offers
-        offers.forEach(offer => {
+        // process offers
+        (offers || []).forEach((offer: {
+            user_id: string;
+            status: string;
+            pricing: { sellingPriceNet?: number; marginValue?: number; marginPercentage?: number } | null;
+            created_at: string;
+        }) => {
             const userId = offer.user_id;
             if (!statsMap.has(userId)) {
                 const user = userMap.get(userId);
@@ -307,11 +351,12 @@ export const UserService = {
                     avgMarginPercent: 0,
                     conversionRate: 0,
                     lastActivityDate: undefined,
-                    pendingOffersCount: 0
-                } as import('../../types').SalesRepStat & { marginSum: number });
+                    pendingOffersCount: 0,
+                    marginSum: 0
+                } as unknown as SalesRepStatWithMargin);
             }
 
-            const stats = statsMap.get(userId);
+            const stats = statsMap.get(userId) as SalesRepStatWithMargin | undefined;
             if (stats) {
                 stats.totalOffers++;
 
@@ -328,18 +373,17 @@ export const UserService = {
 
                 if (offer.status === 'sold') {
                     stats.soldOffers++;
-                    stats.totalValue += offer.pricing.sellingPriceNet || 0;
-                    stats.totalMarginValue += offer.pricing.marginValue || 0;
+                    stats.totalValue += offer.pricing?.sellingPriceNet || 0;
+                    stats.totalMarginValue += offer.pricing?.marginValue || 0;
                 }
 
-                const margin = offer.pricing.marginPercentage || 0;
-                const marginSum = (stats as { marginSum?: number }).marginSum || 0;
-                (stats as { marginSum?: number }).marginSum = marginSum + margin;
+                const margin = offer.pricing?.marginPercentage || 0;
+                stats.marginSum = (stats.marginSum || 0) + margin;
             }
         });
 
         // Process reports for mileage
-        reports.forEach(report => {
+        (reports || []).forEach((report: { user_id: string; data: { distance?: number; date: string } }) => {
             const userId = report.user_id;
             const reportData = report.data;
 
@@ -365,20 +409,21 @@ export const UserService = {
                     conversionRate: 0,
                     lastActivityDate: undefined,
                     pendingOffersCount: 0
-                } as import('../../types').SalesRepStat & { marginSum: number });
+                } as unknown as SalesRepStatWithMargin);
             }
 
-            const stats = statsMap.get(userId);
-            if (stats) {
-                stats.totalDistance += typeof reportData.distance === 'number' ? reportData.distance : 0;
+            const stats = statsMap.get(userId) as SalesRepStatWithMargin | undefined;
+            if (stats && reportData && typeof (reportData as any).distance === 'number') {
+                stats.totalDistance += (reportData as any).distance;
             }
         });
 
         return Array.from(statsMap.values()).map(stat => {
-            const marginSum = (stat as { marginSum?: number }).marginSum || 0;
+            const statWithMargin = stat as unknown as SalesRepStatWithMargin;
+            const marginSum = statWithMargin.marginSum || 0;
             stat.avgMarginPercent = stat.totalOffers > 0 ? marginSum / stat.totalOffers : 0;
             stat.conversionRate = stat.totalOffers > 0 ? (stat.soldOffers / stat.totalOffers) * 100 : 0;
-            delete (stat as { marginSum?: number }).marginSum;
+            delete (stat as any).marginSum;
             return stat;
         });
     }

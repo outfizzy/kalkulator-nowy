@@ -2,14 +2,16 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { supabase } from '../lib/supabase';
+import { PermissionsService } from '../services/database/permissions.service';
 
 interface AuthContextType {
     currentUser: User | null;
-    login: (email: string, password?: string) => Promise<{ error: any }>;
+    login: (email: string, password?: string, captchaToken?: string) => Promise<{ error: any }>;
     verifyOtp: (email: string, token: string) => Promise<{ error: any }>;
     register: (data: { email: string; password?: string; firstName: string; lastName: string; phone: string; role: UserRole }) => Promise<{ error: any }>;
     logout: () => Promise<void>;
     isAdmin: () => boolean;
+    hasPermission: (moduleKey: string) => boolean;
     loading: boolean;
 }
 
@@ -29,6 +31,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [permissions, setPermissions] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -47,12 +50,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 fetchProfile(session.user.id, session.user.email!);
             } else {
                 setCurrentUser(null);
+                setPermissions(new Set());
                 setLoading(false);
             }
         });
 
         return () => subscription.unsubscribe();
     }, []);
+
+    const fetchPermissions = async (role: string) => {
+        try {
+            const perms = await PermissionsService.getUserPermissions(role);
+            setPermissions(new Set(perms));
+        } catch (error) {
+            console.error('Error loading permissions:', error);
+            // Fallback: If error, maybe allow everything or nothing? 
+            // Better to allow nothing critical, but for now lets log it.
+        }
+    };
 
     const fetchProfile = async (userId: string, email: string) => {
         try {
@@ -77,7 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 const profile: User = {
                     id: data.id,
-                    username: email.split('@')[0], // Fallback username
+                    username: email.split('@')[0],
                     firstName: data.full_name?.split(' ')[0] || '',
                     lastName: data.full_name?.split(' ').slice(1).join(' ') || '',
                     email: email,
@@ -106,6 +121,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
 
                 setCurrentUser(profile);
+                // Load permissions for this role
+                await fetchPermissions(normalizedRole);
             }
         } catch (error) {
             console.error('Error fetching profile:', error);
@@ -116,14 +133,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const login = async (email: string, password?: string): Promise<{ error: any }> => {
+    const login = async (email: string, password?: string, captchaToken?: string): Promise<{ error: any }> => {
         if (!password) {
             return { error: { message: 'Hasło jest wymagane' } };
         }
 
         const { error } = await supabase.auth.signInWithPassword({
             email,
-            password
+            password,
+            options: {
+                captchaToken
+            }
         });
 
         return { error };
@@ -141,10 +161,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const logout = async () => {
         await supabase.auth.signOut();
         setCurrentUser(null);
+        setPermissions(new Set());
     };
 
     const isAdmin = (): boolean => {
         return currentUser?.role === 'admin';
+    };
+
+    const hasPermission = (moduleKey: string): boolean => {
+        // Super Admin Override (optional, but good for safety if DB fails)
+        if (currentUser?.role === 'admin') return true;
+
+        // If permissions haven't loaded yet?
+        // Check local set
+        return permissions.has(moduleKey);
     };
 
     const register = async (data: { email: string; password?: string; firstName: string; lastName: string; phone: string; role: UserRole }): Promise<{ error: any }> => {
@@ -174,7 +204,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ currentUser, login, verifyOtp, register, logout, isAdmin, loading }}>
+        <AuthContext.Provider value={{ currentUser, login, verifyOtp, register, logout, isAdmin, hasPermission, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );

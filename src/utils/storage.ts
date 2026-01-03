@@ -402,8 +402,9 @@ export function getTeams(): InstallationTeam[] {
     const defaultTeams: InstallationTeam[] = [
         {
             id: 'team1',
-            name: 'Ekipa 1 (Północ)',
-            color: '#ef4444',
+            name: 'Ekipa 2 (Piotr)',
+            color: '#10b981',
+            isActive: true,
             members: [
                 { id: 'installer-1', firstName: 'Marek', lastName: '' },
                 { id: 'installer-2', firstName: 'Tomek', lastName: '' }
@@ -411,8 +412,9 @@ export function getTeams(): InstallationTeam[] {
         },
         {
             id: 'team2',
-            name: 'Ekipa 2 (Południe)',
+            name: 'Ekipa 1 (Janusz)',
             color: '#3b82f6',
+            isActive: true,
             members: [
                 { id: 'installer-3', firstName: 'Jacek', lastName: '' },
                 { id: 'installer-4', firstName: 'Piotr', lastName: '' }
@@ -420,8 +422,9 @@ export function getTeams(): InstallationTeam[] {
         },
         {
             id: 'team3',
-            name: 'Ekipa 3 (Zachód)',
-            color: '#22c55e',
+            name: 'Ekipa 3 (Michał)',
+            color: '#f59e0b',
+            isActive: true,
             members: [
                 { id: 'installer-5', firstName: 'Adam', lastName: '' },
                 { id: 'installer-6', firstName: 'Krzysztof', lastName: '' }

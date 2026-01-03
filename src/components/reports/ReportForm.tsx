@@ -206,6 +206,8 @@ export const ReportForm: React.FC = () => {
             visits,
             signedContractsCount: visits.filter(v => v.outcome === 'signed').length,
             offerIds: selectedLinkedOffers.map(o => o.id),
+            is_active: true,
+            currency: 'PLN',
             createdAt: new Date()
         };
 

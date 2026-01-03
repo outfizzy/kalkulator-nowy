@@ -189,12 +189,9 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                 {communications.length === 0 ? (
                     <div className="text-slate-400 text-sm italic pl-4">Brak historii komunikacji</div>
                 ) : (
-                    communications.map((comm) => (
+                    communications.map((comm: Communication) => (
                         <div key={comm.id} className="relative pl-6 group">
-                            {/* Dot */}
                             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-slate-300 group-hover:border-accent transition-colors"></div>
-
-                            {/* Content */}
                             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
@@ -202,8 +199,7 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                                         <span className="font-bold text-slate-700">
                                             {comm.subject || (comm.type === 'call' ? 'Rozmowa telefoniczna' : 'Notatka')}
                                         </span>
-                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${comm.direction === 'inbound' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'
-                                            }`}>
+                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${comm.direction === 'inbound' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
                                             {comm.direction === 'inbound' ? 'Przychodzące' : 'Wychodzące'}
                                         </span>
                                     </div>
@@ -213,10 +209,10 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                                 </div>
 
                                 <div className="text-slate-600 text-sm whitespace-pre-wrap">
-                                    {comm.content}
+                                    {comm.content || ''}
                                 </div>
 
-                                {comm.metadata?.recordingUrl && (
+                                {!!comm.metadata?.recordingUrl && (
                                     <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
                                         <div className="text-xs font-semibold text-slate-500 mb-1 uppercase flex items-center gap-1">
                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -224,45 +220,40 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                                             </svg>
                                             Nagranie rozmowy
                                         </div>
-                                        <audio controls src={comm.metadata.recordingUrl} className="w-full h-8" />
+                                        <audio controls src={comm.metadata.recordingUrl as string} className="w-full h-8" />
                                     </div>
                                 )}
 
-                                {/* User / Sender Name */}
                                 <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
-                                    {(comm.user || comm.userId === 'client' || comm.userId === 'system') ? (
+                                    {comm.userId === 'client' ? (
                                         <>
-                                            {comm.userId === 'client' ? (
-                                                <>
-                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                                                    </svg>
-                                                    <span className="font-semibold text-slate-600">Klient (przez stronę oferty)</span>
-                                                </>
-                                            ) : comm.userId === 'system' ? (
-                                                <>
-                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                    </svg>
-                                                    <span className="font-semibold text-slate-600">System (Automatyczne)</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                    </svg>
-                                                    {comm.user?.firstName} {comm.user?.lastName}
-                                                </>
-                                            )}
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                                            </svg>
+                                            <span className="font-semibold text-slate-600">Klient</span>
                                         </>
-                                    ) : null}
+                                    ) : comm.userId === 'system' ? (
+                                        <>
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="font-semibold text-slate-600">System</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                            {comm.user ? `${comm.user.firstName} ${comm.user.lastName}` : comm.userId}
+                                        </>
+                                    )}
                                 </div>
 
-                                {comm.metadata?.attachments && Array.isArray(comm.metadata.attachments) && comm.metadata.attachments.length > 0 && (
+                                {!!comm.metadata?.attachments && Array.isArray(comm.metadata.attachments) && (comm.metadata.attachments as string[]).length > 0 && (
                                     <div className="mt-3 pt-3 border-t border-slate-100">
                                         <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">Załączniki:</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {comm.metadata.attachments.map((url: string, index: number) => {
+                                            {(comm.metadata.attachments as string[]).map((url: string, index: number) => {
                                                 const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i);
                                                 const fileName = url.split('/').pop()?.split('?')[0] || 'Plik';
 

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import type { Measurement } from '../../types';
+import type { Measurement, MeasurementReport } from '../../types';
 import { MeasurementReportModal } from './MeasurementReportModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { DatabaseService } from '../../services/database';
+import { FileText, PlusSquare } from 'lucide-react';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -24,15 +26,37 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
     });
     const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
     const [dropTarget, setDropTarget] = useState<{ date: Date } | null>(null);
-    const [showReportModal, setShowReportModal] = useState(false);
-    // const [selectedDateForReport, setSelectedDateForReport] = useState<Date>(new Date());
 
+    // Reports Integration
+    const [reports, setReports] = useState<MeasurementReport[]>([]);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedReportDate, setSelectedReportDate] = useState<Date>(new Date());
+    const [selectedReport, setSelectedReport] = useState<MeasurementReport | undefined>(undefined);
 
     const weekDays = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(currentWeekStart);
         date.setDate(date.getDate() + i);
         return date;
     });
+
+    React.useEffect(() => {
+        const fetchReports = async () => {
+            if (!currentUser?.id) return;
+            try {
+                const startStr = weekDays[0].toISOString().split('T')[0];
+                const endStr = weekDays[6].toISOString().split('T')[0];
+                const data = await DatabaseService.getMeasurementReports({
+                    userId: currentUser.id,
+                    dateFrom: startStr,
+                    dateTo: endStr
+                });
+                setReports(data);
+            } catch (e) {
+                console.error('Error fetching reports', e);
+            }
+        };
+        fetchReports();
+    }, [currentWeekStart, currentUser?.id]);
 
     const handlePrevWeek = () => {
         const newStart = new Date(currentWeekStart);
@@ -142,10 +166,36 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                             onDragOver={(e) => handleDragOver(e, date)}
                             onDrop={(e) => handleDrop(e, date)}
                         >
-                            <div className="mb-3 pb-2 border-b border-slate-50">
+                            <div className="mb-3 pb-2 border-b border-slate-50 flex justify-between items-start">
                                 <div className={`text-sm font-bold ${isToday(date) ? 'text-accent' : 'text-slate-600'}`}>
                                     {formatDate(date)}
                                 </div>
+
+                                {/* Report Action */}
+                                {(() => {
+                                    const dateStr = date.toISOString().split('T')[0];
+                                    const report = reports.find(r => r.date === dateStr);
+
+                                    return (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Avoid triggering other clicks
+                                                setSelectedReportDate(date);
+                                                setSelectedReport(report);
+                                                setShowReportModal(true);
+                                            }}
+                                            className={`
+                                                p-1 rounded transition-colors
+                                                ${report
+                                                    ? 'text-green-600 hover:bg-green-50'
+                                                    : 'text-slate-300 hover:text-accent hover:bg-slate-50'}
+                                            `}
+                                            title={report ? 'Edytuj Raport' : 'Utwórz Raport'}
+                                        >
+                                            {report ? <FileText size={16} /> : <PlusSquare size={16} />}
+                                        </button>
+                                    );
+                                })()}
                             </div>
 
                             <div className="space-y-2">
@@ -210,18 +260,32 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Stwórz Raport z Dnia
+                    Raport z Dzisiaj
                 </button>
             </div>
 
             {showReportModal && (
                 <MeasurementReportModal
-                    date={new Date()}
-                    measurements={getMeasurementsForDate(new Date())}
-                    onClose={() => setShowReportModal(false)}
+                    date={selectedReportDate}
+                    measurements={getMeasurementsForDate(selectedReportDate)}
+                    report={selectedReport}
+                    onClose={() => {
+                        setShowReportModal(false);
+                        setSelectedReport(undefined);
+                    }}
                     onSave={() => {
                         setShowReportModal(false);
-                        // Optional: trigger refresh
+                        setSelectedReport(undefined);
+                        // Trigger refresh logic if needed, e.g. refetch reports
+                        const startStr = weekDays[0].toISOString().split('T')[0]; // Quick refetch hack
+                        const endStr = weekDays[6].toISOString().split('T')[0];
+                        if (currentUser?.id) {
+                            DatabaseService.getMeasurementReports({
+                                userId: currentUser.id,
+                                dateFrom: startStr,
+                                dateTo: endStr
+                            }).then(setReports);
+                        }
                     }}
                     currentUserId={currentUser?.id || ''}
                 />
