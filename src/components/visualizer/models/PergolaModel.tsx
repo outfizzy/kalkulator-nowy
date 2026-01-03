@@ -26,34 +26,62 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
     const isWallMounted = config.installationType === 'wall-mounted';
 
     // 4. Lamellas
-    // Fits inside the frame defined by beams.
-    // Internal Space Z = Depth - FrontBeamWidth - RearBeamWidth
-    const internalDepth = depth - (2 * beamWidth);
-    const lamellaCount = Math.floor(Math.max(0, internalDepth) / lamellaSpacing);
+    // Changed: Requested "Perpendicular to Depth" -> "Not as they are now".
+    // Previously: They were parallel to Width (X).
+    // Now: We make them parallel to Depth (Z).
+    // They will be distributed along the Width (X).
 
-    // Start Z: Center of model is 0.
-    // Front is +depth/2 (approx). Rear is -depth/2.
-    // Beam centers are at +/- (depth/2 - beamWidth/2).
-    // Lamella area starts just after Rear Beam and ends just before Front Beam.
-    // Rear Inner Edge = -depth/2 + beamWidth.
-    // First lamella center = Rear Inner Edge + lamellaWidth/2 + small gap?
-    const startZ = -(depth / 2) + beamWidth + (lamellaSpacing / 2);
+    // Internal Space Width = Width - (2 * SideBeamWidth) if we consider simplified frame.
+    // Or rather between Left and Right beams.
+    const internalWidth = width - (2 * beamWidth);
+    const lamellaCount = Math.floor(Math.max(0, internalWidth) / lamellaSpacing);
+
+    // Start X:
+    const startX = -(width / 2) + beamWidth + (lamellaSpacing / 2);
 
     const lamellas = useMemo(() => {
         const items = [];
         for (let i = 0; i < lamellaCount; i++) {
-            const z = startZ + (i * lamellaSpacing);
+            const x = startX + (i * lamellaSpacing);
             items.push(
-                <group key={`lamella-${i}`} position={[0, height - (beamHeight / 2), z]}>
+                <group key={`lamella-${i}`} position={[x, height - (beamHeight / 2), 0]}>
+                    {/* 
+                        Rotation:
+                        - Geometry defined as Box(X, Y, Z).
+                        - We want length along Z (Depth).
+                        - Standard Box Geometry: args=[x, y, z].
+                        - So we use args=[lamellaWidth, thickness, length].
+                        - Length = depth - 2*beamWidth.
+                        - Rotation X handles the opening angle.
+                     */}
                     <mesh rotation={[THREE.MathUtils.degToRad(config.lamellaAngle || 0), 0, 0]}>
-                        <boxGeometry args={[width - (2 * beamWidth) - 0.05, 0.04, lamellaWidth]} />
+                        {/* 
+                            Note: If we rotate around X axis (Opening), changes orientation of Y and Z.
+                            If dimensions are: X=Width, Y=Thickness, Z=Length.
+                            Rotation X rotates around the "Tip" or Center.
+                            The lamella should rotate around its long axis?
+                            If long axis is Z, we rotate around Z? No.
+                            Usually lamellas rotate to open.
+                            If they run Front-to-Back (Z axis), they rotate around Z axis?
+                            No, if they rotate around Z axis, they would tilt Left/Right.
+                            A bioclimatic pergola lamella usually rotates to let sun in.
+                            If it runs N-S, it tilts E-W?
+                            Let's assume rotation around Z axis is correct for "opening" if length is along Z.
+                         */}
+                        {/* 
+                            WAIT: If I rotate X, I rotate around the X axis.
+                            My object length is along Z.
+                            So rotating around X would lift the Front/Rear up/down. That's WRONG.
+                            To tilt a long bar running along Z, I must rotate around Z.
+                         */}
+                        <boxGeometry args={[lamellaWidth, 0.04, depth - (2 * beamWidth) - 0.05]} />
                         <meshStandardMaterial color={color} />
                     </mesh>
                 </group>
             );
         }
         return items;
-    }, [lamellaCount, startZ, lamellaSpacing, height, beamHeight, width, beamWidth, lamellaWidth, config.lamellaAngle, color]);
+    }, [lamellaCount, startX, lamellaSpacing, height, beamHeight, depth, beamWidth, lamellaWidth, config.lamellaAngle, color]);
 
     // 5. Addons
     const addons = config.addons || [];
@@ -63,6 +91,10 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
         color: '#eef2ff', transmission: 0.9, opacity: 1, metalness: 0, roughness: 0,
         thickness: 0.01, transparent: true
     }), []);
+
+    // Flooring Check
+    const hasWpc = config.floorType === 'wpc' || (!config.floorType && addons.some(a => a.type === 'wpc-floor'));
+    const hasGres = config.floorType === 'gres' || (!config.floorType && addons.some(a => a.type === 'gres-floor'));
 
     const slidingWallAddons = addons.filter(a => a.type === 'slidingWall');
     const hasFrontSlidingGlass = slidingWallAddons.some(a => a.location === 'front' || !a.location);
@@ -75,14 +107,8 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
 
     return (
         <group>
-            {/* DEBUG CUBE (Visible if model mounts) */}
-            {/* <mesh position={[0, height + 0.5, 0]}>
-                <boxGeometry args={[0.2, 0.2, 0.2]} />
-                <meshStandardMaterial color="red" />
-            </mesh> */}
-
-            {/* --- BEAMS --- */}
-            {/* Front Beam */}
+            {/* FRAME STRUCTURE */}
+            {/* 1. FRONT BEAM */}
             <mesh position={[0, height - beamHeight / 2, depth / 2 - beamWidth / 2]}>
                 <boxGeometry args={[width, beamHeight, beamWidth]} />
                 <meshStandardMaterial color={color} />
@@ -153,6 +179,62 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
             {lamellas}
 
             {/* --- ADDONS --- */}
+
+            {/* WPC FLOORING */}
+            {hasWpc && (
+                <group rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]} receiveShadow>
+                    {/* Base */}
+                    <mesh position={[0, 0, -0.01]}>
+                        <planeGeometry args={[width, depth]} />
+                        <meshStandardMaterial color="#3e2723" roughness={1} />
+                    </mesh>
+                    {/* Planks */}
+                    {Array.from({ length: Math.ceil(width / 0.145) }).map((_, i) => {
+                        const plankW = 0.14;
+                        const gap = 0.005;
+                        const stride = plankW + gap;
+                        const xPos = -width / 2 + stride * i + plankW / 2;
+                        if (xPos > width / 2) return null;
+
+                        return (
+                            <mesh key={`plank-${i}`} position={[xPos, 0, 0]} receiveShadow>
+                                <boxGeometry args={[plankW, depth, 0.02]} />
+                                <meshStandardMaterial color="#5D4037" roughness={0.8} />
+                            </mesh>
+                        )
+                    })}
+                </group>
+            )}
+
+            {/* GRES FLOORING */}
+            {hasGres && (
+                <group rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]} receiveShadow>
+                    {/* Base */}
+                    <mesh position={[0, 0, -0.01]}>
+                        <planeGeometry args={[width, depth]} />
+                        <meshStandardMaterial color="#757575" roughness={1} />
+                    </mesh>
+                    {/* Tiles */}
+                    {Array.from({ length: Math.ceil(width / 0.604) }).map((_, i) => {
+                        return Array.from({ length: Math.ceil(depth / 0.604) }).map((__, j) => {
+                            const tileS = 0.60;
+                            const gap = 0.004;
+                            const stride = tileS + gap;
+                            const xPos = -width / 2 + stride * i + tileS / 2;
+                            const yPos = -depth / 2 + stride * j + tileS / 2;
+
+                            if (xPos > width / 2 + tileS || yPos > depth / 2 + tileS) return null;
+
+                            return (
+                                <mesh key={`tile-${i}-${j}`} position={[xPos, yPos, 0]} receiveShadow>
+                                    <boxGeometry args={[tileS, tileS, 0.02]} />
+                                    <meshStandardMaterial color="#BDBDBD" roughness={0.6} metalness={0.1} />
+                                </mesh>
+                            )
+                        })
+                    })}
+                </group>
+            )}
 
             {/* SLIDING FRONT */}
             {hasFrontSlidingGlass && Array.from({ length: calculatedModules }).map((_, modIdx) => {
@@ -256,7 +338,6 @@ const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height
     const frameMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#333', roughness: 0.5 }), []);
     const guideMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#aaa', roughness: 0.5 }), []);
 
-    // Safety check for width/height
     if (width <= 0 || height <= 0) return null;
 
     return (
