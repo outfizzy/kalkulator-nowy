@@ -147,7 +147,12 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                     {models.map(m => (
                                         <button
                                             key={m.id}
-                                            onClick={() => updateConfig('modelId', m.id)}
+                                            onClick={() => {
+                                                updateConfig('modelId', m.id);
+                                                if (m.id === 'pergola_bio' && !config.color) {
+                                                    updateConfig('color', 'RAL 7016');
+                                                }
+                                            }}
                                             className={`group relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left overflow-hidden ${config.modelId === m.id
                                                 ? 'border-accent bg-accent/5 shadow-accent/10 shadow-lg'
                                                 : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white'
@@ -182,7 +187,7 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
 
                                     <RangeControl
                                         label="Liczba Modułów"
-                                        value={config.moduleCount || Math.ceil(config.width / 4500)} // Default logic for display match
+                                        value={config.moduleCount || 1}
                                         min={1} max={4} step={1}
                                         onChange={(v: number) => updateConfig('moduleCount', v)}
                                     />
@@ -224,32 +229,48 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                             </div>
 
                             {/* 4. Heights & Angles */}
-                            <div className="pt-6 border-t border-slate-200/50 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-bold text-slate-700 text-sm">Wysokości i Kąt</h4>
-                                    <div className="text-xs bg-white px-2 py-1 rounded border border-slate-200 font-mono text-slate-500">
-                                        {(() => {
-                                            const f = config.frontHeight || 2500;
-                                            const r = config.rearHeight || (f + (config.projection * 0.14));
-                                            const ang = Math.atan((r - f) / config.projection) * (180 / Math.PI);
-                                            return `${ang.toFixed(1)}°`;
-                                        })()}
+                            {/* 4. Heights & Angles */}
+                            {config.modelId !== 'pergola_bio' ? (
+                                <div className="pt-6 border-t border-slate-200/50 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="font-bold text-slate-700 text-sm">Wysokości i Kąt</h4>
+                                        <div className="text-xs bg-white px-2 py-1 rounded border border-slate-200 font-mono text-slate-500">
+                                            {(() => {
+                                                const f = config.frontHeight || 2500;
+                                                const r = config.rearHeight || (f + (config.projection * 0.14));
+                                                const ang = Math.atan((r - f) / config.projection) * (180 / Math.PI);
+                                                return `${ang.toFixed(1)}°`;
+                                            })()}
+                                        </div>
                                     </div>
-                                </div>
 
-                                <RangeControl
-                                    label={config.installationType === 'wall-mounted' ? "Wysokość przy Ścianie (mm)" : "Wysokość Tylnych Słupów (mm)"}
-                                    value={config.rearHeight || ((config.frontHeight || 2500) + (config.projection * 0.14))}
-                                    min={2400} max={4000} step={50}
-                                    onChange={(v: number) => updateConfig('rearHeight', v)}
-                                />
-                                <RangeControl
-                                    label="Wysokość Frontu (Przejście) (mm)"
-                                    value={config.frontHeight || 2500}
-                                    min={2000} max={3000} step={50}
-                                    onChange={(v: number) => updateConfig('frontHeight', v)}
-                                />
-                            </div>
+                                    <RangeControl
+                                        label={config.installationType === 'wall-mounted' ? "Wysokość przy Ścianie (mm)" : "Wysokość Tylnych Słupów (mm)"}
+                                        value={config.rearHeight || ((config.frontHeight || 2500) + (config.projection * 0.14))}
+                                        min={2400} max={4000} step={50}
+                                        onChange={(v: number) => updateConfig('rearHeight', v)}
+                                    />
+                                    <RangeControl
+                                        label="Wysokość Frontu (Przejście) (mm)"
+                                        value={config.frontHeight || 2500}
+                                        min={2000} max={3000} step={50}
+                                        onChange={(v: number) => updateConfig('frontHeight', v)}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="pt-6 border-t border-slate-200/50 space-y-6">
+                                    <SectionLabel>Wysokość Konstrukcji</SectionLabel>
+                                    <RangeControl
+                                        label="Wysokość (mm)"
+                                        value={config.postsHeight || config.frontHeight || 2500}
+                                        min={2200} max={3000} step={50}
+                                        onChange={(v: number) => {
+                                            updateConfig('postsHeight', v);
+                                            updateConfig('frontHeight', v);
+                                        }}
+                                    />
+                                </div>
+                            )}
 
                             {/* 5. Advanced Construction */}
                             <div className="pt-4 border-t border-slate-100">

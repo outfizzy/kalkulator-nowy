@@ -21,7 +21,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
     const color = config.color || '#373F43';
 
     // 3. Logic
-    const calculatedModules = config.moduleCount || (width > 4.5 ? Math.ceil(width / 4.5) : 1);
+    const calculatedModules = config.moduleCount || 1;
     const moduleWidth = width / calculatedModules;
     const isWallMounted = config.installationType === 'wall-mounted';
 
