@@ -213,13 +213,16 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
             // Rear Post (Freestanding)
             if (config.installationType === 'freestanding') {
                 const rise = depthM * Math.tan(structurePitch);
-                // Align Z to alignmentZ (calculated above) so it matches Beam
-                els.push({ position: [x, 0, alignmentZ], height: heightM + rise - BEAM_HEIGHT, type: 'rear' });
+                // "Cofnij do krawędzi belki tylnej" -> Align Back Face of Post to Back Face of Beam (-depthM/2).
+                // Post Center = Back Face + Size/2 = -depthM/2 + POST_SIZE/2.
+                const rearPostFlushZ = -depthM / 2 + POST_SIZE / 2;
+
+                els.push({ position: [x, 0, rearPostFlushZ], height: heightM + rise - BEAM_HEIGHT, type: 'rear' });
             }
         });
 
         return els;
-    }, [rafterEls, safePostCount, safeRafterCount, heightM, depthM, config.installationType, BEAM_HEIGHT, POST_SIZE, config.postOverlayLeft, config.postOverlayRight, config.postOffsets, structurePitch, alignmentZ]);
+    }, [rafterEls, safePostCount, safeRafterCount, heightM, depthM, config.installationType, BEAM_HEIGHT, POST_SIZE, config.postOverlayLeft, config.postOverlayRight, config.postOffsets, structurePitch]);
 
     return (
         <group>
