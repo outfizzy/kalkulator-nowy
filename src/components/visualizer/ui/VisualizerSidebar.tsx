@@ -304,91 +304,94 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                 </div>
                             )}
 
-                            {/* 5. Advanced Construction */}
-                            <div className="pt-4 border-t border-slate-100">
-                                <div className="flex items-center justify-between mb-4">
-                                    <SectionLabel>Konstrukcja Zaawansowana</SectionLabel>
-                                    <button
-                                        onClick={() => {
-                                            if (config.customPostCount) {
-                                                updateConfig('customPostCount', undefined);
-                                                updateConfig('customRafterCount', undefined);
-                                            } else {
-                                                const specs = getStructureSpecs(config);
-                                                updateConfig('customPostCount', specs.postCount || 2);
-                                                updateConfig('customRafterCount', specs.rafterCount || 5);
-                                            }
-                                        }}
-                                        className={`text-xs px-2 py-1 rounded transition-colors ${config.customPostCount ? 'bg-accent text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                    >
-                                        {config.customPostCount ? 'Tryb Manualny' : 'Automat'}
-                                    </button>
-                                </div>
+                            {/* 5. Advanced Construction - Hide for Pergola */}
+                            {config.modelId !== 'pergola_bio' && config.modelId !== 'pergola_deluxe' && (
+                                <div className="pt-4 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <SectionLabel>Konstrukcja Zaawansowana</SectionLabel>
+                                        <button
+                                            onClick={() => {
+                                                if (config.customPostCount) {
+                                                    updateConfig('customPostCount', undefined);
+                                                    updateConfig('customRafterCount', undefined);
+                                                } else {
+                                                    const specs = getStructureSpecs(config);
+                                                    updateConfig('customPostCount', specs.postCount || 2);
+                                                    updateConfig('customRafterCount', specs.rafterCount || 5);
+                                                }
+                                            }}
+                                            className={`text-xs px-2 py-1 rounded transition-colors ${config.customPostCount ? 'bg-accent text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            {config.customPostCount ? 'Tryb Manualny' : 'Automat'}
+                                        </button>
+                                    </div>
 
-                                {config.customPostCount ? (
-                                    <div className="space-y-4 animate-fadeIn">
-                                        <RangeControl
-                                            label="Liczba Słupów"
-                                            value={config.customPostCount}
-                                            min={2} max={6} step={1}
-                                            onChange={(v: number) => updateConfig('customPostCount', v)}
-                                        />
-                                        {config.modelId !== 'pergola_bio' && (
+                                    {config.customPostCount ? (
+                                        <div className="space-y-4 animate-fadeIn">
                                             <RangeControl
-                                                label="Liczba Krokwi"
-                                                value={config.customRafterCount || 5}
-                                                min={3} max={15} step={1}
-                                                onChange={(v: number) => updateConfig('customRafterCount', v)}
+                                                label="Liczba Słupów"
+                                                value={config.customPostCount}
+                                                min={2} max={6} step={1}
+                                                onChange={(v: number) => updateConfig('customPostCount', v)}
                                             />
-                                        )}
+                                            {/* Hide Rafter count for Bio (Redundant check if we hide entire block, but safe) */}
+                                            {config.modelId !== 'pergola_bio' && (
+                                                <RangeControl
+                                                    label="Liczba Krokwi"
+                                                    value={config.customRafterCount || 5}
+                                                    min={3} max={15} step={1}
+                                                    onChange={(v: number) => updateConfig('customRafterCount', v)}
+                                                />
+                                            )}
 
-                                        {/* Post Offsets */}
-                                        <div className="pt-2 mt-4 border-t border-slate-100">
-                                            <div className="text-xs font-bold text-slate-500 uppercase mb-3">Przesunięcie Słupów</div>
-                                            <div className="space-y-3 pl-2 border-l-2 border-slate-100">
-                                                {Array.from({ length: config.customPostCount }).map((_, i) => {
-                                                    const currentOffset = (config.postOffsets && config.postOffsets[i]) || 0;
-                                                    return (
-                                                        <div key={i} className="flex flex-col gap-1">
-                                                            <div className="flex justify-between text-xs text-slate-600">
-                                                                <span className="font-medium">Słup {i + 1}</span>
-                                                                <span className={currentOffset !== 0 ? "text-accent font-bold" : "text-slate-400"}>
-                                                                    {currentOffset > 0 ? `+${currentOffset}` : currentOffset} mm
-                                                                </span>
+                                            {/* Post Offsets */}
+                                            <div className="pt-2 mt-4 border-t border-slate-100">
+                                                <div className="text-xs font-bold text-slate-500 uppercase mb-3">Przesunięcie Słupów</div>
+                                                <div className="space-y-3 pl-2 border-l-2 border-slate-100">
+                                                    {Array.from({ length: config.customPostCount }).map((_, i) => {
+                                                        const currentOffset = (config.postOffsets && config.postOffsets[i]) || 0;
+                                                        return (
+                                                            <div key={i} className="flex flex-col gap-1">
+                                                                <div className="flex justify-between text-xs text-slate-600">
+                                                                    <span className="font-medium">Słup {i + 1}</span>
+                                                                    <span className={currentOffset !== 0 ? "text-accent font-bold" : "text-slate-400"}>
+                                                                        {currentOffset > 0 ? `+${currentOffset}` : currentOffset} mm
+                                                                    </span>
+                                                                </div>
+                                                                <input
+                                                                    type="range"
+                                                                    min={-1000} max={1000} step={10}
+                                                                    value={currentOffset}
+                                                                    onChange={(e) => {
+                                                                        const val = parseInt(e.target.value);
+                                                                        const count = config.customPostCount || 2;
+                                                                        const currentOffsets = config.postOffsets ? [...config.postOffsets] : Array(count).fill(0);
+                                                                        while (currentOffsets.length < count) currentOffsets.push(0);
+                                                                        currentOffsets[i] = val;
+                                                                        updateConfig('postOffsets', currentOffsets);
+                                                                    }}
+                                                                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                                />
                                                             </div>
-                                                            <input
-                                                                type="range"
-                                                                min={-1000} max={1000} step={10}
-                                                                value={currentOffset}
-                                                                onChange={(e) => {
-                                                                    const val = parseInt(e.target.value);
-                                                                    const count = config.customPostCount || 2;
-                                                                    const currentOffsets = config.postOffsets ? [...config.postOffsets] : Array(count).fill(0);
-                                                                    while (currentOffsets.length < count) currentOffsets.push(0);
-                                                                    currentOffsets[i] = val;
-                                                                    updateConfig('postOffsets', currentOffsets);
-                                                                }}
-                                                                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                                                            />
-                                                        </div>
-                                                    );
-                                                })}
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-xs text-slate-500 grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg">
-                                        <div>
-                                            <span className="block font-bold text-slate-700 text-lg">{getStructureSpecs(config).postCount || 2}</span>
-                                            Słupy
+                                    ) : (
+                                        <div className="text-xs text-slate-500 grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg">
+                                            <div>
+                                                <span className="block font-bold text-slate-700 text-lg">{getStructureSpecs(config).postCount || 2}</span>
+                                                Słupy
+                                            </div>
+                                            <div>
+                                                <span className="block font-bold text-slate-700 text-lg">{getStructureSpecs(config).rafterCount || 5}</span>
+                                                Krokwie
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className="block font-bold text-slate-700 text-lg">{getStructureSpecs(config).rafterCount || 5}</span>
-                                            Krokwie
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
