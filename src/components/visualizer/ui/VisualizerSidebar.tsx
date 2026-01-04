@@ -149,8 +149,13 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                             key={m.id}
                                             onClick={() => {
                                                 updateConfig('modelId', m.id);
-                                                if (m.id === 'pergola_bio' && !config.color) {
-                                                    updateConfig('color', 'RAL 7016');
+                                                if (m.id === 'pergola_bio') {
+                                                    // Default depth 4000mm
+                                                    updateConfig('projection', 4000);
+                                                    // Default to Anthracite Hex if no color
+                                                    if (!config.color) {
+                                                        updateConfig('color', '#373F43');
+                                                    }
                                                 }
                                             }}
                                             className={`group relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left overflow-hidden ${config.modelId === m.id
@@ -451,10 +456,10 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                         <button
                                             key={c.ral}
                                             onClick={() => {
-                                                updateConfig('color', c.ral);
+                                                updateConfig('color', c.hex);
                                                 updateConfig('customColor', false);
                                             }}
-                                            className={`relative p-3 rounded-2xl border-2 transition-all flex items-center gap-3 group ${!config.customColor && config.color === c.ral
+                                            className={`relative p-3 rounded-2xl border-2 transition-all flex items-center gap-3 group ${!config.customColor && config.color === c.hex
                                                 ? 'border-accent bg-white shadow-lg scale-[1.02] ring-2 ring-accent/20'
                                                 : 'border-slate-100 hover:border-slate-200 bg-white/50 hover:bg-white hover:scale-[1.01]'
                                                 }`}
@@ -466,7 +471,7 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                                 <div className="font-bold text-sm text-slate-700 group-hover:text-slate-900">{c.name}</div>
                                                 <div className="text-[10px] text-slate-400 font-mono">{c.ral}</div>
                                             </div>
-                                            {config.color === c.ral && !config.customColor && (
+                                            {config.color === c.hex && !config.customColor && (
                                                 <div className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full" />
                                             )}
                                         </button>

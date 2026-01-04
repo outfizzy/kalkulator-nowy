@@ -16,8 +16,8 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
     const postSize = 0.15; // 15cm
     const beamHeight = 0.25; // 25cm
     const beamWidth = 0.15; // 15cm
-    const lamellaWidth = 0.20; // 20cm
-    const lamellaSpacing = 0.21; // 21cm
+    const lamellaWidth = 0.17; // Reduced from 0.20 for better visual separation
+    const lamellaSpacing = 0.20; // 20cm spacing (3cm gap)
     const color = config.color || '#373F43';
 
     // 3. Logic
@@ -52,28 +52,13 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                         - Standard Box Geometry: args=[x, y, z].
                         - So we use args=[lamellaWidth, thickness, length].
                         - Length = depth - 2*beamWidth.
-                        - Rotation X handles the opening angle.
                      */}
-                    <mesh rotation={[THREE.MathUtils.degToRad(config.lamellaAngle || 0), 0, 0]}>
+                    <mesh rotation={[0, 0, THREE.MathUtils.degToRad(config.lamellaAngle || 0) * -1]}>
                         {/* 
-                            Note: If we rotate around X axis (Opening), changes orientation of Y and Z.
-                            If dimensions are: X=Width, Y=Thickness, Z=Length.
-                            Rotation X rotates around the "Tip" or Center.
-                            The lamella should rotate around its long axis?
-                            If long axis is Z, we rotate around Z? No.
-                            Usually lamellas rotate to open.
-                            If they run Front-to-Back (Z axis), they rotate around Z axis?
-                            No, if they rotate around Z axis, they would tilt Left/Right.
-                            A bioclimatic pergola lamella usually rotates to let sun in.
-                            If it runs N-S, it tilts E-W?
-                            Let's assume rotation around Z axis is correct for "opening" if length is along Z.
-                         */}
-                        {/* 
-                            WAIT: If I rotate X, I rotate around the X axis.
-                            My object length is along Z.
-                            So rotating around X would lift the Front/Rear up/down. That's WRONG.
-                            To tilt a long bar running along Z, I must rotate around Z.
-                         */}
+                           Rotation:
+                           - Inverted Z-axis rotation for correct "opening" direction.
+                           - Width (X) tilts. Length (Z) stays along depth.
+                        */}
                         <boxGeometry args={[lamellaWidth, 0.04, depth - (2 * beamWidth) - 0.05]} />
                         <meshStandardMaterial color={color} />
                     </mesh>
