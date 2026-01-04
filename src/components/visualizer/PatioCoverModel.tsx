@@ -45,7 +45,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
     // Skystyle structure Pitch is 0. Roof Glass Pitch is calculated but capped for visual "flatness".
     // 2 degrees is enough for drainage but fits in profile.
     const structurePitch = isSkystyle ? 0 : pitchAngle;
-    const structurePitch = isSkystyle ? 0 : pitchAngle;
+
     // For Skystyle, use small pitch (~2.5 deg) or calculated, whichever is smaller, to fit inside profile.
     // Actually, calculate: if we have 20cm profile, and 4m depth. tan(alpha) = 0.2/4 = 0.05 -> 2.8 deg.
     // So 2 degrees is safe.
