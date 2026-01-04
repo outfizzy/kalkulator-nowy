@@ -15,6 +15,7 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
     const [isLoading, setIsLoading] = useState(false);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
 
     // Auto-create session if generic one doesn't exist, or specific one for this context?
     // Strategies:
@@ -23,32 +24,36 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
     // 3. One global "Sidebar Session"?
     // Let's go with: Load last active session or create new if none.
     useEffect(() => {
+        const setupSession = async () => {
+            try {
+                const sessions = await AIService.getSessions();
+                if (sessions.length > 0) {
+                    setCurrentSessionId(sessions[0].id);
+                    const msgs = await AIService.getSessionMessages(sessions[0].id);
+                    setMessages(msgs);
+                    scrollToBottom();
+                } else {
+                    const newSession = await AIService.createSession('Asystent');
+                    setCurrentSessionId(newSession.id);
+                }
+            } catch (error) {
+                console.error('Session setup error', error);
+            }
+        };
+
         if (isOpen && !currentSessionId) {
             setupSession();
         }
-    }, [isOpen]);
-
-    const setupSession = async () => {
-        try {
-            const sessions = await AIService.getSessions();
-            if (sessions.length > 0) {
-                setCurrentSessionId(sessions[0].id);
-                const msgs = await AIService.getSessionMessages(sessions[0].id);
-                setMessages(msgs);
-                scrollToBottom();
-            } else {
-                const newSession = await AIService.createSession('Asystent');
-                setCurrentSessionId(newSession.id);
-            }
-        } catch (error) {
-            console.error('Session setup error', error);
-        }
-    };
+    }, [isOpen, currentSessionId]);
 
     const scrollToBottom = () => {
-        setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
+        if (messagesContainerRef.current) {
+            const { scrollHeight, clientHeight } = messagesContainerRef.current;
+            messagesContainerRef.current.scrollTo({
+                top: scrollHeight - clientHeight,
+                behavior: 'smooth'
+            });
+        }
     };
 
     const handleSendMessage = async () => {
@@ -128,7 +133,10 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
             )} */}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+            <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50"
+            >
                 {messages.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === 'user'

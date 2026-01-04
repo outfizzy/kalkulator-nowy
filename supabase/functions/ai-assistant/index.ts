@@ -7,36 +7,37 @@ const corsHeaders = {
 
 // System Prompt
 const SYSTEM_PROMPT = `
-Jesteś Wirtualnym Asystentem Sprzedaży w firmie zajmującej się zadaszeniami aluminiowymi (tarasowymi), ogrodami zimowymi i systemami osłonowymi (markizy, refleksole).
-Twoim celem jest pomaganie pracownikom (Adminom, Managerom, Handlowcom) w ich codziennej pracy.
+Jesteś **Ekspertem Wsparcia Sprzedaży (World-Class Sales Assistant)** w wiodącej firmie z branży zadaszeń aluminiowych (TGA Metal / Polendach24).
+Twoim celem jest nie tylko odpowiadanie na pytania, ale **aktywne wspieranie handlowców** w zamykaniu sprzedaży, optymalizacji ofert i obsłudze klienta.
 
-Twoje kompetencje:
-1. WIEDZA O FIRMIE I PRODUKTACH: Masz dostęp do pełnej bazy danych.
-   - Klienci: 'search_knowledge' (typ: 'crm')
-   - Oferty: 'search_knowledge' (typ: 'offers') - sprawdzaj statusy, kwoty.
-   - Umowy: 'search_knowledge' (typ: 'contracts') - terminy, statusy.
-   - Montaże/Kalendarz: 'search_knowledge' (typ: 'installations') - planowane montaże.
-   - Produkty/Ceny: 'search_knowledge' (typ: 'products').
+### Twoja Rola i Osobowość:
+- **Ekspert Techniczny**: Znasz detale konstrukcyjne (profile, szkło, silniki Somfy).
+- **Strateg Sprzedaży**: Sugerujesz "cross-selling" (np. "Do tej pergoli warto dodać promiennik").
+- **Proaktywny**: Jeśli widzisz ofertę, sprawdź czy marża jest OK (typowo >25%). Jeśli widzisz klienta, przypomnij o follow-upie.
+- **Ton**: Profesjonalny, zwięzły, pewny siebie (Business Professional).
 
-2. Kalkulacje: Potrafisz przeliczać wymiary szkła dla danego dachu (używając narzędzia 'calculate_glass').
-3. Wizualizacje: Generujesz wizualizacje "NanoBanana" (Tool: generate_visualization).
+### Twoje Kompetencje (Narzędzia):
+1. **BAZA WIEDZY (CRM / Oferty / Umowy / Kalendarz)**:
+   - Użyj 'search_knowledge' aby znaleźć klienta, ofertę czy termin montażu.
+2. **STANY MAGAZYNOWE (Inventory)**:
+   - Użyj 'check_inventory' aby sprawdzić dostępność silników, tkanin, profili.
+   - Zawsze sprawdzaj dostępność przy dużych zamówieniach.
+3. **KALKULACJE**:
+   - 'calculate_glass' dla szkła.
+4. **WIZUALIZACJE**:
+   - 'generate_visualization' (NanoBanana) do generowania inspiracji dla klienta.
 
-System komunikacji: Profesjonalny, zwięzły, pomocny. W języku polskim.
-Wizualizacje: Jeśli użytkownik poprosi o wizualizację dachu, użyj 'generate_visualization'.
+### Zasady Komunikacji:
+- **Kontekst**: Jeśli użytkownik przesyła kontekst (np. "Widzę ofertę #1024"), odwołuj się do niego bezpośrednio. Nie pytaj "o jaką ofertę chodzi".
+- **Formatowanie**: Używaj pogrubień dla kluczowych liczb (kwoty, daty). Używaj tabel dla zestawień.
+- **Sugestie**: Zawszę kończ wypowiedź (jeśli to zasadne) sugestią kolejnego kroku (np. "Czy przygotować draft maila do klienta?").
 
-KONTEKST UI:
-Użytkownik może przesyłać informacje o tym co widzi na ekranie w formacie "[Context: { ... }]".
-- "path": ścieżka URL (np. /offers/123).
-- "entityId": ID obiektu (np. ID oferty).
-Wykorzystuj to! Jeśli użytkownik pisze "zmień cenę w tej ofercie", a w kontekście jest ID oferty, użyj go Domyślnie.
-Nie pytaj "o którą ofertę chodzi", jeśli masz ID w kontekście.
+### Baza Wiedzy (Kontekst Firmowy):
+- Oferujemy: Pergole Bioklimatyczne, Zadaszenia Szklane (Trendstyle, Skystyle), Carporty, Ogrody Zimowe.
+- Silniki: Somfy (IO / RTS).
+- Dostawy: Standardowo 4-6 tygodni.
 
-FORMATOWANIE (RICH UI):
-- Używaj Markdown do formatowania odpowiedzi.
-- Najważniejsze dane w **pogrubieniu**.
-- Listy punktowane dla wyliczeń.
-- TABELE dla zestawień cenowych, kosztorysów i list produktów.
-- Jeśli odnosisz się do innego zasobu (oferty, klienta), podawaj linki w formacie '[Tekst](URL)'. Np. '[Oferta #123](/offers/123)'. Nasz frontend zamieni je na aktywne przyciski nawigacji.
+Działaj w interesie firmy, maksymalizując jakość obsługi i zysk.
 `;
 
 // Tools Schema
@@ -89,6 +90,20 @@ const tools = [
                 required: ["query", "category"]
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "check_inventory",
+            description: "Sprawdź stan magazynowy (dostępność) produktów.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: { type: "string", description: "Nazwa produktu/komponentu (np. 'Silnik Somfy', 'Profil 120')" }
+                },
+                required: ["query"]
+            }
+        }
     }
 ];
 
@@ -104,6 +119,25 @@ function calculateGlass(args: any) {
         length: roofProjection - 50,
         note: "Wymiary orientacyjne. Sprawdź specyfikację."
     });
+}
+
+async function checkInventory(args: any, supabase: any) {
+    const { query } = args;
+    try {
+        const { data, error } = await supabase
+            .from('inventory_items')
+            .select('name, quantity, unit, location')
+            .ilike('name', `%${query}%`)
+            .limit(5);
+
+        if (error) throw error;
+        if (!data || data.length === 0) return JSON.stringify({ result: "Brak produktów w magazynie pasujących do zapytania." });
+
+        return JSON.stringify({ inventory: data });
+    } catch (e: any) {
+        // Fallback if table doesn't exist or other error
+        return JSON.stringify({ error: `Błąd sprawdzania magazynu: ${e.message}. (Upewnij się, że tabela 'inventory_items' istnieje)` });
+    }
 }
 
 async function searchKnowledge(args: any, supabase: any) {
@@ -257,7 +291,7 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { messages } = await req.json();
+        const { messages, context } = await req.json(); // Extract context!
 
         // Initialize Supabase Client for Tool Access
         const authHeader = req.headers.get('Authorization')!;
@@ -271,7 +305,7 @@ Deno.serve(async (req) => {
         if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
         // Sanitize Messages
-        const sanitizedMessages = messages
+        let sanitizedMessages = messages
             .filter((m: any) => m && m.role && (m.content || m.tool_calls)) // Must have content or be a tool call
             .map((m: any) => ({
                 role: m.role,
@@ -280,6 +314,18 @@ Deno.serve(async (req) => {
                 tool_call_id: m.tool_call_id,
                 name: m.name
             }));
+
+        // --- CONTEXT INJECTION REFINEMENT ---
+        // Instead of relying on client to append text, we inject a "System Note" if context is present.
+        // This is cleaner and more effective.
+        if (context) {
+            const contextMsg = {
+                role: 'system',
+                content: `[AKTUALNY KONTEKST UŻYTKOWNIKA]\nUżytkownik przegląda obecnie: ${JSON.stringify(context)}.\nJeśli pyta "o to" lub "o tę ofertę", odnoś się do tego kontekstu.`
+            };
+            // Insert after System Prompt (index 0 is system prompt in the call below, so we add it to messages)
+            sanitizedMessages = [contextMsg, ...sanitizedMessages];
+        }
 
         // 1. First Call to LLM
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -329,6 +375,8 @@ Deno.serve(async (req) => {
                     result = await searchKnowledge(args, supabaseClient);
                 } else if (toolCall.function.name === 'generate_visualization') {
                     result = await generateVisualization(args, apiKey);
+                } else if (toolCall.function.name === 'check_inventory') {
+                    result = await checkInventory(args, supabaseClient);
                 }
 
                 functionResponses.push({

@@ -61,10 +61,13 @@ export const AIService = {
     },
 
     // Messaging
-    async sendMessage(messages: ChatMessage[]) {
+    async sendMessage(messages: ChatMessage[], context?: any) {
         try {
             const { data, error } = await supabase.functions.invoke('ai-assistant', {
-                body: { messages: messages.map(m => ({ role: m.role, content: m.content })) } // Strip IDs
+                body: {
+                    messages: messages.map(m => ({ role: m.role, content: m.content })),
+                    context: context // Pass context to Edge Function
+                }
             });
 
             if (error) {
@@ -122,21 +125,12 @@ export const AIService = {
                 ];
             }
 
-            // Inject Context if present (as a System note or just merged)
-            // We'll append it to the current message or send as a separate system-like user note?
-            // Best practice: Add a System message at the end or prepend context to user message.
-            if (context) {
-                const contextString = `\n\n[Context: User is viewing ${JSON.stringify(context)}]`;
-                if (typeof newMessage.content === 'string') {
-                    newMessage.content += contextString;
-                } else {
-                    newMessage.content.push({ type: "text", text: contextString });
-                }
-            }
+            // Client-side context append REMOVED in favor of System Context Injection in Edge Function
+            // But we keep passing it in payload
 
             const messagesPayload = [...contextMessages, newMessage];
 
-            const aiResponse = await this.sendMessage(messagesPayload); // sendMessage just invokes function
+            const aiResponse = await this.sendMessage(messagesPayload, context); // Pass context explicitly
 
             // 3. Save AI Response
             if (aiResponse) {
