@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import type { Lead, LeadStatus } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { LeadsKanban } from './LeadsKanban';
+import { LeadsFunnelChart } from './LeadsFunnelChart';
 
 export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -12,6 +13,7 @@ export const LeadsList: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+    const [showStats, setShowStats] = useState(false);
     const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all');
     const [groupByRegion, setGroupByRegion] = useState(false);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -28,6 +30,7 @@ export const LeadsList: React.FC = () => {
             setLoading(false);
         }
     };
+
 
     const handleLeadUpdate = () => {
         loadLeads(); // Refresh data after kanban drop
@@ -74,7 +77,7 @@ export const LeadsList: React.FC = () => {
 
     // Grouping Logic
     const groupedLeads = groupByRegion ? filteredLeads.reduce((acc, lead) => {
-        // Germany PLZ is 5 digits. Use first 2 for region, or 1 if it's short? 
+        // Germany PLZ is 5 digits. Use first 2 for region, or 1 if it's short?
         // Let's take first 2 digits of postalCode if available, else "Brak kodu"
         const plz = lead.customerData.postalCode?.replace(/\D/g, '') || '';
         const region = plz.length >= 2 ? `PLZ ${plz.substring(0, 2)}xxx` : 'Inne / Brak kodu';
@@ -218,6 +221,16 @@ export const LeadsList: React.FC = () => {
                     {/* View Toggle */}
                     <div className="bg-white p-1 rounded-lg border border-slate-200 flex items-center">
                         <button
+                            onClick={() => setShowStats(!showStats)}
+                            className={`p-2 rounded-md transition-all ${showStats ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            title="Pokaż Statystyki"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </button>
+                        <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                        <button
                             onClick={() => setViewMode('list')}
                             className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                             title="Lista"
@@ -248,6 +261,11 @@ export const LeadsList: React.FC = () => {
                     </Link>
                 </div>
             </div>
+
+            {/* Stats Chart */}
+            {showStats && (
+                <LeadsFunnelChart leads={filteredLeads} />
+            )}
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">

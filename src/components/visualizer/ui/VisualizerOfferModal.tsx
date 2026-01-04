@@ -120,7 +120,9 @@ export const VisualizerOfferModal: React.FC<VisualizerOfferModalProps> = ({
             // Update productConfig with resolved image (so it persists in offer.product)
             const offerProductConfig = {
                 ...productConfig,
-                imageUrl: resolvedImageUrl
+                imageUrl: resolvedImageUrl,
+                numberOfPosts: pricing?.numberOfPosts,
+                numberOfFields: pricing?.numberOfFields
             };
 
             // We need to fetch userId/role to calculate commission - encapsulated in createOffer?

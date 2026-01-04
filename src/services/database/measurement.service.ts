@@ -12,18 +12,20 @@ export const MeasurementService = {
         const { data, error } = await supabase
             .from('measurements')
             .select(`
-    *
+    *,
+    sales_rep: profiles!sales_rep_id(full_name)
     `)
             .order('scheduled_date', { ascending: true });
 
         if (error) throw error;
 
-        return (data || []).map((m: any) => ({
+        return (data || []).map((m) => ({
             id: m.id,
             offerId: m.offer_id,
+            leadId: m.lead_id,
             scheduledDate: new Date(m.scheduled_date),
             salesRepId: m.sales_rep_id,
-            salesRepName: '', // Can be populated if we join profiles
+            salesRepName: m.sales_rep?.full_name || '',
             customerName: m.customer_name,
             customerAddress: m.customer_address,
             customerPhone: m.customer_phone,
@@ -83,7 +85,7 @@ export const MeasurementService = {
     },
 
     async updateMeasurementReport(id: string, updates: Partial<MeasurementReport>): Promise<void> {
-        const dbUpdates: any = {};
+        const dbUpdates: Record<string, unknown> = {};
         if (updates.carPlate) dbUpdates.car_plate = updates.carPlate;
         if (updates.odometerStart !== undefined) dbUpdates.odometer_start = updates.odometerStart;
         if (updates.odometerEnd !== undefined) dbUpdates.odometer_end = updates.odometerEnd;
@@ -132,7 +134,7 @@ export const MeasurementService = {
             carIssues: row.car_issues,
             reportDescription: row.report_description,
             visits: row.measurements_snapshot || [],
-            signedContractsCount: (row.measurements_snapshot || []).filter((v: any) => v.outcome === 'signed').length,
+            signedContractsCount: (row.measurements_snapshot || []).filter((v: { outcome: string }) => v.outcome === 'signed').length,
             offerIds: [],
             is_active: true,
             currency: 'PLN',
@@ -152,9 +154,10 @@ export const MeasurementService = {
 
         if (error) throw error;
 
-        return (data || []).map((m: any) => ({
+        return (data || []).map((m) => ({
             id: m.id,
             offerId: m.offer_id,
+            leadId: m.lead_id,
             scheduledDate: new Date(m.scheduled_date),
             salesRepId: m.sales_rep_id,
             salesRepName: m.sales_rep?.full_name || '',
@@ -175,6 +178,7 @@ export const MeasurementService = {
 
     async createMeasurement(measurement: {
         offerId?: string;
+        leadId?: string;
         scheduledDate: Date;
         salesRepId: string;
         customerName: string;
@@ -200,17 +204,18 @@ export const MeasurementService = {
         const { data, error } = await supabase
             .from('measurements')
             .insert({
-                offer_id: measurement.offerId,
+                offer_id: measurement.offerId || null,
+                lead_id: measurement.leadId || null,
                 scheduled_date: measurement.scheduledDate.toISOString(),
                 sales_rep_id: measurement.salesRepId,
                 customer_name: measurement.customerName,
                 customer_address: measurement.customerAddress,
-                customer_phone: measurement.customerPhone,
+                customer_phone: measurement.customerPhone || null,
                 status: 'scheduled',
-                notes: measurement.notes,
-                estimated_duration: measurement.estimatedDuration,
-                location_lat: measurement.locationLat,
-                location_lng: measurement.locationLng
+                notes: measurement.notes || null,
+                estimated_duration: measurement.estimatedDuration || null,
+                location_lat: measurement.locationLat || null,
+                location_lng: measurement.locationLng || null
             })
             .select(`
         *,
@@ -223,6 +228,7 @@ export const MeasurementService = {
         return {
             id: data.id,
             offerId: data.offer_id,
+            leadId: data.lead_id,
             scheduledDate: new Date(data.scheduled_date),
             salesRepId: data.sales_rep_id,
             salesRepName: data.sales_rep?.full_name || '',
@@ -249,7 +255,7 @@ export const MeasurementService = {
         locationLng?: number;
         distanceFromPrevious?: number;
     }): Promise<Measurement> {
-        const updateData: any = {};
+        const updateData: Record<string, unknown> = {};
         if (updates.scheduledDate) updateData.scheduled_date = updates.scheduledDate.toISOString();
         if (updates.customerName) updateData.customer_name = updates.customerName;
         if (updates.customerAddress) updateData.customer_address = updates.customerAddress;
@@ -277,6 +283,7 @@ export const MeasurementService = {
         return {
             id: data.id,
             offerId: data.offer_id,
+            leadId: data.lead_id,
             scheduledDate: new Date(data.scheduled_date),
             salesRepId: data.sales_rep_id,
             salesRepName: data.sales_rep?.full_name || '',
@@ -307,7 +314,7 @@ export const MeasurementService = {
 
         if (error) throw error;
 
-        return data.map((row: any) => ({
+        return data.map((row) => ({
             id: row.id,
             date: row.data.date,
             salesRepId: row.user_id,

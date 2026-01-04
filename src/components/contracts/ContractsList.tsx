@@ -4,12 +4,14 @@ import type { Contract, Installation } from '../../types';
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { ContractStats } from './ContractStats';
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
     const { isAdmin, currentUser } = useAuth();
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [showStats, setShowStats] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -92,6 +94,17 @@ export const ContractsList: React.FC = () => {
                         <h1 className="text-2xl font-bold text-slate-800">Lista Umów</h1>
                         <p className="text-slate-500">Zarządzaj umowami i dokumentacją</p>
                     </div>
+                    {isAdmin() && (
+                        <button
+                            onClick={() => setShowStats(!showStats)}
+                            className={`p-2 rounded-lg border transition-all flex items-center gap-2 ${showStats ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span className="font-medium text-sm">Statystyki</span>
+                        </button>
+                    )}
                 </div>
 
                 {error && (
@@ -113,6 +126,9 @@ export const ContractsList: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+
+                {showStats && isAdmin() && <ContractStats contracts={filteredContracts} />}
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100 flex gap-4">

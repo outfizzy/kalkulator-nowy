@@ -266,39 +266,51 @@ export const LeadDetailsPage: React.FC = () => {
                                             <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" /></svg>
                                         </div>
 
-                                        {/* Next Best Action */}
+                                        {/* Next Best Action & AI Summary */}
                                         <div className="mb-6 relative z-10">
                                             <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                                 </svg>
-                                                Sugerowane Działanie
+                                                Analiza AI
                                             </h3>
-                                            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 border border-indigo-100 shadow-sm">
-                                                {(() => {
-                                                    // Simple Rule-Based "AI" Logic
-                                                    const daysSinceCreated = (new Date().getTime() - new Date(lead.createdAt).getTime()) / (1000 * 3600 * 24);
-                                                    const hasPhone = !!lead.customerData.phone;
-                                                    const hasEmail = !!lead.customerData.email;
+                                            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-indigo-100 shadow-sm space-y-3">
+                                                {/* AI Summary Text if available */}
+                                                {lead.aiSummary && (
+                                                    <div className="mb-3 text-sm text-slate-700 leading-relaxed border-b border-indigo-50 pb-3">
+                                                        <span className="font-semibold text-indigo-900 block mb-1">Podsumowanie:</span>
+                                                        {lead.aiSummary}
+                                                    </div>
+                                                )}
 
-                                                    if (lead.status === 'new' && daysSinceCreated < 1) return (
-                                                        <div className="text-sm font-medium text-slate-800">🚀 Nowy lead! Zadzwoń lub wyślij powitanie.</div>
-                                                    );
-                                                    if (lead.status === 'new' && daysSinceCreated >= 1) return (
-                                                        <div className="text-sm font-medium text-red-600">⚠️ Lead czeka ponad 24h. Skontaktuj się pilnie!</div>
-                                                    );
-                                                    if (lead.status === 'offer_sent') return (
-                                                        <div className="text-sm font-medium text-slate-800">📞 Oferta wysłana. Zadzwoń zapytać o decyzję.</div>
-                                                    );
-                                                    if (!hasPhone && hasEmail) return (
-                                                        <div className="text-sm font-medium text-slate-800">📧 Brak telefonu. Wyślij prośbę o numer.</div>
-                                                    );
-                                                    if (lead.status === 'contacted') return (
-                                                        <div className="text-sm font-medium text-slate-800">📝 Po rozmowie? Przygotuj ofertę.</div>
-                                                    );
+                                                {/* Suggested Action */}
+                                                <div>
+                                                    <span className="text-xs font-bold text-indigo-800 uppercase block mb-1">Sugerowane Działanie:</span>
+                                                    {(() => {
+                                                        // Simple Rule-Based "AI" Logic
+                                                        const daysSinceCreated = (new Date().getTime() - new Date(lead.createdAt).getTime()) / (1000 * 3600 * 24);
+                                                        const hasPhone = !!lead.customerData.phone;
+                                                        const hasEmail = !!lead.customerData.email;
 
-                                                    return <div className="text-sm font-medium text-slate-600">Monitoruj status leadu.</div>;
-                                                })()}
+                                                        if (lead.status === 'new' && daysSinceCreated < 1) return (
+                                                            <div className="text-sm font-medium text-slate-800">🚀 Nowy lead! Zadzwoń lub wyślij powitanie.</div>
+                                                        );
+                                                        if (lead.status === 'new' && daysSinceCreated >= 1) return (
+                                                            <div className="text-sm font-medium text-red-600">⚠️ Lead czeka ponad 24h. Skontaktuj się pilnie!</div>
+                                                        );
+                                                        if (lead.status === 'offer_sent') return (
+                                                            <div className="text-sm font-medium text-slate-800">📞 Oferta wysłana. Zadzwoń zapytać o decyzję.</div>
+                                                        );
+                                                        if (!hasPhone && hasEmail) return (
+                                                            <div className="text-sm font-medium text-slate-800">📧 Brak telefonu. Wyślij prośbę o numer.</div>
+                                                        );
+                                                        if (lead.status === 'contacted') return (
+                                                            <div className="text-sm font-medium text-slate-800">📝 Po rozmowie? Przygotuj ofertę.</div>
+                                                        );
+
+                                                        return <div className="text-sm font-medium text-slate-600">Monitoruj status leadu.</div>;
+                                                    })()}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -443,43 +455,58 @@ export const LeadDetailsPage: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* Client Activity Widget (New) */}
+                                    {/* Email & Communication Widget (Expanded) */}
                                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                                         <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                                             <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                             </svg>
-                                            Aktywność Klienta
+                                            Historia E-mail i Komunikacja
                                         </h3>
                                         <div className="space-y-4">
-                                            {communications.filter(c => c.userId === 'client').length > 0 ? (
-                                                communications.filter(c => c.userId === 'client').slice(0, 3).map((comm) => (
-                                                    <div key={comm.id} className="flex gap-3 items-start p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                            {(() => {
+                                                const emails = communications.filter(c => c.type === 'email' || c.userId === 'client');
+                                                if (emails.length === 0) return <div className="text-sm text-slate-400 italic">Brak wiadomości e-mail.</div>;
+
+                                                return emails.slice(0, 5).map((comm) => (
+                                                    <div key={comm.id} className={`flex gap-3 items-start p-3 rounded-lg border ${comm.direction === 'inbound' || comm.userId === 'client' ? 'bg-purple-50 border-purple-100' : 'bg-slate-50 border-slate-100'}`}>
                                                         <div className="mt-1">
-                                                            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                                            </svg>
+                                                            {comm.direction === 'inbound' || comm.userId === 'client' ? (
+                                                                <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                                </svg>
+                                                            ) : (
+                                                                <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                                </svg>
+                                                            )}
                                                         </div>
-                                                        <div>
-                                                            <div className="text-xs text-purple-800 font-bold mb-0.5">
-                                                                {new Date(comm.createdAt).toLocaleString()}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex justify-between items-center mb-0.5">
+                                                                <div className="text-xs font-bold uppercase tracking-wider opacity-70">
+                                                                    {(comm.direction === 'inbound' || comm.userId === 'client') ? 'Otrzymana' : 'Wysłana'}
+                                                                </div>
+                                                                <div className="text-xs text-slate-500">
+                                                                    {new Date(comm.createdAt).toLocaleDateString()}
+                                                                </div>
                                                             </div>
-                                                            <div className="text-sm text-purple-900 font-medium">
+                                                            <div className="text-sm font-semibold text-slate-800 truncate">
+                                                                {comm.subject || '(Bez tematu)'}
+                                                            </div>
+                                                            <div className="text-sm text-slate-600 line-clamp-2">
                                                                 {comm.content}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ))
-                                            ) : (
-                                                <div className="text-sm text-slate-400 italic">Brak aktywności klienta na portalu ofertowym.</div>
-                                            )}
+                                                ));
+                                            })()}
                                         </div>
-                                        {communications.filter(c => c.userId === 'client').length > 0 && (
+                                        {communications.some(c => c.type === 'email' || c.userId === 'client') && (
                                             <button
                                                 onClick={() => setActiveTab('communications')}
                                                 className="w-full text-center text-sm text-purple-600 font-medium hover:underline mt-4"
                                             >
-                                                Zobacz całą historię
+                                                Pokaż wszystkie wiadomości
                                             </button>
                                         )}
                                     </div>

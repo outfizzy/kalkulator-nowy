@@ -88,6 +88,39 @@ export const LeadService = {
 
         if (error) throw error;
 
+        // --- Phase 1: Ownership Sync Logic ---
+        // If assignedTo changed, update the Customer's representative_id as well
+        if (updates.assignedTo) {
+            try {
+                // 1. Get the lead's customer_id
+                const { data: leadData } = await supabase
+                    .from('leads')
+                    .select('customer_id')
+                    .eq('id', id)
+                    .single();
+
+                if (leadData?.customer_id) {
+                    // 2. Update Customer Representative
+                    const { error: custError } = await supabase
+                        .from('customers')
+                        .update({ representative_id: updates.assignedTo })
+                        .eq('id', leadData.customer_id);
+
+                    if (custError) {
+                        console.error('Failed to sync Customer Representative ownership:', custError);
+                    } else {
+                        console.log(`Ownership Synced: Customer ${leadData.customer_id} is now assigned to ${updates.assignedTo}`);
+
+                        // --- Phase 3: Automation (Welcome Email) ---
+                        // Trigger only if we have customer data and a new specific assignee
+                        await this.sendWelcomeEmail(id, updates.assignedTo, leadData.customer_id);
+                    }
+                }
+            } catch (err) {
+                console.error('Error during Ownership Sync:', err);
+            }
+        }
+
         // Automation: Create Task when Client Will Contact date is set
         if (updates.clientWillContactAt) {
             try {
@@ -134,20 +167,42 @@ export const LeadService = {
             throw error;
         }
 
-        return (data || []).map((lead) => ({
-            ...lead,
-            id: lead.id,
-            assignedTo: lead.assigned_to,
-            status: lead.status as LeadStatus,
-            source: lead.source as LeadSource,
-            createdAt: new Date(lead.created_at),
-            updatedAt: new Date(lead.updated_at),
+        // Manually fetch assignees
+        const assigneeIds = Array.from(new Set((data || []).map(l => l.assigned_to).filter(Boolean)));
+        const assigneeMap = new Map<string, { first_name?: string; last_name?: string }>();
 
-            lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
-            clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
-            customerData: lead.customer_data,
-            salesRep: undefined
-        }));
+        if (assigneeIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name')
+                .in('id', assigneeIds);
+
+            if (profiles) {
+                profiles.forEach(p => assigneeMap.set(p.id, p));
+            }
+        }
+
+        return (data || []).map((lead) => {
+            const assigneeProfile = lead.assigned_to ? assigneeMap.get(lead.assigned_to) : null;
+            return {
+                ...lead,
+                id: lead.id,
+                assignedTo: lead.assigned_to,
+                status: lead.status as LeadStatus,
+                source: lead.source as LeadSource,
+                createdAt: new Date(lead.created_at),
+                updatedAt: new Date(lead.updated_at),
+
+                lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
+                clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
+                customerData: lead.customer_data,
+                salesRep: undefined,
+                assignee: assigneeProfile ? {
+                    firstName: assigneeProfile.first_name || '',
+                    lastName: assigneeProfile.last_name || ''
+                } : undefined
+            };
+        });
     },
 
     async getStaleLeads(days = 3): Promise<Lead[]> {
@@ -319,7 +374,82 @@ export const LeadService = {
             lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
             clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
             customerData: lead.customer_data,
-            salesRep: undefined
+            salesRep: undefined,
+            aiScore: lead.ai_score,
+            aiSummary: lead.ai_summary
         }));
+    },
+
+    async scoreLead(leadId: string): Promise<{ score: number; summary: string; icon: string }> {
+        // 1. Get full lead data
+        const lead = await this.getLead(leadId);
+        if (!lead) throw new Error("Lead not found");
+
+        // 2. Call Edge Function
+        const { data, error } = await supabase.functions.invoke('lead-scorer', {
+            body: { lead }
+        });
+
+        if (error) {
+            console.error("AI Scoring Error:", error);
+            throw error;
+        }
+
+        return data;
+    },
+
+    async sendWelcomeEmail(leadId: string, userId: string, customerId: string): Promise<void> {
+        try {
+            // 1. Fetch User (Handlowiec) details
+            const { data: userProfile } = await supabase
+                .from('profiles')
+                .select('full_name, email, phone')
+                .eq('id', userId)
+                .single();
+
+            // 2. Fetch Customer details (Email)
+            const { data: customer } = await supabase
+                .from('customers')
+                .select('email, first_name, last_name, company_name')
+                .eq('id', customerId)
+                .single();
+
+            if (!userProfile || !customer || !customer.email) {
+                console.log('Skipping Welcome Email: Missing user or customer email.');
+                return;
+            }
+
+            // 3. Prepare Email Content
+            const subject = `Opiekun Twojej Oferty - ${userProfile.full_name}`;
+            const html = `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2>Dzień dobry ${customer.first_name} ${customer.last_name},</h2>
+                    <p>Nazywam się <strong>${userProfile.full_name}</strong> i zostałem przypisany jako Twój osobisty opiekun w sprawie zapytania o zadaszenie.</p>
+                    <p>Możesz się ze mną kontaktować bezpośrednio:</p>
+                    <ul>
+                        <li>Telefon: <strong>${userProfile.phone || 'Brak'}</strong></li>
+                        <li>Email: <a href="mailto:${userProfile.email}">${userProfile.email}</a></li>
+                    </ul>
+                    <p>Wkrótce skontaktuję się z Tobą, aby omówić szczegóły.</p>
+                    <br/>
+                    <p>Pozdrawiam,<br/>${userProfile.full_name}</p>
+                </div>
+            `;
+
+            // 4. Send using Edge Function
+            const { error } = await supabase.functions.invoke('send-email', {
+                body: {
+                    to: customer.email,
+                    subject: subject,
+                    html: html
+                }
+            });
+
+            if (error) throw error;
+            console.log(`Welcome Email sent to ${customer.email}`);
+
+        } catch (err) {
+            console.error('Failed to send Welcome Email:', err);
+        }
     }
 };

@@ -285,6 +285,19 @@ export const InstallationService = {
 
     // --- Profitability & Work Logs ---
 
+    async addManualWorkLog(installationId: string, startTime: string, endTime: string, userIds: string[]): Promise<void> {
+        const { error } = await supabase
+            .from('installation_work_logs')
+            .insert({
+                installation_id: installationId,
+                start_time: startTime, // ISO string
+                end_time: endTime,     // ISO string
+                user_ids: userIds
+            });
+
+        if (error) throw error;
+    },
+
     async startWorkDay(installationId: string, userIds: string[]): Promise<void> {
         const { error } = await supabase
             .from('installation_work_logs')
@@ -346,11 +359,12 @@ export const InstallationService = {
         }));
     },
 
-    async updateFinancials(installationId: string, costs: { hotelCost?: number; consumablesCost?: number; additionalCosts?: number }): Promise<void> {
+    async updateFinancials(installationId: string, costs: { hotelCost?: number; consumablesCost?: number; additionalCosts?: number; status?: Installation['status'] }): Promise<void> {
         const updates: Record<string, unknown> = {};
         if (costs.hotelCost !== undefined) updates.hotel_cost = costs.hotelCost;
         if (costs.consumablesCost !== undefined) updates.consumables_cost = costs.consumablesCost;
         if (costs.additionalCosts !== undefined) updates.additional_costs = costs.additionalCosts;
+        if (costs.status !== undefined) updates.status = costs.status;
 
         if (Object.keys(updates).length === 0) return;
 
@@ -568,19 +582,30 @@ export const InstallationService = {
             client: installation.client,
             productSummary: installation.productSummary,
             teamId: installation.teamId,
-            notes: installation.notes
+            notes: installation.notes,
+            acceptance: installation.acceptance
+        };
+
+        const insertPayload: Record<string, unknown> = {
+            offer_id: installation.offerId || null,
+            customer_id: installation.customerId || null,
+            user_id: user.id,
+            scheduled_date: installation.scheduledDate || null,
+            status: installation.status,
+            installation_data: installationData,
+            // Map flat columns
+            source_type: installation.sourceType || 'contract', // Default per existing logic
+            source_id: installation.sourceId || null,
+            team_id: installation.teamId || null,
+            parts_ready: installation.partsReady || false,
+            expected_duration: installation.expectedDuration || 1,
+            delivery_date: installation.deliveryDate || null,
+            title: installation.title || null
         };
 
         const { data, error } = await supabase
             .from('installations')
-            .insert({
-                offer_id: installation.offerId || null,
-                customer_id: installation.customerId || null,
-                user_id: user.id,
-                scheduled_date: installation.scheduledDate || null,
-                status: installation.status,
-                installation_data: installationData
-            })
+            .insert(insertPayload)
             .select()
             .single();
 
@@ -623,7 +648,8 @@ export const InstallationService = {
                 source_type: data.sourceType || 'manual',
                 source_id: data.sourceId || null,
                 title: data.title,
-                expected_duration: data.expectedDuration || 1
+                expected_duration: data.expectedDuration || 1,
+                team_id: data.teamId || null
             })
             .select() // Add select to return the new row for processing
             .single();
@@ -639,7 +665,7 @@ export const InstallationService = {
             teamId: data.teamId,
             notes: data.description,
             createdAt: new Date(newInst.created_at),
-            sourceType: 'manual',
+            sourceType: data.sourceType || 'manual',
             title: data.title,
             expectedDuration: newInst.expected_duration
         } as Installation;
@@ -662,6 +688,12 @@ export const InstallationService = {
         if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
         if (updates.partsReady !== undefined) dbUpdates.parts_ready = updates.partsReady;
         if (updates.expectedDuration !== undefined) dbUpdates.expected_duration = updates.expectedDuration;
+        if (updates.deliveryDate !== undefined) dbUpdates.delivery_date = updates.deliveryDate;
+
+        // Ensure team_id column is updated if teamId provided
+        if (updates.teamId !== undefined) {
+            dbUpdates.team_id = updates.teamId || null;
+        }
 
         // Merge installation_data
         if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance) {
@@ -674,7 +706,8 @@ export const InstallationService = {
                 ...(updates.acceptance && { acceptance: updates.acceptance })
             };
 
-            if (updates.teamId) installationData.teamId = updates.teamId;
+            // Redundant assignment for clarity: updates.teamId handles logic above
+            // if (updates.teamId) installationData.teamId = updates.teamId;
 
             dbUpdates.installation_data = installationData;
         }
@@ -691,9 +724,7 @@ export const InstallationService = {
             .eq('id', id);
 
         if (error) throw error;
-        if (error) throw error;
     },
-
     async getInstallationTeams(): Promise<InstallationTeam[]> {
         const { data, error } = await supabase
             .from('installation_teams')
@@ -702,23 +733,24 @@ export const InstallationService = {
 
         if (error) throw error;
 
-        return data.map((t: any) => {
+        return data.map((t) => {
             // Handle members being JSONB array of strings or objects
             let membersList: { id: string; firstName: string; lastName: string }[] = [];
 
             if (Array.isArray(t.members)) {
-                membersList = t.members.map((m: any, idx: number) => {
+                membersList = t.members.map((m: unknown, idx: number) => {
                     if (typeof m === 'string') {
                         return {
                             id: `mem-${t.id}-${idx}`,
                             firstName: m,
                             lastName: ''
                         };
-                    } else if (typeof m === 'object') {
+                    } else if (typeof m === 'object' && m !== null) {
+                        const memberObj = m as Record<string, any>;
                         return {
-                            id: m.id || `mem-${t.id}-${idx}`,
-                            firstName: m.firstName || m.name || '',
-                            lastName: m.lastName || ''
+                            id: memberObj.id || `mem-${t.id}-${idx}`,
+                            firstName: memberObj.firstName || memberObj.name || '',
+                            lastName: memberObj.lastName || ''
                         };
                     }
                     return { id: `unknown-${idx}`, firstName: 'Nieznany', lastName: '' };

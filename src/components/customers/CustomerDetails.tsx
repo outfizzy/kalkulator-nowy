@@ -105,7 +105,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                             };
                             const customerPhone = normalize(customer.phone);
 
-                            const customerCalls = data.calls.filter((call: any) => {
+                            const customerCalls = data.calls.filter((call: RingostatCall) => {
                                 const caller = normalize(call.caller);
                                 const callee = normalize(call.callee);
                                 return caller.includes(customerPhone) || callee.includes(customerPhone);
@@ -269,7 +269,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => setActiveTab(tab.id as typeof activeTab)}
                             className={`px-6 py-4 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === tab.id
                                 ? 'border-blue-600 text-blue-600 bg-blue-50/50'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -306,71 +306,151 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                         </span>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Team & Responsibilities - NEW */}
-                            <div className="mt-8">
-                                <h3 className="font-bold text-slate-800 mb-4">Zespół i Odpowiedzialność</h3>
-                                <div className="space-y-4 text-sm">
-                                    <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                </svg>
+                                {/* Team & Responsibilities - NEW */}
+                                <div className="mt-8">
+                                    <h3 className="font-bold text-slate-800 mb-4">Zespół i Odpowiedzialność</h3>
+                                    <div className="space-y-4 text-sm">
+                                        <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                    </svg>
+                                                </div>
+                                                <span className="text-slate-500">Opiekun Klienta</span>
                                             </div>
-                                            <span className="text-slate-500">Opiekun Klienta</span>
+                                            <span className={`font-medium ${customer.representative ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                                                {customer.representative
+                                                    ? `${customer.representative.firstName} ${customer.representative.lastName}`
+                                                    : 'Nie przypisano'}
+                                            </span>
                                         </div>
-                                        <span className={`font-medium ${customer.representative ? 'text-slate-800' : 'text-slate-400 italic'}`}>
-                                            {customer.representative
-                                                ? `${customer.representative.firstName} ${customer.representative.lastName}`
-                                                : 'Nie przypisano'}
-                                        </span>
+                                        <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
+                                                </div>
+                                                <span className="text-slate-500">Osoba Decyzyjna</span>
+                                            </div>
+                                            <span className={`font-medium ${customer.contractSigner ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                                                {customer.contractSigner
+                                                    ? `${customer.contractSigner.firstName} ${customer.contractSigner.lastName}`
+                                                    : 'Nie wskazano'}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                </svg>
+                                </div>
+
+                                <div>
+                                    <h3 className="font-bold text-slate-800 mb-4">Ostatnie Aktywności</h3>
+                                    <div className="space-y-3">
+                                        {contracts.length === 0 && calls.length === 0 && <span className="text-slate-400 text-sm">Brak aktywności</span>}
+                                        {contracts.slice(0, 3).map(c => (
+                                            <div key={c.id} className="flex gap-3 text-sm">
+                                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-slate-800">Umowa {c.contractNumber}</div>
+                                                    <div className="text-slate-500">{formatDate(c.createdAt)} • {c.status}</div>
+                                                </div>
                                             </div>
-                                            <span className="text-slate-500">Osoba Decyzyjna</span>
-                                        </div>
-                                        <span className={`font-medium ${customer.contractSigner ? 'text-slate-800' : 'text-slate-400 italic'}`}>
-                                            {customer.contractSigner
-                                                ? `${customer.contractSigner.firstName} ${customer.contractSigner.lastName}`
-                                                : 'Nie wskazano'}
-                                        </span>
+                                        ))}
+                                        {calls.slice(0, 3).map(call => (
+                                            <div key={call.id} className="flex gap-3 text-sm">
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-slate-800">Rozmowa ({call.direction === 'incoming' ? 'przych.' : 'wych.'})</div>
+                                                    <div className="text-slate-500">{formatDate(call.date)} • {Math.round(call.duration / 60)} min</div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
+                            <div className="space-y-6">
+                                {/* AI Analysis Widget (if Lead exists) */}
+                                {leads.length > 0 && leads[0].aiSummary && (
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 shadow-sm p-5 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-3 opacity-10">
+                                            <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" /></svg>
+                                        </div>
+                                        <div className="relative z-10">
+                                            <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                </svg>
+                                                Analiza AI (z Leada)
+                                            </h3>
+                                            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-indigo-100 shadow-sm">
+                                                <div className="text-sm text-slate-700 leading-relaxed">
+                                                    <span className="font-semibold text-indigo-900 block mb-1">Podsumowanie:</span>
+                                                    {leads[0].aiSummary}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                            <div>
-                                <h3 className="font-bold text-slate-800 mb-4">Ostatnie Aktywności</h3>
-                                <div className="space-y-3">
-                                    {contracts.length === 0 && calls.length === 0 && <span className="text-slate-400 text-sm">Brak aktywności</span>}
-                                    {contracts.slice(0, 3).map(c => (
-                                        <div key={c.id} className="flex gap-3 text-sm">
-                                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-slate-800">Umowa {c.contractNumber}</div>
-                                                <div className="text-slate-500">{formatDate(c.createdAt)} • {c.status}</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {calls.slice(0, 3).map(call => (
-                                        <div key={call.id} className="flex gap-3 text-sm">
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-slate-800">Rozmowa ({call.direction === 'incoming' ? 'przych.' : 'wych.'})</div>
-                                                <div className="text-slate-500">{formatDate(call.date)} • {Math.round(call.duration / 60)} min</div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                {/* Email History Widget */}
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        Historia Komunikacji
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {(() => {
+                                            const emails = communications.filter(c => c.type === 'email' || c.userId === 'client');
+                                            if (emails.length === 0) return <div className="text-sm text-slate-400 italic">Brak wiadomości e-mail.</div>;
+
+                                            return emails.slice(0, 5).map((comm) => (
+                                                <div key={comm.id} className={`flex gap-3 items-start p-3 rounded-lg border ${comm.direction === 'inbound' || comm.userId === 'client' ? 'bg-purple-50 border-purple-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                    <div className="mt-1">
+                                                        {comm.direction === 'inbound' || comm.userId === 'client' ? (
+                                                            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-center mb-0.5">
+                                                            <div className="text-xs font-bold uppercase tracking-wider opacity-70">
+                                                                {(comm.direction === 'inbound' || comm.userId === 'client') ? 'Otrzymana' : 'Wysłana'}
+                                                            </div>
+                                                            <div className="text-xs text-slate-500">
+                                                                {new Date(comm.createdAt).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-sm font-semibold text-slate-800 truncate">
+                                                            {comm.subject || '(Bez tematu)'}
+                                                        </div>
+                                                        <div className="text-sm text-slate-600 line-clamp-2">
+                                                            {comm.content}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                    {communications.some(c => c.type === 'email' || c.userId === 'client') && (
+                                        <button
+                                            onClick={() => setActiveTab('communication')}
+                                            className="w-full text-center text-sm text-purple-600 font-medium hover:underline mt-4"
+                                        >
+                                            Przejdź do pełnej historii
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -703,7 +783,9 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     {/* PROFITABILITY TAB */}
                     {activeTab === 'profitability' && (
                         <div className="space-y-6">
-                            <LeadsList leads={leadsData || []} customer={customer as Customer & { id: string }} />
+                            <div className="space-y-6">
+                                <ProfitabilityDashboard customer={customer as Customer & { id: string }} />
+                            </div>
                         </div>
                     )}
 
@@ -820,6 +902,6 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

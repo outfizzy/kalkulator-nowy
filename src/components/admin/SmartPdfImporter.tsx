@@ -36,6 +36,8 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
     const [snowZone, setSnowZone] = useState<string>('1'); // Added snowZone state
     const [variantName, setVariantName] = useState<string>('');
 
+    const [provider, setProvider] = useState<string>('Inny'); // Added Provider State
+
     // Ref to the container that holds the Page to get the canvas
     const pageRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +91,109 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                 resolve(blob);
             }, 'image/jpeg');
         });
+    };
+
+    const handleScanPage = async () => {
+        if (!file || !selectedProductId) {
+            toast.error("Wybierz plik i model zadaszenia!");
+            return;
+        }
+
+        setAnalyzing(true);
+        const toastId = toast.loading('Skanowanie całej strony i szukanie tabel...');
+
+        try {
+            // 1. Get Full Page Image
+            const canvas = pageRef.current?.querySelector('canvas');
+            if (!canvas) throw new Error("Canvas not ready");
+
+            // Create full page crop equivalent
+            const blob = await new Promise<Blob | null>((resolve) => {
+                canvas.toBlob(resolve, 'image/jpeg', 0.8);
+            });
+
+            if (!blob) throw new Error("Failed to capture page");
+
+            const formData = new FormData();
+            formData.append('image', blob, 'full_page.jpg');
+            formData.append('mode', 'scan_page'); // Hint to backend if supported
+
+            const { data, error } = await supabase.functions.invoke('parse-price-pdf', {
+                body: formData
+            });
+
+            if (error) throw error;
+            if (data.error) throw new Error(data.error);
+
+            // 2. Process Detected Tables
+            const payload = data.data || data;
+            const tables = payload.tables || [payload]; // Fallback if single object
+
+            if (!tables || tables.length === 0) {
+                throw new Error("Nie wykryto żadnych tabel na tej stronie.");
+            }
+
+            // 3. Auto-queue all valid tables
+            let addedCount = 0;
+            const newQueueItems: any[] = [];
+
+            tables.forEach((tableData: any, idx: number) => {
+                // Check if valid table data
+                const rawEntries = tableData.entries || tableData.data;
+                if (!rawEntries || rawEntries.length === 0) return;
+
+                // Calculate dimensions
+                const uniqueWidths = new Set(rawEntries.map((e: any) => e.width_mm || e.width));
+                const uniqueProjections = new Set(rawEntries.map((e: any) => e.projection_mm || e.projection));
+
+                // Normalize data for UI
+                const normalizedData = {
+                    ...tableData,
+                    rows: uniqueProjections.size || tableData.rows,
+                    cols: uniqueWidths.size || tableData.cols,
+                    data: rawEntries
+                };
+
+                // Create Queue Item
+                const productName = products.find(p => p.id === selectedProductId)?.name || 'Nieznany';
+
+                // Use AI detected attributes OR global context
+                const aiAttrs = tableData.detected_attributes || {};
+
+                const config = {
+                    roofType: aiAttrs.roof_type && ['glass', 'polycarbonate'].includes(aiAttrs.roof_type)
+                        ? aiAttrs.roof_type
+                        : roofType,
+                    snowZone: aiAttrs.snow_zone ? String(aiAttrs.snow_zone) : snowZone,
+                    subtype: aiAttrs.subtype || variantName || undefined
+                };
+
+                newQueueItems.push({
+                    id: Date.now().toString() + '_' + idx,
+                    matrixData: normalizedData,
+                    productId: selectedProductId,
+                    productName: productName,
+                    variantConfig: config,
+                    provider: provider, // Pass provider
+                    sourceFile: file.name + ` (Strona ${pageNumber})`
+                });
+                addedCount++;
+            });
+
+            if (addedCount > 0) {
+                setQueue(prev => [...prev, ...newQueueItems]);
+                toast.success(`Znaleziono i dodano ${addedCount} tabel!`, { id: toastId });
+                setAnalyzedData(payload); // Show debug info
+            } else {
+                toast.error("Znaleziono dane, ale nie udało się ich przetworzyć na tabele.", { id: toastId });
+            }
+
+        } catch (e: any) {
+            console.error(e);
+            toast.error('Błąd skanowania: ' + e.message, { id: toastId });
+        } finally {
+            setAnalyzing(false);
+        }
     };
 
     const handleAddToQueue = async () => {
@@ -213,6 +318,7 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                     snowZone: snowZone,
                     subtype: variantName || undefined
                 },
+                provider: provider, // Add Provider
                 sourceFile: file.name
             };
 
@@ -249,9 +355,22 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
             <div className="flex justify-between items-center mb-4">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800">Inteligentny Import PDF (Hurtowy)</h2>
-                    <p className="text-sm text-slate-500">Wybierz model, typ dachu, zaznacz tabelę i dodaj do kolejki.</p>
+                    <p className="text-sm text-slate-500">Wybierz model, typ dachu, zaznacz tabelę lub zeskanuj całą stronę.</p>
                 </div>
-                <button onClick={onClose} className="text-slate-500 hover:text-slate-700">✕</button>
+                <div className="flex items-center gap-4">
+                    <select
+                        value={provider}
+                        onChange={(e) => setProvider(e.target.value)}
+                        className="p-2 border border-slate-200 rounded text-sm bg-white"
+                    >
+                        <option value="Inny">Dostawca: Inny / Własny</option>
+                        <option value="Aluxe">Aluxe</option>
+                        <option value="Deponti">Deponti</option>
+                        <option value="TGA">TGA Metal</option>
+                        <option value="Gardendreams">Gardendreams</option>
+                    </select>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-700">✕</button>
+                </div>
             </div>
 
             {!file ? (
@@ -303,7 +422,7 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                     <div className="w-80 flex flex-col gap-4">
                         {/* 1. Context Selection */}
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 space-y-4">
-                            <h3 className="font-bold text-slate-700 border-b pb-2">1. Konfiguracja Tabeli</h3>
+                            <h3 className="font-bold text-slate-700 border-b pb-2">1. Konfiguracja</h3>
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 mb-1">Model Zadaszenia</label>
@@ -375,26 +494,40 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                                         )}
                                     </datalist>
                                     <p className="text-[10px] text-slate-400">
-                                        Użyj standardowych kodów (np. <code>ir-gold</code>, <code>mat</code>) aby wizualizator automatycznie wykrył cenę.
+                                        Użyj standardowych kodów (np. <code>ir-gold</code>)
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex gap-2">
+                            <hr className="border-slate-100" />
+
+                            {/* ACTION BUTTONS */}
+                            <div className="flex flex-col gap-2">
+                                {/* SCAN FULL PAGE BUTTON */}
                                 <button
-                                    onClick={clearSelection}
-                                    disabled={!completedCrop}
-                                    className="px-3 py-2 text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-xs font-medium"
+                                    onClick={handleScanPage}
+                                    disabled={analyzing || !selectedProductId}
+                                    className="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
                                 >
-                                    Wyczyść
+                                    {analyzing ? 'Skanowanie...' : '⚡ Skanuj Całą Stronę (AI)'}
                                 </button>
-                                <button
-                                    onClick={handleAddToQueue}
-                                    disabled={analyzing || !completedCrop?.width || !selectedProductId}
-                                    className={`flex-1 py-2 text-white rounded-lg font-bold flex justify-center gap-2 ${analyzedData && analyzedCrop === completedCrop ? 'bg-green-600 hover:bg-green-700' : 'bg-accent hover:bg-accent/90'} disabled:opacity-50`}
-                                >
-                                    {analyzing ? 'Analizowanie...' : analyzedData && analyzedCrop === completedCrop ? '➕ Dodaj Wariant' : '🔍 Analizuj i Dodaj'}
-                                </button>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={clearSelection}
+                                        disabled={!completedCrop}
+                                        className="px-3 py-2 text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-xs font-medium"
+                                    >
+                                        Wyczyść
+                                    </button>
+                                    <button
+                                        onClick={handleAddToQueue}
+                                        disabled={analyzing || !completedCrop?.width || !selectedProductId}
+                                        className={`flex-1 py-2 text-white rounded-lg font-bold flex justify-center gap-2 ${analyzedData && analyzedCrop === completedCrop ? 'bg-green-600 hover:bg-green-700' : 'bg-accent hover:bg-accent/90'} disabled:opacity-50`}
+                                    >
+                                        {analyzing ? 'Analizowanie...' : analyzedData && analyzedCrop === completedCrop ? '➕ Dodaj' : '🔍 Analizuj Zaznaczenie'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -426,6 +559,7 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                                                 {item.matrixData.entries ? ` • ${item.matrixData.entries.length} pozycji` :
                                                     item.matrixData.rows ? ` • ${item.matrixData.rows}x${item.matrixData.cols}` : ''}
                                             </span>
+                                            {item.provider && <span className="block text-[10px] text-blue-500">Dostawca: {item.provider}</span>}
                                         </div>
                                         <button
                                             onClick={() => handleRemoveFromQueue(idx)}

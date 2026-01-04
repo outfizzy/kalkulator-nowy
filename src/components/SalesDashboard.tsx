@@ -13,6 +13,9 @@ import { RingostatWidget } from './widgets/RingostatWidget';
 import { TasksList } from './tasks/TasksList';
 import { TaskModal } from './tasks/TaskModal';
 import { StaleLeadsWidget } from './widgets/StaleLeadsWidget';
+import { InstallationService } from '../services/database/installation.service';
+import { InstallationSettlementModal } from './installations/InstallationSettlementModal';
+import type { Installation } from '../types';
 
 export const SalesDashboard: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
@@ -25,6 +28,10 @@ export const SalesDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
+
+    // Settlement State
+    const [unsettledInstallations, setUnsettledInstallations] = useState<Installation[]>([]);
+    const [settlementInstallation, setSettlementInstallation] = useState<Installation | null>(null);
 
     // Month Selection State
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -54,6 +61,18 @@ export const SalesDashboard: React.FC = () => {
                 ]);
                 setLeads(allLeads);
                 setStaleLeads(fetchedStaleLeads);
+
+                // 2.5 Fetch Unsettled Installations (Admin/Manager only)
+                if (isAdmin() || currentUser.role === 'manager') {
+                    try {
+                        await InstallationService.checkAndAutoCompleteInstallations();
+                        const updateTrigger = await InstallationService.getInstallations();
+                        // Filter for verification status
+                        setUnsettledInstallations(updateTrigger.filter(i => i.status === 'verification'));
+                    } catch (err) {
+                        console.error("Error fetching unsettled installations", err);
+                    }
+                }
 
                 // 3. Calculate Stats
                 const computedStats = calculateCommissionStats(userOffers);
@@ -338,21 +357,86 @@ export const SalesDashboard: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Unsettled Install Widget */}
+                {unsettledInstallations.length > 0 && (
+                    <div className="lg:col-span-1">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full flex flex-col min-h-[400px]">
+                            <div className="p-4 border-b border-slate-100 bg-amber-50 flex justify-between items-center shrink-0 rounded-t-xl">
+                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Do Rozliczenia
+                                </h3>
+                                <div className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">
+                                    {unsettledInstallations.length}
+                                </div>
+                            </div>
+                            <div className="p-4 flex-1 overflow-y-auto space-y-3">
+                                {unsettledInstallations.map(inst => (
+                                    <div key={inst.id} className="bg-white border border-amber-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="font-bold text-slate-800">{inst.client.lastName}</div>
+                                            <div className="text-xs text-slate-500">{inst.scheduledDate}</div>
+                                        </div>
+                                        <div className="text-xs text-slate-600 mb-3 line-clamp-2">{inst.productSummary}</div>
+                                        <button
+                                            onClick={() => setSettlementInstallation(inst)}
+                                            className="w-full py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded transition-colors text-center"
+                                        >
+                                            Rozlicz
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
                 {staleLeads.length > 0 && (
                     <div className="lg:col-span-1">
                         <StaleLeadsWidget leads={staleLeads} />
                     </div>
                 )}
-                <div className={`lg:col-span-${staleLeads.length > 0 ? '2' : '3'} md:col-span-2`}>
+
+                {/* Dynamic Col Span Logic based on occupied slots
+                    Total 4 slots.
+                    Tasks: 1
+                    Unsettled: 1 (if present)
+                    Stale: 1 (if present)
+                    Max Ringostat = 4 - occupied.
+                */}
+                <div className={`
+                    lg:col-span-${Math.max(1, 4 - 1 - (unsettledInstallations.length > 0 ? 1 : 0) - (staleLeads.length > 0 ? 1 : 0))} 
+                    md:col-span-2
+                `}>
                     <RingostatWidget compact />
                 </div>
             </div>
 
+            {/* Modals */}
             <TaskModal
                 isOpen={isTaskModalOpen}
                 onClose={() => setIsTaskModalOpen(false)}
                 onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
             />
+
+            {settlementInstallation && (
+                <InstallationSettlementModal
+                    isOpen={!!settlementInstallation}
+                    installation={settlementInstallation}
+                    onClose={() => setSettlementInstallation(null)}
+                    onSuccess={() => {
+                        setSettlementInstallation(null);
+                        // Refresh data (should ideally trigger effect)
+                        InstallationService.getInstallations().then(res => {
+                            setUnsettledInstallations(res.filter(i => i.status === 'verification'));
+                        });
+                    }}
+                />
+            )}
 
             {/* Monthly Settlement Card */}
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 rounded-xl shadow-lg">

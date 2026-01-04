@@ -28,6 +28,8 @@ import { format, differenceInDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { LostLeadModal } from './LostLeadModal';
+import { MeasurementModal } from '../measurements/MeasurementModal';
+import type { Measurement } from '../../types';
 
 interface LeadsKanbanProps {
     leads: Lead[];
@@ -50,7 +52,7 @@ const isLeadStale = (lead: Lead) => {
     return differenceInDays(new Date(), lastDate) > 3;
 };
 
-const KanbanCard = ({ lead, onClick, onUpdate }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void }) => {
+const KanbanCard = ({ lead, onClick, onUpdate, onSchedule }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void }) => {
     const {
         attributes,
         listeners,
@@ -86,6 +88,11 @@ const KanbanCard = ({ lead, onClick, onUpdate }: { lead: Lead; onClick: (id: str
         }
     };
 
+    const handleScheduleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSchedule(lead);
+    };
+
     return (
         <div
             ref={setNodeRef}
@@ -115,6 +122,15 @@ const KanbanCard = ({ lead, onClick, onUpdate }: { lead: Lead; onClick: (id: str
                         </svg>
                     </button>
                 )}
+                <button
+                    onClick={handleScheduleClick}
+                    className="absolute top-2 right-8 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                    title="Umów pomiar"
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </button>
                 {isStale && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px] font-bold" title="Brak kontaktu > 3 dni">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -143,6 +159,37 @@ const KanbanCard = ({ lead, onClick, onUpdate }: { lead: Lead; onClick: (id: str
                 )}
             </div>
 
+            {/* AI Score Badge */}
+            <div className="mb-3 flex items-center gap-2">
+                {lead.aiScore !== undefined ? (
+                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${lead.aiScore > 70 ? 'bg-orange-50 text-orange-700 border-orange-100' : lead.aiScore < 30 ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-50 text-slate-600 border-slate-100'}`} title={lead.aiSummary}>
+                        <span className="text-sm">{lead.aiScore > 70 ? '🔥' : lead.aiScore < 30 ? '❄️' : '😐'}</span>
+                        <span>Score: {lead.aiScore}</span>
+                    </div>
+                ) : (
+                    <button
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                                const toastId = toast.loading('AI Analizuje...');
+                                await DatabaseService.scoreLead(lead.id);
+                                toast.dismiss(toastId);
+                                toast.success('Analiza gotowa!');
+                                onUpdate();
+                            } catch {
+                                toast.error('Błąd AI');
+                            }
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-600 rounded-md text-[10px] font-bold border border-violet-100 hover:bg-violet-100 transition-colors"
+                    >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        AI OCENA
+                    </button>
+                )}
+            </div>
+
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                     {lead.assignee ? (
@@ -168,12 +215,12 @@ const KanbanCard = ({ lead, onClick, onUpdate }: { lead: Lead; onClick: (id: str
                     {format(new Date(lead.createdAt), 'dd.MM', { locale: pl })}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
 // Extracted Column Component with useDroppable
-const KanbanColumn = ({ column, leads, onNavigate, onUpdate }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void }) => {
+const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void }) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
@@ -204,6 +251,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate }: { column: typeof 
                                 lead={lead}
                                 onClick={onNavigate}
                                 onUpdate={onUpdate}
+                                onSchedule={onSchedule}
                             />
                         ))}
                     </div>
@@ -221,6 +269,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     // Modal State
     const [lostModalOpen, setLostModalOpen] = useState(false);
     const [pendingLostLeadId, setPendingLostLeadId] = useState<string | null>(null);
+    const [measurementLead, setMeasurementLead] = useState<Lead | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -318,13 +367,38 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const handleLostConfirm = async (reason: string, notes: string) => {
         if (!pendingLostLeadId) return;
 
-        await updateLeadStatus(pendingLostLeadId, 'lost', {
+        const updateData: any = {
             lostReason: reason,
             notes: notes ? (leads.find(l => l.id === pendingLostLeadId)?.notes + '\n\n[Utrata]: ' + notes) : undefined
-        });
+        };
+
+        await updateLeadStatus(pendingLostLeadId, 'lost', updateData);
 
         toast.success('Oznaczono jako utracone');
         setPendingLostLeadId(null);
+    };
+
+    const handleSaveMeasurement = async (data: Partial<Measurement>) => {
+        if (!measurementLead || !currentUser) return;
+        try {
+            await DatabaseService.createMeasurement({
+                scheduledDate: data.scheduledDate!,
+                salesRepId: measurementLead.assignedTo || currentUser.id, // Use assignee or current user
+                customerName: data.customerName!,
+                customerAddress: data.customerAddress!,
+                customerPhone: data.customerPhone,
+                leadId: measurementLead.id,
+                notes: data.notes,
+                estimatedDuration: data.estimatedDuration,
+                locationLat: data.locationLat,
+                locationLng: data.locationLng
+            });
+            toast.success('Pomiar umówiony!');
+            setMeasurementLead(null);
+        } catch (error) {
+            console.error('Error creating measurement:', error);
+            toast.error('Błąd umawiania pomiaru');
+        }
     };
 
     return (
@@ -343,6 +417,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             leads={columns[column.id]}
                             onNavigate={(id) => navigate(`/leads/${id}`)}
                             onUpdate={onLeadUpdate}
+                            onSchedule={setMeasurementLead}
                         />
                     ))}
                 </div>
@@ -353,7 +428,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             const lead = leads.find(l => l.id === activeId);
                             return lead ? (
                                 <div className="opacity-90 rotate-3 cursor-grabbing transform scale-105">
-                                    <KanbanCard lead={lead} onClick={() => { }} onUpdate={() => { }} />
+                                    <KanbanCard lead={lead} onClick={() => { }} onUpdate={() => { }} onSchedule={() => { }} />
                                 </div>
                             ) : null;
                         })()
@@ -366,6 +441,21 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 onClose={() => { setLostModalOpen(false); setPendingLostLeadId(null); }}
                 onConfirm={handleLostConfirm}
             />
+
+            {measurementLead && (
+                <MeasurementModal
+                    measurement={null}
+                    initialData={{
+                        leadId: measurementLead.id,
+                        customerName: `${measurementLead.customerData.firstName} ${measurementLead.customerData.lastName}`,
+                        customerAddress: `${measurementLead.customerData.address}, ${measurementLead.customerData.postalCode} ${measurementLead.customerData.city}`,
+                        customerPhone: undefined, // Phone not directly in flat structure? check customerData
+                        notes: `Lead: ${measurementLead.source}` + (measurementLead.notes ? `\n\n${measurementLead.notes}` : '')
+                    }}
+                    onSave={handleSaveMeasurement}
+                    onClose={() => setMeasurementLead(null)}
+                />
+            )}
         </>
     );
 };

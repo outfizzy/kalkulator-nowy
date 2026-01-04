@@ -62,6 +62,31 @@ export const UserService = {
         };
     },
 
+    async getUsersByIds(ids: string[]): Promise<User[]> {
+        if (!ids || ids.length === 0) return [];
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', ids);
+
+        if (error) throw error;
+
+        return data.map(row => ({
+            id: row.id,
+            username: (row.full_name || '').split(' ')[0].toLowerCase() || '',
+            firstName: (row.full_name || '').split(' ')[0] || '',
+            lastName: (row.full_name || '').split(' ').slice(1).join(' ') || '',
+            email: '',
+            role: row.role as User['role'],
+            createdAt: new Date(row.created_at),
+            phone: row.phone,
+            status: row.status as 'pending' | 'active' | 'blocked',
+            hourlyRate: typeof row.hourly_rate === 'number' ? row.hourly_rate : undefined,
+            hourlyRateCurrency: row.hourly_rate_currency
+        }));
+    },
+
     async checkEmailConfigColumn(userId: string): Promise<{ error: Error | null }> {
         const { error } = await supabase
             .from('profiles')

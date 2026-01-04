@@ -146,7 +146,8 @@ export const PricingPage = () => {
                     variant_config: item.variantConfig,
                     type: 'matrix',
                     is_active: true,
-                    currency: 'EUR' // Default to EUR for now
+                    currency: 'EUR', // Default to EUR for now
+                    attributes: item.provider ? { provider: item.provider } : {}
                 }).select().single();
 
                 if (tableError) throw tableError;

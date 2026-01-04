@@ -43,6 +43,8 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                     <SpecRow label="Głębokość (Wysięg)" value={`${product.projection} mm`} />
                     {product.postsHeight && <SpecRow label="Wysokość Słupów" value={`${product.postsHeight} mm`} />}
                     {product.installationDays && <SpecRow label="Przewidywany czas montażu" value={`${product.installationDays} dni`} />}
+                    {product.numberOfPosts && <SpecRow label="Liczba Słupów" value={`${product.numberOfPosts} szt.`} />}
+                    {product.numberOfFields && <SpecRow label="Liczba Pól (Sekcji)" value={`${product.numberOfFields}`} />}
                 </div>
 
                 {/* 2. Aesthetics */}

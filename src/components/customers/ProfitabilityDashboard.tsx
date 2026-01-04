@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
-import type { CustomerCost, Customer } from '../../types';
+import type { CustomerCost, Customer, Offer } from '../../types';
 
 interface ProfitabilityDashboardProps {
     customer: Customer & { id: string };
@@ -9,6 +9,7 @@ interface ProfitabilityDashboardProps {
 
 export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ customer }) => {
     const [costs, setCosts] = useState<CustomerCost[]>([]);
+    const [offers, setOffers] = useState<Offer[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCost, setNewCost] = useState<Partial<CustomerCost>>({
@@ -21,12 +22,10 @@ export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ 
         totalRevenue: 0,
         totalCosts: 0,
         profit: 0,
-        margin: 0
+        margin: 0,
+        estimatedProfit: 0,
+        estimatedMargin: 0
     });
-
-    useEffect(() => {
-        loadData();
-    }, [customer.id]);
 
     const loadData = useCallback(async () => {
         try {
@@ -37,23 +36,38 @@ export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ 
             ]);
 
             setCosts(costsData);
+            setOffers(offersData);
 
             // Calculate Revenue (Sold offers/contracts)
-            // Ideally we check contracts, but let's assume sold offers for now or implementation plan says "Revenue vs Costs"
-            // Let's grab sold offers value
             const soldOffers = offersData.filter(o => o.status === 'sold');
-            const revenue = soldOffers.reduce((sum: number, o: any) => sum + (o.pricing.sellingPriceNet || 0), 0);
+            const revenue = soldOffers.reduce((sum: number, o: Offer) => sum + (o.pricing.sellingPriceNet || 0), 0);
 
-            const totalCosts = costsData.reduce((sum: number, c: CustomerCost) => sum + c.amount, 0); // simplifying currency for now (assuming all PLN or normalized)
+            // Calculate Estimated Profit (from Offers)
+            const estimatedProfit = soldOffers.reduce((sum: number, o: Offer) => {
+                const marginVal = o.pricing.marginValue || 0;
+                // Commission is percentage or value? Usually calculated in OfferSummary as value.
+                // In types.ts, Offer.commission implies calculated value? Or rate? 
+                // Let's assume it's the calculated provison value if stored, or calculate it.
+                // Looking at OfferSummary logic: `const costs = offer.commission + ...`
+                // So `offer.commission` is the value.
+
+                const cost = (o.commission || 0) + (o.pricing.measurementCost || 0) + (o.pricing.orderCosts || 0);
+                return sum + (marginVal - cost);
+            }, 0);
+
+            const totalCosts = costsData.reduce((sum: number, c: CustomerCost) => sum + c.amount, 0);
 
             const profit = revenue - totalCosts;
             const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+            const estimatedMargin = revenue > 0 ? (estimatedProfit / revenue) * 100 : 0;
 
             setStats({
                 totalRevenue: revenue,
                 totalCosts,
                 profit,
-                margin
+                margin,
+                estimatedProfit,
+                estimatedMargin
             });
 
         } catch (error) {
@@ -63,6 +77,10 @@ export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ 
             setLoading(false);
         }
     }, [customer.id]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleAddCost = async () => {
         if (!newCost.amount || !newCost.type) return;
@@ -100,36 +118,102 @@ export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ 
 
     if (loading) return <div className="p-8 text-center text-slate-400">Ładowanie finansów...</div>;
 
+    // Helper for table
+    const soldOffersList = offers.filter(o => o.status === 'sold');
+
     return (
         <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-5 gap-4">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-xs text-slate-500 uppercase font-bold">Przychód (Sprzedaż)</div>
                     <div className="text-2xl font-bold text-green-600 mt-1">{formatMoney(stats.totalRevenue)}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="text-xs text-slate-500 uppercase font-bold">Koszty Całkowite</div>
+                    <div className="text-xs text-slate-500 uppercase font-bold">Koszty Rejestrowane</div>
                     <div className="text-2xl font-bold text-red-600 mt-1">{formatMoney(stats.totalCosts)}</div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="text-xs text-slate-500 uppercase font-bold">Zysk</div>
+
+                {/* Realized Profit */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+                    <div className="text-xs text-slate-500 uppercase font-bold">Zysk Rzeczywisty</div>
                     <div className={`text-2xl font-bold mt-1 ${stats.profit >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
                         {formatMoney(stats.profit)}
                     </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="text-xs text-slate-500 uppercase font-bold">Marża Rzeczywista</div>
-                    <div className={`text-2xl font-bold mt-1 ${stats.margin >= 25 ? 'text-green-600' : stats.margin >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {stats.margin.toFixed(1)}%
+                    <div className={`text-xs mt-1 ${stats.margin >= 15 ? 'text-green-600' : 'text-orange-500'}`}>
+                        Marża: {stats.margin.toFixed(1)}%
                     </div>
                 </div>
+
+                {/* Estimated Profit */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-purple-500">
+                    <div className="text-xs text-slate-500 uppercase font-bold">Zysk Szacunkowy (Ofert.)</div>
+                    <div className={`text-2xl font-bold mt-1 ${stats.estimatedProfit >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
+                        {formatMoney(stats.estimatedProfit || 0)}
+                    </div>
+                    <div className={`text-xs mt-1 ${stats.estimatedMargin >= 15 ? 'text-green-600' : 'text-orange-500'}`}>
+                        Marża: {(stats.estimatedMargin || 0).toFixed(1)}%
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center">
+                    <div className="text-sm text-slate-500">Różnica (Szac. vs Rzecz.)</div>
+                    <div className={`text-lg font-bold ${stats.profit - (stats.estimatedProfit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {formatMoney(stats.profit - (stats.estimatedProfit || 0))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Offers Profitability Breakdown */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                <div className="p-4 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-800">Analiza Zyskowności Ofert (Zaakceptowane)</h3>
+                </div>
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                        <tr>
+                            <th className="p-3">Numer/Produkt</th>
+                            <th className="p-3 text-right">Przychód Netto</th>
+                            <th className="p-3 text-right">Marża Handlowa</th>
+                            <th className="p-3 text-right">Prowizja</th>
+                            <th className="p-3 text-right">Koszt Pomiary</th>
+                            <th className="p-3 text-right">Koszt Dodatk.</th>
+                            <th className="p-3 text-right text-purple-700 font-bold">Zysk Szac.</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {soldOffersList.map(offer => {
+                            const marginVal = offer.pricing.marginValue || 0;
+                            const costs = (offer.commission || 0) + (offer.pricing.measurementCost || 0) + (offer.pricing.orderCosts || 0);
+                            const estProfit = marginVal - costs;
+                            return (
+                                <tr key={offer.id} className="hover:bg-slate-50">
+                                    <td className="p-3">
+                                        <div className="font-bold text-slate-800">{offer.offerNumber}</div>
+                                        <div className="text-xs text-slate-500">{offer.product.modelId}</div>
+                                    </td>
+                                    <td className="p-3 text-right font-medium">{formatMoney(offer.pricing.sellingPriceNet)}</td>
+                                    <td className="p-3 text-right text-slate-600">{formatMoney(marginVal)}</td>
+                                    <td className="p-3 text-right text-red-500">-{formatMoney(offer.commission || 0)}</td>
+                                    <td className="p-3 text-right text-red-500">-{formatMoney(offer.pricing.measurementCost || 0)}</td>
+                                    <td className="p-3 text-right text-red-500">-{formatMoney(offer.pricing.orderCosts || 0)}</td>
+                                    <td className={`p-3 text-right font-bold ${estProfit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>
+                                        {formatMoney(estProfit)}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {soldOffersList.length === 0 && (
+                            <tr><td colSpan={7} className="p-8 text-center text-slate-400">Brak sprzedanych ofert</td></tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
 
             {/* Cost Ledger */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800">Rejestr Kosztów</h3>
+                    <h3 className="font-bold text-slate-800">Rejestr Kosztów (Rzeczywiste)</h3>
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-slate-700 transition-colors"

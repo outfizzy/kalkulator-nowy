@@ -102,6 +102,7 @@ export const ManualInstallationModal: React.FC<ManualInstallationModalProps> = (
                 offerId: contract.offerId,
                 customerId: contract.client.id, // Try to link if we have ID
                 status: 'pending',
+                sourceType: 'contract',
                 client: {
                     firstName: contract.client.firstName,
                     lastName: contract.client.lastName,
@@ -134,10 +135,8 @@ export const ManualInstallationModal: React.FC<ManualInstallationModalProps> = (
         }
 
         try {
-            await DatabaseService.createInstallation({
-                // No offerId for manual creation
-                customerId: manualForm.customerId || undefined,
-                status: 'pending',
+            await DatabaseService.createManualInstallation({
+                title: manualForm.product,
                 client: {
                     firstName: manualForm.firstName,
                     lastName: manualForm.lastName,
@@ -145,8 +144,10 @@ export const ManualInstallationModal: React.FC<ManualInstallationModalProps> = (
                     address: manualForm.street,
                     phone: manualForm.phone
                 },
-                productSummary: manualForm.product,
-                notes: manualForm.notes
+                description: manualForm.notes
+                    ? `${manualForm.product}\n${manualForm.notes}`
+                    : manualForm.product,
+                sourceType: 'manual'
             });
 
             toast.success('Utworzono montaż ręczny');

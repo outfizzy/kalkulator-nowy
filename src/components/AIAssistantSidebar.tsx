@@ -46,14 +46,21 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
         }
     }, [isOpen, currentSessionId]);
 
+    // Auto-scroll when messages change
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
     const scrollToBottom = () => {
-        if (messagesContainerRef.current) {
-            const { scrollHeight, clientHeight } = messagesContainerRef.current;
-            messagesContainerRef.current.scrollTo({
-                top: scrollHeight - clientHeight,
-                behavior: 'smooth'
-            });
-        }
+        // Use timeout to ensure DOM update is finished
+        setTimeout(() => {
+            if (messagesContainerRef.current) {
+                const { scrollHeight, clientHeight } = messagesContainerRef.current;
+                // Instant jump for better UX on load, smooth for new messages could be optional
+                // But user wants "scroll down", so let's force it.
+                messagesContainerRef.current.scrollTop = scrollHeight - clientHeight;
+            }
+        }, 100);
     };
 
     const handleSendMessage = async () => {
@@ -65,7 +72,8 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
         const tempMsg: ChatMessage = { role: 'user', content };
         setMessages(prev => [...prev, tempMsg]);
         setIsLoading(true);
-        scrollToBottom();
+        // scrollToBottom triggered by useEffect
+
 
         try {
             // Include context only if it's the first message about this context? 

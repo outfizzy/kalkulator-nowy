@@ -132,32 +132,32 @@ export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'other';
 
 export interface Lead {
     id: string;
+    customerData: {
+        firstName: string;
+        lastName: string;
+        companyName?: string;
+        phone?: string;
+        email?: string;
+        address?: string;
+        postalCode?: string;
+        city?: string;
+    };
+    customerId?: string;
     status: LeadStatus;
     source: LeadSource;
-    customerData: {
-        firstName?: string;
-        lastName?: string;
-        companyName?: string;
-        email?: string;
-        phone?: string;
-        city?: string;
-        address?: string; // Street + House Number
-        postalCode?: string;
-    };
-    customerId?: string; // Link to Customers table
     assignedTo?: string; // User ID
-    emailMessageId?: string;
-    notes?: string;
-    lostReason?: string; // Reason for losing the lead
-    lastContactDate?: Date;
-    clientWillContactAt?: Date;
-    createdAt: Date;
-    updatedAt: Date;
-    // Joined data
     assignee?: {
         firstName: string;
         lastName: string;
     };
+    createdAt: Date;
+    updatedAt: Date;
+    lastContactDate?: Date;
+    clientWillContactAt?: Date;
+    notes: string;
+    emailMessageId?: string; // If created from email
+    aiScore?: number;
+    aiSummary?: string;
 }
 
 // --- New Catalog Types ---
@@ -223,7 +223,7 @@ export interface ProductConfig {
     postOverlayLeft?: number; // Inset in mm
     postOverlayRight?: number; // Inset in mm
     customPostCount?: number; // Manual override
-    customPostCount?: number; // Manual override
+
     customRafterCount?: number; // Manual override
     roofOpen?: number; // 0-1 for Retractable Pergola (Deluxe)
 
@@ -266,6 +266,8 @@ export interface ProductConfig {
     };
     // Pergola Specific
     lamellaAngle?: number; // 0-135 degrees
+    numberOfPosts?: number; // Calculated number of posts
+    numberOfFields?: number; // Calculated number of fields (sections)
     moduleCount?: number; // Number of modules (sections)
 }
 
@@ -458,7 +460,14 @@ export type InstallationStatus = 'pending' | 'scheduled' | 'confirmed' | 'comple
 export interface InstallationTeam {
     id: string;
     name: string;
-    members: { id: string; firstName: string; lastName: string }[];
+    members: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        role?: string;
+        hourlyRate?: number;
+        type?: 'user' | 'virtual';
+    }[];
     vehicle?: string;
     color: string;
     isActive: boolean;
@@ -635,6 +644,7 @@ export interface SalesRepStat {
 export interface Measurement {
     id: string;
     offerId?: string;
+    leadId?: string; // Link to Lead
     scheduledDate: Date;
     salesRepId: string;
     salesRepName: string;

@@ -142,23 +142,38 @@ export const PricingService = {
         // Optimization: If table has `data` (JSON matrix), use it directly instead of entries table
         if (bestMatch.data) {
             const matrix = bestMatch.data;
-            // Convert JSON format (headers/rows) to flat entries for compatibility
-            const entries: PriceMatrixEntry[] = [];
-            matrix.rows.forEach((row: any) => {
-                matrix.headers.forEach((width: number, index: number) => {
-                    const price = row.prices[index];
-                    if (price > 0) {
-                        entries.push({
-                            width_mm: width,
-                            projection_mm: row.projection,
-                            price: price,
-                            structure_price: price, // Simple assumption for bulk import
-                            glass_price: 0
-                        });
-                    }
+
+            // NEW: Support for direct entry list (from Intelligent Import)
+            if (matrix.data && Array.isArray(matrix.data)) {
+                return matrix.data.map((e: any) => ({
+                    width_mm: e.width_mm || e.width,
+                    projection_mm: e.projection_mm || e.projection,
+                    price: e.price,
+                    structure_price: e.structure_price || e.price,
+                    glass_price: e.glass_price || 0,
+                    properties: e.properties || {}
+                }));
+            }
+
+            // Legacy Matrix Format (Pivoted)
+            if (matrix.rows && matrix.headers) {
+                const entries: PriceMatrixEntry[] = [];
+                matrix.rows.forEach((row: any) => {
+                    matrix.headers.forEach((width: number, index: number) => {
+                        const price = row.prices[index];
+                        if (price > 0) {
+                            entries.push({
+                                width_mm: width,
+                                projection_mm: row.projection,
+                                price: price,
+                                structure_price: price, // Simple assumption for bulk import
+                                glass_price: 0
+                            });
+                        }
+                    });
                 });
-            });
-            return entries;
+                return entries;
+            }
         }
 
         const { data } = await supabase
