@@ -33,40 +33,118 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
 
     // Internal Space Width = Width - (2 * SideBeamWidth) if we consider simplified frame.
     // Or rather between Left and Right beams.
-    const internalWidth = width - (2 * beamWidth);
-    const lamellaCount = Math.floor(Math.max(0, internalWidth) / lamellaSpacing);
+    // 4. Lamellas
+    // Deluxe: Retractable -> "Slide to Rear". Implies Lamellas are Parallel to Width (X), Distributed along Depth (Z).
+    // Bio: Previous request made them Parallel to Depth (Z), Distributed along Width (X).
 
-    // Start X:
-    const startX = -(width / 2) + beamWidth + (lamellaSpacing / 2);
+    // We bifurcate logic based on model.
+    const isDeluxe = config.modelId === 'pergola_deluxe';
+    const roofOpen = config.roofOpen || 0; // 0..1
+
+    // Calculation Constants
+    const internalWidth = width - (2 * beamWidth);
+    const internalDepth = depth - (2 * beamWidth);
+
+    // Bio: Distributed along Width (X). Lamella Length = Depth.
+    // Deluxe: Distributed along Depth (Z). Lamella Length = Width.
 
     const lamellas = useMemo(() => {
         const items = [];
-        for (let i = 0; i < lamellaCount; i++) {
-            const x = startX + (i * lamellaSpacing);
-            items.push(
-                <group key={`lamella-${i}`} position={[x, height - (beamHeight / 2), 0]}>
-                    {/* 
-                        Rotation:
-                        - Geometry defined as Box(X, Y, Z).
-                        - We want length along Z (Depth).
-                        - Standard Box Geometry: args=[x, y, z].
-                        - So we use args=[lamellaWidth, thickness, length].
-                        - Length = depth - 2*beamWidth.
-                     */}
-                    <mesh rotation={[0, 0, THREE.MathUtils.degToRad(config.lamellaAngle || 0) * -1]}>
-                        {/* 
-                           Rotation:
-                           - Inverted Z-axis rotation for correct "opening" direction.
-                           - Width (X) tilts. Length (Z) stays along depth.
-                        */}
-                        <boxGeometry args={[lamellaWidth, 0.04, depth - (2 * beamWidth) - 0.05]} />
-                        <meshStandardMaterial color={color} />
-                    </mesh>
-                </group>
-            );
+
+        if (isDeluxe) {
+            // DELUXE LOGIC: Distributed along Z (Depth). Slide to Rear.
+            // Lamella is Long (X). Width is Depth-wise dimension.
+            // Count based on Depth.
+            const lCount = Math.floor(Math.max(0, internalDepth) / lamellaSpacing);
+
+
+            // Animation Phases:
+            // 1. Rotation (0% - 20%): Angle goes from 0 to 90.
+            // 2. Sliding (20% - 100%): Slide to Rear (-depth/2).
+
+            const rotatePhase = Math.min(1, roofOpen / 0.2); // 0->1
+            const slidePhase = Math.max(0, (roofOpen - 0.2) / 0.8); // 0->1
+
+            // Effective Angle
+            // If closed (0), angle is config.lamellaAngle.
+            // If opening, we interpolate to 90.
+            const currentAngle = config.lamellaAngle || 0;
+            const targetAngle = 90;
+            const effectiveAngle = currentAngle + (targetAngle - currentAngle) * rotatePhase;
+
+            // Stacking Logic
+            // We stack at REAR (Z = -depth/2 + beamWidth + some margin).
+            // Stack Start (First lamella to arrive): Rearmost.
+            // Wait, if we slide "To Rear", the Rearmost lamella stays put? Or loops?
+            // Usually, the Frontmost lamella (#0) travels the farthest.
+            // Lamella #N (Rearmost) stays or moves slightly.
+            // Target Z for Lamella i:
+            // Stack starts at Rear Wall.
+            // Lamella N is at Rear. Lamella N-1 is at Rear + Thickness.
+            // Index 0 is Front. Index N is Rear.
+            // So Target for i = RearLimit + ((N-1-i) * stackThickness).
+            // Wait, usually they stack compact.
+            // Let's say RearLimit = -depth/2 + beamWidth + 0.1.
+            // StackThickness = lamellaWidth * sin(90) = width? No, they stand vertical?
+            // If 90deg, they take 'thickness' space (4cm).
+            // If they are flat, they take 'width' space (20cm).
+            // If they stack vertical, they take very little space.
+            // Let's assume 5cm stack pitch.
+
+            const stackPitch = 0.05;
+            const rearLimit = -depth / 2 + beamWidth + 0.1;
+
+            for (let i = 0; i < lCount; i++) {
+                // Initial Distributed Position
+                const distZ = (depth / 2) - beamWidth - (lamellaSpacing / 2) - (i * lamellaSpacing);
+
+                // Stack Target
+                // Rearmost (i = lCount-1) should be at rearLimit.
+                // Frontmost (i = 0) should be at rearLimit + (lCount-1)*pitch.
+                // Wait, if they all go to Rear.
+                // i=0 (Front) must travel to become the "Last" in the stack?
+                // Or does it become the "First" into the stack?
+                // Visual: ||||| ->      |||||
+                // Usually the Front one (i=0) pushes back? Or the Rear one stays?
+                // Let's assume i=lCount-1 is fixed at Rear. i=0 slides all the way back to meet it.
+                // So Stack Position for i: rearLimit + ( (lCount - 1 - i) * stackPitch ) ?
+                // Let's try: i=lCount-1 -> rearLimit. i=0 -> rearLimit + MaxOffset.
+                // This means i=0 is "In Front" of the stack. Correct.
+
+                const stackZ = rearLimit + ((lCount - 1 - i) * stackPitch);
+
+                // Current Z
+                const currentZ = distZ + (stackZ - distZ) * slidePhase;
+
+                items.push(
+                    <group key={`deluxe-lamella-${i}`} position={[0, height - (beamHeight / 2), currentZ]}>
+                        {/* Box Length is Internal Width */}
+                        <mesh rotation={[THREE.MathUtils.degToRad(effectiveAngle), 0, 0]}>
+                            <boxGeometry args={[internalWidth, 0.04, lamellaWidth]} />
+                            <meshStandardMaterial color={color} />
+                        </mesh>
+                    </group>
+                );
+            }
+
+        } else {
+            // BIO LOGIC: Distributed along Width (X).
+            const lamellaCount = Math.floor(Math.max(0, internalWidth) / lamellaSpacing);
+            const startX = -(width / 2) + beamWidth + (lamellaSpacing / 2);
+            for (let i = 0; i < lamellaCount; i++) {
+                const x = startX + (i * lamellaSpacing);
+                items.push(
+                    <group key={`lamella-${i}`} position={[x, height - (beamHeight / 2), 0]}>
+                        <mesh rotation={[0, 0, THREE.MathUtils.degToRad(config.lamellaAngle || 0) * -1]}>
+                            <boxGeometry args={[lamellaWidth, 0.04, depth - (2 * beamWidth) - 0.05]} />
+                            <meshStandardMaterial color={color} />
+                        </mesh>
+                    </group>
+                );
+            }
         }
         return items;
-    }, [lamellaCount, startX, lamellaSpacing, height, beamHeight, depth, beamWidth, lamellaWidth, config.lamellaAngle, color]);
+    }, [isDeluxe, roofOpen, internalWidth, internalDepth, lamellaSpacing, height, beamHeight, depth, width, beamWidth, lamellaWidth, config.lamellaAngle, color]);
 
     // 5. Addons
     const addons = config.addons || [];

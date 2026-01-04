@@ -81,6 +81,7 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
         { id: 'topstyle', name: 'Topstyle', icon: '🟦', desc: 'Premium, pogrubione profile' },
         { id: 'skystyle', name: 'Skystyle', icon: '🌤️', desc: 'Dach płaski, szkło ze spadkiem' },
         { id: 'pergola_bio', name: 'Pergola Bioklimatyczna', icon: '☀️', desc: 'Ruchome lamele, nowoczesna' },
+        { id: 'pergola_deluxe', name: 'Pergola Deluxe (Rozsuwana)', icon: '↔️', desc: 'Lamele obracane i zsuwane' },
     ];
 
     const standardColors = [
@@ -146,7 +147,7 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                             key={m.id}
                                             onClick={() => {
                                                 updateConfig('modelId', m.id);
-                                                if (m.id === 'pergola_bio') {
+                                                if (m.id === 'pergola_bio' || m.id === 'pergola_deluxe') {
                                                     // Default depth 4000mm
                                                     updateConfig('projection', 4000);
                                                     // Default to Anthracite Hex if no color
@@ -232,7 +233,7 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
 
                             {/* 4. Heights & Angles */}
                             {/* 4. Heights & Angles */}
-                            {config.modelId !== 'pergola_bio' ? (
+                            {config.modelId !== 'pergola_bio' && config.modelId !== 'pergola_deluxe' ? (
                                 <div className="pt-6 border-t border-slate-200/50 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h4 className="font-bold text-slate-700 text-sm">Wysokości i Kąt</h4>
@@ -271,6 +272,35 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                             updateConfig('frontHeight', v);
                                         }}
                                     />
+                                </div>
+                            )}
+
+                            {/* Deluxe: Roof Opening Slider */}
+                            {config.modelId === 'pergola_deluxe' && (
+                                <div className="pt-6 border-t border-slate-200/50 space-y-4">
+                                    <SectionLabel>Otwarcie Dachu (Rozsuwany)</SectionLabel>
+                                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <span className="text-2xl">↔️</span>
+                                        <div className="flex-1">
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                step="1"
+                                                value={(config.roofOpen || 0) * 100}
+                                                onChange={(e) => updateConfig('roofOpen', parseInt(e.target.value) / 100)}
+                                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-accent"
+                                            />
+                                            <div className="flex justify-between mt-1 text-xs font-bold text-slate-400">
+                                                <span>Zamknięty</span>
+                                                <span className="text-accent">{Math.round((config.roofOpen || 0) * 100)}%</span>
+                                                <span>Otwarty</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 px-1">
+                                        Lamele obracają się (0-20%), a następnie zsuwają na tył (20-100%).
+                                    </p>
                                 </div>
                             )}
 

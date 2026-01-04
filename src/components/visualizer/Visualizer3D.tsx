@@ -51,7 +51,7 @@ export const Visualizer3D = ({ config, transparent, sunPosition = 0.5, structure
 
             {/* Model */}
             <group position={[0, -1.5, 0]}> {/* Lower model slightly to center it */}
-                {config.modelId === 'pergola_bio' ? (
+                {config.modelId === 'pergola_bio' || config.modelId === 'pergola_deluxe' ? (
                     <PergolaModel config={config} />
                 ) : (
                     <PatioCoverModel config={config} structureConfig={structureConfig} />

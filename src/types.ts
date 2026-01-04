@@ -223,7 +223,9 @@ export interface ProductConfig {
     postOverlayLeft?: number; // Inset in mm
     postOverlayRight?: number; // Inset in mm
     customPostCount?: number; // Manual override
+    customPostCount?: number; // Manual override
     customRafterCount?: number; // Manual override
+    roofOpen?: number; // 0-1 for Retractable Pergola (Deluxe)
 
     // Structural Heights (Advanced)
     rearHeight?: number; // Wall mounting height (mm). If missing, calculated from angle.
