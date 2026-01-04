@@ -38,6 +38,12 @@ export function getStructureSpecs(config: ProductConfig): StructureSpecs {
     // Assume rafter spacing approx 900mm
     let fields = Math.max(2, Math.ceil(config.width / 900));
 
+    // Special Rule for Topstyle standard:
+    // If width <= 7000mm, force 2 posts (no middle post).
+    if (config.modelId === 'topstyle' && config.width <= 7000) {
+        posts = 2;
+    }
+
     const snowZoneId = config.snowZone || '2';
     const mappedZone = mapSnowZoneToOrangelineZone(snowZoneId);
 

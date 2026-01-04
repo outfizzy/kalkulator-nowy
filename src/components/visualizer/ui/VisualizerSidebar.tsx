@@ -78,11 +78,8 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
 
     const models = [
         { id: 'trendstyle', name: 'Trendstyle', icon: '🟥', desc: 'Nowoczesny, proste linie' },
-        { id: 'trendstyle_plus', name: 'Trendstyle Plus', icon: '➕', desc: 'Wzmocniona konstrukcja (gł. > 3.5m)' },
-        { id: 'orangestyle', name: 'Orangestyle', icon: '🟧', desc: 'Klasyczny, zaokrąglony', note: 'Wymaga strefy 1-2' },
-        { id: 'topstyle', name: 'Topstyle', icon: '🟦', desc: 'Premium, ukryty odpływ' },
-        { id: 'topstyle_xl', name: 'Topstyle XL', icon: '🟦', desc: 'Topstyle dla dużych rozpiętości' },
-        { id: 'skystyle', name: 'Skystyle', icon: '🌤️', desc: 'Dach wolnowiszący / Specjalny' },
+        { id: 'topstyle', name: 'Topstyle', icon: '🟦', desc: 'Premium, pogrubione profile' },
+        { id: 'skystyle', name: 'Skystyle', icon: '🌤️', desc: 'Dach płaski, szkło ze spadkiem' },
         { id: 'pergola_bio', name: 'Pergola Bioklimatyczna', icon: '☀️', desc: 'Ruchome lamele, nowoczesna' },
     ];
 

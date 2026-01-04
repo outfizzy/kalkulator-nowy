@@ -35,9 +35,16 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
     const heightM = frontHeightBase; // Base height for posts/gutter
 
     // 2. Geometry Constants (Meters)
-    const isHeavy = config.modelId.includes('xl') || config.modelId === 'skystyle' || config.modelId === 'trendstyle_plus';
+    const isHeavy = config.modelId.includes('xl') || config.modelId === 'skystyle' || config.modelId === 'trendstyle_plus' || config.modelId === 'topstyle';
+    const isSkystyle = config.modelId === 'skystyle';
     const postScale = isHeavy ? 1.36 : 1.0;
     const POST_SIZE = 0.11 * postScale;
+
+    // Skystyle has massive beams/rafters visually, but let's stick to heavy profile for now.
+    // Skystyle structure Pitch is 0. Roof Glass Pitch is calculated.
+    const structurePitch = isSkystyle ? 0 : pitchAngle;
+    const glassPitch = pitchAngle; // Always use calculated slope for glass
+
     const BEAM_HEIGHT = isHeavy ? 0.20 : 0.15; // Nominal height for positioning
     const GUTTER_DEPTH = 0.15 * postScale;
 
@@ -131,19 +138,19 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
         // Front Height = heightM. Rear = heightM + rise.
         // Mid Y = heightM + rise/2 - BEAM_HEIGHT/2.
 
-        const midY = heightM + (depthM / 2) * Math.tan(pitchAngle) - BEAM_HEIGHT / 2;
+        const midY = heightM + (depthM / 2) * Math.tan(structurePitch) - BEAM_HEIGHT / 2;
 
         for (let i = 0; i < safeRafterCount; i++) {
             const x = -widthM / 2 + (widthM / (safeRafterCount - 1)) * i;
 
             els.push({
                 position: [x, midY, 0], // Center at 0 Z
-                rotation: [pitchAngle, 0, 0],
+                rotation: [structurePitch, 0, 0],
                 length: length
             });
         }
         return els;
-    }, [widthM, heightM, depthM, safeRafterCount, BEAM_HEIGHT, pitchAngle]);
+    }, [widthM, heightM, depthM, safeRafterCount, BEAM_HEIGHT, structurePitch]);
 
     // POSTS (Aligned to Rafters)
     const postEls = useMemo(() => {
@@ -192,14 +199,14 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
 
             // Rear Post (Freestanding)
             if (config.installationType === 'freestanding') {
-                const rise = depthM * Math.tan(pitchAngle);
+                const rise = depthM * Math.tan(structurePitch);
                 // Rear has same X.
                 els.push({ position: [x, 0, -depthM / 2 + POST_SIZE / 2], height: heightM + rise - BEAM_HEIGHT, type: 'rear' });
             }
         });
 
         return els;
-    }, [rafterEls, safePostCount, safeRafterCount, heightM, depthM, config.installationType, BEAM_HEIGHT, POST_SIZE, config.postOverlayLeft, config.postOverlayRight, config.postOffsets, pitchAngle]);
+    }, [rafterEls, safePostCount, safeRafterCount, heightM, depthM, config.installationType, BEAM_HEIGHT, POST_SIZE, config.postOverlayLeft, config.postOverlayRight, config.postOffsets, structurePitch]);
 
     return (
         <group>
@@ -247,10 +254,14 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
 
             {/* REAR BEAM (Freestanding) OR WALL PROFILE (Wall Mounted) */}
             {config.installationType === 'freestanding' ? (
-                // Rear Beam - similar to front but at the back and higher
+                // Rear Beam - aligned with rear posts
                 <mesh
                     rotation={[0, Math.PI / 2, 0]}
-                    position={[-widthM / 2, heightM + (depthM * Math.tan(pitchAngle)) - BEAM_HEIGHT, -depthM / 2 + POST_SIZE / 2 - GUTTER_DEPTH / 2]} // Aligned with rear posts
+                    position={[
+                        -widthM / 2,
+                        heightM + (depthM * Math.tan(structurePitch)) - BEAM_HEIGHT,
+                        -depthM / 2 + POST_SIZE / 2 // Correct alignment: Center of beam matches Center of Posts
+                    ]}
                     castShadow receiveShadow
                     material={structureMaterial}
                 >
@@ -260,7 +271,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                 // Wall Profile
                 <mesh
                     rotation={[0, Math.PI / 2, 0]}
-                    position={[-widthM / 2, heightM + (depthM * Math.tan(pitchAngle)) - BEAM_HEIGHT, -depthM / 2]}
+                    position={[-widthM / 2, heightM + (depthM * Math.tan(structurePitch)) - BEAM_HEIGHT, -depthM / 2]}
                     castShadow receiveShadow
                     material={structureMaterial}
                     scale={[postScale, postScale, 1]}
@@ -286,36 +297,53 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
             ))}
 
             {/* ROOF PANELS */}
+            {/* ROOF PANELS */}
             {Array.from({ length: fieldsCount }).map((_, i) => {
                 const rafterSpacing = widthM / fieldsCount;
                 const x = -widthM / 2 + rafterSpacing * i + rafterSpacing / 2;
 
-                // Use pitchAngle logic
-                const OVERHANG = 0.05; // 5cm overhang into gutter
+                // For Skystyle, panels are tilted (glassPitch), structure is flat (structurePitch=0).
+                const useScale = 1.0;
+
+                // If structure is flat, but glass is tilted, we need to position glass carefully.
+                // Pivot at front? 
+                // Front Height is Base.
+                // Center Z is 0.
+                // If we rotate at center, ends might clip. 
+                // Usually easier to pivot at Z=0 if we calculated midY carefully.
+
+                // If Skystyle: Glass tilt is calculated relative to flat structure.
+                // Actually, let's just use glassPitch for rotation.
+                // And ensure midY lifts it above rafters.
+
+                const OVERHANG = 0.05;
                 const effectiveDepthZ = depthM;
-                const rafterLength = effectiveDepthZ / Math.cos(pitchAngle);
+                const rafterLength = effectiveDepthZ / Math.cos(glassPitch); // Use glass pitch for length
                 const panelLength = rafterLength + OVERHANG;
 
-                // Center logic same as rafters but shifted for overhang?
-                // Rafter Center Z is 0.
-                // Panel should align with Rafter, but stick out 5cm at Front.
-                // So Panel Center Z = Rafter Center Z + (Overhang/2 projected).
-                const centerZ = 0 + (OVERHANG / 2 * Math.cos(pitchAngle));
+                const centerZ = 0 + (OVERHANG / 2 * Math.cos(glassPitch));
 
-                // Correct height at centerZ
-                // Pivot of Rafter is at (0, midY, 0).
-                // Panel is on top. width 0.016.
-                // Offset Y (local to rotated frame) = RafterHeight? No, rafterShape is complex.
-                // Rafter top is approx 0.
-                // We add 0.01 to sit on top.
+                // Pivot logic:
+                // If structure is flat, midY is constant.
+                // But glass is tilted. 
+                // We want Front of glass to be near Gutter (low). Back of glass to be High.
+                // Rotated around X axis.
 
-                const midY = heightM + (depthM / 2) * Math.tan(pitchAngle) - BEAM_HEIGHT / 2 + 0.01;
+                // If we use standard logic with pitchAngle replaced by glassPitch:
+                const midY = heightM + (depthM / 2) * Math.tan(glassPitch) - BEAM_HEIGHT / 2 + 0.01;
+                // Important: If isSkystyle, rafters are flat. Glass is not.
+                // If structurePitch is 0, then heightM + ... tan(0) is just heightM.
+                // But we use glassPitch for Y calculation so it sits "as if" on sloped rafters.
+                // But wait, if rafters are flat, the glass will float above them at the back?
+                // YES! That is the point of Skystyle - flat look, internal slope. 
+                // The rafters/fascia hide the slope.
+                // So this logic is correct: calculate Y based on glassPitch.
 
                 return (
                     <mesh
                         key={`panel-${i}`}
                         position={[x, midY, centerZ]}
-                        rotation={[pitchAngle, 0, 0]}
+                        rotation={[glassPitch, 0, 0]}
                         material={activeRoofMat}
                         castShadow={config.roofType !== 'glass'} receiveShadow
                     >
