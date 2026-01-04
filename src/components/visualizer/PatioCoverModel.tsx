@@ -42,11 +42,24 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
 
     // Skystyle has massive beams/rafters visually, but let's stick to heavy profile for now.
     // Skystyle structure Pitch is 0. Roof Glass Pitch is calculated.
+    // Skystyle structure Pitch is 0. Roof Glass Pitch is calculated but capped for visual "flatness".
+    // 2 degrees is enough for drainage but fits in profile.
     const structurePitch = isSkystyle ? 0 : pitchAngle;
-    const glassPitch = pitchAngle; // Always use calculated slope for glass
+    const structurePitch = isSkystyle ? 0 : pitchAngle;
+    // For Skystyle, use small pitch (~2.5 deg) or calculated, whichever is smaller, to fit inside profile.
+    // Actually, calculate: if we have 20cm profile, and 4m depth. tan(alpha) = 0.2/4 = 0.05 -> 2.8 deg.
+    // So 2 degrees is safe.
+    const skystyleFixedPitch = 2 * Math.PI / 180;
+
+    const glassPitch = isSkystyle ? skystyleFixedPitch : pitchAngle;
 
     const BEAM_HEIGHT = isHeavy ? 0.20 : 0.15; // Nominal height for positioning
     const GUTTER_DEPTH = 0.15 * postScale;
+
+    // Use Max Depth for alignment (Beam vs Post) in Freestanding mode
+    // Standard: Align Centers to the Beam Center (dominant visual).
+    const alignmentZ = -depthM / 2 + GUTTER_DEPTH / 2;
+    // (Cleaned up unused calculations)
 
     // ... (Use Memos for shapes) ...
     const gutterProfileShape = useMemo(() => getGutterProfile(config.modelId, GUTTER_DEPTH, BEAM_HEIGHT), [config.modelId, GUTTER_DEPTH, BEAM_HEIGHT]);
@@ -200,13 +213,13 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
             // Rear Post (Freestanding)
             if (config.installationType === 'freestanding') {
                 const rise = depthM * Math.tan(structurePitch);
-                // Rear has same X.
-                els.push({ position: [x, 0, -depthM / 2 + POST_SIZE / 2], height: heightM + rise - BEAM_HEIGHT, type: 'rear' });
+                // Align Z to alignmentZ (calculated above) so it matches Beam
+                els.push({ position: [x, 0, alignmentZ], height: heightM + rise - BEAM_HEIGHT, type: 'rear' });
             }
         });
 
         return els;
-    }, [rafterEls, safePostCount, safeRafterCount, heightM, depthM, config.installationType, BEAM_HEIGHT, POST_SIZE, config.postOverlayLeft, config.postOverlayRight, config.postOffsets, structurePitch]);
+    }, [rafterEls, safePostCount, safeRafterCount, heightM, depthM, config.installationType, BEAM_HEIGHT, POST_SIZE, config.postOverlayLeft, config.postOverlayRight, config.postOffsets, structurePitch, alignmentZ]);
 
     return (
         <group>
@@ -260,7 +273,13 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                     position={[
                         -widthM / 2,
                         heightM + (depthM * Math.tan(structurePitch)) - BEAM_HEIGHT,
-                        -depthM / 2 + POST_SIZE / 2 // Correct alignment: Center of beam matches Center of Posts
+                        alignmentZ + GUTTER_DEPTH / 2 // Position is Start Corner? No, shape is 0->Width. 
+                        // If Rot Y 90 (X->-Z). Shape 0->Width maps to Z->Z-Width.
+                        // So Position should be Back Face + Width? No, Back Face is MinZ.
+                        // We want MinZ = -depthM/2.
+                        // So MaxZ (Position) = -depthM/2 + GUTTER_DEPTH.
+                        // alignmentZ is Center = -depthM/2 + GUTTER_DEPTH/2.
+                        // So Position = alignmentZ + GUTTER_DEPTH/2.
                     ]}
                     castShadow receiveShadow
                     material={structureMaterial}
@@ -303,7 +322,6 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                 const x = -widthM / 2 + rafterSpacing * i + rafterSpacing / 2;
 
                 // For Skystyle, panels are tilted (glassPitch), structure is flat (structurePitch=0).
-                const useScale = 1.0;
 
                 // If structure is flat, but glass is tilted, we need to position glass carefully.
                 // Pivot at front? 
@@ -324,20 +342,21 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                 const centerZ = 0 + (OVERHANG / 2 * Math.cos(glassPitch));
 
                 // Pivot logic:
-                // If structure is flat, midY is constant.
-                // But glass is tilted. 
-                // We want Front of glass to be near Gutter (low). Back of glass to be High.
-                // Rotated around X axis.
+                // glassPitch used for rotation.
+                // We want HIGHEST point of glass (Rear) to be <= heightM (Structure Top).
+                // Glass Rear Z approx -depthM/2.
+                // Glass Pivot Z = centerZ (approx 0).
+                // Distance to Rear = depthM/2.
+                // Rear Y = PivotY + (depthM/2) * sin(glassPitch).
+                // Solve for PivotY: PivotY = heightM - (depthM/2 * sin(glassPitch)).
+                // We add small safety margin (-0.01) to be slightly under.
 
-                // If we use standard logic with pitchAngle replaced by glassPitch:
-                const midY = heightM + (depthM / 2) * Math.tan(glassPitch) - BEAM_HEIGHT / 2 + 0.01;
-                // Important: If isSkystyle, rafters are flat. Glass is not.
-                // If structurePitch is 0, then heightM + ... tan(0) is just heightM.
-                // But we use glassPitch for Y calculation so it sits "as if" on sloped rafters.
-                // But wait, if rafters are flat, the glass will float above them at the back?
-                // YES! That is the point of Skystyle - flat look, internal slope. 
-                // The rafters/fascia hide the slope.
-                // So this logic is correct: calculate Y based on glassPitch.
+                let midY = heightM + (depthM / 2) * Math.tan(glassPitch) - BEAM_HEIGHT / 2 + 0.01;
+
+                if (isSkystyle) {
+                    // Override midY to sink it
+                    midY = heightM - (effectiveDepthZ / 2 * Math.sin(glassPitch)) - 0.02; // 2cm below rim
+                }
 
                 return (
                     <mesh
