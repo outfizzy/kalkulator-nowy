@@ -34,10 +34,22 @@ Deno.serve(async (req) => {
 Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego WSZYSTKIE dane w formacie JSON.
 
             CRITICAL RULES (READ CAREFULLY):
-            1. **EXHAUSTIVE EXTRACTION**: You MUST extract **EVERY SINGLE ROW** visible in the image. Do NOT skip rows. Do NOT summarize. Do NOT use "..." or "etc".
-            2. **NO TRUNCATION**: If the table has 50 rows, return 50 entries. If you skip rows, the user loses money.
+            1. **EXHAUSTIVE EXTRACTION**: You MUST extract **EVERY SINGLE ROW** visible in the image. Do NOT skip rows. Do NOT summarize.
+            2. **ROOF TYPE DETECTION (CRITICAL)**:
+               - IF headers contain: "VSG", "ESG", "Glas", "Glass", "8mm", "10mm", "Verbundsicherheitsglas", "Szkło", "Hartglas" -> Set "roof_type": "glass".
+               - IF headers contain: "Poly", "Policarbonat", "Stegplatten", "16mm", "Poliwęglan" -> Set "roof_type": "polycarbonate".
+               - DEFAULT to null if unsure, but PREFER detection based on keywords.
             3. **ALL COLUMNS**: Look for ALL columns that indicate a price adder/surcharge (e.g. "Opal", "Matt", "VSG", "Dopłata").
             4. **ACCURACY**: Prefer accurate extraction over speed.
+             5. **9-COLUMN GLASS TABLE SPECIAL RULE**:
+               - If you see columns like: "dimension", "price incl. 44.2 clear", "44.2 mm incl. roof filling clear", "Standard included", "Surcharge glass 44.2 matt/opal", "Surcharge glass 55.2 sun protection", "number fields", "Post", "surface":
+                 - Map "price incl. 44.2 clear" -> 'price' (Total Price) and also 'glass_price'.
+                 - Map "Standard included" -> Ignore price (it's 0), but note it.
+                 - Map "Surcharge glass 44.2 matt/opal" -> Add to 'properties.surcharges' list as "Matt/Opal".
+                 - Map "Surcharge glass 55.2" -> Add to 'properties.surcharges' list as "Sun Protection 55.2".
+                 - Map "Post" -> 'posts_count'.
+                 - Map "number fields" -> 'fields_count'.
+                 - Map "surface" -> 'area_m2'.
 
             CRITICAL: Return strictly a JSON object with this structure:
             {
@@ -74,8 +86,8 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
             Mapping Rules:
             1. **Dimensions**: "Maß" / "Breite" / "Tiefe" -> width_mm, projection_mm.
             2. **Structure Price** (structure_price): Look for "Gestell", "Konstruktion", "System", "Bausatz".
-            3. **Roof Price** (glass_price): Look for "Dach", "Poly", "Glas", "Platten", "Eindeckung".
-               - **IMPORTANT**: The system uses 'glass_price' as a generic field for ANY roof material.
+            3. **Roof Price** (glass_price): Look for "Dach", "Poly", "Glas", "Platten", "Eindeckung", "VSG".
+               - **IMPORTANT**: The system uses 'glass_price' as a generic field for ANY roof material price.
                - If the table is Polycarbonate, put the Poly price into 'glass_price'.
                - If the table is Glass, put the Glass price into 'glass_price'.
             4. **Total Price** (price): Look for "Komplett", "Gesamt", "Preis" (if only one price column).

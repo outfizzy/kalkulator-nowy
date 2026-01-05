@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { DatabaseService } from '../../services/database';
+import { LeadService } from '../../services/database/lead.service';
 import type { Lead, LeadStatus, LeadSource } from '../../types';
 
 interface LeadFormProps {
@@ -38,7 +38,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
 
         try {
             if (isEditMode && initialData?.id) {
-                await DatabaseService.updateLead(initialData.id, {
+                await LeadService.updateLead(initialData.id, {
                     status: formData.status,
                     source: formData.source,
                     customerData: {
@@ -56,7 +56,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                 });
                 toast.success('Lead zaktualizowany pomyślnie!');
             } else {
-                await DatabaseService.createLead({
+                await LeadService.createLead({
                     status: formData.status,
                     source: formData.source,
                     customerData: {

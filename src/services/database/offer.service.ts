@@ -1,4 +1,5 @@
-import { supabase, normalizePricing } from './base.service';
+import { supabase } from '../../lib/supabase';
+import { normalizePricing } from './base.service';
 import type { Offer } from '../../types';
 import { CustomerService } from './customer.service';
 import { TaskService } from './task.service';

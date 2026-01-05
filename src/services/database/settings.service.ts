@@ -72,5 +72,33 @@ export const SettingsService = {
             });
 
         if (error) throw error;
+    },
+
+    async getContractNumberStart(): Promise<number> {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'contract_number_start')
+                .single();
+
+            if (error || !data) return 1;
+            return (data.value as any)?.start || 1;
+        } catch (e) {
+            console.error('Error fetching contract start number:', e);
+            return 1;
+        }
+    },
+
+    async updateContractNumberStart(start: number): Promise<void> {
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert({
+                key: 'contract_number_start',
+                value: { start },
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
     }
 };

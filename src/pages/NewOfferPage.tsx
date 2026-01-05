@@ -8,6 +8,7 @@ import { DatabaseService } from '../services/database';
 import { PricingService } from '../services/pricing.service';
 import { CustomerForm } from '../components/CustomerForm';
 import { ProductConfigurator } from '../components/ProductConfigurator';
+import { ManualOfferConfigurator } from '../components/ManualOfferConfigurator';
 import { MarginControl } from '../components/MarginControl';
 import { OfferSummary } from '../components/OfferSummary';
 import type { Customer, SnowZoneInfo, ProductConfig, Offer } from '../types';
@@ -35,6 +36,7 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
     const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
     const [product, setProduct] = useState<ProductConfig | null>(null);
     const [offer, setOffer] = useState<Offer | null>(null);
+    const [isManualMode, setIsManualMode] = useState(false); // Toggle for manual mode
 
     // Initialize margin based on mode and user
     const [margin, setMargin] = useState<number>(() => {
@@ -143,6 +145,67 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
         setProduct(null);
         setOffer(null);
         setMargin(mode === 'partner' ? (currentUser?.partnerMargin ?? 0.25) : 0.40);
+        setIsManualMode(false);
+    };
+
+    const handleManualProductComplete = async (config: ProductConfig) => {
+        // Handle visualization image fetch (same as standard)
+        try {
+            const imageUrl = await PricingService.getProductImage(config.modelId, {
+                roofType: config.roofType,
+                snowZone: snowZone?.id || '1'
+            });
+            if (imageUrl) {
+                config.imageUrl = imageUrl;
+            }
+        } catch (e) {
+            console.error('Failed to fetch product image', e);
+        }
+
+        setProduct(config);
+
+        if (customer && snowZone && currentUser) {
+            try {
+                // Manual Pricing Logic
+                const sellingPriceNet = config.manualPrice || 0;
+                const sellingPriceGross = sellingPriceNet * 1.19; // VAT estimation or exact? German VAT is 19%
+                // For manual offers, we assume purchase price is 0 or user doesn't care about margin calculation for now
+                // Or we could ask for Purchase Price too? Plan said "Price: Netto input" which usually implies selling price
+                // Let's assume margin is 0 or strictly unknown for now.
+
+                const pricing = {
+                    basePrice: sellingPriceNet,
+                    addonsPrice: 0,
+                    totalCost: 0, // Unknown in manual mode
+                    marginPercentage: 0,
+                    marginValue: 0,
+                    sellingPriceNet,
+                    sellingPriceGross,
+                    installationCosts: undefined,
+                    paymentMethod: 'transfer' as const, // fixed literal type
+                };
+
+                const newOffer: Omit<Offer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
+                    offerNumber: `OFF/${new Date().getFullYear()}/${Math.floor(Math.random() * 10000)}`,
+                    status: 'draft',
+                    customer,
+                    snowZone,
+                    product: config,
+                    pricing: pricing as any, // Cast because we might miss some calculated fields
+                    commission: 0, // No auto-commission for manual? or calculate based on price?
+                    leadId,
+                };
+
+                const savedOffer = await DatabaseService.createOffer(newOffer);
+                toast.success('Oferta ręczna utworzona!');
+                setOffer(savedOffer);
+                setStep('summary');
+
+            } catch (error) {
+                console.error('Error creating manual offer:', error);
+                toast.error('Błąd podczas tworzenia oferty ręcznej');
+            }
+        }
     };
 
     return (
@@ -193,7 +256,37 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
                 )}
 
                 {step === 'product' && (
-                    <ProductConfigurator onComplete={handleProductComplete} initialData={product || undefined} />
+                    <div className="space-y-6">
+                        {/* Mode Toggle */}
+                        <div className="flex justify-center mb-6">
+                            <div className="bg-slate-100 p-1 rounded-xl flex gap-1 shadow-inner">
+                                <button
+                                    onClick={() => setIsManualMode(false)}
+                                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isManualMode
+                                            ? 'bg-white text-slate-800 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    ⚡️ Konfigurator (Standard)
+                                </button>
+                                <button
+                                    onClick={() => setIsManualMode(true)}
+                                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isManualMode
+                                            ? 'bg-accent text-white shadow-md'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    ✍️ Tryb Ręczny
+                                </button>
+                            </div>
+                        </div>
+
+                        {isManualMode ? (
+                            <ManualOfferConfigurator onComplete={handleManualProductComplete} initialData={product || undefined} />
+                        ) : (
+                            <ProductConfigurator onComplete={handleProductComplete} initialData={product || undefined} />
+                        )}
+                    </div>
                 )}
 
                 {step === 'summary' && offer && (

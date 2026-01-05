@@ -6,6 +6,7 @@ import type { Lead, LeadStatus } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { LeadsKanban } from './LeadsKanban';
 import { LeadsFunnelChart } from './LeadsFunnelChart';
+import { LeadsStats } from './LeadsStats';
 
 export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -262,9 +263,12 @@ export const LeadsList: React.FC = () => {
                 </div>
             </div>
 
-            {/* Stats Chart */}
+            {/* Stats Section */}
             {showStats && (
-                <LeadsFunnelChart leads={filteredLeads} />
+                <div className="space-y-6">
+                    <LeadsStats leads={filteredLeads} />
+                    <LeadsFunnelChart leads={filteredLeads} />
+                </div>
             )}
 
             {/* Filters */}

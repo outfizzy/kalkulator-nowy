@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { format } from 'date-fns';
-import { ServiceTicket } from '../../types';
+import type { ServiceTicket } from '../../types';
 
 export const generateServiceProtocol = (ticket: ServiceTicket) => {
     const doc = new jsPDF();
@@ -32,7 +32,7 @@ export const generateServiceProtocol = (ticket: ServiceTicket) => {
     doc.setFontSize(10);
     if (ticket.client) {
         doc.text(`${ticket.client.firstName} ${ticket.client.lastName}`, pageWidth / 2 + 10, 50);
-        doc.text(`${ticket.client.address || ''}`, pageWidth / 2 + 10, 55);
+        doc.text(`${ticket.client.street || ''} ${ticket.client.houseNumber || ''}`, pageWidth / 2 + 10, 55);
         doc.text(`${ticket.client.city || ''} ${ticket.client.postalCode || ''}`, pageWidth / 2 + 10, 60);
         doc.text(`Tel: ${ticket.client.phone}`, pageWidth / 2 + 10, 65);
     } else {

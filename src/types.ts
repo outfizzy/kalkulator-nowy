@@ -138,7 +138,8 @@ export interface Lead {
         companyName?: string;
         phone?: string;
         email?: string;
-        address?: string;
+        address?: string; // Legacy field, prefer street
+        street?: string; // New field from AI
         postalCode?: string;
         city?: string;
     };
@@ -269,6 +270,11 @@ export interface ProductConfig {
     numberOfPosts?: number; // Calculated number of posts
     numberOfFields?: number; // Calculated number of fields (sections)
     moduleCount?: number; // Number of modules (sections)
+
+    // Manual Offer Mode
+    isManual?: boolean;
+    manualDescription?: string;
+    manualPrice?: number;
 }
 
 export interface InstallationCostResult {

@@ -22,6 +22,11 @@ export const TaskService = {
         if (filters?.customerId) {
             query = query.eq('customer_id', filters.customerId);
         }
+        // If no specific entity filter is provided, assume "My Tasks" context
+        if (!filters?.leadId && !filters?.customerId) {
+            query = query.eq('user_id', currentUser.id);
+        }
+
         if (filters?.status) {
             query = query.eq('status', filters.status);
         }

@@ -1,43 +1,216 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.0";
-import imaps from "npm:imap-simple@5.1.0";
-import { simpleParser } from "npm:mailparser@3.6.4";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// System Prompt for AI
+// IMPROVED System Prompt for AI (Polish Enforcement & HTML Cleaning)
 const SYSTEM_PROMPT = `
-You are an AI Sales & Service Assistant. Analyze incoming emails to classify them as "lead" (sales inquiry), "service" (complaint, repair, warranty issue), or "spam" (newsletter, internal, automated).
+You are an AI Sales Assistant for a Polish company (Polendach). Your job is to classify incoming emails into specific categories and extract structured data.
 
-Input: Email Subject and Body.
-Output: JSON ONLY.
-Structure:
+LANGUAGE REQUIREMENT:
+- All summaries, notes, and descriptions MUST be in POLISH language.
+- Even if the email is in German, translate the summary to Polish.
+
+CATEGORIES:
+1. "lead": A NEW sales inquiry, request for offer, or potential client interested in products/services (Terrace roofs, Carports, Winter gardens).
+2. "service": A generic customer service request, complaint, report of damage/defect to existing installation.
+3. "spam": Newsletters, automated notifications, internal system emails, or obvious junk.
+4. "reply": An ongoing conversation (RE: in subject), payment confirmation, or simple follow-up that is NOT a new inquiry.
+
+OUTPUT FORMAT (JSON ONLY):
 {
-  "type": "lead" | "service" | "spam",
-  "confidence": number, // 0-1
-  // If type is "lead":
+  "type": "lead" | "service" | "spam" | "reply",
+  "confidence": number, // 0.0 to 1.0
+  "summary": "Short summary in POLISH (max 200 chars). E.g., 'Zapytanie o wycenę zadaszenia 4x3m z montażem w Berlinie'.",
+  "cleaned_content": "The full original message content, but CLEANED of HTML tags (like <p>, <div>, <li>), system footers, and legal disclaimers. Keep it readable with newlines. Translate key technical requests to Polish if needed, but keep original German text if it's crucial for context.",
   "leadData": {
     "firstName": string | null,
-    "lastName": string | null, // try to extract from signature or "From" field
+    "lastName": string | null,
     "companyName": string | null,
     "phone": string | null,
-    "email": string | null, // extract from body or return null if same as sender
-    "city": string | null, 
-    "postalCode": string | null,
-    "address": string | null
+    "email": string | null,
+    "street": string | null, // Street + House Number
+    "postalCode": string | null, // PLZ (CRITICAL)
+    "city": string | null // City (CRITICAL)
   },
-  // If type is "service":
   "serviceData": {
-    "contractNumber": string | null, // Look for patterns like "ZK/2024/...", "UM/...", numbers
-    "issueDescription": string,
-    "priority": "low" | "medium" | "high" // Infer from urgency tone
-  },
-  "summary": "Short summary of the request"
+    "issueDescription": string, // In Polish
+    "priority": "low" | "medium" | "high"
+  }
 }
-Ignore no-reply, newsletters, and spam.
+
+EXTRACTION RULES (CRITICAL):
+- **POSTAL CODE (PLZ) & CITY**: You MUST aggressively search for a 5-digit German Postal Code (PLZ) and City Name in the email body, especially in the SIGNATURE or FOOTER. If found, extract them to "postalCode" and "city".
+- **ADDRESS**: If a street address is found, extract it to "street".
+- If the email is a direct reply (Subject starts with "Re:" or "AW:") and doesn't look like a NEW project inquiry, classify as "reply".
+- "cleaned_content" should look like a clean text message, ready for a sales rep to read without technical clutter.
 `;
+
+/**
+ * Minimal IMAP Client for Deno
+ * Implements LOGIN, SELECT, SEARCH, FETCH, STORE +FLAGS, LOGOUT
+ */
+class SimpleIMAP {
+    private conn: Deno.TlsConn | null = null;
+    private tagCount: number = 0;
+
+    constructor(private config: any) { }
+
+    async connect() {
+        this.conn = await Deno.connectTls({
+            hostname: this.config.host,
+            port: this.config.port || 993,
+        });
+        await this.readUntil("* OK");
+    }
+
+    async login() {
+        return this.sendCommand(`LOGIN "${this.config.user}" "${this.config.password}"`);
+    }
+
+    async select(mailbox: string = 'INBOX') {
+        return this.sendCommand(`SELECT ${mailbox}`);
+    }
+
+    async searchEmails(criteria: string) {
+        const response = await this.sendCommand(`SEARCH ${criteria}`);
+        const lines = response.split('\r\n');
+        const searchLine = lines.find(l => l.startsWith('* SEARCH'));
+        if (!searchLine) return [];
+        return searchLine.split(' ').slice(2).filter(x => x.trim().length > 0).map(Number);
+    }
+
+    // Fetches Header + Body Text
+    async fetchEmail(id: number) {
+        // BODY.PEEK[] fetches the entire email (Header + Body) without marking as read
+        const cmd = `FETCH ${id} (BODY.PEEK[])`;
+        return this.execFetch(cmd);
+    }
+
+    async fetchEmailByUid(uid: number) {
+        const cmd = `UID FETCH ${uid} (BODY.PEEK[])`;
+        return this.execFetch(cmd);
+    }
+
+    private async execFetch(cmd: string) {
+        if (!this.conn) throw new Error("No connection");
+        const tag = `A${this.tagCount++}`;
+        const encoder = new TextEncoder();
+        await this.conn.write(encoder.encode(`${tag} ${cmd}\r\n`));
+        return this.readUntil(`${tag} OK`);
+    }
+
+    async markSeen(id: number) {
+        return this.sendCommand(`STORE ${id} +FLAGS (\\Seen)`);
+    }
+
+    async logout() {
+        if (this.conn) {
+            try {
+                await this.sendCommand(`LOGOUT`);
+                this.conn.close();
+            } catch (e) { }
+        }
+    }
+
+    private async sendCommand(cmd: string) {
+        if (!this.conn) throw new Error("Not connected");
+        const tag = `A${this.tagCount++}`;
+        const encoder = new TextEncoder();
+        await this.conn.write(encoder.encode(`${tag} ${cmd}\r\n`));
+        return this.readUntil(`${tag} OK`);
+    }
+
+    private async readUntil(terminator: string): Promise<string> {
+        if (!this.conn) return "";
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        let buf = new Uint8Array(4096); // Increased buffer
+
+        while (true) {
+            const n = await this.conn.read(buf);
+            if (n === null) break;
+            const chunk = decoder.decode(buf.subarray(0, n));
+            accumulated += chunk;
+            if (accumulated.includes(terminator)) break;
+            if (accumulated.includes(`A${this.tagCount - 1} NO`) || accumulated.includes(`A${this.tagCount - 1} BAD`)) {
+                throw new Error("IMAP Error: " + accumulated);
+            }
+        }
+        return accumulated;
+    }
+}
+
+function getImapDateStr(daysAgo: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    const day = d.getDate().toString().padStart(2, '0');
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
+// --------------------------------------------------------------------------------
+//  ROBUST PARSER with MIME Decoding
+// --------------------------------------------------------------------------------
+
+function decodeMimeEncodedWord(str: string): string {
+    return str.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/g, (_, charset, encoding, text) => {
+        try {
+            const buffer = encoding.toLowerCase() === 'b'
+                ? Uint8Array.from(atob(text), c => c.charCodeAt(0))
+                : Uint8Array.from(decodeQuotedPrintable(text), c => c.charCodeAt(0));
+
+            const decoder = new TextDecoder(charset);
+            return decoder.decode(buffer);
+        } catch (e) {
+            return text; // Fallback
+        }
+    });
+}
+
+function decodeQuotedPrintable(str: string): string {
+    return str.replace(/=([a-fA-F0-9]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/_/g, ' ');
+}
+
+function parseEmailRobust(raw: string) {
+    const headerEnd = raw.indexOf("\r\n\r\n");
+    const headerBlock = raw.substring(0, headerEnd);
+    let bodyBlock = raw.substring(headerEnd);
+
+    const subjectMatch = headerBlock.match(/^Subject:\s*(.*)$/im);
+    let subject = subjectMatch ? subjectMatch[1].trim() : "No Subject";
+    subject = decodeMimeEncodedWord(subject);
+
+    const fromMatch = headerBlock.match(/^From:\s*(.*)$/im);
+    const fromLine = fromMatch ? fromMatch[1].trim() : "";
+    let senderName = "Unknown";
+    let senderEmail = "";
+
+    if (fromLine.includes("<")) {
+        const parts = fromLine.split("<");
+        senderName = parts[0].replaceAll('"', '').trim();
+        senderName = decodeMimeEncodedWord(senderName);
+        senderEmail = parts[1].replace(">", "").trim();
+    } else {
+        senderEmail = fromLine;
+        senderName = fromLine.split("@")[0];
+    }
+
+    // Extract Message-ID for Deduplication
+    const msgIdMatch = headerBlock.match(/^Message-ID:\s*<(.*?)>/im);
+    const messageId = msgIdMatch ? msgIdMatch[1].trim() : null;
+
+    // Decode Quoted-Printable Body (Naive but functional for now)
+    let text = bodyBlock.replaceAll("=3D", "=").replaceAll("=\r\n", "");
+
+    return { subject, senderName, senderEmail, text, messageId };
+}
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -45,211 +218,266 @@ Deno.serve(async (req) => {
     }
 
     try {
-        // 1. Initialize Supabase Admin Client (Service Role)
+        const { batchSize = 10, days = 0, offset = 0, userEmail, targetIds, config: providedConfig } = await req.json().catch(() => ({}));
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
-
         const openAiKey = Deno.env.get('OPENAI_API_KEY');
         if (!openAiKey) throw new Error("Missing OPENAI_API_KEY");
 
-        // 2. Fetch Users with active Email Config
-        const { data: profiles, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email, email_config, full_name')
-            .not('email_config', 'is', null);
+        const allEmailRefs: { profile: any; id: number; config?: any }[] = [];
 
-        if (profileError) throw profileError;
+        if (providedConfig && providedConfig.imapHost) {
+            // DIRECT MODE (e.g. Shared Inbox or matched Frontend Config)
+            console.log("Using provided config from request body");
+            const virtualProfile = {
+                id: 'direct',
+                email: providedConfig.imapUser || providedConfig.smtpUser || 'direct-access',
+                email_config: providedConfig
+            };
 
-        const results = [];
-
-        // 3. Loop through users
-        for (const profile of profiles || []) {
             try {
-                const config = profile.email_config;
-
-                // Skip if config is incomplete
-                if (!config?.imapHost || !config?.imapPassword) {
-                    console.log(`Skipping user ${profile.email}: Missing IMAP credentials.`);
-                    continue;
-                }
-
-                const imapConfig = {
-                    imap: {
-                        user: config.imapUser || config.smtpUser || profile.email,
-                        password: config.imapPassword,
+                const config = providedConfig;
+                if (targetIds && targetIds.length > 0) {
+                    // MANUAL MODE
+                    const refs = targetIds.map((id: number) => ({ profile: virtualProfile, id, config }));
+                    allEmailRefs.push(...refs);
+                } else {
+                    // AUTO MODE (Search)
+                    const client = new SimpleIMAP({
                         host: config.imapHost,
                         port: config.imapPort || 993,
-                        tls: true,
-                        authTimeout: 10000,
-                        tlsOptions: { rejectUnauthorized: false }
-                    }
-                };
-
-                // Connect
-                console.log(`Connecting to IMAP for ${profile.email}...`);
-                const connection = await imaps.connect(imapConfig);
-                await connection.openBox('INBOX');
-
-                // Fetch UNSEEN messages
-                const searchCriteria = ['UNSEEN'];
-                const fetchOptions = {
-                    bodies: ['HEADER', 'TEXT', ''],
-                    markSeen: false
-                };
-
-                const messages = await connection.search(searchCriteria, fetchOptions);
-                console.log(`Found ${messages.length} unseen emails for ${profile.email}.`);
-
-                for (const item of messages) {
-                    // Extract body
-                    const all = item.parts.find((part: any) => part.which === "");
-                    const id = item.attributes.uid;
-                    const idHeader = "IMAP-" + id;
-
-                    // Parse Email
-                    const parsed = await simpleParser(all ? all.body : "");
-                    const subject = parsed.subject || "No Subject";
-                    const fromObj = parsed.from?.value[0];
-                    const senderEmail = fromObj?.address;
-                    const senderName = fromObj?.name;
-                    const textBody = parsed.text || "No Content";
-
-                    // AI Analysis
-                    console.log(`Analyzing email: ${subject}`);
-                    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${openAiKey}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            model: 'gpt-4o',
-                            messages: [
-                                { role: 'system', content: SYSTEM_PROMPT },
-                                { role: 'user', content: `Subject: ${subject}\nFrom: ${senderName} <${senderEmail}>\n\nBody:\n${textBody.substring(0, 3000)}` }
-                            ],
-                            response_format: { type: "json_object" }
-                        }),
+                        user: config.imapUser || config.smtpUser,
+                        password: config.imapPassword || config.smtpPassword
                     });
 
-                    const aiJson = await aiResponse.json();
-                    const analysis = JSON.parse(aiJson.choices[0].message.content);
+                    await client.connect();
+                    await client.login();
+                    await client.select('INBOX');
 
-                    if (analysis.type === 'lead') {
-                        console.log(`LEAD DETECTED: ${analysis.summary}`);
+                    let searchCriteria = 'UNSEEN';
+                    if (days > 0) searchCriteria = `SINCE ${getImapDateStr(days)}`;
 
-                        // Refine Data
-                        const leadData = analysis.leadData || {};
-                        if (!leadData.email) leadData.email = senderEmail;
-                        if (!leadData.lastName && senderName) {
-                            const parts = senderName.split(' ');
-                            if (parts.length > 1) {
-                                leadData.firstName = parts[0];
-                                leadData.lastName = parts.slice(1).join(' ');
-                            } else {
-                                leadData.lastName = senderName;
-                            }
-                        }
-
-                        // Determine Assignment
-                        const isSharedInbox = profile.email.toLowerCase() === 'buero@polendach24.de';
-                        const assignedTo = isSharedInbox ? null : profile.id;
-
-                        // Insert into Leads
-                        const { error: insertError } = await supabaseAdmin
-                            .from('leads')
-                            .insert({
-                                status: 'new',
-                                source: 'email',
-                                customer_data: leadData,
-                                notes: `[AI Auto-Import] Source: Email "${subject}"\nSummary: ${analysis.summary}`,
-                                email_message_id: idHeader,
-                                assigned_to: assignedTo
-                            });
-
-                        if (insertError) {
-                            console.error('Failed to insert lead:', insertError);
-                        } else {
-                            results.push({ email: subject, status: 'created_lead' });
-                            await connection.addFlags(id, '\\Seen');
-                        }
-
-                    } else if (analysis.type === 'service') {
-                        console.log(`SERVICE TICKET DETECTED: ${analysis.summary}`);
-                        const sData = analysis.serviceData || {};
-
-                        // 1. Find Contract
-                        let contractId = null;
-                        let clientId = null;
-
-                        if (sData.contractNumber) {
-                            const { data: contract } = await supabaseAdmin
-                                .from('contracts')
-                                .select('id, client_id')
-                                .ilike('contract_number', `%${sData.contractNumber}%`)
-                                .maybeSingle();
-
-                            if (contract) {
-                                contractId = contract.id;
-                                clientId = contract.client_id; // Prefer contract's client
-                            }
-                        }
-
-                        // 2. Find Client by Email if not found by contract
-                        if (!clientId && senderEmail) {
-                            const { data: customer } = await supabaseAdmin
-                                .from('customers')
-                                .select('id')
-                                .ilike('email', senderEmail)
-                                .maybeSingle();
-                            if (customer) clientId = customer.id;
-                        }
-
-                        // 3. Insert Service Ticket
-                        const ticketNumber = `SRV-${Date.now().toString().slice(-6)}`;
-                        const { error: insertError } = await supabaseAdmin
-                            .from('service_tickets')
-                            .insert({
-                                ticket_number: ticketNumber,
-                                type: 'other', // Default as AI might not map perfectly to enum yet
-                                status: 'new',
-                                priority: sData.priority || 'medium',
-                                description: `[AI Import] ${analysis.summary}\n\nClient Issue: ${sData.issueDescription}`,
-                                contract_id: contractId,
-                                client_id: clientId, // Can be null if unknown client
-                                created_at: new Date().toISOString()
-                            });
-
-                        if (insertError) {
-                            console.error('Failed to insert service ticket:', insertError);
-                        } else {
-                            results.push({ email: subject, status: 'created_ticket' });
-                            await connection.addFlags(id, '\\Seen');
-                        }
-
-                    } else {
-                        console.log('Not a lead/service. Skipping.');
-                        // Do not mark seen to prevent losing valid email if logic is wrong?
-                        // Or logic: If it's analyzed once and rejected, should we analyze it again?
-                        // Ideally "Processed" flag.
-                    }
+                    const ids = await client.searchEmails(searchCriteria);
+                    const refs = ids.map((id: number) => ({ profile: virtualProfile, id, config }));
+                    allEmailRefs.push(...refs);
+                    await client.logout();
                 }
-
-                connection.end();
-
             } catch (err: any) {
-                console.error(`Error processing profile ${profile.id}:`, err);
+                console.error("Error in Direct Config scan:", err);
+            }
+
+        } else {
+            // DB PROFILE LOOKUP MODE
+            let query = supabaseAdmin
+                .from('profiles')
+                .select('id, email, email_config')
+                .not('email_config', 'is', null);
+
+            if (userEmail) {
+                query = query.eq('email', userEmail);
+            }
+
+            const { data: profiles, error: profileError } = await query;
+            if (profileError) throw profileError;
+
+            // 1. COLLECT IDs from all matching profiles
+            for (const profile of profiles || []) {
+                try {
+                    const config = profile.email_config;
+                    if (!config?.imapHost) continue;
+
+                    if (targetIds && targetIds.length > 0) {
+                        const refs = targetIds.map((id: number) => ({ profile, id, config }));
+                        allEmailRefs.push(...refs);
+                    } else {
+                        const client = new SimpleIMAP({
+                            host: config.imapHost,
+                            port: config.imapPort || 993,
+                            user: config.imapUser || config.smtpUser || profile.email,
+                            password: config.imapPassword || config.smtpPassword
+                        });
+
+                        await client.connect();
+                        await client.login();
+                        await client.select('INBOX');
+
+                        let searchCriteria = 'UNSEEN';
+                        if (days > 0) searchCriteria = `SINCE ${getImapDateStr(days)}`;
+
+                        const ids = await client.searchEmails(searchCriteria);
+                        const refs = ids.map((id: number) => ({ profile, id, config }));
+                        allEmailRefs.push(...refs);
+
+                        await client.logout();
+                    }
+
+                } catch (err) {
+                    console.error(`Error searching profile ${profile.email}:`, err);
+                }
             }
         }
 
-        return new Response(JSON.stringify({ success: true, processed: results }), {
+        // 2. PAGINATION (Global)
+        const totalFound = allEmailRefs.length;
+
+        // If Manual Mode (targetIds), we ignore offset usually, unless explicitly passed for batching manual list??
+        // Assuming manual list is small (<50), we can just process all if offset=0.
+        // But let's respect offset and batchSize just in case frontend slices it.
+
+        const safeOffset = Math.min(offset, totalFound);
+        // Ensure we don't slice out of bounds or negatively
+        const batchRefs = allEmailRefs.slice(safeOffset, Math.min(safeOffset + batchSize, totalFound));
+        const remaining = Math.max(0, totalFound - (safeOffset + batchSize));
+
+        console.log(`Global Scan: Found ${totalFound}, Offset ${safeOffset}, Batch Size ${batchSize}, Actual Batch ${batchRefs.length}, Remaining ${remaining}`);
+
+        const results = [];
+        const activeConnections: Record<string, SimpleIMAP> = {};
+
+        // 3. PROCESS BATCH
+        for (const ref of batchRefs) {
+            const { profile, id, config: refConfig } = ref;
+            const profileKey = profile.email; // Identify unique connection needed
+
+            let client = activeConnections[profileKey];
+
+            try {
+                if (!client) {
+                    const config = refConfig || profile.email_config;
+                    client = new SimpleIMAP({
+                        host: config.imapHost,
+                        port: config.imapPort || 993,
+                        user: config.imapUser || config.smtpUser || profile.email,
+                        password: config.imapPassword || config.smtpPassword
+                    });
+                    await client.connect();
+                    await client.login();
+                    await client.select('INBOX');
+                    activeConnections[profileKey] = client;
+                }
+
+                let raw;
+                if (targetIds) {
+                    // Manual Mode: IDs are UIDs
+                    raw = await client.fetchEmailByUid(id);
+                } else {
+                    // Auto Mode: IDs are SeqNos (from SEARCH)
+                    raw = await client.fetchEmail(id);
+                }
+                const { subject, senderName, senderEmail, text, messageId } = parseEmailRobust(raw);
+
+                // DEDUPLICATION
+                let isDuplicate = false;
+                let uniqueId = messageId || `LEGACY-IMAP-${subject}-${senderEmail}`;
+
+                const { data: existingLead } = await supabaseAdmin
+                    .from('leads')
+                    .select('id')
+                    .eq('email_message_id', uniqueId)
+                    .maybeSingle();
+
+                if (existingLead) isDuplicate = true;
+
+                if (isDuplicate) {
+                    // In Manual Mode, user might WANT to re-analyze?
+                    // But usually we respect Deduplication.
+                    // Let's Log it.
+                    console.log(`Skipping duplicate: ${subject}`);
+                    results.push({ status: 'skipped_duplicate', subject });
+                    if (days === 0 && !targetIds) await client.markSeen(id); // Only mark seen if auto-mode
+                    continue;
+                }
+
+                // AI ANALYSIS
+                const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${openAiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages: [
+                            { role: 'system', content: SYSTEM_PROMPT },
+                            { role: 'user', content: `Subject: ${subject}\nFrom: ${senderName} <${senderEmail}>\n\nBody:\n${text.substring(0, 3000)}` }
+                        ],
+                        response_format: { type: "json_object" }
+                    }),
+                });
+
+                const aiJson = await aiResponse.json();
+                const analysis = JSON.parse(aiJson.choices?.[0]?.message?.content || '{}');
+
+                // ACTION
+                if (analysis.type === 'lead') {
+                    const leadData = analysis.leadData || {};
+                    if (!leadData.email) leadData.email = senderEmail;
+                    if (!leadData.lastName) leadData.lastName = senderName;
+
+                    const isShared = profile.email.toLowerCase().includes('buero') || profile.email.toLowerCase().includes('kontakt');
+                    const assignedTo = isShared ? null : profile.id;
+
+                    const { error } = await supabaseAdmin.from('leads').insert({
+                        status: 'new',
+                        source: 'email',
+                        customer_data: leadData,
+                        notes: `[AI Import] Źródło: Email "${subject}"\nPodsumowanie: ${analysis.summary}\n\n--- Treść wiadomości ---\n${analysis.cleaned_content || text}`,
+                        email_message_id: uniqueId,
+                        assigned_to: assignedTo
+                    });
+
+                    if (!error) {
+                        if (!targetIds) await client.markSeen(id); // Only mark seen if auto-mode
+                        results.push({ status: 'created_lead', subject });
+                    } else {
+                        results.push({ status: 'error_db', subject, error: error.message });
+                    }
+                } else if (analysis.type === 'service') {
+                    const { error } = await supabaseAdmin.from('service_tickets').insert({
+                        ticket_number: `SRV-${Date.now().toString().slice(-6)}`,
+                        type: 'other',
+                        status: 'new',
+                        priority: analysis.serviceData?.priority || 'medium',
+                        description: analysis.serviceData?.issueDescription || analysis.summary,
+                        created_at: new Date().toISOString()
+                    });
+                    if (!error) {
+                        if (!targetIds) await client.markSeen(id);
+                        results.push({ status: 'created_ticket', subject });
+                    }
+                } else {
+                    console.log(`Skipped (Type: ${analysis.type}): ${subject}`);
+                    // If manual, we don't mark as seen.
+                    if (analysis.type === 'spam' && !targetIds) {
+                        await client.markSeen(id);
+                    }
+                    results.push({ status: `skipped_${analysis.type}`, subject });
+                }
+
+            } catch (err: any) {
+                console.error(`Error processing email ${id} for ${profile.email}:`, err);
+                results.push({ status: 'error', subject: `ID ${id}`, message: err.message });
+            }
+        }
+
+        // Cleanup connections
+        for (const client of Object.values(activeConnections)) {
+            try { await client.logout(); } catch (e) { }
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            processedCount: results.length,
+            remaining,
+            results
+        }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
-    } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), {
+    } catch (e: any) {
+        return new Response(JSON.stringify({ error: e.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

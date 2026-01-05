@@ -38,6 +38,9 @@ export const SettingsPage: React.FC = () => {
         signature: ''
     });
 
+    // Contract Settings
+    const [contractStartNumber, setContractStartNumber] = useState(1);
+
     useEffect(() => {
         const loadProfileAndCheckDb = async () => {
             if (!currentUser) return;
@@ -101,6 +104,14 @@ export const SettingsPage: React.FC = () => {
                 } catch (err) {
                     console.error('Error loading global settings:', err);
                 }
+
+                // Load Contract Settings
+                try {
+                    const startNum = await SettingsService.getContractNumberStart();
+                    setContractStartNumber(startNum);
+                } catch (e) {
+                    console.error('Error loading contract settings', e);
+                }
             }
         };
 
@@ -115,6 +126,17 @@ export const SettingsPage: React.FC = () => {
         } catch (error) {
             console.error('Error saving global settings:', error);
             toast.error('Błąd zapisu ustawień globalnych');
+        }
+    };
+
+    const handleSaveContractSettings = async () => {
+        if (currentUser?.role !== 'admin') return;
+        try {
+            await SettingsService.updateContractNumberStart(contractStartNumber);
+            toast.success('Początkowy numer umowy zaktualizowany');
+        } catch (error) {
+            console.error('Error saving contract settings:', error);
+            toast.error('Błąd zapisu ustawień umów');
         }
     };
 
@@ -345,6 +367,52 @@ export const SettingsPage: React.FC = () => {
                                     className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-lg shadow-purple-600/20 transition-colors"
                                 >
                                     Zapisz Ustawienia Biura
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Contract Settings (Admin Only) */}
+                {currentUser?.role === 'admin' && (
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl border-l-4 border-l-blue-500">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Numeracja Umów</h3>
+                                <p className="text-sm text-slate-500">Konfiguracja automatycznego nadawania numerów</p>
+                            </div>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">ADMIN ONLY</span>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Rozpocznij numerację od (Numer Bieżący / Startowy)
+                                </label>
+                                <div className="flex gap-4 items-center">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={contractStartNumber}
+                                        onChange={(e) => setContractStartNumber(parseInt(e.target.value) || 1)}
+                                        className="w-32 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center font-bold"
+                                    />
+                                    <span className="text-sm text-slate-500">
+                                        Następna umowa otrzyma numer: <strong>UM/{new Date().getFullYear()}/{String(crypto.getRandomValues ? Math.max(contractStartNumber, 1) : 1).padStart(3, '0')}</strong> (przybliżenie)
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Jeśli w danym roku istnieją już umowy z wyższym numerem, system automatycznie użyje kolejnego wolnego numeru.
+                                    To ustawienie wymusza "przeskok" w górę, np. na 500.
+                                </p>
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={handleSaveContractSettings}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-700 shadow-sm"
+                                >
+                                    Zapisz Numerację
                                 </button>
                             </div>
                         </div>

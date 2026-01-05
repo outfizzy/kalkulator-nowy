@@ -5,6 +5,7 @@ import { trendstylePricingEntries, trendstylePlusPricingEntries } from '../data/
 import { topstylePricingEntries } from '../data/topstyle_pricing';
 import { topstyleXlPricingEntries } from '../data/topstyle_xl_pricing';
 import { skystylePricingEntries } from '../data/skystyle_pricing';
+import ultrastyleData from '../data/ultrastyle_full.json';
 import { calculateDistanceFromGubin, calculateInstallationCosts } from './distanceCalculator';
 
 // Normalize snow zone IDs coming from postal-code lookup (1/2/3) or Roman numerals (I/II/III)
@@ -288,6 +289,34 @@ export function calculatePrice(
             }
         } else {
             console.log('[PRICING DEBUG] No zone prices found for Skystyle and installation type:', config.installationType);
+        }
+    } else if (config.modelId === 'ultrastyle_style' || config.modelId === 'ultrastyle') {
+        // Ultrastyle Logic
+        console.log('[PRICING DEBUG] Ultrastyle calculation');
+
+        // Ultrastyle pricing is simple (width x depth)
+        const products = ultrastyleData.products;
+
+        // 1. Filter by Width (find smallest width >= config.width)
+        const availableWidths = Array.from(new Set(products.map(p => p.width_mm))).sort((a, b) => a - b);
+        const matchedWidth = availableWidths.find(w => w >= config.width) || availableWidths[availableWidths.length - 1];
+
+        // 2. Filter by Depth (find smallest depth >= config.projection)
+        const matchedEntry = products.find(p =>
+            p.width_mm === matchedWidth &&
+            p.depth_mm >= config.projection
+        );
+
+        // Fallback: if no exact depth match found for this width (rare), try finding the max depth for this width
+        const finalEntry = matchedEntry || products.filter(p => p.width_mm === matchedWidth).sort((a, b) => b.depth_mm - a.depth_mm)[0];
+
+        if (finalEntry) {
+            basePrice = finalEntry.price_eur;
+            numberOfFields = finalEntry.fields;
+            numberOfPosts = finalEntry.posts;
+            console.log('[PRICING DEBUG] Ultrastyle Price:', basePrice);
+        } else {
+            console.warn('[PRICING DEBUG] No Ultrastyle price found for', config.width, config.projection);
         }
     } else {
         // Fallback to catalog.json for other models

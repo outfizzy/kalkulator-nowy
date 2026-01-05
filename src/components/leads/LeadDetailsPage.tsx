@@ -92,7 +92,7 @@ export const LeadDetailsPage: React.FC = () => {
 
         navigate('/new-offer', {
             state: {
-                initialData: {
+                customer: {
                     firstName: lead.customerData.firstName,
                     lastName: lead.customerData.lastName,
                     email: lead.customerData.email,
@@ -384,9 +384,9 @@ export const LeadDetailsPage: React.FC = () => {
                                             <div>
                                                 <label className="text-xs font-medium text-slate-500 uppercase">Adres</label>
                                                 <div className="text-slate-900">
-                                                    {lead.customerData.address ? (
+                                                    {(lead.customerData.address || lead.customerData.street || (lead.customerData.postalCode && lead.customerData.city)) ? (
                                                         <div>
-                                                            <div>{lead.customerData.address}</div>
+                                                            <div>{lead.customerData.address || lead.customerData.street}</div>
                                                             <div className="text-slate-500 text-sm">
                                                                 {lead.customerData.postalCode} {lead.customerData.city}
                                                             </div>
@@ -597,6 +597,8 @@ export const LeadDetailsPage: React.FC = () => {
                     ...lead.customerData,
                     notes: lead.notes
                 }}
+                leadId={lead.id}
+                customerId={lead.customerId}
                 availableOffers={offers}
             />
             <TaskModal

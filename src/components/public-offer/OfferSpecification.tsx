@@ -25,6 +25,27 @@ interface OfferSpecificationProps {
 }
 
 export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product }) => {
+    // === MANUAL OFFER MODE ===
+    if (product.isManual) {
+        return (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                    <span className="text-3xl">📝</span> Specyfikacja (Indywidualna)
+                </h3>
+
+                <div className="prose prose-slate max-w-none">
+                    <div className="whitespace-pre-wrap text-slate-700 leading-relaxed font-medium">
+                        {product.manualDescription || "Brak opisu."}
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-400">
+                    ℹ️ Oferta przygotowana indywidualnie przez doradcę.
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="bg-slate-900 p-6 text-white flex justify-between items-center">

@@ -174,11 +174,14 @@ export const LeadService = {
         if (assigneeIds.length > 0) {
             const { data: profiles } = await supabase
                 .from('profiles')
-                .select('id, first_name, last_name')
+                .select('id, full_name')
                 .in('id', assigneeIds);
 
             if (profiles) {
-                profiles.forEach(p => assigneeMap.set(p.id, p));
+                profiles.forEach(p => assigneeMap.set(p.id, {
+                    first_name: (p.full_name || '').split(' ')[0],
+                    last_name: (p.full_name || '').split(' ').slice(1).join(' ')
+                }));
             }
         }
 
@@ -226,11 +229,14 @@ export const LeadService = {
         if (assigneeIds.length > 0) {
             const { data: profiles } = await supabase
                 .from('profiles')
-                .select('id, first_name, last_name') // Assuming fields exist on profiles
+                .select('id, full_name') // Assuming fields exist on profiles
                 .in('id', assigneeIds);
 
             if (profiles) {
-                profiles.forEach(p => assigneeMap.set(p.id, p));
+                profiles.forEach(p => assigneeMap.set(p.id, {
+                    first_name: (p.full_name || '').split(' ')[0],
+                    last_name: (p.full_name || '').split(' ').slice(1).join(' ')
+                }));
             }
         }
 
@@ -280,8 +286,8 @@ export const LeadService = {
             customerData: data.customer_data,
             salesRep: undefined,
             assignee: data.assignee ? {
-                firstName: data.assignee.first_name || '',
-                lastName: data.assignee.last_name || ''
+                firstName: (data.assignee.full_name || '').split(' ')[0] || '',
+                lastName: (data.assignee.full_name || '').split(' ').slice(1).join(' ') || ''
             } : undefined
         };
     },

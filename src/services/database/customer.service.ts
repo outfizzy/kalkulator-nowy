@@ -167,6 +167,30 @@ export const CustomerService = {
         return await this.createCustomer(customer);
     },
 
+    /**
+     * Secure version of ensureCustomer that uses RPC to bypass RLS.
+     * Use this for Legacy Imports or cases where Rep needs to find existing customer hidden by RLS.
+     */
+    async ensureCustomerSecure(customer: Partial<Customer>): Promise<Customer> {
+        const { data, error } = await supabase.rpc('get_or_create_customer_v2', {
+            p_email: customer.email || null,
+            p_phone: customer.phone || null,
+            p_first_name: customer.firstName || null,
+            p_last_name: customer.lastName || null,
+            p_company_name: customer.companyName || null,
+            p_street: customer.street || null,
+            p_house_number: customer.houseNumber || null,
+            p_postal_code: customer.postalCode || null,
+            p_city: customer.city || null,
+            p_country: customer.country || 'Deutschland'
+        });
+
+        if (error) throw error;
+        // Data returned from RPC is JSONB, we cast it to Customer
+        // RPC v2 returns the full customer row
+        return data as Customer;
+    },
+
     async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer> {
         const { data, error } = await supabase
             .from('customers')

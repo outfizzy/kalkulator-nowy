@@ -22,6 +22,14 @@ export const LegacyImportModal: React.FC<LegacyImportModalProps> = ({ isOpen, on
     const [price, setPrice] = useState<number>(0);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
+    // Extended Fields
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [street, setStreet] = useState('');
+    const [houseNumber, setHouseNumber] = useState('');
+    const [postalCode, setPostalCode] = useState('');
+    const [city, setCity] = useState('');
+
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -35,15 +43,15 @@ export const LegacyImportModal: React.FC<LegacyImportModalProps> = ({ isOpen, on
                 companyName: companyName,
                 firstName: firstName,
                 lastName: lastName,
-                street: 'Nieznana 1', // Placeholder for legacy
-                houseNumber: '',
-                postalCode: '00-000',
-                city: 'Nieznane',
-                phone: '',
-                email: '',
+                street: street || 'Nieznana 1',
+                houseNumber: houseNumber || '',
+                postalCode: postalCode || '00-000',
+                city: city || 'Nieznane',
+                phone: phone || '',
+                email: email || '',
                 country: 'Deutschland'
             };
-            const customer = await CustomerService.ensureCustomer(customerInput);
+            const customer = await CustomerService.ensureCustomerSecure(customerInput);
 
             // 2. Create "Shadow" Offer (Sold)
             const offer = await OfferService.createLegacyOffer(customer.id!, price, new Date(date));
@@ -75,6 +83,12 @@ export const LegacyImportModal: React.FC<LegacyImportModalProps> = ({ isOpen, on
             setCompanyName('');
             setContractNumber('');
             setPrice(0);
+            setEmail('');
+            setPhone('');
+            setStreet('');
+            setHouseNumber('');
+            setPostalCode('');
+            setCity('');
 
         } catch (error) {
             console.error('Import Fail:', error);
@@ -126,6 +140,64 @@ export const LegacyImportModal: React.FC<LegacyImportModalProps> = ({ isOpen, on
                             value={companyName}
                             onChange={e => setCompanyName(e.target.value)}
                         />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Telefon</label>
+                            <input
+                                className="w-full border border-slate-300 rounded p-2 text-sm"
+                                value={phone}
+                                onChange={e => setPhone(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+                            <input
+                                type="email"
+                                className="w-full border border-slate-300 rounded p-2 text-sm"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Ulica</label>
+                            <input
+                                className="w-full border border-slate-300 rounded p-2 text-sm"
+                                value={street}
+                                onChange={e => setStreet(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Nr Domu</label>
+                            <input
+                                className="w-full border border-slate-300 rounded p-2 text-sm"
+                                value={houseNumber}
+                                onChange={e => setHouseNumber(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Kod Pocztowy</label>
+                            <input
+                                className="w-full border border-slate-300 rounded p-2 text-sm"
+                                value={postalCode}
+                                onChange={e => setPostalCode(e.target.value)}
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Miasto</label>
+                            <input
+                                className="w-full border border-slate-300 rounded p-2 text-sm"
+                                value={city}
+                                onChange={e => setCity(e.target.value)}
+                            />
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

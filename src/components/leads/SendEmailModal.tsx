@@ -6,22 +6,22 @@ import type { Offer } from '../../types';
 import { getOfferEmailHtml } from '../../utils/emailTemplates';
 import { generateOfferPDFData } from '../../utils/pdfGenerator';
 import { OfferService } from '../../services/database/offer.service';
+import { SALES_TEMPLATES, EmailTemplate } from '../../data/emailTemplates';
+import { supabase } from '../../lib/supabase';
 
 interface SendEmailModalProps {
     isOpen: boolean;
     onClose: () => void;
     to: string; // Pre-filled recipient
     subject?: string; // Optional pre-filled subject
-    leadData?: { firstName?: string; lastName?: string; notes?: string; }; // Data for generation
+    leadData?: { firstName?: string; lastName?: string; notes?: string; companyName?: string; }; // Data for generation
+    leadId?: string; // New: For logging
+    customerId?: string; // New: For logging
     offer?: Offer;
     availableOffers?: Offer[];
 }
 
-export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose, to, subject = '', leadData, offer, availableOffers }) => {
-    // ... we need 'offer' in scope for useEffect above, so I need to rewrite the component signature line and the Effect properly. 
-    // Wait, multi_replace cannot access variables I define in ReplacementChunks easily if I split them wrong.
-    // I will replace the component definition line. 
-
+export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose, to, subject = '', leadData, leadId, customerId, offer, availableOffers }) => {
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [emailSubject, setEmailSubject] = useState(subject);
@@ -34,6 +34,10 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
     const [useSignature, setUseSignature] = useState(true);
     const [useOfferTemplate, setUseOfferTemplate] = useState(false);
     const [selectedOffer, setSelectedOffer] = useState<Offer | undefined>(offer); // Local state for offer
+    const [senderIdentity, setSenderIdentity] = useState<'personal' | 'shared'>('personal'); // New: Sender Selection
+
+    // New: Template State
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
     // Effect to Update Local Offer State
     useEffect(() => {
@@ -67,6 +71,38 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
     ];
 
     if (!isOpen) return null;
+
+    const applyTemplate = (templateId: string) => {
+        const template = SALES_TEMPLATES.find(t => t.id === templateId);
+        if (!template) return;
+
+        let filledBody = template.body;
+        let filledSubject = template.subject;
+
+        // Placeholders Replacement
+        const replacements: Record<string, string> = {
+            '{{firstName}}': leadData?.firstName || '',
+            '{{lastName}}': leadData?.lastName || 'Kliencie',
+            '{{companyName}}': leadData?.companyName || '',
+            '{{signature}}': currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName}\nPolenDach24` : 'PolenDach24 Team'
+        };
+
+        Object.entries(replacements).forEach(([key, value]) => {
+            filledBody = filledBody.replaceAll(key, value);
+            filledSubject = filledSubject.replaceAll(key, value);
+        });
+
+        // Don't auto-add signature if placeholder was already replaced
+        if (filledBody.includes(replacements['{{signature}}'])) {
+            // If signature placeholder was present, disable auto-signature to avoid double sig
+            setUseSignature(false);
+        }
+
+        setBody(filledBody);
+        setEmailSubject(filledSubject);
+        setSelectedTemplateId(templateId);
+        toast.success(`Zastosowano szablon: ${template.name}`);
+    };
 
     const handleRewrite = async () => {
         if (!body) return toast.error('Wpisz najpierw treść wiadomości');
@@ -187,7 +223,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     const sigHtml = (rawSig.includes('<') && rawSig.includes('>'))
                         ? rawSig
                         : rawSig.replace(/\n/g, '<br>');
-                    finalBody += `< br > <br>--<br>${sigHtml}`;
+                    finalBody += `<br><br>--<br>${sigHtml}`;
                 }
             }
 
@@ -200,12 +236,25 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     subject: emailSubject,
                     body: finalBody,
                     config: currentUser.emailConfig,
+                    useSharedConfig: senderIdentity === 'shared', // Pass flag
+                    leadId,     // Pass for logging
+                    customerId, // Pass for logging
                     attachments // Pass attachments
                 }),
             });
 
             const result = await response.json();
             if (!response.ok) throw new Error(result.error);
+
+            // New: Auto-Update Lead Status if Offer was sent
+            if (useOfferTemplate && leadId) {
+                try {
+                    await supabase.from('leads').update({ status: 'offer_sent' }).eq('id', leadId);
+                    toast.success('Status leada zmieniony na "Oferta Wysłana"');
+                } catch (err) {
+                    console.error('Failed to update lead status', err);
+                }
+            }
 
             toast.success('Wiadomość wysłana!');
             onClose();
@@ -225,6 +274,29 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-bold text-lg text-slate-800">Wyślij wiadomość</h3>
                     <div className="flex gap-2">
+                        {/* TEMPLATES DROPDOWN */}
+                        <div className="relative group">
+                            <button className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors flex items-center gap-2 text-sm font-medium">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
+                                Szablony
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-2 hidden group-hover:block z-10">
+                                <div className="text-xs font-bold text-slate-500 uppercase px-2 py-1 mb-1">Szybkie Strzały</div>
+                                {SALES_TEMPLATES.map(tmpl => (
+                                    <button
+                                        key={tmpl.id}
+                                        onClick={() => applyTemplate(tmpl.id)}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 text-slate-700 rounded-lg transition-colors flex flex-col"
+                                    >
+                                        <span className="font-medium text-amber-900">{tmpl.name}</span>
+                                        <span className="text-xs text-slate-500 truncate">{tmpl.subject}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         <button
                             type="button"
                             onClick={() => setShowAiPresets(!showAiPresets)}
@@ -253,6 +325,29 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-500"
                         />
                     </div>
+
+                    {/* NEW: Sender Selection */}
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 mb-2 flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 uppercase px-2">Nadawca:</span>
+                        <div className="flex bg-white rounded-md border border-slate-200 p-0.5">
+                            <button
+                                onClick={() => setSenderIdentity('personal')}
+                                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${senderIdentity === 'personal' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {currentUser?.firstName || 'Osobiste'}
+                            </button>
+                            <button
+                                onClick={() => setSenderIdentity('shared')}
+                                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${senderIdentity === 'shared' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Biuro
+                            </button>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                            {senderIdentity === 'personal' ? currentUser?.email : 'buero@polendach24.de'}
+                        </span>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Temat:</label>
                         <input

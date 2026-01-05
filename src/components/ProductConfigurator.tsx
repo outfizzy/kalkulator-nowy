@@ -252,14 +252,21 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         if (!data) return 0;
 
         // Find matching product
-        const product = data.products.find((p: any) => {
+        // Find matching product (Smart Lookup: Next Size Up)
+        const candidates = data.products.filter((p: any) => {
             // For Skystyle check mounting type
             if (config.modelId === 'skystyle') {
                 const mountingType = config.installationType === 'wall-mounted' ? 'wall' : 'freestanding';
                 if (p.mounting_type !== mountingType) return false;
             }
-            return p.width_mm === config.width && p.depth_mm === config.projection;
+            // Check if product dimensions fit the requested ones
+            return p.width_mm >= config.width && p.depth_mm >= config.projection;
         });
+
+        // Sort candidates by size (area) to find the "Next Size Up" (smallest sufficient)
+        candidates.sort((a: any, b: any) => (a.width_mm * a.depth_mm) - (b.width_mm * b.depth_mm));
+
+        const product = candidates[0];
 
         return product ? product.price_eur : 0;
     }, [config.modelId, config.width, config.projection, config.installationType, dynamicBasePrice]);

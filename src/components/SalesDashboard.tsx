@@ -228,6 +228,22 @@ export const SalesDashboard: React.FC = () => {
                 </Link>
 
                 <Link
+                    to="/fairs"
+                    className="group bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Targi</h3>
+                        <p className="text-white/80 text-sm">Tryb obsługi na targach</p>
+                    </div>
+                </Link>
+
+                <Link
                     to="/leads"
                     className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
                 >

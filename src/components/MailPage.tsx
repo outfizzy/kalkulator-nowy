@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { LeadForm } from './leads/LeadForm';
-import { OfferService } from '../services/database/offer.service';
-import { SettingsService } from '../services/database/settings.service';
+import { RefreshCw } from 'lucide-react';
+
 import type { Lead, Offer, EmailConfig } from '../types';
 
 // Mock Email Data
@@ -45,6 +45,7 @@ export const MailPage: React.FC = () => {
     React.useEffect(() => {
         const loadSharedConfig = async () => {
             try {
+                const { SettingsService } = await import('../services/database/settings.service');
                 const config = await SettingsService.getBueroEmailConfig();
                 if (config) setBueroConfig(config);
             } catch (e) {
@@ -56,6 +57,45 @@ export const MailPage: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState<MailTab>('inbox');
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+    const [convertedMessageIds, setConvertedMessageIds] = useState<Set<string>>(new Set());
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    // New State for Scan Logic
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanProgress, setScanProgress] = useState<{ processed: number, remaining: number | null }>({ processed: 0, remaining: null });
+    const [scanRange, setScanRange] = useState<number>(0); // 0 = New/Unseen Only
+
+    // Selection state
+    const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
+
+
+    const [emails, setEmails] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
+
+    // Fetch Converted Lead IDs
+    React.useEffect(() => {
+        const fetchConvertedIds = async () => {
+            try {
+                // Ensure session exists
+                await import('../lib/supabase').then(m => m.supabase.auth.getSession());
+
+                // We fetch specific columns using Rest API client for simplicity if available, or just use supabase-js
+                const { data } = await import('../lib/supabase').then(m => m.supabase
+                    .from('leads')
+                    .select('email_message_id')
+                    .not('email_message_id', 'is', null)
+                );
+
+                if (data) {
+                    const ids = new Set(data.map(d => d.email_message_id).filter(Boolean) as string[]);
+                    setConvertedMessageIds(ids);
+                }
+            } catch (e) {
+                console.error('Failed to fetch converted IDs', e);
+            }
+        };
+        fetchConvertedIds();
+    }, [refreshTrigger]); // Refresh when trigger changes (e.g. after scan)
 
     // Lead Integration
     const [showLeadForm, setShowLeadForm] = useState(false);
@@ -81,6 +121,7 @@ export const MailPage: React.FC = () => {
                 // Simplest approach: reuse existing getOffers but valid logic.
                 // Actually, OfferService.getSystemStats uses supabase. 
                 // Let's just fetch directly here for simplicity or use OfferService.
+                const { OfferService } = await import('../services/database/offer.service');
                 const offersData = await OfferService.getOffers();
                 // Checking OfferService: it has `getOffers`.
                 setRecentOffers((offersData || []).slice(0, 5));
@@ -95,6 +136,7 @@ export const MailPage: React.FC = () => {
 
     const handleInsertOfferLink = async (offer: Offer) => {
         try {
+            const { OfferService } = await import('../services/database/offer.service');
             const token = await OfferService.ensurePublicToken(offer.id);
             const link = `${window.location.origin}/p/offer/${token}`;
 
@@ -171,11 +213,7 @@ export const MailPage: React.FC = () => {
         }
     };
 
-    const [emails, setEmails] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [refreshTrigger, setRefreshTrigger] = useState(0); // to force refresh
 
-    const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
 
     // Determine active config based on selection
     const activeConfig = selectedAccount === 'personal' ? currentUser?.emailConfig : bueroConfig;
@@ -239,7 +277,18 @@ export const MailPage: React.FC = () => {
         }
     }, [activeConfig, activeTab, isConfigured, refreshTrigger, boxName, CACHE_KEY]);
 
-    const handleSelectEmail = async (uid: number) => {
+    const handleSelectEmail = async (uid: number | string) => {
+        const emailIdAsNumber = Number(uid);
+
+        // Selection Mode Logic
+        if (selectedEmailIds.size > 0) {
+            const newSet = new Set(selectedEmailIds);
+            if (newSet.has(emailIdAsNumber)) newSet.delete(emailIdAsNumber);
+            else newSet.add(emailIdAsNumber);
+            setSelectedEmailIds(newSet);
+            return;
+        }
+
         setSelectedEmail(null); // Clear previous selection while loading
         setShowLeadForm(false); // Reset lead form
         try {
@@ -432,6 +481,98 @@ export const MailPage: React.FC = () => {
         }
     };
 
+
+
+    const handleEmailAction = async (action: 'mark_read' | 'mark_unread' | 'delete') => {
+        if (selectedEmailIds.size === 0) return;
+        const ids = Array.from(selectedEmailIds);
+
+        // Optimistic UI Update
+        const updatedEmails = emails.map(e => {
+            if (ids.includes(e.id)) {
+                let newFlags = e.flags || [];
+                if (action === 'mark_read') {
+                    if (!newFlags.includes('\\Seen')) newFlags = [...newFlags, '\\Seen'];
+                } else if (action === 'mark_unread') {
+                    newFlags = newFlags.filter((f: string) => f !== '\\Seen');
+                } else if (action === 'delete') {
+                    return null; // Remove from list
+                }
+                return { ...e, flags: newFlags };
+            }
+            return e;
+        }).filter(Boolean);
+
+        setEmails(updatedEmails);
+        setSelectedEmailIds(new Set());
+
+        try {
+            const { supabase } = await import('../lib/supabase');
+            await supabase.functions.invoke('manage-emails', {
+                body: {
+                    uids: ids,
+                    action,
+                    box: activeTab === 'inbox' ? 'INBOX' : 'Sent',
+                    config: activeConfig // Pass the active email configuration
+                }
+            });
+            toast.success(`Zaktualizowano ${ids.length} wiadomości`);
+        } catch (err) {
+            console.error(err);
+            toast.error('Błąd aktualizacji');
+            setRefreshTrigger(p => p + 1); // Revert by refresh
+        }
+    };
+    // Manual Analysis Handler
+    const handleAnalyzeSelected = async () => {
+        if (selectedEmailIds.size === 0) return;
+        const ids = Array.from(selectedEmailIds);
+        setIsScanning(true);
+        const toastId = toast.loading(`Analizuję ${ids.length} wiadomości...`);
+
+        try {
+            const { supabase } = await import('../lib/supabase');
+            const targetEmail = activeConfig?.imapUser || activeConfig?.smtpUser || currentUser?.email;
+
+            const { data, error } = await supabase.functions.invoke('scan-emails', {
+                body: {
+                    targetIds: ids,
+                    userEmail: targetEmail,
+                    config: activeConfig // Use active config (personal or shared) directly
+                }
+            });
+
+            if (error) throw new Error(error.message || 'Analysis failed');
+
+            const results = data.results || [];
+            const created = results.filter((r: any) => r.status.includes('created')).length;
+            const errors = results.filter((r: any) => r.status.includes('error')).length;
+            const skipped = results.filter((r: any) => r.status.includes('skipped')).length;
+
+            if (created > 0) {
+                toast.success(`Sukces: Utworzono ${created}, Pominięto: ${skipped}`, { id: toastId });
+            } else if (errors > 0) {
+                toast.error(`Błąd: ${results[0].message || 'Wystąpił błąd'}`, { id: toastId });
+            } else {
+                if (skipped > 0) {
+                    toast(`Pominięto (np. duplikaty): ${skipped}`, { icon: 'ℹ️', id: toastId });
+                } else {
+                    toast('Brak wyników.', { icon: '🤷', id: toastId });
+                }
+            }
+            setSelectedEmailIds(new Set()); // Clear selection
+
+            // Refresh leads list? Maybe trigger a refetch if needed.
+            // For now, user can check Leads tab.
+
+        } catch (err: any) {
+            console.error("Manual Analysis Error:", err);
+            toast.error(`Błąd: ${err.message}`, { id: toastId });
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
     // AI Extraction Handler
     const handleAiExtract = async () => {
         if (!selectedEmail) return;
@@ -484,37 +625,60 @@ export const MailPage: React.FC = () => {
     };
 
     // Manual Scan Trigger
-    const handleScanLeads = async () => {
-        const toastId = toast.loading('Skanowanie inboxa w poszukiwaniu nowych leadów...');
-        try {
-            const { data: { session } } = await import('../lib/supabase').then(m => m.supabase.auth.getSession());
 
-            const res = await fetch('https://whgjsppyuvglhbdgdark.supabase.co/functions/v1/scan-emails', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${session?.access_token}`,
-                    'Content-Type': 'application/json'
+
+    // Recursive Batch Scanning
+    const runBatchScan = async (processedSoFar = 0): Promise<void> => {
+        try {
+            setIsScanning(true);
+            setScanProgress({ processed: processedSoFar, remaining: null });
+
+            const { supabase } = await import('../lib/supabase');
+            // Identify target email to prevent scanning everyone's mailbox
+            const targetEmail = activeConfig?.imapUser || activeConfig?.smtpUser || currentUser?.email;
+
+            const { data, error } = await supabase.functions.invoke('scan-emails', {
+                body: {
+                    batchSize: 5,
+                    days: scanRange, // Pass the selected range
+                    offset: processedSoFar, // Pass offset for pagination
+                    userEmail: targetEmail // Filter by user
                 }
             });
 
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Scan failed');
+            if (error) {
+                console.error("Supabase Invoke Error:", error);
+                throw new Error(error.message || 'Error invoking scan function');
             }
 
-            const data = await res.json();
-            const processedCount = data.processed?.length || 0;
+            const currentProcessed = data.processedCount || 0;
+            const remaining = data.remaining || 0;
+            const total = processedSoFar + currentProcessed;
 
-            if (processedCount > 0) {
-                toast.success(`Zakończono! Znaleziono ${processedCount} nowych zgłoszeń.`, { id: toastId });
-                // Optional: Refresh leads list logic if we were in leads view
+            if (remaining > 0) {
+                setScanProgress({ processed: total, remaining: remaining });
+                await runBatchScan(total);
             } else {
-                toast.success('Skanowanie zakończone. Nie znaleziono nowych leadów.', { id: toastId });
+                setScanProgress({ processed: 0, remaining: null });
+                toast.success(`Zakończono skanowanie. Przeanalizowano łącznie ${total} wiadomości.`);
+                setRefreshTrigger(prev => prev + 1);
             }
 
         } catch (error: any) {
             console.error('Scan error:', error);
-            toast.error(`Błąd skanowania: ${error.message}`, { id: toastId });
+            toast.error("Błąd skanowania: " + error.message);
+            setScanProgress({ processed: 0, remaining: null });
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleScanEmails = async () => {
+        setIsScanning(true);
+        try {
+            await runBatchScan(0);
+        } finally {
+            setIsScanning(false);
         }
     };
 
@@ -554,9 +718,11 @@ export const MailPage: React.FC = () => {
                     Nowa
                 </button>
 
+
+
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-2 overflow-hidden">
                     <button
-                        onClick={() => { setActiveTab('inbox'); }}
+                        onClick={() => { setActiveTab('inbox'); setSelectedEmailIds(new Set()); }}
                         className={`w-full p-3 flex items-center justify-between text-left transition-colors text-sm ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
@@ -568,7 +734,7 @@ export const MailPage: React.FC = () => {
                         </div>
                     </button>
                     <button
-                        onClick={() => { setActiveTab('sent'); }}
+                        onClick={() => { setActiveTab('sent'); setSelectedEmailIds(new Set()); }}
                         className={`w-full p-3 flex items-center justify-between text-left transition-colors text-sm ${activeTab === 'sent' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
@@ -598,30 +764,159 @@ export const MailPage: React.FC = () => {
                 {/* Email List Column (Visible unless in Compose mode) */}
                 {activeTab !== 'compose' && (
                     <div className={`flex-col border-r border-slate-200 overflow-y-auto transition-all duration-300 ${selectedEmail ? 'w-80 hidden lg:flex' : 'w-full'}`}>
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                            <h2 className="text-lg font-bold text-slate-800">
-                                {activeTab === 'inbox' ? 'Skrzynka Odbiorcza' : 'Wysłane'}
-                            </h2>
-                            <div className="flex gap-2">
-                                {activeTab === 'inbox' && (
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 min-h-[60px]">
+                            {selectedEmailIds.size > 0 ? (
+                                <div className="flex items-center justify-between w-full animate-fade-in-up">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-bold text-slate-700 bg-white px-2 py-1 rounded shadow-sm border border-slate-200">
+                                            {selectedEmailIds.size}
+                                        </span>
+                                        <div className="flex gap-1">
+                                            <button
+                                                onClick={handleAnalyzeSelected}
+                                                disabled={isScanning}
+                                                className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 flex items-center gap-1"
+                                                title="Analizuj zaznaczone (AI)"
+                                            >
+                                                {isScanning ? (
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                    </svg>
+                                                )}
+                                                <span className="text-xs font-semibold hidden md:inline">Analizuj</span>
+                                            </button>
+                                            <div className="w-px h-6 bg-slate-300 mx-1" />
+
+                                            <button
+                                                onClick={() => handleEmailAction('mark_read')}
+                                                className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200" title="Oznacz jako przeczytane">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" /></svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleEmailAction('mark_unread')}
+                                                className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200" title="Oznacz jako nieprzeczytane">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleEmailAction('delete')}
+                                                className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200" title="Usuń">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
                                     <button
-                                        onClick={handleScanLeads}
-                                        className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-200 transition-colors font-bold flex items-center gap-1"
-                                        title="Uruchom AI do szukania leadów"
-                                    >
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                        Skanuj Leady
+                                        onClick={() => setSelectedEmailIds(new Set())}
+                                        className="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                                        Anuluj
                                     </button>
-                                )}
-                                <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
-                                    <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                </button>
-                            </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <h2 className="text-lg font-bold text-slate-800">
+                                        {activeTab === 'inbox' ? 'Skrzynka Odbiorcza' : 'Wysłane'}
+                                    </h2>
+                                    <div className="flex gap-2">
+                                        {activeTab === 'inbox' && (
+                                            <button
+                                                onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
+                                                <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
+
+                        {/* AI Sacnner Toolbar */}
+                        {activeTab === 'inbox' && (
+                            <div className="bg-purple-50 border-b border-purple-100 p-3">
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                            AI Skaner Leadów
+                                        </span>
+                                        {isScanning && (
+                                            <span className="text-xs text-purple-600 font-medium animate-pulse">
+                                                Przetworzono: {scanProgress.processed}
+                                                {scanProgress.remaining ? ` / ~${scanProgress.processed + scanProgress.remaining}` : ''}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                        {[
+                                            { label: 'Nowe', val: 0 },
+                                            { label: '24h', val: 1 },
+                                            { label: '3 dni', val: 3 },
+                                            { label: '7 dni', val: 7 },
+                                            { label: '14 dni', val: 14 },
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.val}
+                                                disabled={isScanning}
+                                                onClick={() => {
+                                                    setScanRange(opt.val);
+                                                    if (!isScanning) {
+                                                        // Update state but don't auto-run unless desired. 
+                                                        // User wants "choice", so let's select then run? 
+                                                        // Or instant run? Pattern "Select Range" -> Click Scan.
+                                                    }
+                                                }}
+                                                className={`
+                                                    px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border
+                                                    ${scanRange === opt.val
+                                                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300'
+                                                    }
+                                                `}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+
+                                        <div className="w-px h-6 bg-purple-200 mx-1"></div>
+
+                                        <button
+                                            onClick={handleScanEmails}
+                                            disabled={isScanning}
+                                            className={`
+                                                flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-white transition-all shadow-sm whitespace-nowrap
+                                                ${isScanning
+                                                    ? 'bg-slate-400 cursor-not-allowed'
+                                                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700'
+                                                }
+                                            `}
+                                        >
+                                            {isScanning ? (
+                                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                            ) : (
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                </svg>
+                                            )}
+                                            {isScanning ? 'Skanuję...' : 'Uruchom'}
+                                        </button>
+                                    </div>
+
+                                    {/* Progress Bar Visual */}
+                                    {isScanning && (
+                                        <div className="w-full h-1 bg-purple-200 rounded-full overflow-hidden mt-1">
+                                            <div
+                                                className="h-full bg-purple-600 animate-progress-indeterminate"
+                                                style={{ width: '100%' }} // Could be actual percentage if we knew total upfront
+                                            ></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         {loading ? (
                             <div className="p-8 text-center text-slate-400">
                                 <svg className="w-8 h-8 animate-spin mx-auto mb-2" fill="none" viewBox="0 0 24 24">
@@ -651,19 +946,49 @@ export const MailPage: React.FC = () => {
                                 {emails.map(email => (
                                     <div
                                         key={email.id}
-                                        onClick={() => handleSelectEmail(email.id)}
-                                        className={`p-3 cursor-pointer hover:bg-slate-50 transition-colors ${selectedEmail?.id === email.messageId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                                            } ${!email.flags?.includes('\\Seen') ? 'font-semibold bg-white' : 'text-slate-600 bg-slate-50/50'}`}
+                                        className={`p-3 border-b border-slate-50 transition-colors ${selectedEmail?.id === email.messageId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                                            } ${!email.flags?.includes('\\Seen') ? 'font-semibold bg-white' : 'text-slate-600 bg-slate-50/50'} relative group`}
                                     >
-                                        <div className="flex justify-between items-baseline mb-1">
-                                            <span className="truncate text-sm font-medium text-slate-900 max-w-[70%]">
-                                                {email.from.replace(/<.*>/, '').trim()}
-                                            </span>
-                                            <span className="text-xs text-slate-400 flex-shrink-0">
-                                                {new Date(email.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                                            </span>
+                                        <div className="absolute left-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedEmailIds.has(email.id)}
+                                                onChange={(e) => {
+                                                    const newSet = new Set(selectedEmailIds);
+                                                    if (e.target.checked) newSet.add(email.id);
+                                                    else newSet.delete(email.id);
+                                                    setSelectedEmailIds(newSet);
+                                                }}
+                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                                            />
                                         </div>
-                                        <h3 className="text-sm text-slate-800 truncate mb-1">{email.subject}</h3>
+                                        <div
+                                            className="pl-6 cursor-pointer" // Space for checkbox (even when hidden)
+                                            onClick={(e) => {
+                                                // Prevent click if clicking checkbox (handled by input above) but just in case
+                                                handleSelectEmail(email.id);
+                                            }}
+                                        >
+                                            <div className="flex justify-between items-baseline mb-1">
+                                                <span className="truncate text-sm font-medium text-slate-900 max-w-[70%] flex items-center gap-1">
+                                                    {selectedEmailIds.has(email.id) && (
+                                                        <span className="text-blue-600 scale-75 transform -ml-1">✓</span>
+                                                    )}
+                                                    {convertedMessageIds.has(String(email.id)) && (
+                                                        <span title="Utworzono Lead" className="text-emerald-500">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        </span>
+                                                    )}
+                                                    {email.from.replace(/<.*>/, '').trim()}
+                                                </span>
+                                                <span className="text-xs text-slate-400 flex-shrink-0">
+                                                    {new Date(email.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-sm text-slate-800 truncate mb-1">{email.subject}</h3>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -879,9 +1204,22 @@ export const MailPage: React.FC = () => {
                                                         title="Automatycznie wyciągnij dane z treści"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            ```
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                                         </svg>
                                                         <span className="hidden sm:inline">Utwórz Lead (AI)</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={handleScanEmails}
+                                                        disabled={loading || isScanning}
+                                                        className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg ${loading || isScanning ? 'opacity-70 cursor-wait' : ''}`}
+                                                    >
+                                                        <RefreshCw className={`w-4 h-4 ${(loading || isScanning) ? 'animate-spin' : ''}`} />
+                                                        <span className="hidden sm:inline">
+                                                            {(loading || isScanning) ?
+                                                                `Skanowanie... (${scanProgress.processed})`
+                                                                : 'Skanuj Leady (AI)'}
+                                                        </span>
                                                     </button>
                                                     <button
                                                         onClick={handleCreateLead}
@@ -1027,3 +1365,9 @@ export const MailPage: React.FC = () => {
         </div>
     );
 };
+
+
+
+
+
+export default MailPage;

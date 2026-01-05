@@ -5,6 +5,7 @@ import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { ContractStats } from './ContractStats';
+import { LegacyImportModal } from './LegacyImportModal';
 export const ContractsList: React.FC = () => {
     const navigate = useNavigate();
     const { isAdmin, currentUser } = useAuth();
@@ -12,6 +13,7 @@ export const ContractsList: React.FC = () => {
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [showStats, setShowStats] = useState(false);
+    const [isLegacyImportOpen, setIsLegacyImportOpen] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +107,15 @@ export const ContractsList: React.FC = () => {
                             <span className="font-medium text-sm">Statystyki</span>
                         </button>
                     )}
+                    <button
+                        onClick={() => setIsLegacyImportOpen(true)}
+                        className="ml-2 p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 flex items-center gap-2 transition-all"
+                    >
+                        <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <span className="font-medium text-sm text-slate-700">Import Archiwalnej</span>
+                    </button>
                 </div>
 
                 {error && (
@@ -273,6 +284,14 @@ export const ContractsList: React.FC = () => {
                 </div>
             </div>
 
+            {/* Legacy Import Modal */}
+            <LegacyImportModal
+                isOpen={isLegacyImportOpen}
+                onClose={() => setIsLegacyImportOpen(false)}
+                onSuccess={() => {
+                    loadContracts();
+                }}
+            />
         </div>
     );
 };
