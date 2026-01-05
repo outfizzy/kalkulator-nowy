@@ -195,6 +195,69 @@ export const OfferService = {
         } as Offer;
     },
 
+    async createLegacyOffer(customerId: string, price: number, date: Date): Promise<Offer> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single();
+        if (!customer) throw new Error('Customer not found');
+
+        const simplifiedProduct: any = {
+            modelId: 'legacy',
+            description: 'Import Historyczny',
+            width: 0,
+            projection: 0,
+            roofType: 'glass',
+            installationType: 'wall-mounted',
+            color: 'standard'
+        };
+
+        const simplifiedPricing: any = {
+            totalCost: price,
+            sellingPriceNet: (price / 1.19), // Approximate net
+            sellingPriceGross: price,
+            marginPercentage: 30, // Default stub
+            marginValue: 0,
+            basePrice: 0,
+            addonsPrice: 0
+        };
+
+        const { data, error } = await supabase
+            .from('offers')
+            .insert({
+                user_id: user.id,
+                offer_number: `LEGACY-${Date.now()}`,
+                customer_data: { ...customer, id: customerId },
+                customer_id: customerId,
+                product_config: simplifiedProduct,
+                pricing: simplifiedPricing,
+                status: 'sold', // Immediately sold
+                snow_zone: { id: '1', value: 0.85, description: '' },
+                commission: 0,
+                margin_percentage: 30,
+                created_at: date.toISOString(),
+                updated_at: date.toISOString()
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            offerNumber: data.offer_number,
+            customer: { ...data.customer_data, id: customerId },
+            product: data.product_config,
+            pricing: normalizePricing(data.pricing),
+            status: data.status,
+            snowZone: data.snow_zone,
+            commission: data.commission,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at),
+            createdBy: data.user_id
+        } as Offer;
+    },
+
     async updateOffer(id: string, updates: Partial<Offer>): Promise<void> {
         // [GUARDRAILS] Check Margin for Sales Reps
         if (updates.pricing) {

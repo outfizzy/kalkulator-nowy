@@ -12,6 +12,7 @@ export const InstallerDashboard: React.FC = () => {
     const [todayInstallation, setTodayInstallation] = useState<Installation | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [showDetails, setShowDetails] = useState(false);
 
     useEffect(() => {
         const loadTodayInstallation = async () => {
@@ -192,27 +193,54 @@ export const InstallerDashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Navigation Buttons */}
-                            <div className="grid grid-cols-2 gap-3">
+                            {/* Action Buttons Grid */}
+                            <div className="grid grid-cols-4 gap-2">
                                 <button
                                     onClick={openGoogleMaps}
-                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-semibold transition-all"
+                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 flex flex-col items-center justify-center gap-1 transition-all"
                                 >
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
                                     </svg>
-                                    Google Maps
+                                    <span className="text-[10px] font-medium">Google</span>
                                 </button>
                                 <button
                                     onClick={openAppleMaps}
-                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-semibold transition-all"
+                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 flex flex-col items-center justify-center gap-1 transition-all"
                                 >
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
                                     </svg>
-                                    Apple Maps
+                                    <span className="text-[10px] font-medium">Apple</span>
+                                </button>
+                                <a
+                                    href={`tel:${todayInstallation.client.phone}`}
+                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 flex flex-col items-center justify-center gap-1 transition-all"
+                                >
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                    </svg>
+                                    <span className="text-[10px] font-medium">Zadzwoń</span>
+                                </a>
+                                <button
+                                    onClick={() => setShowDetails(!showDetails)}
+                                    className={`bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl py-3 flex flex-col items-center justify-center gap-1 transition-all ${showDetails ? 'bg-white/40 ring-2 ring-white/50' : ''}`}
+                                >
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span className="text-[10px] font-medium">Info</span>
                                 </button>
                             </div>
+
+                            {/* Expanded Details */}
+                            {showDetails && (
+                                <div className="mt-4 pt-4 border-t border-white/20 text-sm space-y-2 animate-fadeIn">
+                                    <p><span className="opacity-75">Produkt:</span> <strong>{todayInstallation.productSummary}</strong></p>
+                                    {todayInstallation.notes && <p><span className="opacity-75">Notatki:</span> {todayInstallation.notes}</p>}
+                                    {/* Add more details here if available, e.g. dimensions */}
+                                </div>
+                            )}
                         </div>
                     </>
                 ) : (

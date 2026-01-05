@@ -74,12 +74,16 @@ export const ContractService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        // Generate sequential contract number using database function
-        const { data: contractNumberData, error: rpcError } = await supabase
-            .rpc('get_next_contract_number');
+        // Generate or use provided contract number
+        let newContractNumber = contract.contractNumber;
 
-        if (rpcError) throw rpcError;
-        const newContractNumber = contractNumberData as string;
+        if (!newContractNumber) {
+            const { data: contractNumberData, error: rpcError } = await supabase
+                .rpc('get_next_contract_number');
+
+            if (rpcError) throw rpcError;
+            newContractNumber = contractNumberData as string;
+        }
 
         const contractData = {
             contractNumber: newContractNumber,

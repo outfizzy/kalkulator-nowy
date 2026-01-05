@@ -116,6 +116,8 @@
         "clientName": "Imię i nazwisko klienta",
         "clientNamePlaceholder": "np. Jan Kowalski",
         "clientSignature": "Podpis klienta",
+        "photos": "Zdjęcia z realizacji",
+        "addPhoto": "Dodaj zdjęcie",
         "notes": "Uwagi (opcjonalnie)",
         "notesPlaceholder": "Dodatkowe uwagi lub komentarze...",
         "submit": "Zatwierdź Odbiór",

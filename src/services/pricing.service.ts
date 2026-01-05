@@ -277,7 +277,7 @@ export const PricingService = {
             addonsTotal += addon.price;
         });
 
-        // Surcharges
+        // Surcharges (Config-based)
         const surcharges = this.calculateSurcharges(
             basePrice,
             product.width,
@@ -288,6 +288,27 @@ export const PricingService = {
                 mountingType: product.installationType
             }
         );
+
+        // NEW: Inject Row-Specific Surcharges from PDF Extraction (IDP)
+        // If the price table contains specific surcharge variants for this size (e.g. "Aufpreis Opal")
+        if (matchedEntryProperties?.surcharges && Array.isArray(matchedEntryProperties.surcharges)) {
+            const currentSubtype = attributes['subtype']?.toLowerCase();
+
+            matchedEntryProperties.surcharges.forEach((s: any) => {
+                if (s && typeof s.name === 'string' && typeof s.price === 'number') {
+                    // Fuzzy match the subtype (e.g. "opal" matches "Aufpreis Opal")
+                    // Only apply if we have a specific subtype selected
+                    if (currentSubtype && s.name.toLowerCase().includes(currentSubtype)) {
+                        surcharges.items.push({
+                            name: `Dopłata (Wariant): ${s.name}`,
+                            price: s.price
+                        });
+                        surcharges.total += s.price;
+                        console.log(`[Pricing] Applied IDP Surcharge: ${s.name} (+${s.price})`);
+                    }
+                }
+            });
+        }
 
         if (surcharges.total > 0) {
             basePrice += surcharges.total;

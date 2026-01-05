@@ -31,7 +31,13 @@ Deno.serve(async (req) => {
             const dataUrl = `data:${imageFile.type};base64,${base64}`;
 
             systemPrompt = `Jesteś wyspecjalizowanym asystentem AI vision do analizy tabel cenowych (zadaszenia, ogrody zimowe).
-Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego dane w formacie JSON.
+Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego WSZYSTKIE dane w formacie JSON.
+
+            CRITICAL RULES (READ CAREFULLY):
+            1. **EXHAUSTIVE EXTRACTION**: You MUST extract **EVERY SINGLE ROW** visible in the image. Do NOT skip rows. Do NOT summarize. Do NOT use "..." or "etc".
+            2. **NO TRUNCATION**: If the table has 50 rows, return 50 entries. If you skip rows, the user loses money.
+            3. **ALL COLUMNS**: Look for ALL columns that indicate a price adder/surcharge (e.g. "Opal", "Matt", "VSG", "Dopłata").
+            4. **ACCURACY**: Prefer accurate extraction over speed.
 
             CRITICAL: Return strictly a JSON object with this structure:
             {
@@ -55,6 +61,7 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
                             "properties": {
                                 "posts_count": number | null,
                                 "fields_count": number | null,
+                                "area_m2": number | null,
                                 "surcharges": { "name": string, "price": number }[]
                             }
                           }
@@ -64,20 +71,26 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
                ]
             }
             
-            Rules:
-            1. **Columns Mapping**:
-               - "Maß" / Dimensions -> width_mm, projection_mm
-               - "Preis" -> price (If multiple, pick the 'Included' or 'Base' price)
-               - "Anzahl Pfosten" -> properties.posts_count
-               - "Anzahl Felder" -> properties.fields_count
-               - "Aufpreis" / Surcharge columns -> Add to properties.surcharges array (e.g. { name: "milk_glass", price: 50 })
-            2. **SPLIT INTELLIGENTLY**: If the image contains data for both "Polycarbonate" and "Glass" (e.g. separate columns or sections), create TWO separate entries in the 'tables' array. One for 'polycarbonate', one for 'glass'.
-            3. **Matrix**: Look for Width (top header) and Projection (side header) or vice versa.
-            4. **Context**: Use heuristics. "VSG" = Glass. "Stegplatten"/"Poly" = Polycarbonate.
-            5. **Currency**: Detect currency symbol (€, PLN) in headers.`;
+            Mapping Rules:
+            1. **Dimensions**: "Maß" / "Breite" / "Tiefe" -> width_mm, projection_mm.
+            2. **Structure Price** (structure_price): Look for "Gestell", "Konstruktion", "System", "Bausatz".
+            3. **Roof Price** (glass_price): Look for "Dach", "Poly", "Glas", "Platten", "Eindeckung".
+               - **IMPORTANT**: The system uses 'glass_price' as a generic field for ANY roof material.
+               - If the table is Polycarbonate, put the Poly price into 'glass_price'.
+               - If the table is Glass, put the Glass price into 'glass_price'.
+            4. **Total Price** (price): Look for "Komplett", "Gesamt", "Preis" (if only one price column).
+               - If separate Structure/Roof columns exist, 'price' should be their SUM (if valid) or 0 (letting system calculate).
+            5. **Attributes**: 
+               - "Pfosten" / "Słupy" -> posts_count
+               - "Felder" / "Pola" -> fields_count
+               - "Fläche" / "Area" / "m2" -> area_m2 (Required if visible)
+            6. **Surcharges (CRITICAL)**: 
+               - Scan headers for words like: "Aufpreis", "Opal", "Matt", "Bronze", "Poly", "VSG", "Surcharge", "Dodatek".
+               - If a column contains price adders (e.g. +50, +100), extract explicitly to 'surcharges' array.
+            7. **SWAP PREVENTION**: Do NOT swap Structure and Roof prices. "Gestell" is ALWAYS structure.`;
 
             requestContent = [
-                { type: "text", text: "Analyze this pricing table image. Extract Dimensions, Prices, Structural Specs (Posts/Fields), and Surcharges." },
+                { type: "text", text: "Analyze this pricing table image. Extract Dimensions, Prices, Structural Specs (Posts/Fields/Area), and Surcharges." },
                 {
                     type: "image_url",
                     image_url: {
@@ -108,7 +121,7 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
             } catch (e: any) {
                 console.error("PDF Parse Error:", e);
                 return new Response(
-                    JSON.stringify({ error: `PDF Parse Failed: ${e.message || e}` }),
+                    JSON.stringify({ error: `PDF Parse Failed: ${e.message || e} ` }),
                     { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
                 )
             }
@@ -116,39 +129,44 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
             const truncatedText = textContent.slice(0, 40000);
             requestContent = [{ type: "text", text: truncatedText }];
 
-            systemPrompt = `Jesteś wyspecjalizowanym asystentem AI do strukturyzowania cenników budowlanych (zadaszenia, ogrody zimowe).
+            systemPrompt = `Jesteś wyspecjalizowanym asystentem AI do strukturyzowania cenników budowlanych(zadaszenia, ogrody zimowe).
             Twoim zadaniem jest przeanalizować tekst PDF i wyciągnąć z niego KOMPLETNE dane cenowe.
-            
-            CRITICAL: Return strictly a JSON object with this structure:
-            {
-               "confidence": 0-100,
-               "tables": [
-                   {
-                       "detected_product_name": "string",
-                       "currency": "EUR" | "PLN",
-                       "detected_attributes": {
-                           "snow_zone": "1" | "2" | "3" | null,
-                           "roof_type": "polycarbonate" | "glass" | null,
-                           "mounting": "wall" | "free" | null
-                       },
-                       "entries": [
-                          { 
-                            "width_mm": number, 
-                            "projection_mm": number, 
-                            "price": number,
-                            "structure_price": number,
-                            "glass_price": number
-                          }
-                       ],
-                       "surcharges": [ ... ],
-                       "notes": "string"
-                   }
-               ]
-            }
-            
+
+                CRITICAL: Return strictly a JSON object with this structure:
+                {
+                    "confidence": 0 - 100,
+                        "tables": [
+                            {
+                                "detected_product_name": "string",
+                                "currency": "EUR" | "PLN",
+                                "detected_attributes": {
+                                    "snow_zone": "1" | "2" | "3" | null,
+                                    "roof_type": "polycarbonate" | "glass" | null,
+                                    "mounting": "wall" | "free" | null
+                                },
+                                "entries": [
+                                    {
+                                        "width_mm": number,
+                                        "projection_mm": number,
+                                        "price": number,
+                                        "properties": {
+                                            "posts_count": number | null,
+                                            "fields_count": number | null,
+                                            "area_m2": number | null,
+                                            "surcharges": { "name": string, "price": number }[]
+                                        }
+                                    }
+                                ],
+                                "notes": "string"
+                            }
+                        ]
+                }
+
             Rules:
-            1. **FIND ALL**: Look for multiple tables in the text (e.g. "Trendstyle Poly", "Trendstyle Glass", "Premium"). Create a separate entry in 'tables' for each.
-            2. **SPLIT**: Separately categorize Polycarbonate vs Glass.`;
+            1. ** FIND ALL **: Look for multiple tables in the text(e.g. "Trendstyle Poly", "Trendstyle Glass", "Premium").Create a separate entry in 'tables' for each.
+            2. ** EXTRACT DETAILS **: Populate properties.posts_count, fields_count, area_m2 from available columns.
+            3. ** SURCHARGES **: Extract variant prices(e.g.Opal vs Clear) into properties.surcharges.
+            4. ** SPLIT **: Separately categorize Polycarbonate vs Glass.`;
         }
 
         // 2. Call OpenAI
@@ -161,7 +179,7 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${apiKey} `,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -182,7 +200,7 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`OpenAI API Error: ${response.status} ${errText}`);
+            throw new Error(`OpenAI API Error: ${response.status} ${errText} `);
         }
 
         const aiData = await response.json()
@@ -196,7 +214,7 @@ Twój cel: Przeanalizuj przesłany obrazek (wycinek tabeli) i wyciągnij z niego
     } catch (error) {
         console.error("Global Error:", error);
         return new Response(
-            JSON.stringify({ error: `Function Error: ${error.message}` }),
+            JSON.stringify({ error: `Function Error: ${error.message} ` }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
     }

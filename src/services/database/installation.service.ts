@@ -191,6 +191,7 @@ export const InstallationService = {
             clientName: string;
             signature?: string;
             notes?: string;
+            photos?: string[];
         }
     ): Promise<{ error: Error | null }> {
         // 1. Update status and acceptance

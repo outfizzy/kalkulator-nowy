@@ -121,7 +121,7 @@ export const PricingPage = () => {
     // Fetch products for dropdown
     useEffect(() => {
         const fetchProducts = async () => {
-            const { data } = await supabase.from('product_definitions').select('id, name').order('name');
+            const { data } = await supabase.from('product_definitions').select('id, name, code').order('name');
             setProducts(data || []);
         };
         fetchProducts();
@@ -171,7 +171,14 @@ export const PricingPage = () => {
                     price: e.price,
                     structure_price: e.structure_price || e.price,
                     glass_price: e.glass_price || 0,
-                    properties: e.properties || {} // Setup Properties
+                    properties: {
+                        ...(e.properties || {}),
+                        // Ensure critical structural data is captured even if flattened by AI
+                        area_m2: e.properties?.area_m2 || e.area_m2 || e.area,
+                        posts_count: e.properties?.posts_count || e.posts_count || e.posts,
+                        fields_count: e.properties?.fields_count || e.fields_count || e.fields,
+                        surcharges: e.properties?.surcharges || e.surcharges || []
+                    }
                 }));
 
                 const { error: entriesError } = await supabase.from('price_matrix_entries').insert(entries);
@@ -347,6 +354,28 @@ export const PricingPage = () => {
                     >
                         <IconPlus /> Nowy Pusty Cennik
                     </button>
+                    <button
+                        onClick={async () => {
+                            if (confirm('⚠️ CZY NA PEWNO?! \n\nTa operacja usunie WSZYSTKIE cenniki, macierze, dopłaty i konfiguracje. Tej operacji nie można cofnąć.\n\nCzy chcesz kontynuować i wyczyścić całą bazę cenników?')) {
+                                const toastId = toast.loading('Czyszczenie cenników...');
+                                // We try to call DELETE on all rows if RLS permits, or just rely on the migration if they ran it.
+                                // Since I can't call TRUNCATE from client easily without function, I'll try to iterate deletion or just inform user.
+                                // Actually, the migration is the proper way. But let's try to delete via API for convenience if RLS allows.
+                                // Deleting price_tables usually cascades.
+                                const { error } = await supabase.from('price_tables').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all where id is not zero (i.e. all)
+
+                                if (error) {
+                                    toast.error('Błąd: ' + error.message, { id: toastId });
+                                } else {
+                                    toast.success('Baza wyczyszczona!', { id: toastId });
+                                    fetchPriceTables();
+                                }
+                            }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 border border-red-200 rounded-lg hover:bg-red-200 font-bold"
+                    >
+                        🗑️ Usuń WSZYSTKO
+                    </button>
                 </div>
             </header>
 
@@ -428,7 +457,7 @@ export const PricingPage = () => {
                                                     <td className="px-6 py-4 font-medium text-slate-900">
                                                         {table.name}
                                                         {table.variant_config?.roofType && (
-                                                            <div className="flex gap-1 mt-1">
+                                                            <div className="flex gap-1 mt-1 flex-wrap">
                                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${table.variant_config.roofType === 'glass' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
                                                                     {table.variant_config.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}
                                                                 </span>

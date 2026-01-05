@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import type { TransportSettings } from '../../types';
+import type { TransportSettings, EmailConfig } from '../../types';
 
 const SETTINGS_KEY = 'transport_settings';
 
@@ -40,6 +40,34 @@ export const SettingsService = {
             .upsert({
                 key: SETTINGS_KEY,
                 value: settings,
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+    },
+
+    async getBueroEmailConfig(): Promise<EmailConfig | null> {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'email_buero')
+                .single();
+
+            if (error || !data) return null;
+            return data.value as EmailConfig;
+        } catch (e) {
+            console.error('Error fetching buero email config:', e);
+            return null;
+        }
+    },
+
+    async updateSetting(key: string, value: any): Promise<void> {
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert({
+                key,
+                value,
                 updated_at: new Date().toISOString()
             });
 

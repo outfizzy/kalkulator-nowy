@@ -4,7 +4,9 @@ import { DatabaseService } from '../services/database';
 import { SettingsService } from '../services/database/settings.service';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { supabase } from '../services/database/base.service';
 import { GlobalSettingsPanel } from './admin/GlobalSettingsPanel';
+import { LegacyImportModal } from './contracts/LegacyImportModal';
 
 export const SettingsPage: React.FC = () => {
     const { currentUser } = useAuth();
@@ -19,6 +21,9 @@ export const SettingsPage: React.FC = () => {
         substituteUntil: null
     });
     const [availableSubstitutes, setAvailableSubstitutes] = useState<User[]>([]);
+
+    // Legacy Import State
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     // Global Settings (Admin Only)
     const [bueroConfig, setBueroConfig] = useState<EmailConfig>({
@@ -37,7 +42,7 @@ export const SettingsPage: React.FC = () => {
         const loadProfileAndCheckDb = async () => {
             if (!currentUser) return;
 
-            // 1. Diagnostic Check: Verify if email_config column exists
+            // 1. Diagnostic Check
             try {
                 const { error } = await DatabaseService.checkEmailConfigColumn(currentUser.id);
                 if (error) {
@@ -53,7 +58,6 @@ export const SettingsPage: React.FC = () => {
 
             // 2. Load Profile Data
             if (profile.email !== currentUser.email) {
-                // Auto-fill defaults for Home.pl (requested by user) if empty
                 const currentConfig = currentUser.emailConfig || {};
                 const defaultConfig = {
                     smtpHost: currentConfig.smtpHost || 'serwer2426445.home.pl',
@@ -79,16 +83,15 @@ export const SettingsPage: React.FC = () => {
                 });
             }
 
-            // 3. Load Sales Reps for Substitution Dropdown
+            // 3. Load Sales Reps
             try {
                 const reps = await DatabaseService.getSalesReps();
-                // Filter out current user from potential substitutes
                 setAvailableSubstitutes(reps.filter(r => r.id !== currentUser.id));
             } catch (err) {
                 console.error('Error loading substitutes:', err);
             }
 
-            // 4. Load Global Settings (Admin Only)
+            // 4. Load Global Settings
             if (currentUser.role === 'admin') {
                 try {
                     const config = await SettingsService.getBueroEmailConfig();
@@ -115,8 +118,6 @@ export const SettingsPage: React.FC = () => {
         }
     };
 
-
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setProfile(prev => ({
@@ -128,13 +129,12 @@ export const SettingsPage: React.FC = () => {
     const handleSave = async () => {
         try {
             await DatabaseService.updateUserProfile(profile);
-            // Save substitution settings separately as they might need different permissions or distinct update call
             await DatabaseService.updateSubstitution(
                 profile.substituteUserId || null,
                 profile.substituteUntil || null
             );
             toast.success('Profil i ustawienia delegacji zapisane pomyślnie');
-            window.location.reload(); // Reload to refresh auth context with new delegation rules if needed
+            window.location.reload();
         } catch (error) {
             console.error('Error saving profile:', JSON.stringify(error, null, 2));
             const errorMessage = (error as any)?.message || 'Nieznany błąd';
@@ -177,7 +177,6 @@ export const SettingsPage: React.FC = () => {
         }
 
         try {
-            // First verify current password by attempting to sign in
             const { error: verifyError } = await DatabaseService.verifyCurrentPassword(currentUser?.email || '', passwordData.currentPassword);
             if (verifyError) {
                 toast.error('Obecne hasło jest nieprawidłowe');
@@ -190,6 +189,25 @@ export const SettingsPage: React.FC = () => {
         } catch (error) {
             console.error('Error updating password:', error);
             toast.error('Błąd zmiany hasła');
+        }
+    };
+
+    const handleSystemReset = async () => {
+        const confirmText = prompt('Wpisz "DELETE", aby potwierdzić całkowite wyczyszczenie systemu. Tej operacji NIE DA SIĘ cofnąć.');
+        if (confirmText !== 'DELETE') {
+            toast.error('Operacja anulowana - nieprawidłowe potwierdzenie.');
+            return;
+        }
+
+        try {
+            const { error } = await supabase.rpc('admin_wipe_crm_data');
+            if (error) throw error;
+
+            toast.success('SYSTEM WYCZYSZCZONY POMYŚLNIE');
+            setTimeout(() => window.location.reload(), 1500);
+        } catch (error) {
+            console.error('System Wipe Failed:', error);
+            toast.error('Błąd resetowania systemu.');
         }
     };
 
@@ -325,6 +343,47 @@ export const SettingsPage: React.FC = () => {
                                     className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-lg shadow-purple-600/20 transition-colors"
                                 >
                                     Zapisz Ustawienia Biura
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* DANGER ZONE (Admin Only) */}
+                {currentUser?.role === 'admin' && (
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 max-w-2xl border-l-4 border-l-red-600">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-red-800">Strefa Niebezpieczna</h3>
+                                <p className="text-sm text-red-600">Operacje tutaj są nieodwracalne.</p>
+                            </div>
+                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded animate-pulse">DANGER</span>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                                <div>
+                                    <h4 className="font-bold text-red-900">Import Umów Archiwalnych</h4>
+                                    <p className="text-xs text-red-700">Ręczne wprowadzanie starych umów (tworzy klienta, ofertę i umowę).</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsImportModalOpen(true)}
+                                    className="px-4 py-2 bg-white border border-red-300 text-red-700 rounded hover:bg-red-100 font-bold text-sm"
+                                >
+                                    Otwórz Import
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                                <div>
+                                    <h4 className="font-bold text-red-900">SYSTEM RESET (WIPE)</h4>
+                                    <p className="text-xs text-red-700">Usuwa WSZYSTKIE dane (Klienci, Oferty, Umowy, Leady). Zachowuje Użytkowników i Produkty.</p>
+                                </div>
+                                <button
+                                    onClick={handleSystemReset}
+                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold text-sm shadow-lg shadow-red-500/30"
+                                >
+                                    WYCZYŚĆ SYSTEM
                                 </button>
                             </div>
                         </div>
@@ -534,10 +593,7 @@ export const SettingsPage: React.FC = () => {
                             <input
                                 type="text"
                                 value={profile.emailConfig?.imapHost || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, imapHost: e.target.value }
-                                }))}
+                                onChange={(e) => setProfile(prev => ({ ...prev, imapHost: e.target.value }))}
                                 placeholder="np. imap.gmail.com"
                                 className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                             />
@@ -560,10 +616,7 @@ export const SettingsPage: React.FC = () => {
                             <input
                                 type="text"
                                 value={profile.emailConfig?.imapUser || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, imapUser: e.target.value }
-                                }))}
+                                onChange={(e) => setProfile(prev => ({ ...prev, imapUser: e.target.value }))}
                                 className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                             />
                         </div>
@@ -572,10 +625,7 @@ export const SettingsPage: React.FC = () => {
                             <input
                                 type="password"
                                 value={profile.emailConfig?.imapPassword || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, imapPassword: e.target.value }
-                                }))}
+                                onChange={(e) => setProfile(prev => ({ ...prev, imapPassword: e.target.value }))}
                                 className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
                             />
                         </div>
@@ -681,6 +731,13 @@ export const SettingsPage: React.FC = () => {
                 <p>System ID: {import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || 'Unknown'}</p>
                 <p>Version: 1.0.2</p>
             </div>
-        </div >
+
+            {/* Modals */}
+            <LegacyImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => toast.success('Import zakończony sukcesem')}
+            />
+        </div>
     );
 };

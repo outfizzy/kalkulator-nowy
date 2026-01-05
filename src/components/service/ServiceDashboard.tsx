@@ -5,12 +5,14 @@ import { ServiceService } from '../../services/database/service.service';
 import type { ServiceTicket, ServiceTicketStatus } from '../../types';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { AddServiceTicketModal } from './AddServiceTicketModal';
 
 export const ServiceDashboard = () => {
     const navigate = useNavigate();
     const [tickets, setTickets] = useState<ServiceTicket[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<ServiceTicketStatus | 'all'>('all');
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     const fetchTickets = async () => {
         setLoading(true);
@@ -69,9 +71,22 @@ export const ServiceDashboard = () => {
                     >
                         Odśwież
                     </button>
-                    {/* Add Ticket Button could go here */}
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm"
+                    >
+                        Dodaj Zgłoszenie
+                    </button>
                 </div>
             </div>
+
+            <AddServiceTicketModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSuccess={() => {
+                    fetchTickets();
+                }}
+            />
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-lg shadow mb-6 flex gap-4">
@@ -148,6 +163,6 @@ export const ServiceDashboard = () => {
                     </table>
                 )}
             </div>
-        </div>
+        </div >
     );
 };

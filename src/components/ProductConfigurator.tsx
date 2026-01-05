@@ -573,7 +573,12 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 : 'border-slate-100 hover:border-accent/30'
                                                 }`}
                                         >
-                                            <h3 className="text-lg font-bold mb-1 text-slate-900">{model.name}</h3>
+                                            <h3 className="text-lg font-bold mb-1 text-slate-900 flex justify-between items-center gap-2">
+                                                <span>{model.name}</span>
+                                                <span className="text-[10px] text-slate-400 font-normal bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 font-mono" title={`Kod systemowy: ${model.id}`}>
+                                                    {model.id}
+                                                </span>
+                                            </h3>
                                             <p className="text-xs text-slate-500 mb-3">{model.desc}</p>
                                             <ul className="text-[10px] text-slate-600 space-y-0.5">
                                                 {model.features.map((f, i) => <li key={i}>• {f}</li>)}
@@ -615,7 +620,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 : 'border-slate-100 hover:border-purple-300 bg-slate-50'
                                                 }`}
                                         >
-                                            <span className="font-bold text-sm text-slate-800">{product.name}</span>
+                                            <div className="flex flex-col items-center">
+                                                <span className="font-bold text-sm text-slate-800">{product.name}</span>
+                                                <span className="text-[10px] text-slate-400 font-mono scale-90 opacity-70">[{product.id}]</span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

@@ -391,210 +391,236 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                     </label>
                 </div>
             ) : (
-                <div className="flex flex-1 overflow-hidden gap-6 h-[70vh]">
-                    {/* PDF Viewer */}
-                    <div className="flex-[2] bg-slate-200 overflow-auto rounded-lg relative flex justify-center p-4">
-                        <div ref={pageRef} className="relative shadow-lg">
-                            <ReactCrop
-                                crop={crop}
-                                onChange={(c) => setCrop(c)}
-                                onComplete={(c) => setCompletedCrop(c)}
-                                disabled={analyzing}
-                            >
-                                <Document
-                                    file={file}
-                                    onLoadSuccess={onDocumentLoadSuccess}
-                                    loading={<div className="p-10">Ładowanie PDF...</div>}
-                                    error={<div className="p-10 text-red-500">Błąd ładowania PDF.</div>}
-                                >
-                                    <Page
-                                        pageNumber={pageNumber}
-                                        scale={scale}
-                                        renderTextLayer={false}
-                                        renderAnnotationLayer={false}
-                                    />
-                                </Document>
-                            </ReactCrop>
-                        </div>
-                    </div>
-
-                    {/* Controls & Queue */}
-                    <div className="w-80 flex flex-col gap-4">
-                        {/* 1. Context Selection */}
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 space-y-4">
-                            <h3 className="font-bold text-slate-700 border-b pb-2">1. Konfiguracja</h3>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Model Zadaszenia</label>
-                                <select
-                                    value={selectedProductId}
-                                    onChange={e => setSelectedProductId(e.target.value)}
-                                    className="w-full p-2 border border-slate-200 rounded text-sm"
-                                >
-                                    <option value="">-- Wybierz Model --</option>
-                                    {products.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Typ Dachu</label>
-                                <select
-                                    value={roofType}
-                                    onChange={e => setRoofType(e.target.value as any)}
-                                    className="w-full p-2 border border-slate-200 rounded text-sm"
-                                >
-                                    <option value="polycarbonate">Poliwęglan</option>
-                                    <option value="glass">Szkło</option>
-                                    <option value="other">Inne</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Strefa Śniegowa</label>
-                                <select
-                                    value={snowZone}
-                                    onChange={e => setSnowZone(e.target.value)}
-                                    className="w-full p-2 border border-slate-200 rounded text-sm"
-                                >
-                                    <option value="1">Strefa 1 (Standard)</option>
-                                    <option value="2">Strefa 2 (Wzmocniona)</option>
-                                    <option value="3">Strefa 3 (Górska)</option>
-                                    <option value="custom">Inna / Specjalna</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Wariant (Subtype)</label>
-                                <div className="space-y-1">
-                                    <input
-                                        type="text"
-                                        list="variant-suggestions"
-                                        value={variantName}
-                                        onChange={e => setVariantName(e.target.value)}
-                                        placeholder={roofType === 'glass' ? 'np. mat' : 'np. ir-gold'}
-                                        className="w-full p-2 border border-slate-200 rounded text-sm"
-                                    />
-                                    <datalist id="variant-suggestions">
-                                        {roofType === 'glass' ? (
-                                            <>
-                                                <option value="standard">Standard (Przeźroczyste)</option>
-                                                <option value="mat">Matowe (Opal/Milchglas)</option>
-                                                <option value="sunscreen">Sunscreen (Przyciemniane)</option>
-                                                <option value="heat-protection">Heat Protection</option>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <option value="standard">Standard (Opal/Clear)</option>
-                                                <option value="ir-gold">IR Gold (Hitze Stop)</option>
-                                                <option value="iq-relax">IQ Relax</option>
-                                                <option value="clear">Clear (Przeźroczyste)</option>
-                                            </>
-                                        )}
-                                    </datalist>
-                                    <p className="text-[10px] text-slate-400">
-                                        Użyj standardowych kodów (np. <code>ir-gold</code>)
-                                    </p>
-                                </div>
-                            </div>
-
-                            <hr className="border-slate-100" />
-
-                            {/* ACTION BUTTONS */}
-                            <div className="flex flex-col gap-2">
-                                {/* SCAN FULL PAGE BUTTON */}
-                                <button
-                                    onClick={handleScanPage}
-                                    disabled={analyzing || !selectedProductId}
-                                    className="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
-                                >
-                                    {analyzing ? 'Skanowanie...' : '⚡ Skanuj Całą Stronę (AI)'}
-                                </button>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={clearSelection}
-                                        disabled={!completedCrop}
-                                        className="px-3 py-2 text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-xs font-medium"
-                                    >
-                                        Wyczyść
-                                    </button>
-                                    <button
-                                        onClick={handleAddToQueue}
-                                        disabled={analyzing || !completedCrop?.width || !selectedProductId}
-                                        className={`flex-1 py-2 text-white rounded-lg font-bold flex justify-center gap-2 ${analyzedData && analyzedCrop === completedCrop ? 'bg-green-600 hover:bg-green-700' : 'bg-accent hover:bg-accent/90'} disabled:opacity-50`}
-                                    >
-                                        {analyzing ? 'Analizowanie...' : analyzedData && analyzedCrop === completedCrop ? '➕ Dodaj' : '🔍 Analizuj Zaznaczenie'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Keyword Autodetection Effect */}
-                        {analyzedData && analyzedData.detected_attributes && (
-                            <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-xs text-yellow-800 mb-2">
-                                <strong>Wykryto AI:</strong>
-                                {analyzedData.detected_attributes.roof_type && <span className="ml-1 px-1 bg-white rounded border">Dach: {analyzedData.detected_attributes.roof_type}</span>}
-                                {analyzedData.detected_attributes.snow_zone && <span className="ml-1 px-1 bg-white rounded border">Strefa: {analyzedData.detected_attributes.snow_zone}</span>}
-                            </div>
-                        )}
-
-                        {/* 2. Queue */}
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0">
-                            <h3 className="font-bold text-slate-700 border-b pb-2 mb-2 flex justify-between">
-                                <span>Kolejka ({queue.length})</span>
-                                <button onClick={() => setQueue([])} className="text-xs text-red-400 hover:text-red-500">Wyczyść</button>
-                            </h3>
-
-                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                                {queue.map((item: any, idx: number) => (
-                                    <div key={idx} className="p-2 bg-slate-50 rounded border border-slate-100 text-sm relative group">
-                                        <div className="font-bold text-slate-700">{item.productName}</div>
-                                        <div className="text-xs text-slate-500">
-                                            {item.variantConfig.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}
-                                            , Strefa {item.variantConfig.snowZone}
-                                            {item.variantConfig.subtype && <span className="font-medium text-slate-700"> • {item.variantConfig.subtype}</span>}
-                                            <span className="opacity-70">
-                                                {item.matrixData.entries ? ` • ${item.matrixData.entries.length} pozycji` :
-                                                    item.matrixData.rows ? ` • ${item.matrixData.rows}x${item.matrixData.cols}` : ''}
-                                            </span>
-                                            {item.provider && <span className="block text-[10px] text-blue-500">Dostawca: {item.provider}</span>}
-                                        </div>
-                                        <button
-                                            onClick={() => handleRemoveFromQueue(idx)}
-                                            className="absolute top-1 right-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                ))}
-                                {queue.length === 0 && (
-                                    <div className="text-center text-slate-400 text-xs py-4">Pusta kolejka</div>
-                                )}
-                            </div>
-
+                <div className="flex flex-col flex-1 min-h-0">
+                    {/* TOP TOOLBAR: Pagination & File Controls */}
+                    <div className="flex justify-between items-center mb-3 shrink-0">
+                        <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
                             <button
-                                onClick={handleSaveAll}
-                                disabled={queue.length === 0}
-                                className="w-full py-3 mt-4 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 disabled:opacity-50 shadow-lg shadow-green-500/20"
+                                onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
+                                disabled={pageNumber <= 1}
+                                className="w-9 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-600 disabled:opacity-30 font-bold"
+                                title="Poprzednia strona"
                             >
-                                Zapisz Wszystkie ({queue.length})
+                                ◀
+                            </button>
+                            <span className="px-3 text-sm font-medium text-slate-700 select-none">
+                                Strona <span className="font-bold">{pageNumber}</span> z {numPages}
+                            </span>
+                            <button
+                                onClick={() => setPageNumber(Math.min(numPages, pageNumber + 1))}
+                                disabled={pageNumber >= numPages}
+                                className="w-9 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-600 disabled:opacity-30 font-bold"
+                                title="Następna strona"
+                            >
+                                ▶
                             </button>
                         </div>
 
-                        {/* Navigation */}
-                        <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-200 flex justify-between items-center text-sm">
-                            <button onClick={() => setPageNumber(Math.max(1, pageNumber - 1))} disabled={pageNumber <= 1} className="p-1 hover:bg-slate-100">◀</button>
-                            <span>Strona {pageNumber} z {numPages}</span>
-                            <button onClick={() => setPageNumber(Math.min(numPages, pageNumber + 1))} disabled={pageNumber >= numPages} className="p-1 hover:bg-slate-100">▶</button>
-                        </div>
                         <button
                             onClick={() => setFile(null)}
-                            className="w-full py-2 text-slate-500 hover:bg-slate-50 rounded"
+                            className="text-xs font-medium text-slate-500 hover:text-slate-800 px-3 py-2 hover:bg-slate-100 rounded border border-transparent hover:border-slate-200 transition-all"
                         >
-                            Zmień plik
+                            ↶ Wybierz inny plik
                         </button>
+                    </div>
+
+                    <div className="flex flex-1 overflow-hidden gap-6 h-[70vh]">
+                        {/* PDF Viewer */}
+                        <div className="flex-[2] bg-slate-200 overflow-auto rounded-lg relative flex flex-col items-center p-4 border border-slate-300/50 shadow-inner">
+
+                            <div ref={pageRef} className="relative shadow-lg">
+                                <ReactCrop
+                                    crop={crop}
+                                    onChange={(c) => setCrop(c)}
+                                    onComplete={(c) => setCompletedCrop(c)}
+                                    disabled={analyzing}
+                                >
+                                    <Document
+                                        file={file}
+                                        onLoadSuccess={onDocumentLoadSuccess}
+                                        loading={<div className="p-10">Ładowanie PDF...</div>}
+                                        error={<div className="p-10 text-red-500">Błąd ładowania PDF.</div>}
+                                    >
+                                        <Page
+                                            pageNumber={pageNumber}
+                                            scale={scale}
+                                            renderTextLayer={false}
+                                            renderAnnotationLayer={false}
+                                        />
+                                    </Document>
+                                </ReactCrop>
+                            </div>
+                        </div>
+
+                        {/* Controls & Queue */}
+                        <div className="w-80 flex flex-col gap-4">
+                            {/* 1. Context Selection */}
+                            <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 space-y-4">
+                                <h3 className="font-bold text-slate-700 border-b pb-2">1. Konfiguracja</h3>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Model Zadaszenia</label>
+                                    <select
+                                        value={selectedProductId}
+                                        onChange={e => setSelectedProductId(e.target.value)}
+                                        className="w-full p-2 border border-slate-200 rounded text-sm"
+                                    >
+                                        <option value="">-- Wybierz Model --</option>
+                                        {products.map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name} {p.code ? `[${p.code}]` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Typ Dachu</label>
+                                    <select
+                                        value={roofType}
+                                        onChange={e => setRoofType(e.target.value as any)}
+                                        className="w-full p-2 border border-slate-200 rounded text-sm"
+                                    >
+                                        <option value="polycarbonate">Poliwęglan</option>
+                                        <option value="glass">Szkło</option>
+                                        <option value="other">Inne</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Strefa Śniegowa</label>
+                                    <select
+                                        value={snowZone}
+                                        onChange={e => setSnowZone(e.target.value)}
+                                        className="w-full p-2 border border-slate-200 rounded text-sm"
+                                    >
+                                        <option value="1">Strefa 1 (Standard)</option>
+                                        <option value="2">Strefa 2 (Wzmocniona)</option>
+                                        <option value="3">Strefa 3 (Górska)</option>
+                                        <option value="custom">Inna / Specjalna</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Wariant (Subtype)</label>
+                                    <div className="space-y-1">
+                                        <input
+                                            type="text"
+                                            list="variant-suggestions"
+                                            value={variantName}
+                                            onChange={e => setVariantName(e.target.value)}
+                                            placeholder={roofType === 'glass' ? 'np. mat' : 'np. ir-gold'}
+                                            className="w-full p-2 border border-slate-200 rounded text-sm"
+                                        />
+                                        <datalist id="variant-suggestions">
+                                            {roofType === 'glass' ? (
+                                                <>
+                                                    <option value="standard">Standard (Przeźroczyste)</option>
+                                                    <option value="mat">Matowe (Opal/Milchglas)</option>
+                                                    <option value="sunscreen">Sunscreen (Przyciemniane)</option>
+                                                    <option value="heat-protection">Heat Protection</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="standard">Standard (Opal/Clear)</option>
+                                                    <option value="ir-gold">IR Gold (Hitze Stop)</option>
+                                                    <option value="iq-relax">IQ Relax</option>
+                                                    <option value="clear">Clear (Przeźroczyste)</option>
+                                                </>
+                                            )}
+                                        </datalist>
+                                        <p className="text-[10px] text-slate-400">
+                                            Użyj standardowych kodów (np. <code>ir-gold</code>)
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <hr className="border-slate-100" />
+
+                                {/* ACTION BUTTONS */}
+                                <div className="flex flex-col gap-2">
+                                    {/* SCAN FULL PAGE BUTTON */}
+                                    <button
+                                        onClick={handleScanPage}
+                                        disabled={analyzing || !selectedProductId}
+                                        className="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                                    >
+                                        {analyzing ? 'Skanowanie...' : '⚡ Skanuj Całą Stronę (AI)'}
+                                    </button>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={clearSelection}
+                                            disabled={!completedCrop}
+                                            className="px-3 py-2 text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-xs font-medium"
+                                        >
+                                            Wyczyść
+                                        </button>
+                                        <button
+                                            onClick={handleAddToQueue}
+                                            disabled={analyzing || !completedCrop?.width || !selectedProductId}
+                                            className={`flex-1 py-2 text-white rounded-lg font-bold flex justify-center gap-2 ${analyzedData && analyzedCrop === completedCrop ? 'bg-green-600 hover:bg-green-700' : 'bg-accent hover:bg-accent/90'} disabled:opacity-50`}
+                                        >
+                                            {analyzing ? 'Analizowanie...' : analyzedData && analyzedCrop === completedCrop ? '➕ Dodaj' : '🔍 Analizuj Zaznaczenie'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Keyword Autodetection Effect */}
+                            {analyzedData && analyzedData.detected_attributes && (
+                                <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-xs text-yellow-800 mb-2">
+                                    <strong>Wykryto AI:</strong>
+                                    {analyzedData.detected_attributes.roof_type && <span className="ml-1 px-1 bg-white rounded border">Dach: {analyzedData.detected_attributes.roof_type}</span>}
+                                    {analyzedData.detected_attributes.snow_zone && <span className="ml-1 px-1 bg-white rounded border">Strefa: {analyzedData.detected_attributes.snow_zone}</span>}
+                                </div>
+                            )}
+
+                            {/* 2. Queue */}
+                            <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0">
+                                <h3 className="font-bold text-slate-700 border-b pb-2 mb-2 flex justify-between">
+                                    <span>Kolejka ({queue.length})</span>
+                                    <button onClick={() => setQueue([])} className="text-xs text-red-400 hover:text-red-500">Wyczyść</button>
+                                </h3>
+
+                                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                    {queue.map((item: any, idx: number) => (
+                                        <div key={idx} className="p-2 bg-slate-50 rounded border border-slate-100 text-sm relative group">
+                                            <div className="font-bold text-slate-700">{item.productName}</div>
+                                            <div className="text-xs text-slate-500">
+                                                {item.variantConfig.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}
+                                                , Strefa {item.variantConfig.snowZone}
+                                                {item.variantConfig.subtype && <span className="font-medium text-slate-700"> • {item.variantConfig.subtype}</span>}
+                                                <span className="opacity-70">
+                                                    {item.matrixData.entries ? ` • ${item.matrixData.entries.length} pozycji` :
+                                                        item.matrixData.rows ? ` • ${item.matrixData.rows}x${item.matrixData.cols}` : ''}
+                                                </span>
+                                                {item.provider && <span className="block text-[10px] text-blue-500">Dostawca: {item.provider}</span>}
+                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveFromQueue(idx)}
+                                                className="absolute top-1 right-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {queue.length === 0 && (
+                                        <div className="text-center text-slate-400 text-xs py-4">Pusta kolejka</div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={handleSaveAll}
+                                    disabled={queue.length === 0}
+                                    className="w-full py-3 mt-4 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 disabled:opacity-50 shadow-lg shadow-green-500/20"
+                                >
+                                    Zapisz Wszystkie ({queue.length})
+                                </button>
+                            </div>
+
+
+                        </div>
                     </div>
                 </div>
             )}

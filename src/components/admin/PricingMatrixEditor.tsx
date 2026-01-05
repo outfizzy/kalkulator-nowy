@@ -32,6 +32,18 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups'>('list'); // Default to list as requested
+    const uniqueSurchargeNames = React.useMemo(() => {
+        const names = new Set<string>();
+        entries.forEach(e => {
+            if (e.properties?.surcharges && Array.isArray(e.properties.surcharges)) {
+                e.properties.surcharges.forEach((s: any) => {
+                    if (s.name) names.add(s.name);
+                });
+            }
+        });
+        return Array.from(names).sort();
+    }, [entries]);
+
     const componentGroups = React.useMemo(() => {
         const groups: Record<string, MatrixEntry[]> = {};
         entries.forEach(d => {
@@ -120,6 +132,28 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                     }
 
                     updated.properties = newProps;
+                } else if (field.startsWith('surcharge_')) {
+                    // Update specific surcharge
+                    const surchargeName = field.replace('surcharge_', '');
+                    const val = parseFloat(value) || 0;
+                    const currentSurcharges = updated.properties?.surcharges || [];
+
+                    // Clone array
+                    let newSurcharges = [...currentSurcharges];
+                    const existingIndex = newSurcharges.findIndex((s: any) => s.name === surchargeName);
+
+                    if (existingIndex >= 0) {
+                        // Update existing
+                        newSurcharges[existingIndex] = { ...newSurcharges[existingIndex], price: val };
+                    } else if (val !== 0) {
+                        // Add new if not zero
+                        newSurcharges.push({ name: surchargeName, price: val });
+                    }
+                    // Filter out zero price surcharges to keep it clean? 
+                    // No, keeping them with 0 is fine for editing experience, or maybe remove if 0?
+                    // Let's keep them if they exist for now, or just let them stay.
+
+                    updated.properties = { ...updated.properties, surcharges: newSurcharges };
                 } else {
                     // Direct field update
                     // @ts-ignore
@@ -399,6 +433,12 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                             <th className="p-3 w-1/4">Opis (Admin)</th>
                                                             <th className="p-3 w-24 text-center">Jednostka</th>
                                                             <th className="p-3 w-32 text-right">Cena</th>
+                                                            {uniqueSurchargeNames.map(sName => (
+                                                                <th key={sName} className="p-3 w-28 text-center bg-amber-50 text-amber-900 border-l border-amber-100">
+                                                                    <div className="text-[10px] uppercase text-amber-500">Dopłata</div>
+                                                                    {sName}
+                                                                </th>
+                                                            ))}
                                                             <th className="p-3 w-10"></th>
                                                         </tr>
                                                     </thead>
@@ -451,7 +491,27 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                         />
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-3 text-center">
+                                                                {
+                                                                    uniqueSurchargeNames.map(sName => {
+                                                                        const surcharge = entry.properties?.surcharges?.find((s: any) => s.name === sName);
+                                                                        const price = surcharge?.price || 0;
+                                                                        return (
+                                                                            <td key={sName} className="p-3 text-center bg-amber-50/30 border-l border-amber-100/50">
+                                                                                <div className="relative">
+                                                                                    <span className="absolute left-2 top-1.5 text-slate-400 text-xs">+</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        value={price}
+                                                                                        onChange={(e) => handleEntryChange(entry.id, `surcharge_${sName}`, e.target.value)}
+                                                                                        className="w-20 pl-4 pr-1 py-1 text-center bg-transparent border-b border-dashed border-amber-200 hover:border-amber-400 focus:border-amber-600 outline-none text-sm font-medium text-amber-700"
+                                                                                        placeholder="0"
+                                                                                    />
+                                                                                </div>
+                                                                            </td>
+                                                                        );
+                                                                    })
+                                                                }
+                                                                < td className="p-3 text-center" >
                                                                     <button
                                                                         title="Usuń wiersz"
                                                                         className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -658,15 +718,31 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                             type="number"
                                                                             step="0.01"
                                                                             className="w-20 text-center bg-white border border-slate-200 rounded text-sm"
-                                                                            value={entry.properties?.area || 0}
-                                                                            onChange={(e) => handleEntryChange(entry.id, 'prop_area', parseFloat(e.target.value), w, p)}
+                                                                            // Standardize on area_m2, fallback to legacy area
+                                                                            value={entry.properties?.area_m2 ?? entry.properties?.area ?? 0}
+                                                                            onChange={(e) => handleEntryChange(entry.id, 'prop_area_m2', parseFloat(e.target.value), w, p)}
                                                                         />
                                                                         <span className="absolute right-1 top-1.5 text-slate-400 text-[10px]">m²</span>
                                                                     </div>
                                                                 </td>
                                                                 <td className="p-2 border-r border-slate-100 text-xs text-slate-500">
-                                                                    {/* Render Rafter Type / Reinforcement */}
+                                                                    {/* Render Rafter Type / Reinforcement / Surcharges */}
                                                                     <div className="flex flex-col gap-1 items-start">
+                                                                        {entry.properties?.surcharges && Array.isArray(entry.properties.surcharges) && entry.properties.surcharges.length > 0 && (
+                                                                            <div className="group/tooltip relative">
+                                                                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700 font-bold border border-amber-200 cursor-help">
+                                                                                    + {entry.properties.surcharges.length} DOPŁATY
+                                                                                </span>
+                                                                                <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity z-50">
+                                                                                    {entry.properties.surcharges.map((s: any, idx: number) => (
+                                                                                        <div key={idx} className="flex justify-between">
+                                                                                            <span>{s.name}:</span>
+                                                                                            <span className="font-mono">€{s.price}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
                                                                         {entry.properties?.rafter_type && entry.properties.rafter_type !== 'std' && (
                                                                             <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold text-white
                                                                                 ${entry.properties.rafter_type === 'M' ? 'bg-slate-400' :
@@ -679,9 +755,6 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 font-bold border border-red-200">
                                                                                 + STAL
                                                                             </span>
-                                                                        )}
-                                                                        {(!entry.properties?.rafter_type || entry.properties.rafter_type === 'std') && !entry.properties?.reinforcement && (
-                                                                            <span className="text-slate-300 font-mono text-xs">-</span>
                                                                         )}
                                                                     </div>
                                                                 </td>
@@ -699,7 +772,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                         </>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };

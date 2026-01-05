@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import SignatureCanvas from 'react-signature-canvas';
 import { DatabaseService } from '../../services/database';
+import { StorageService } from '../../services/database/storage.service';
 import type { Installation } from '../../types';
 import { useTranslation } from '../../contexts/TranslationContext';
 
@@ -17,6 +18,29 @@ export const InstallationAcceptance: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [clientName, setClientName] = useState('');
     const [notes, setNotes] = useState('');
+    const [photos, setPhotos] = useState<string[]>([]);
+    const [uploading, setUploading] = useState(false);
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length || !installationId) return;
+
+        const files = Array.from(e.target.files);
+        setUploading(true);
+
+        try {
+            const uploadPromises = files.map(file =>
+                StorageService.uploadFile(file, 'attachments', `installations/${installationId}`)
+            );
+            const urls = await Promise.all(uploadPromises);
+            setPhotos(prev => [...prev, ...urls]);
+            toast.success('Zdjęcia dodane');
+        } catch (error) {
+            console.error('Error uploading photos:', error);
+            toast.error('Błąd wgrywania zdjęć');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const [checklist, setChecklist] = useState({
         structureIntegrity: false,
@@ -35,7 +59,10 @@ export const InstallationAcceptance: React.FC = () => {
                 const inst = installations.find(i => i.id === installationId);
                 if (inst) {
                     setInstallation(inst);
-                    setClientName(`${inst.client.firstName} ${inst.client.lastName}`);
+                    setClientName(inst.acceptance?.clientName || `${inst.client.firstName} ${inst.client.lastName}`);
+                    if (inst.acceptance?.photos && Array.isArray(inst.acceptance.photos)) {
+                        setPhotos(inst.acceptance.photos);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading installation:', error);
@@ -86,7 +113,8 @@ export const InstallationAcceptance: React.FC = () => {
                 acceptedAt: new Date().toISOString(),
                 clientName: clientName.trim(),
                 signature: signatureData,
-                notes: notes.trim() || undefined
+                notes: notes.trim() || undefined,
+                photos: photos
             });
 
             toast.success(t('acceptance.successMessage'));
@@ -239,6 +267,51 @@ export const InstallationAcceptance: React.FC = () => {
                                 placeholder={t('acceptance.notesPlaceholder')}
                             />
                         </label>
+                    </div>
+
+                    {/* Photos Section */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="font-bold text-slate-800 mb-4">{t('acceptance.photos')}</h2>
+
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {photos.map((url, idx) => (
+                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+                                        <img src={url} alt={`Realization ${idx + 1}`} className="w-full h-full object-cover" />
+                                        <button
+                                            type="button"
+                                            onClick={() => setPhotos(photos.filter((_, i) => i !== idx))}
+                                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                                <label className="aspect-square rounded-lg border-2 border-dashed border-slate-300 hover:border-accent flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50 hover:bg-white text-slate-400 hover:text-accent">
+                                    <svg className="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span className="text-xs font-medium">{t('acceptance.addPhoto')}</span>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handlePhotoUpload}
+                                        disabled={uploading}
+                                    />
+                                </label>
+                            </div>
+                            {uploading && (
+                                <div className="text-center text-sm text-slate-500 flex items-center justify-center gap-2">
+                                    <div className="animate-spin w-4 h-4 border-2 border-accent border-b-transparent rounded-full" />
+                                    Wgrywanie zdjęć...
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Submit Button */}

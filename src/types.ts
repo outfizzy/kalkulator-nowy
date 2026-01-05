@@ -525,6 +525,7 @@ export interface Installation {
         clientName: string;
         signature?: string;
         notes?: string;
+        photos?: string[];
     };
     photoUrls?: string[]; // Array of photo URLs from installation
     partsReady?: boolean; // Whether parts are ready for installation
@@ -821,51 +822,7 @@ export interface Notification {
 
 // --- Service Module Types ---
 
-export type ServiceStatus = 'new' | 'assigned' | 'in_progress' | 'parts_ordered' | 'completed' | 'cancelled';
-export type ServicePriority = 'low' | 'medium' | 'high' | 'critical';
 
-export interface ServiceTicket {
-    id: string;
-    ticketNumber: string; // SRV/2025/001
-    contractId?: string; // Optional link to contract
-    customerId?: string; // Link to customer
-    title: string;
-    description: string;
-    status: ServiceStatus;
-    priority: ServicePriority;
-
-    // Assignment
-    assigneeId?: string;
-    assignedTeamId?: string;
-
-    // Dates
-    createdAt: Date;
-    updatedAt: Date;
-    scheduledDate?: string; // ISO Date
-    completedDate?: string; // ISO Date
-
-    // Metadata
-    reportedBy?: string; // 'client' | 'installer' | 'internal'
-    clientName?: string; // Snapshot or fallback
-    clientPhone?: string;
-    clientEmail?: string;
-    clientAddress?: string;
-    productInfo?: string; // e.g., "Pergola Trendstyle 4x3"
-
-    // Joined data
-    assignee?: {
-        firstName: string;
-        lastName: string;
-    };
-    team?: {
-        name: string;
-    };
-    customer?: {
-        firstName: string;
-        lastName: string;
-        companyName?: string;
-    };
-}
 
 
 
