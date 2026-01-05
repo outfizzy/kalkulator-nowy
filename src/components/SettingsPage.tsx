@@ -207,7 +207,9 @@ export const SettingsPage: React.FC = () => {
             setTimeout(() => window.location.reload(), 1500);
         } catch (error) {
             console.error('System Wipe Failed:', error);
-            toast.error('Błąd resetowania systemu.');
+            console.error('System Wipe Failed:', error);
+            const errMsg = (error as any)?.message || (error as any)?.details || 'Nieznany błąd';
+            toast.error(`Błąd resetowania: ${errMsg}`);
         }
     };
 
