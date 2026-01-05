@@ -165,9 +165,12 @@ export const FairManagement: React.FC = () => {
                                     href="/fairs"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="block w-full text-center py-2 px-4 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium transition-colors text-sm border border-indigo-100"
+                                    className="block w-full text-center py-2 px-4 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium transition-colors text-sm border border-indigo-100 flex items-center justify-center gap-2"
                                 >
-                                    Otwórz Panel (Testuj) ↗
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    Otwórz Panel (Tablet) ↗
                                 </a>
                             </div>
 
