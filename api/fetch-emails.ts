@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const searchCriteria = ['ALL'];
+        // Optimal Fetch: Get structure and header, avoid full body scan for list
         const fetchOptions = {
             bodies: ['HEADER'],
             struct: true,
