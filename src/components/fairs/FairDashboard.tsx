@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FairService, Fair, Prize } from '../../services/database/fair.service';
+import { FairService, type Fair, type Prize } from '../../services/database/fair.service';
 import { FairLeadForm } from './FairLeadForm';
 import { WheelOfFortune } from './WheelOfFortune';
 import confetti from 'canvas-confetti';
