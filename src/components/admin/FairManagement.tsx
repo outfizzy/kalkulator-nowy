@@ -7,6 +7,8 @@ export const FairManagement: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingFair, setEditingFair] = useState<Fair | null>(null);
+    const [stats, setStats] = useState<Record<string, { totalLeads: number, prizesWon: Record<string, number> } | null>>({});
+    const [loadingStats, setLoadingStats] = useState<Record<string, boolean>>({});
 
     // Form State
     const [formData, setFormData] = useState<Partial<Fair>>({
@@ -74,6 +76,27 @@ export const FairManagement: React.FC = () => {
         }));
     };
 
+    const toggleStats = async (fairId: string) => {
+        if (stats[fairId]) {
+            // Toggle off (optional, or just leave it)
+            // For now, let's just re-fetch to refresh, or we can add logic to hide.
+            // Let's make it a toggle visibility if we have data, but always refresh if clicked?
+            // Actually, simplest is: if not present, fetch. If present, maybe just show/hide?
+            // Let's simple load.
+        }
+
+        setLoadingStats(prev => ({ ...prev, [fairId]: true }));
+        try {
+            const data = await FairService.getFairStatistics(fairId);
+            setStats(prev => ({ ...prev, [fairId]: data }));
+        } catch (error) {
+            console.error(error);
+            toast.error('Błąd pobierania statystyk');
+        } finally {
+            setLoadingStats(prev => ({ ...prev, [fairId]: false }));
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <div className="flex justify-between items-center mb-6">
@@ -134,6 +157,62 @@ export const FairManagement: React.FC = () => {
                                         Edytuj
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Stats Section */}
+                            <div className="mt-4 border-t border-slate-100 pt-3">
+                                {!stats[fair.id] ? (
+                                    <button
+                                        onClick={() => toggleStats(fair.id)}
+                                        disabled={loadingStats[fair.id]}
+                                        className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-2"
+                                    >
+                                        {loadingStats[fair.id] ? (
+                                            <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                            </svg>
+                                        )}
+                                        Pokaż statystyki
+                                    </button>
+                                ) : (
+                                    <div className="bg-slate-50 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {/* Total Leads */}
+                                            <div className="text-center md:text-left">
+                                                <div className="text-3xl font-bold text-slate-800">{stats[fair.id]?.totalLeads}</div>
+                                                <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">Zebranych Leadów</div>
+                                            </div>
+
+                                            {/* Prize Distribution */}
+                                            <div className="col-span-2">
+                                                <h4 className="text-sm font-bold text-slate-700 mb-2">Rozkład Nagród</h4>
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                    {Object.entries(stats[fair.id]?.prizesWon || {}).map(([label, count]) => (
+                                                        <div key={label} className="bg-white px-3 py-2 rounded border border-slate-200 text-sm flex justify-between items-center">
+                                                            <span className="text-slate-600 truncate mr-2" title={label}>{label}</span>
+                                                            <span className="font-bold text-slate-800 bg-slate-100 px-1.5 rounded">{count}</span>
+                                                        </div>
+                                                    ))}
+                                                    {Object.keys(stats[fair.id]?.prizesWon || {}).length === 0 && (
+                                                        <div className="text-sm text-slate-400 italic col-span-full">Brak wygranych nagród.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setStats(prev => {
+                                                const next = { ...prev };
+                                                delete next[fair.id];
+                                                return next;
+                                            })}
+                                            className="mt-3 text-xs text-slate-400 hover:text-slate-600 underline"
+                                        >
+                                            Ukryj statystyki
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

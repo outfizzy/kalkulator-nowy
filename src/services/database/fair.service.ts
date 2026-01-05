@@ -18,7 +18,36 @@ export interface Fair {
     created_at: string;
 }
 
+export interface FairStats {
+    totalLeads: number;
+    prizesWon: Record<string, number>;
+}
+
 export class FairService {
+    static async getFairStatistics(fairId: string): Promise<FairStats> {
+        // Fetch all leads for this fair to calculate stats
+        // Optimisation: We only select 'fair_prize' to minimize data transfer
+        const { data: leads, error } = await supabase
+            .from('leads')
+            .select('fair_prize')
+            .eq('fair_id', fairId);
+
+        if (error) throw error;
+
+        const stats: FairStats = {
+            totalLeads: leads?.length || 0,
+            prizesWon: {}
+        };
+
+        leads?.forEach(lead => {
+            if (lead.fair_prize && lead.fair_prize.label) {
+                const label = lead.fair_prize.label;
+                stats.prizesWon[label] = (stats.prizesWon[label] || 0) + 1;
+            }
+        });
+
+        return stats;
+    }
     static async getActiveFairs(): Promise<Fair[]> {
         const { data, error } = await supabase
             .from('fairs')

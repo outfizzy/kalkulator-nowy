@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Prize } from '../../services/database/fair.service';
 
 interface WheelOfFortuneProps {
@@ -11,11 +11,13 @@ export const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({ prizes, onSpinEn
     const [isSpinning, setIsSpinning] = useState(false);
 
     // Normalize probabilities to 100%
-    const totalProb = prizes.reduce((sum, p) => sum + p.probability, 0);
-    const normalizedPrizes = prizes.map(p => ({
-        ...p,
-        normalizedProb: p.probability / totalProb
-    }));
+    const normalizedPrizes = useMemo(() => {
+        const totalProb = prizes.reduce((sum, p) => sum + p.probability, 0);
+        return prizes.map(p => ({
+            ...p,
+            normalizedProb: p.probability / totalProb
+        }));
+    }, [prizes]);
 
     const drawWheel = useCallback((rotationAngle: number) => {
         const canvas = canvasRef.current;
@@ -65,7 +67,7 @@ export const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({ prizes, onSpinEn
         ctx.closePath();
         ctx.fillStyle = '#1e293b'; // Slate-800
         ctx.fill();
-    };
+    }, [normalizedPrizes]);
 
     useEffect(() => {
         drawWheel(0);
