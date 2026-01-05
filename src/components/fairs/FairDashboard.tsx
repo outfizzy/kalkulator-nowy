@@ -59,7 +59,12 @@ export const FairDashboard: React.FC = () => {
                         </button>
                     ))}
                     {fairs.length === 0 && (
-                        <div className="text-center text-slate-500">Brak aktywnych wydarzeń.</div>
+                        <div className="text-center text-slate-500">
+                            <p>Brak aktywnych wydarzeń.</p>
+                            <a href="/admin/fairs" className="text-accent hover:underline mt-2 block">
+                                Przejdź do Panelu Administratora, aby utworzyć wydarzenie.
+                            </a>
+                        </div>
                     )}
                     <button onClick={() => navigate('/')} className="mt-8 text-slate-400 font-medium">Powrót</button>
                 </div>
