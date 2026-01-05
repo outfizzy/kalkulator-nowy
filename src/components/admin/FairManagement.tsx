@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { FairService, Fair, Prize } from '../../services/database/fair.service';
+import { FairService } from '../../services/database/fair.service';
+import type { Fair, Prize } from '../../services/database/fair.service';
 
 export const FairManagement: React.FC = () => {
     const [fairs, setFairs] = useState<Fair[]>([]);
@@ -157,6 +158,17 @@ export const FairManagement: React.FC = () => {
                                         Edytuj
                                     </button>
                                 </div>
+                            </div>
+
+                            <div className="mt-2 mb-2">
+                                <a
+                                    href="/fairs"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block w-full text-center py-2 px-4 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium transition-colors text-sm border border-indigo-100"
+                                >
+                                    Otwórz Panel (Testuj) ↗
+                                </a>
                             </div>
 
                             {/* Stats Section */}
