@@ -420,8 +420,7 @@ export const PricingService = {
         const { data: tables } = await supabase
             .from('price_tables')
             .select('*, product:product_definitions(name, code)')
-            .eq('is_active', true)
-            .eq('type', 'matrix');
+            .eq('is_active', true); // Relaxed: fetch all active tables, not just 'matrix' type
 
         if (!tables || tables.length === 0) return [];
 

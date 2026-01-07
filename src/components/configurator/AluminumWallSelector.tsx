@@ -4,17 +4,17 @@ import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
 import { PricingService } from '../../services/pricing.service';
 
-type GlassVariant = 'klar' | 'matt' | 'ig';
+type GlassType = 'standard' | 'matt' | 'ig';
 
 interface AluminumWallSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
-    maxRoofWidth: number;
-    maxRoofDepth: number;
+    maxRoofWidth?: number;
+    maxRoofDepth?: number;
     availableItems: any[];
-    sideMatrix: any[];
-    frontMatrix: any[];
+    sideTables: { table: any, entries: any[] }[]; // Changed from sideMatrix
+    frontTables: { table: any, entries: any[] }[]; // Changed from frontMatrix
 }
 
 type WallType = 'side' | 'front';
@@ -23,32 +23,22 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     onAdd,
     onRemove,
     currentAddons,
-    maxRoofWidth,
-    maxRoofDepth,
+    maxRoofWidth = 5000,
+    maxRoofDepth = 3000,
     availableItems,
-    sideMatrix,
-    frontMatrix
+    sideTables,
+    frontTables
 }) => {
-    const existingSide = currentAddons.find(a => a.id === 'alu-side');
-    const existingFront = currentAddons.find(a => a.id === 'alu-front');
-
+    // Component State
     const [activeTab, setActiveTab] = useState<WallType>('side');
+    const [width, setWidth] = useState<number>(3000);
+    const [height, setHeight] = useState<number>(2500); // Only for front
+    const [projection, setProjection] = useState<number>(3000); // Only for side
 
-    // Side Wall State
-    const [sideWidth, setSideWidth] = useState<number>(existingSide?.width || maxRoofDepth || 3000);
-    const [sideHeight, setSideHeight] = useState<number>(2200);
-    const [sideGlass, setSideGlass] = useState<GlassVariant>('klar');
-    const [sideSprosse, setSideSprosse] = useState<boolean>(false);
-    const [sideQty, setSideQty] = useState<number>(existingSide?.quantity || 0);
-    const [sideExtras, setSideExtras] = useState<Set<string>>(new Set());
-
-    // Front Wall State
-    const [frontWidth, setFrontWidth] = useState<number>(existingFront?.width || maxRoofWidth || 4000);
-    const [frontHeight, setFrontHeight] = useState<number>(2200);
-    const [frontGlass, setFrontGlass] = useState<GlassVariant>('klar');
-    const [frontSprosse, setFrontSprosse] = useState<boolean>(false);
-    const [frontQty, setFrontQty] = useState<number>(existingFront?.quantity || 0);
-    const [frontExtras, setFrontExtras] = useState<Set<string>>(new Set());
+    const [glass, setGlass] = useState<GlassType>('standard');
+    const [sprosse, setSprosse] = useState<boolean>(false);
+    const [quantity, setQuantity] = useState<number>(1);
+    const [extras, setExtras] = useState<Set<string>>(new Set());
 
     // Helper to calculate extras price
     const calculateExtrasPrice = (extras: Set<string>) => {

@@ -1167,7 +1167,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
-                                                    matrixEntries={matrixTables.find(t => t.table.attributes?.system === 'alu_schiebetuer_base')?.entries || []}
+                                                    tables={matrixTables.filter(t => t.table.name.toLowerCase().includes('schiebetür'))}
                                                 />
                                             )}
                                             {activeWallTab === 'panorama' && (
@@ -1187,8 +1187,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
                                                     availableItems={componentLists.find(l => l.table.attributes?.system === 'alu_walls')?.entries || []}
-                                                    sideMatrix={matrixTables.find(t => t.table.attributes?.system === 'alu_seitenwand_base')?.entries || []}
-                                                    frontMatrix={matrixTables.find(t => t.table.attributes?.system === 'alu_frontwand_base')?.entries || []}
+                                                    sideTables={matrixTables.filter(t => t.table.name.toLowerCase().includes('seitenwand'))}
+                                                    frontTables={matrixTables.filter(t => t.table.name.toLowerCase().includes('frontwand'))}
                                                 />
                                             )}
                                             {activeWallTab === 'keil' && (
@@ -1198,7 +1198,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onRemove={handleAddonRemove}
                                                     maxRoofDepth={config.projection}
                                                     availableItems={componentLists.find(l => l.table.attributes?.system === 'keilfenster')?.entries || []}
-                                                    baseMatrix={matrixTables.find(t => t.table.attributes?.system === 'keilfenster_base')?.entries || []}
+                                                    tables={matrixTables.filter(t => t.table.name.toLowerCase().includes('keilfenster'))}
                                                 />
                                             )}
                                         </div>

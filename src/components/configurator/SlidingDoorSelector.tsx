@@ -9,7 +9,7 @@ interface SlidingDoorSelectorProps {
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
     maxRoofWidth: number;
-    matrixEntries: any[];
+    tables: { table: any, entries: any[] }[];
 }
 
 type GlassVariant = 'klar' | 'matt' | 'ig';
@@ -19,7 +19,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
     onRemove,
     currentAddons,
     maxRoofWidth,
-    matrixEntries
+    tables
 }) => {
     const existing = currentAddons.find(a => a.id === 'alu-schiebetuer');
 
@@ -29,19 +29,31 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
     const [quantity, setQuantity] = useState<number>(existing?.quantity || 0);
 
     const priceData = useMemo(() => {
-        if (!matrixEntries || matrixEntries.length === 0) return { price: 0, config: 'N/A' };
+        if (!tables || tables.length === 0) return { price: 0, config: 'N/A' };
 
-        const entry = PricingService.findMatrixEntry(matrixEntries, width, 0);
+        // 1. Find Correct Table for Variant
+        const targetVariant = glass; // 'klar', 'matt', 'ig'
+
+        const table = tables.find(t => {
+            const name = t.table.name.toLowerCase();
+            const sub = t.table.attributes?.subtype?.toLowerCase() || '';
+
+            if (targetVariant === 'matt') return name.includes('matt') || name.includes('satyn') || sub.includes('matt');
+            if (targetVariant === 'ig') return name.includes('ig') || name.includes('heat') || sub.includes('ig');
+            // Default/Klar (if not matt/ig and has 'klar' or is generic?)
+            // Assuming 'Klar' tables explicitly say 'klar' or we pick the one that ISN'T the others?
+            // Safest: check for 'klar'
+            return name.includes('klar') || sub.includes('klar');
+        });
+
+        if (!table) return { price: 0, config: 'Brak cennika' };
+
+        // 2. Lookup Price
+        const entry = PricingService.findMatrixEntry(table.entries, width, 0); // Projection 0 usually for walls
         if (!entry) return { price: 0, config: 'N/A' };
 
-        let price = entry.price;
-        const props = entry.properties || {};
-
-        if (glass === 'matt') price += (props.surcharge_matt || 0);
-        if (glass === 'ig') price += (props.surcharge_ig || 0);
-
-        return { price, config: props.config || 'Standard' };
-    }, [width, glass, matrixEntries]);
+        return { price: entry.price, config: table.table.name };
+    }, [width, glass, tables]);
 
     const { price, config } = priceData;
     const totalPrice = price * quantity;
