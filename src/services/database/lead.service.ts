@@ -52,7 +52,11 @@ export const LeadService = {
                 assigned_to: lead.assignedTo || user.id, // Default to current user if not set
                 email_message_id: lead.emailMessageId,
                 notes: lead.notes,
-                last_contact_date: lead.lastContactDate ? lead.lastContactDate.toISOString() : null
+                last_contact_date: lead.lastContactDate ? lead.lastContactDate.toISOString() : null,
+                // Fair Module
+                fair_id: lead.fairId,
+                fair_photos: lead.fairPhotos,
+                fair_prize: lead.fairPrize
             })
             .select()
             .single();

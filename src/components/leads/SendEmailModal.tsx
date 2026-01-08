@@ -6,7 +6,7 @@ import type { Offer } from '../../types';
 import { getOfferEmailHtml } from '../../utils/emailTemplates';
 import { generateOfferPDFData } from '../../utils/pdfGenerator';
 import { OfferService } from '../../services/database/offer.service';
-import { SALES_TEMPLATES, EmailTemplate } from '../../data/emailTemplates';
+import { SALES_TEMPLATES, type EmailTemplate } from '../../data/emailTemplates';
 import { supabase } from '../../lib/supabase';
 
 interface SendEmailModalProps {

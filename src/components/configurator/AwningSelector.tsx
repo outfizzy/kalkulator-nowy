@@ -11,9 +11,10 @@ interface AwningSelectorProps {
     currentAddons: SelectedAddon[];
     maxRoofWidth: number;
     maxRoofDepth: number;
+    snowZone?: string;
 }
 
-export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove, currentAddons, maxRoofWidth, maxRoofDepth }) => {
+export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove, currentAddons, maxRoofWidth, maxRoofDepth, snowZone }) => {
     const existing = currentAddons.find(a => a.id.startsWith('awning-'));
 
     const [type, setType] = useState<'aufdachmarkise_zip' | 'unterdachmarkise_zip' | 'zip_screen'>(
@@ -38,8 +39,12 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
         const fetchPricing = async () => {
             // setPricesLoading(true);
             try {
-                // 1. Get Matrix
-                const entries = await PricingService.getPriceMatrix(type);
+                // 1. Get Matrix (Context Aware)
+                // Pass snow_zone to ensure we get the correct table (e.g. Zone 1 vs Zone 2)
+                const attributes: Record<string, string> = {};
+                if (snowZone) attributes['snow_zone'] = snowZone;
+
+                const entries = await PricingService.getPriceMatrix(type, attributes);
                 setMatrix(entries);
 
                 // 2. Get Product & Supplier Costs

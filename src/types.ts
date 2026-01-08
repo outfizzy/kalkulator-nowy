@@ -128,7 +128,7 @@ export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected';
 
 // --- Leads Types ---
 export type LeadStatus = 'new' | 'contacted' | 'offer_sent' | 'negotiation' | 'won' | 'lost';
-export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'other';
+export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'targi' | 'other';
 
 export interface Lead {
     id: string;
@@ -159,6 +159,10 @@ export interface Lead {
     emailMessageId?: string; // If created from email
     aiScore?: number;
     aiSummary?: string;
+    // Fair Module
+    fairId?: string;
+    fairPhotos?: { url: string; name: string }[];
+    fairPrize?: { label: string; type: string; value: any };
 }
 
 // --- New Catalog Types ---
@@ -275,6 +279,9 @@ export interface ProductConfig {
     isManual?: boolean;
     manualDescription?: string;
     manualPrice?: number;
+
+    // Calculator V2 Surcharges
+    selectedSurcharges?: string[];
 }
 
 export interface InstallationCostResult {

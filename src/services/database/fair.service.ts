@@ -48,6 +48,22 @@ export class FairService {
 
         return stats;
     }
+
+    static async getPrizes(fairId: string): Promise<Prize[]> {
+        const { data, error } = await supabase
+            .from('fairs')
+            .select('prizes_config')
+            .eq('id', fairId)
+            .single();
+
+        if (error) {
+            console.error('Error fetching prizes', error);
+            return [];
+        }
+        // Ensure strictly typed return
+        return (data?.prizes_config as Prize[]) || [];
+    }
+
     static async getActiveFairs(): Promise<Fair[]> {
         const { data, error } = await supabase
             .from('fairs')

@@ -19,6 +19,7 @@ import { DuplicateTableModal } from './DuplicateTableModal';
 import { SmartPdfImporter } from './SmartPdfImporter';
 import { TableSettingsModal } from './TableSettingsModal';
 import { TransportSettingsManager } from './TransportSettings';
+import { ExcelImportModal } from './ExcelImportModal';
 
 export const PricingPage = () => {
     const [activeTab, setActiveTab] = useState<'tables' | 'import' | 'costs' | 'surcharges' | 'transport'>('tables');
@@ -29,6 +30,7 @@ export const PricingPage = () => {
     const [configTable, setConfigTable] = useState<{ id: string, name: string, config: any, productId?: string, productName?: string } | null>(null);
     const [settingsTable, setSettingsTable] = useState<{ id: string, name: string, attributes: any } | null>(null);
     const [showClipboardImport, setShowClipboardImport] = useState(false);
+    const [showExcelImport, setShowExcelImport] = useState(false);
 
     // Simulation State
     const [simulationReport, setSimulationReport] = useState<SimulationReport | null>(null);
@@ -246,6 +248,7 @@ export const PricingPage = () => {
                 <MatrixEditor
                     tableId={editingTable.id}
                     tableName={editingTable.name}
+                    products={products}
                     onClose={() => setEditingTable(null)}
                 />
             )}
@@ -347,6 +350,13 @@ export const PricingPage = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90"
                     >
                         <IconUpload /> Import PDF (AI)
+                    </button>
+                    <button
+                        onClick={() => setShowExcelImport(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Import z Excela
                     </button>
                     <button
                         onClick={handleCreateEmptyTable}
@@ -723,6 +733,20 @@ export const PricingPage = () => {
 
                             setShowClipboardImport(false);
                             toast.success('Dane wczytane do podglądu. Uzupełnij atrybuty i zapisz.');
+                        }}
+                        products={products}
+                    />
+                )
+            }
+
+            {
+                showExcelImport && (
+                    <ExcelImportModal
+                        isOpen={true}
+                        onClose={() => setShowExcelImport(false)}
+                        onSave={() => {
+                            setShowExcelImport(false);
+                            fetchPriceTables();
                         }}
                     />
                 )

@@ -12,10 +12,19 @@ interface LightingSelectorProps {
 
 export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRemove, currentAddons, availableItems }) => {
     // Identify DB items by known strings/identifiers
-    // Case insensitive matching
-    const spotItem = availableItems.find(i => i.properties?.name?.toLowerCase().includes('spot'));
-    const stripItem = availableItems.find(i => i.properties?.name?.toLowerCase().includes('listwa'));
-    const heaterItem = availableItems.find(i => i.properties?.name?.toLowerCase().includes('promiennik') || i.properties?.name?.toLowerCase().includes('heizstrahler'));
+    // Case insensitive matching with multilingual support
+    const spotItem = availableItems.find(i => {
+        const n = i.properties?.name?.toLowerCase() || '';
+        return n.includes('spot') || n.includes('punkt');
+    });
+    const stripItem = availableItems.find(i => {
+        const n = i.properties?.name?.toLowerCase() || '';
+        return n.includes('listwa') || n.includes('strip') || n.includes('led-band') || n.includes('band');
+    });
+    const heaterItem = availableItems.find(i => {
+        const n = i.properties?.name?.toLowerCase() || '';
+        return n.includes('promiennik') || n.includes('heizstrahler') || n.includes('heater') || n.includes('wärme');
+    });
 
     // Find other items (unmatched)
     const otherItems = availableItems.filter(i => i !== spotItem && i !== stripItem && i !== heaterItem);

@@ -22,8 +22,6 @@ type WallType = 'side' | 'front';
 export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     onAdd,
     onRemove,
-    currentAddons,
-    maxRoofWidth = 5000,
     maxRoofDepth = 3000,
     availableItems,
     sideTables,
@@ -31,14 +29,28 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
 }) => {
     // Component State
     const [activeTab, setActiveTab] = useState<WallType>('side');
-    const [width, setWidth] = useState<number>(3000);
-    const [height, setHeight] = useState<number>(2500); // Only for front
-    const [projection, setProjection] = useState<number>(3000); // Only for side
 
-    const [glass, setGlass] = useState<GlassType>('standard');
-    const [sprosse, setSprosse] = useState<boolean>(false);
-    const [quantity, setQuantity] = useState<number>(1);
-    const [extras, setExtras] = useState<Set<string>>(new Set());
+    // Side Wall State
+    const [sideWidth, setSideWidth] = useState<number>(3000);
+    const [sideHeight, setSideHeight] = useState<number>(2500); // Fixed or default
+    const [sideGlass, setSideGlass] = useState<GlassType>('standard');
+    const [sideSprosse, setSideSprosse] = useState<boolean>(false);
+    const [sideQty, setSideQty] = useState<number>(0);
+    const [sideExtras, setSideExtras] = useState<Set<string>>(new Set());
+
+    // Front Wall State
+    const [frontWidth, setFrontWidth] = useState<number>(3000);
+    const [frontHeight, setFrontHeight] = useState<number>(2500);
+    const [frontGlass, setFrontGlass] = useState<GlassType>('standard');
+    const [frontSprosse, setFrontSprosse] = useState<boolean>(false);
+    const [frontQty, setFrontQty] = useState<number>(0);
+    const [frontExtras, setFrontExtras] = useState<Set<string>>(new Set());
+
+
+    // Auto-default side width to roof depth
+    React.useEffect(() => {
+        if (maxRoofDepth) setSideWidth(maxRoofDepth);
+    }, [maxRoofDepth]);
 
     // Helper to calculate extras price
     const calculateExtrasPrice = (extras: Set<string>) => {
@@ -51,12 +63,18 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     };
 
     // Calculations using DB Matrix
-    const calculateBasePrice = (matrix: any[], width: number, glass: GlassVariant, sprosse: boolean) => {
-        if (!matrix || matrix.length === 0) return 0;
-        const entry = PricingService.findMatrixEntry(matrix, width, 0);
+    const calculateBasePrice = (tables: { table: any, entries: any[] }[], width: number, glass: GlassType, sprosse: boolean) => {
+        if (!tables || tables.length === 0) return 0;
+        // Assume first table is the correct one for now (or find best match by dimensions if needed)
+        const entries = tables[0].entries;
+
+        const entry = PricingService.findMatrixEntry(entries, width, 0); // Wall usually price by Width only (or Width x Height?)
+        // Aluxe Walls: Matrix is usually Width x Pricing Group (Height is standard or surcharge?)
+        // For now assume findMatrixEntry works with Width x 0 (start of range)
+
         if (!entry) return 0;
 
-        let price = entry.price;
+        let price = entry.price || entry.structure_price || 0;
         const props = entry.properties || {};
 
         if (glass === 'matt') price += (props.surcharge_matt || 0);
@@ -66,11 +84,13 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
         return price;
     };
 
-    const sideBasePrice = useMemo(() => calculateBasePrice(sideMatrix, sideWidth, sideGlass, sideSprosse), [sideMatrix, sideWidth, sideGlass, sideSprosse]);
+
+
+    const sideBasePrice = useMemo(() => calculateBasePrice(sideTables, sideWidth, sideGlass, sideSprosse), [sideTables, sideWidth, sideGlass, sideSprosse]);
     const sideExtrasPrice = useMemo(() => calculateExtrasPrice(sideExtras), [sideExtras, availableItems]);
     const totalSidePrice = sideBasePrice + sideExtrasPrice;
 
-    const frontBasePrice = useMemo(() => calculateBasePrice(frontMatrix, frontWidth, frontGlass, frontSprosse), [frontMatrix, frontWidth, frontGlass, frontSprosse]);
+    const frontBasePrice = useMemo(() => calculateBasePrice(frontTables, frontWidth, frontGlass, frontSprosse), [frontTables, frontWidth, frontGlass, frontSprosse]);
     const frontExtrasPrice = useMemo(() => calculateExtrasPrice(frontExtras), [frontExtras, availableItems]);
     const totalFrontPrice = frontBasePrice + frontExtrasPrice;
 
@@ -95,6 +115,7 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                 name: 'Ściana Alu Boczna',
                 variant: `${sideGlass} ${sideSprosse ? '+ Sprosse' : ''}`,
                 width: sideWidth,
+                depth: 0,
                 quantity: sideQty,
                 price: totalSidePrice * sideQty,
                 description: `Szkło: ${sideGlass}. ${extraNames}`
@@ -113,6 +134,7 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                 name: 'Ściana Alu Frontowa',
                 variant: `${frontGlass} ${frontSprosse ? '+ Sprosse' : ''}`,
                 width: frontWidth,
+                depth: 0,
                 quantity: frontQty,
                 price: totalFrontPrice * frontQty,
                 description: `Szkło: ${frontGlass}. ${extraNames}`
@@ -141,12 +163,24 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                 <div className="lg:col-span-1 space-y-6">
                     {/* Controls */}
                     <div>
-                        <label className="block text-sm font-medium mb-1">Szerokość</label>
+                        <label className="block text-sm font-medium mb-1">
+                            Szerokość
+                            {currentType === 'side' && <span className="text-xs text-slate-500 ml-1">(Max: {maxRoofDepth}mm)</span>}
+                        </label>
                         <input
                             type="number"
                             value={currentType === 'side' ? sideWidth : frontWidth}
-                            onChange={e => currentType === 'side' ? setSideWidth(Number(e.target.value)) : setFrontWidth(Number(e.target.value))}
-                            className="w-full border p-2 rounded"
+                            onChange={e => {
+                                const val = Number(e.target.value);
+                                if (currentType === 'side') {
+                                    // Clamp to maxRoofDepth
+                                    setSideWidth(maxRoofDepth ? Math.min(val, maxRoofDepth) : val);
+                                } else {
+                                    setFrontWidth(val);
+                                }
+                            }}
+                            max={currentType === 'side' ? maxRoofDepth : undefined}
+                            className={`w-full border p-2 rounded ${currentType === 'side' && sideWidth >= (maxRoofDepth || 99999) ? 'border-orange-300 bg-orange-50' : ''}`}
                         />
                     </div>
                     <div>

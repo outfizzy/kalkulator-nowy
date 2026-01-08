@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Installation, InstallationTeam } from '../../types';
+import type { Installation, InstallationTeam } from '../../types';
 import { InstallationService } from '../../services/database/installation.service';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
 import { DatabaseService } from '../../services/database';

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { SmartPastePreviewModal } from './SmartPastePreviewModal';
 
 interface MatrixEditorProps {
     tableId: string;
     onClose: () => void;
     tableName: string;
+    products: any[];
 }
 
 interface MatrixEntry {
@@ -13,6 +15,7 @@ interface MatrixEntry {
     width_mm: number;
     projection_mm: number;
     price: number; // Total price (legacy or calculated)
+    price_table_id?: string;
     structure_price?: number;
     glass_price?: number;
     properties?: {
@@ -25,12 +28,22 @@ interface MatrixEntry {
 }
 
 
-export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, tableName }) => {
+export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, tableName, products }) => {
     const [entries, setEntries] = useState<MatrixEntry[]>([]);
     const [widths, setWidths] = useState<number[]>([]);
     const [projections, setProjections] = useState<number[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [bulkValue, setBulkValue] = useState<string>('');
+    const [bulkOperation, setBulkOperation] = useState<'add' | 'multiply' | 'set'>('set');
+    const [selectedProductId, setSelectedProductId] = useState<string>('');
+
+    // Smart Paste State
+    const [isSmartPasteOpen, setIsSmartPasteOpen] = useState(false);
+    const [smartPasteText, setSmartPasteText] = useState('');
+    const [smartPasteRows, setSmartPasteRows] = useState<number[][]>([]);
+    const [isSmartPasteLoading, setIsSmartPasteLoading] = useState(false);
+    const [pasteOrigin, setPasteOrigin] = useState<{ width: number, projection: number, targetField?: keyof MatrixEntry } | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups'>('list'); // Default to list as requested
     const uniqueSurchargeNames = React.useMemo(() => {
         const names = new Set<string>();
@@ -75,8 +88,12 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                 properties: d.properties || { rafters: 0, posts: 2 }
             })));
 
-            // Fetch table attributes and TYPE
-            const { data: tableData } = await supabase.from('price_tables').select('attributes, type').eq('id', tableId).single();
+            // Fetch table attributes and TYPE and Product ID
+            const { data: tableData } = await supabase.from('price_tables').select('attributes, type, product_definition_id').eq('id', tableId).single();
+
+            if (tableData?.product_definition_id) {
+                setSelectedProductId(tableData.product_definition_id);
+            }
 
             if (tableData?.attributes?.component_images) {
                 setComponentImages(tableData.attributes.component_images);
@@ -104,6 +121,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
 
     useEffect(() => {
         loadMatrix();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tableId]);
 
     const handleEntryChange = (id: string | undefined, field: keyof MatrixEntry | string, value: any, width?: number, projection?: number) => {
@@ -139,7 +157,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                     const currentSurcharges = updated.properties?.surcharges || [];
 
                     // Clone array
-                    let newSurcharges = [...currentSurcharges];
+                    const newSurcharges = [...currentSurcharges];
                     const existingIndex = newSurcharges.findIndex((s: any) => s.name === surchargeName);
 
                     if (existingIndex >= 0) {
@@ -266,6 +284,114 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         setSaving(false);
     };
 
+    const handlePaste = async (e: React.ClipboardEvent, width: number, projection: number) => {
+        // Try getting text from clipboard
+        const text = e.clipboardData.getData('text');
+
+        console.log('Paste event triggered on:', width, 'x', projection);
+        console.log('Clipboard content length:', text.length);
+
+        // Heuristic: If it contains newlines OR tabs, treat as potential smart paste
+        // Also if it looks like a list of numbers separated by newlines (single column)
+        const isMultiLine = text.includes('\n') || text.includes('\r');
+        const isTabular = text.includes('\t');
+
+        // If it's just a single number (no newlines/tabs), let default handler work (normal paste)
+        if (!isMultiLine && !isTabular) {
+            return;
+        }
+
+        e.preventDefault();
+        console.log('Smart Paste Activated');
+
+        setPasteOrigin({ width, projection });
+        setSmartPasteText(text);
+
+        // Open modal immediately to show feedback
+        setIsSmartPasteOpen(true);
+        setIsSmartPasteLoading(true);
+        setSmartPasteRows([]);
+
+        try {
+            // Call AI Function
+            // Note: If text is small, AI might need context. 
+            // We pass simply text_content. The AI function should handle partials.
+            const { data, error } = await supabase.functions.invoke('parse-pricing-text', {
+                body: { text_content: text }
+            });
+
+            if (error) throw error;
+            if (data?.rows) {
+                setSmartPasteRows(data.rows);
+                toast.success('Dane przeanalizowane. Sprawdź dopasowanie.');
+            }
+        } catch (err) {
+            console.error('Smart Paste Error:', err);
+            toast.error('Błąd analizy tekstu. Spróbuj ręcznie.');
+            // Don't close modal, let user see error or use manual edit if we add that later
+            setIsSmartPasteLoading(false);
+        } finally {
+            setIsSmartPasteLoading(false);
+        }
+    };
+
+    const confirmSmartPaste = (finalRows?: number[][]) => {
+        const rowsToUse = finalRows || smartPasteRows;
+
+        if (!pasteOrigin || rowsToUse.length === 0) return;
+
+        const startWIdx = widths.indexOf(pasteOrigin.width);
+        const startPIdx = projections.indexOf(pasteOrigin.projection);
+
+        if (startWIdx === -1 || startPIdx === -1) {
+            toast.error('Błąd: Punkt startowy nie istnieje już w tabeli');
+            return;
+        }
+
+        const newEntries = [...entries];
+        let updatedCount = 0;
+
+        rowsToUse.forEach((row, rIdx) => {
+            row.forEach((price, cIdx) => {
+                const targetWIdx = startWIdx + cIdx;
+                const targetPIdx = startPIdx + rIdx;
+
+                if (targetWIdx < widths.length && targetPIdx < projections.length) {
+                    const w = widths[targetWIdx];
+                    const p = projections[targetPIdx];
+
+                    const entryIndex = newEntries.findIndex(e => e.width_mm === w && e.projection_mm === p);
+                    if (entryIndex >= 0) {
+                        newEntries[entryIndex] = {
+                            ...newEntries[entryIndex],
+                            price: price,
+                            structure_price: price, // Assume structure price update for now
+                            _changed: true
+                        };
+                        updatedCount++;
+                    } else {
+                        // Create if missing (rare case if matrix is full)
+                        newEntries.push({
+                            price_table_id: tableId,
+                            width_mm: w,
+                            projection_mm: p,
+                            price: price,
+                            structure_price: price,
+                            _changed: true,
+                            _isNew: true
+                        });
+                        updatedCount++;
+                    }
+                }
+            });
+        });
+
+        setEntries(newEntries);
+        toast.success(`Wklejono ${updatedCount} cen! Pamiętaj o zapisaniu zmian.`);
+        setIsSmartPasteOpen(false);
+        setPasteOrigin(null);
+    };
+
     // Helper to get entry
     const getEntry = (w: number, p: number) => entries.find(e => e.width_mm === w && e.projection_mm === p);
 
@@ -320,77 +446,87 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         }
     };
 
+    const handleProductChange = async (newProductId: string) => {
+        setSelectedProductId(newProductId);
+        const { error } = await supabase.from('price_tables')
+            .update({ product_definition_id: newProductId || null })
+            .eq('id', tableId);
+
+        if (error) {
+            toast.error('Błąd zmiany produktu');
+            console.error(error);
+        } else {
+            toast.success('Przypisano produkt');
+        }
+    };
+
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col">
-                {/* Header */}
-                <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={editedTableName}
-                                onChange={(e) => setEditedTableName(e.target.value)}
-                                onBlur={handleNameChange}
-                                className="text-xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-accent focus:outline-none transition-colors"
-                            />
-                            <span className="text-xs text-slate-400">(kliknij by edytować)</span>
-                        </div>
-                        <div className="flex gap-2 text-sm mt-1">
-                            {viewMode !== 'groups' && (
-                                <>
-                                    <button
-                                        onClick={() => setViewMode('list')}
-                                        className={`px-2 py-0.5 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
-                                    >
-                                        Macierz (Lista)
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode('grid')}
-                                        className={`px-2 py-0.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
-                                    >
-                                        Macierz (Siatka)
-                                    </button>
-                                </>
-                            )}
-                            <button
-                                onClick={() => setViewMode(viewMode === 'groups' ? 'list' : 'groups')}
-                                className={`px-2 py-0.5 rounded ${viewMode === 'groups' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-200'}`}
+        <div className="fixed inset-0 bg-white z-40 flex flex-col">
+            <SmartPastePreviewModal
+                isOpen={isSmartPasteOpen}
+                onClose={() => setIsSmartPasteOpen(false)}
+                onConfirm={confirmSmartPaste}
+                parsedRows={smartPasteRows}
+                originalText={smartPasteText}
+                isLoading={isSmartPasteLoading}
+                startColIndex={widths.indexOf(pasteOrigin?.width || 0)}
+                startRowIndex={projections.indexOf(pasteOrigin?.projection || 0)}
+                targetWidths={widths}
+                targetProjections={projections}
+            />
+
+            <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg shrink-0">
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            📏 Edytor Cennika: <span className="text-blue-400">{tableName}</span>
+                        </h2>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                            <span>Przypisany Model:</span>
+                            <select
+                                value={selectedProductId}
+                                onChange={(e) => handleProductChange(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 text-white rounded px-2 py-0.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
                             >
-                                {viewMode === 'groups' ? 'Tryb Komponentów (Aktywny)' : 'Przełącz na Tryb Prosty (Lista)'}
-                            </button>
+                                <option value="">-- Brak (Ogólny) --</option>
+                                {products.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} {p.code ? `[${p.code}]` : ''}</option>
+                                ))}
+                            </select>
                         </div>
-                    </div>
-                    <div className="flex gap-2">
-                        {viewMode !== 'groups' && (
-                            <>
-                                <button onClick={() => handleAddDimension('width')} className="px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 font-medium">
-                                    + Dodaj Szerokość
-                                </button>
-                                <button onClick={() => handleAddDimension('projection')} className="px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 font-medium">
-                                    + Dodaj Wysięg
-                                </button>
-                                <div className="w-px bg-slate-300 mx-2"></div>
-                            </>
-                        )}
-                        <button onClick={onClose} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg">Anuluj</button>
-                        <button
-                            onClick={saveChanges}
-                            disabled={saving}
-                            className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-accent/90 disabled:opacity-50"
-                        >
-                            {saving ? 'Zapisywanie...' : 'Zapisz Zmiany'}
-                        </button>
                     </div>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-auto p-0 bg-white">
-                    {loading ? (
+                <div className="flex items-center gap-4">
+                    <div className="flex bg-slate-800 rounded p-1">
+                        <button onClick={() => setViewMode('list')} className={`px-3 py-1 rounded text-xs ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>Lista</button>
+                        <button onClick={() => setViewMode('grid')} className={`px-3 py-1 rounded text-xs ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>Siatka</button>
+                        <button onClick={() => setViewMode(viewMode === 'groups' ? 'list' : 'groups')} className={`px-3 py-1 rounded text-xs ${viewMode === 'groups' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}>Komponenty</button>
+                    </div>
+
+                    <div className="flex gap-2">
+                        {viewMode !== 'groups' && (
+                            <>
+                                <button onClick={() => handleAddDimension('width')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium">+ Szer</button>
+                                <button onClick={() => handleAddDimension('projection')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium">+ Wys</button>
+                            </>
+                        )}
+                        <button onClick={onClose} className="px-4 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded font-medium text-sm">Anuluj</button>
+                        <button onClick={saveChanges} disabled={saving} className="px-5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-sm disabled:opacity-50">
+                            {saving ? 'Zapisuję...' : 'Zapisz'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-0 bg-white">
+                {
+                    loading ? (
                         <div className="flex justify-center items-center h-full text-slate-400">Ładowanie cennika...</div>
                     ) : (
                         <>
-                            {viewMode === 'groups' ? (
+                            {viewMode === 'groups' && (
                                 <div className="p-6 space-y-8">
                                     {componentGroups.map(group => (
                                         <div key={group.name} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
@@ -399,13 +535,11 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                     <input
                                                         className="font-bold text-lg text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-accent focus:outline-none"
                                                         value={group.name}
-                                                        onChange={() => {
-                                                            // Bulk update not implemented explicitly here
-                                                        }}
+                                                        onChange={() => { }}
                                                         disabled
                                                     />
-                                                    {componentImages[group.name] ? (
-                                                        <img src={componentImages[group.name]} alt={group.name} className="h-10 w-10 object-cover rounded border border-slate-300" />
+                                                    {componentImages[group.name] || group.entries[0]?.properties?.image_url ? (
+                                                        <img src={componentImages[group.name] || group.entries[0]?.properties?.image_url} alt={group.name} className="h-10 w-10 object-cover rounded border border-slate-300" />
                                                     ) : (
                                                         <div className="h-10 w-10 bg-slate-200 rounded flex items-center justify-center text-slate-400 text-xs">Brak foto</div>
                                                     )}
@@ -487,6 +621,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                             type="number"
                                                                             value={entry.price}
                                                                             onChange={(e) => handleEntryChange(entry.id, 'price', e.target.value)}
+                                                                            onPaste={(e) => handlePaste(e, entry.width_mm, entry.projection_mm)}
                                                                             className="w-full pl-6 pr-2 py-1 text-right border border-slate-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                                                         />
                                                                     </div>
@@ -511,7 +646,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                         );
                                                                     })
                                                                 }
-                                                                < td className="p-3 text-center" >
+                                                                <td className="p-3 text-center">
                                                                     <button
                                                                         title="Usuń wiersz"
                                                                         className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -597,7 +732,9 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                         </button>
                                     </div>
                                 </div>
-                            ) : viewMode === 'grid' ? (
+                            )}
+
+                            {viewMode === 'grid' && (
                                 <div className="p-4">
                                     <div className="inline-block min-w-full">
                                         <div className="grid gap-px bg-slate-200 border border-slate-300 shadow-sm rounded-lg overflow-hidden"
@@ -628,9 +765,18 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                 <div className="flex flex-col h-full justify-center">
                                                                     <label className="text-[10px] text-slate-400 text-center">Całość</label>
                                                                     <input
-                                                                        type="number"
-                                                                        value={entry?.price || 0}
-                                                                        onChange={(e) => handleEntryChange(entry?.id, 'price', e.target.value, w, p)}
+                                                                        type="text"
+                                                                        // Use text type to allow handling raw paste events better without browser interfering
+                                                                        // Format simply as string, but handle change as number
+                                                                        value={entry?.price || ''}
+                                                                        onChange={(e) => {
+                                                                            // Allow typing logic (numbers only)
+                                                                            const val = e.target.value;
+                                                                            if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                                                                handleEntryChange(entry?.id, 'price', val, w, p);
+                                                                            }
+                                                                        }}
+                                                                        onPaste={(e) => handlePaste(e, w, p)}
                                                                         className={`w-full text-center text-sm font-bold focus:outline-none bg-transparent ${changed ? 'text-amber-700' : 'text-slate-800'}`}
                                                                     />
                                                                 </div>
@@ -642,7 +788,9 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                         </div>
                                     </div>
                                 </div>
-                            ) : (
+                            )}
+
+                            {(viewMode === 'list' || !viewMode || (viewMode !== 'grid' && viewMode !== 'groups')) && (
                                 <div className="w-full overflow-x-auto">
                                     <table className="w-full text-left border-collapse min-w-[800px]">
                                         <thead className="bg-slate-100 text-slate-600 text-xs uppercase font-bold sticky top-0 z-10 shadow-sm">
@@ -676,7 +824,14 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                             type="number"
                                                                             className="w-full pl-6 pr-2 py-1 text-right bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-accent"
                                                                             value={entry.structure_price || 0}
-                                                                            onChange={(e) => handleEntryChange(entry.id, 'structure_price', e.target.value, w, p)}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value.replace(',', '.');
+                                                                                // Allow numeric + dot + comma during typing, only set if valid-ish
+                                                                                if (val === '' || /^[0-9]*[.,]?[0-9]*$/.test(val)) {
+                                                                                    handleEntryChange(entry.id, 'structure_price', val, w, p);
+                                                                                }
+                                                                            }}
+                                                                            onPaste={(e) => handlePaste(e, w, p, 'structure_price')}
                                                                         />
                                                                     </div>
                                                                 </td>
@@ -687,7 +842,13 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                                                             type="number"
                                                                             className="w-full pl-6 pr-2 py-1 text-right bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-accent"
                                                                             value={entry.glass_price || 0}
-                                                                            onChange={(e) => handleEntryChange(entry.id, 'glass_price', e.target.value, w, p)}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value.replace(',', '.');
+                                                                                if (val === '' || /^[0-9]*[.,]?[0-9]*$/.test(val)) {
+                                                                                    handleEntryChange(entry.id, 'glass_price', val, w, p);
+                                                                                }
+                                                                            }}
+                                                                            onPaste={(e) => handlePaste(e, w, p, 'glass_price')}
                                                                         />
                                                                     </div>
                                                                 </td>
@@ -770,9 +931,43 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                 </div>
                             )}
                         </>
-                    )}
-                </div>
-            </div >
+                    )
+                }
+                {/* Smart Paste Modal */}
+                {isSmartPasteOpen && pasteOrigin && (
+                    <SmartPastePreviewModal
+                        isOpen={isSmartPasteOpen}
+                        onClose={() => setIsSmartPasteOpen(false)}
+                        onConfirm={confirmSmartPaste}
+                        parsedRows={smartPasteRows}
+                        startColIndex={widths.indexOf(pasteOrigin.width)}
+                        startRowIndex={projections.indexOf(pasteOrigin.projection)}
+                        targetWidths={widths}
+                        targetProjections={projections}
+                        isLoading={isSmartPasteLoading}
+                        originalText={smartPasteText}
+                        // Product Context
+                        products={products}
+                        selectedProductId={selectedProductId}
+                        onProductChange={async (id) => {
+                            setSelectedProductId(id);
+                            // Also update the table in DB immediately if user changes it here
+                            try {
+                                await supabase.from('price_tables').update({ product_definition_id: id }).eq('id', tableId);
+                                toast.success('Zaktualizowano model zadaszenia');
+                            } catch (e) {
+                                console.error(e);
+                                toast.error('Błąd zapisu modelu');
+                            }
+                        }}
+                        targetFieldName={
+                            pasteOrigin.targetField === 'glass_price' ? 'Szklane' :
+                                pasteOrigin.targetField === 'structure_price' ? 'Konstrukcja' :
+                                    'Cena Całkowita'
+                        }
+                    />
+                )}
+            </div>
         </div >
     );
 };

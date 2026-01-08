@@ -34,7 +34,8 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
         const tracks = new Set<number>();
         activeList.forEach(item => {
             const name = item.properties.name || '';
-            const match = name.match(/(\d+)[- ]tor/i);
+            // Match: "3-tor", "3 tor", "3-rail", "3 rail", "3-spurig", "3 spurig"
+            const match = name.match(/(\d+)[- ](tor|rail|spur|gleis|lauf)/i);
             if (match) {
                 tracks.add(parseInt(match[1]));
             }
@@ -67,14 +68,17 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
         const items: { name: string, price: number }[] = [];
 
         // 1. Rails (Bottom and Top) - Find by string matching current tracks
-        const bottomRail = activeList.find(i =>
-            i.properties.name.toLowerCase().includes('szyna dolna') &&
-            i.properties.name.includes(`${numTracks}-tor`)
-        );
-        const topRail = activeList.find(i =>
-            i.properties.name.toLowerCase().includes('szyna górna') &&
-            i.properties.name.includes(`${numTracks}-tor`)
-        );
+        // 1. Rails (Bottom and Top)
+        const bottomRail = activeList.find(i => {
+            const n = i.properties.name.toLowerCase();
+            return (n.includes('szyna dolna') || n.includes('bottom rail') || n.includes('unter') || n.includes('u-profil')) &&
+                n.match(new RegExp(`${numTracks}[- ](tor|rail|spur)`, 'i'));
+        });
+        const topRail = activeList.find(i => {
+            const n = i.properties.name.toLowerCase();
+            return (n.includes('szyna górna') || n.includes('top rail') || n.includes('ober') || n.includes('h-profil')) &&
+                n.match(new RegExp(`${numTracks}[- ](tor|rail|spur)`, 'i'));
+        });
 
         // Helper: Price unit handling
         const addCost = (item: any, qty: number, dim: number, label: string) => {
@@ -101,7 +105,10 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
         addCost(topRail, 1, width, `Szyna górna (${numTracks}-tor)`);
 
         // 2. Side Profiles
-        const sideProfile = activeList.find(i => i.properties.name.toLowerCase().includes('profil boczny'));
+        const sideProfile = activeList.find(i => {
+            const n = i.properties.name.toLowerCase();
+            return n.includes('profil boczny') || n.includes('side') || n.includes('seit');
+        });
         // Usually 2 sides * height
         addCost(sideProfile, 2, height, 'Profile boczne');
 
@@ -109,7 +116,10 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
         // Default to ESG Klar or Planibel based on user selection? 
         // For simplicity, let's assume Klar default, or add a selector.
         // Let's add a Glass Selector.
-        const glassItem = activeList.find(i => i.properties.name.toLowerCase().includes('esg klar') || i.properties.name.toLowerCase().includes('szyba'));
+        const glassItem = activeList.find(i => {
+            const n = i.properties.name.toLowerCase();
+            return n.includes('esg klar') || n.includes('szyba') || n.includes('glass');
+        });
         if (glassItem) {
             const area = (width * height) / 1000000; // m2
             // Glass overlap? Ignore for now.

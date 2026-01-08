@@ -100,97 +100,115 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
         }
 
         setAnalyzing(true);
-        const toastId = toast.loading('Skanowanie całej strony i szukanie tabel...');
+        const toastId = toast.loading('Skanowanie stron PDF... (Przygotowanie)');
 
         try {
-            // 1. Get Full Page Image
-            const canvas = pageRef.current?.querySelector('canvas');
-            if (!canvas) throw new Error("Canvas not ready");
+            // New "Page-by-Page" Strategy
+            // We use pdfjs directly to load the document and render pages to canvas hiddenly
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDocument = await pdfjs.getDocument(arrayBuffer).promise;
+            const totalPages = pdfDocument.numPages;
 
-            // Create full page crop equivalent
-            const blob = await new Promise<Blob | null>((resolve) => {
-                canvas.toBlob(resolve, 'image/jpeg', 0.8);
-            });
-
-            if (!blob) throw new Error("Failed to capture page");
-
-            const formData = new FormData();
-            formData.append('image', blob, 'full_page.jpg');
-            formData.append('mode', 'scan_page'); // Hint to backend if supported
-
-            const { data, error } = await supabase.functions.invoke('parse-price-pdf', {
-                body: formData
-            });
-
-            if (error) throw error;
-            if (data.error) throw new Error(data.error);
-
-            // 2. Process Detected Tables
-            const payload = data.data || data;
-            const tables = payload.tables || [payload]; // Fallback if single object
-
-            if (!tables || tables.length === 0) {
-                throw new Error("Nie wykryto żadnych tabel na tej stronie.");
-            }
-
-            // 3. Auto-queue all valid tables
             let addedCount = 0;
             const newQueueItems: any[] = [];
+            const failedPages: number[] = [];
 
-            tables.forEach((tableData: any, idx: number) => {
-                // Check if valid table data
-                const rawEntries = tableData.entries || tableData.data;
-                if (!rawEntries || rawEntries.length === 0) return;
+            // Loop through ALL pages
+            for (let i = 1; i <= totalPages; i++) {
 
-                // Calculate dimensions
-                const uniqueWidths = new Set(rawEntries.map((e: any) => e.width_mm || e.width));
-                const uniqueProjections = new Set(rawEntries.map((e: any) => e.projection_mm || e.projection));
+                // Update UI Progress
+                toast.loading(`Analiza strony ${i} z ${totalPages}...`, { id: toastId });
 
-                // Normalize data for UI
-                const normalizedData = {
-                    ...tableData,
-                    rows: uniqueProjections.size || tableData.rows,
-                    cols: uniqueWidths.size || tableData.cols,
-                    data: rawEntries
-                };
+                try {
+                    // 1. Render Page to Blob
+                    const page = await pdfDocument.getPage(i);
+                    const viewport = page.getViewport({ scale: 2.0 }); // High Quality for OCR (Balanced)
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
 
-                // Create Queue Item
-                const productName = products.find(p => p.id === selectedProductId)?.name || 'Nieznany';
+                    if (!context) throw new Error("Canvas context failed");
 
-                // Use AI detected attributes OR global context
-                const aiAttrs = tableData.detected_attributes || {};
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-                const config = {
-                    roofType: aiAttrs.roof_type && ['glass', 'polycarbonate'].includes(aiAttrs.roof_type)
-                        ? aiAttrs.roof_type
-                        : roofType,
-                    snowZone: aiAttrs.snow_zone ? String(aiAttrs.snow_zone) : snowZone,
-                    subtype: aiAttrs.subtype || variantName || undefined
-                };
+                    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+                    if (!blob) throw new Error("Blob creation failed");
 
-                newQueueItems.push({
-                    id: Date.now().toString() + '_' + idx,
-                    matrixData: normalizedData,
-                    productId: selectedProductId,
-                    productName: productName,
-                    variantConfig: config,
-                    provider: provider, // Pass provider
-                    sourceFile: file.name + ` (Strona ${pageNumber})`
-                });
-                addedCount++;
-            });
+                    // 2. Send to API
+                    const formData = new FormData();
+                    formData.append('image', blob, `page_${i}.jpg`);
+                    formData.append('mode', 'scan_page');
 
+                    const { data, error } = await supabase.functions.invoke('parse-price-pdf', {
+                        body: formData
+                    });
+
+                    if (error) throw error;
+
+                    // 3. Process Results (Similar to previous logic)
+                    const payload = data.data || data;
+                    const tables = payload.tables || [payload];
+
+                    if (tables && tables.length > 0) {
+                        tables.forEach((tableData: any, idx: number) => {
+                            // Check valid data
+                            const rawEntries = tableData.entries || tableData.data;
+                            if (!rawEntries || rawEntries.length === 0) return;
+
+                            // Normalize
+                            const uniqueProjections = new Set(rawEntries.map((e: any) => e.projection_mm || e.projection));
+                            const uniqueWidths = new Set(rawEntries.map((e: any) => e.width_mm || e.width));
+
+                            // Config from AI
+                            const aiAttrs = tableData.detected_attributes || {};
+                            const config = {
+                                roofType: aiAttrs.roof_type && ['glass', 'polycarbonate'].includes(aiAttrs.roof_type) ? aiAttrs.roof_type : roofType,
+                                snowZone: aiAttrs.snow_zone ? String(aiAttrs.snow_zone) : snowZone,
+                                subtype: aiAttrs.subtype || variantName || undefined
+                            };
+
+                            newQueueItems.push({
+                                id: Date.now().toString() + `_p${i}_${idx}`,
+                                matrixData: {
+                                    ...tableData,
+                                    rows: uniqueProjections.size || tableData.rows,
+                                    cols: uniqueWidths.size || tableData.cols,
+                                    data: rawEntries
+                                },
+                                productId: selectedProductId,
+                                productName: products.find(p => p.id === selectedProductId)?.name || 'Nieznany',
+                                variantConfig: config,
+                                provider: provider,
+                                sourceFile: `${file.name} (Str. ${i})`
+                            });
+                            addedCount++;
+                        });
+                    }
+
+                } catch (pageError: any) {
+                    console.error(`Error on page ${i}:`, pageError);
+                    failedPages.push(i);
+                    // Don't stop the whole loop, just log fail
+                }
+            }
+
+            // Final Summary
             if (addedCount > 0) {
                 setQueue(prev => [...prev, ...newQueueItems]);
-                toast.success(`Znaleziono i dodano ${addedCount} tabel!`, { id: toastId });
-                setAnalyzedData(payload); // Show debug info
+                const msg = `Zakończono! Dodano ${addedCount} tabel z ${totalPages} stron.`;
+                if (failedPages.length > 0) {
+                    toast.success(`${msg} (Błędy na stronach: ${failedPages.join(', ')})`, { id: toastId, duration: 5000 });
+                } else {
+                    toast.success(msg, { id: toastId });
+                }
             } else {
-                toast.error("Znaleziono dane, ale nie udało się ich przetworzyć na tabele.", { id: toastId });
+                toast.error(`Zakończono, ale nie znaleziono żadnych tabel. (Błędy na stronach: ${failedPages.length})`, { id: toastId });
             }
 
         } catch (e: any) {
             console.error(e);
-            toast.error('Błąd skanowania: ' + e.message, { id: toastId });
+            toast.error('Błąd całego procesu: ' + e.message, { id: toastId });
         } finally {
             setAnalyzing(false);
         }
@@ -308,28 +326,78 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
         if (dataToUse) {
             const productName = products.find(p => p.id === selectedProductId)?.name || 'Nieznany';
 
-            const queueItem = {
-                id: Date.now().toString(),
-                matrixData: dataToUse,
-                productId: selectedProductId,
-                productName: productName,
-                variantConfig: {
-                    roofType: roofType,
-                    snowZone: snowZone,
-                    subtype: variantName || undefined
-                },
-                provider: provider, // Add Provider
-                sourceFile: file.name
-            };
+            // CHECK FOR MERGE CANDIDATE
+            const existingItemIndex = queue.findIndex(item =>
+                item.productId === selectedProductId &&
+                item.variantConfig.roofType === roofType &&
+                item.variantConfig.snowZone === snowZone &&
+                item.variantConfig.subtype === (variantName || undefined)
+            );
 
-            setQueue([...queue, queueItem]);
+            if (existingItemIndex > -1) {
+                // MERGE MODE
+                const existingItem = queue[existingItemIndex];
+                const newEntries = dataToUse.entries || [];
+                const mergedEntries = [...(existingItem.matrixData.entries || []), ...newEntries];
+
+                // Merge Surcharges (deduplicate by name)
+                const existingSurcharges = existingItem.matrixData.detected_attributes?.surcharges || [];
+                const newSurcharges = dataToUse.detected_attributes?.surcharges || [];
+                const mergedSurcharges = [...existingSurcharges];
+
+                newSurcharges.forEach((ns: any) => {
+                    if (!mergedSurcharges.find((es: any) => es.name === ns.name)) {
+                        mergedSurcharges.push(ns);
+                    }
+                });
+
+                const updatedItem = {
+                    ...existingItem,
+                    matrixData: {
+                        ...existingItem.matrixData,
+                        entries: mergedEntries,
+                        // Update surcharge list if we found new ones
+                        detected_attributes: {
+                            ...existingItem.matrixData.detected_attributes,
+                            surcharges: mergedSurcharges
+                        }
+                    },
+                    // Update source file label if different
+                    sourceFile: existingItem.sourceFile.includes(file.name)
+                        ? existingItem.sourceFile
+                        : `${existingItem.sourceFile}, ${file.name}`
+                };
+
+                const newQueue = [...queue];
+                newQueue[existingItemIndex] = updatedItem;
+                setQueue(newQueue);
+
+                toast.success(`SCALONO: Dodano ${newEntries.length} nowych pozycji do istniejącego wariantu!`, { icon: '🔗' });
+            } else {
+                // NEW ITEM MODE
+                const queueItem = {
+                    id: Date.now().toString(),
+                    matrixData: dataToUse,
+                    productId: selectedProductId,
+                    productName: productName,
+                    variantConfig: {
+                        roofType: roofType,
+                        snowZone: snowZone,
+                        subtype: variantName || undefined
+                    },
+                    provider: provider,
+                    sourceFile: file.name
+                };
+
+                setQueue([...queue, queueItem]);
+                toast.success(`Dodano: ${productName} (${roofType === 'glass' ? 'Szkło' : 'Poli'}, S${snowZone})`);
+            }
 
             // UX: Put focus back on variant name or clear it? 
             // Clearing it suggests "Ready for next variant"
             setVariantName('');
 
             // We DO NOT clear crop here, allowing user to add another variant from same table
-            toast.success(`Dodano: ${productName} (${roofType === 'glass' ? 'Szkło' : 'Poli'}, S${snowZone})`);
         }
     };
 
@@ -584,27 +652,80 @@ export const SmartPdfImporter = ({ onExtractSuccess, onClose, products }: SmartP
                                 </h3>
 
                                 <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                                    {queue.map((item: any, idx: number) => (
-                                        <div key={idx} className="p-2 bg-slate-50 rounded border border-slate-100 text-sm relative group">
-                                            <div className="font-bold text-slate-700">{item.productName}</div>
-                                            <div className="text-xs text-slate-500">
-                                                {item.variantConfig.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}
-                                                , Strefa {item.variantConfig.snowZone}
-                                                {item.variantConfig.subtype && <span className="font-medium text-slate-700"> • {item.variantConfig.subtype}</span>}
-                                                <span className="opacity-70">
-                                                    {item.matrixData.entries ? ` • ${item.matrixData.entries.length} pozycji` :
-                                                        item.matrixData.rows ? ` • ${item.matrixData.rows}x${item.matrixData.cols}` : ''}
-                                                </span>
-                                                {item.provider && <span className="block text-[10px] text-blue-500">Dostawca: {item.provider}</span>}
+                                    {queue.map((item: any, idx: number) => {
+                                        // Helper to get dim ranges
+                                        const widths = item.matrixData.data.map((e: any) => e.width_mm || e.width).filter(Number);
+                                        const projs = item.matrixData.data.map((e: any) => e.projection_mm || e.projection || e.depth_mm || e.depth).filter(Number);
+                                        const minW = Math.min(...widths);
+                                        const maxW = Math.max(...widths);
+                                        const minP = Math.min(...projs);
+                                        const maxP = Math.max(...projs);
+
+                                        // Helper to get surcharges (sample from first few rows or aggregated)
+                                        const detectedSurcharges = new Set<string>();
+                                        item.matrixData.data.forEach((row: any) => {
+                                            const surcharges = row.properties?.surcharges || row.surcharges;
+                                            if (Array.isArray(surcharges)) {
+                                                surcharges.forEach((s: any) => detectedSurcharges.add(`${s.name} (+${s.price})`));
+                                            }
+                                        });
+
+                                        return (
+                                            <div key={idx} className="p-3 bg-slate-50 rounded border border-slate-200 text-sm relative group hover:border-blue-300 transition-colors">
+                                                <div className="font-bold text-slate-800 flex justify-between pr-6">
+                                                    <span>{item.productName}</span>
+                                                    <span className="text-xs font-normal bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">
+                                                        {item.matrixData.data.length} poz.
+                                                    </span>
+                                                </div>
+
+                                                {/* DATA VALIDATION BADGES */}
+                                                <div className="flex flex-wrap gap-1 my-1.5">
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${item.variantConfig.roofType === 'glass' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-orange-50 border-orange-100 text-orange-600'}`}>
+                                                        {item.variantConfig.roofType === 'glass' ? 'Szkło' : 'Poliwęglan'}
+                                                    </span>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-100 text-slate-600">
+                                                        Strefa {item.variantConfig.snowZone}
+                                                    </span>
+                                                    {item.variantConfig.subtype && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-50 border-purple-100 text-purple-600 font-medium">
+                                                            {item.variantConfig.subtype}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* DIMENSIONS */}
+                                                <div className="text-xs text-slate-500 mb-1">
+                                                    <span className="font-medium text-slate-600">Wymiary:</span> {minW}-{maxW}mm <span className="text-slate-300">x</span> {minP}-{maxP}mm
+                                                </div>
+
+                                                {/* SURCHARGES (THE FIX) */}
+                                                {detectedSurcharges.size > 0 ? (
+                                                    <div className="text-[11px] text-slate-600 bg-emerald-50/50 p-1.5 rounded border border-emerald-100/50 mt-1">
+                                                        <span className="font-bold text-emerald-700 block mb-0.5">Wykryte dodatki:</span>
+                                                        <ul className="list-disc list-inside opacity-90 leading-tight">
+                                                            {Array.from(detectedSurcharges).slice(0, 4).map(s => (
+                                                                <li key={s}>{s}</li>
+                                                            ))}
+                                                            {detectedSurcharges.size > 4 && <li>...i {detectedSurcharges.size - 4} więcej</li>}
+                                                        </ul>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-[10px] text-slate-400 italic mt-1 pl-1 border-l-2 border-slate-200">
+                                                        Brak wykrytych dopłat
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={() => handleRemoveFromQueue(idx)}
+                                                    className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-white/50 rounded-full hover:bg-white"
+                                                    title="Usuń"
+                                                >
+                                                    ✕
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => handleRemoveFromQueue(idx)}
-                                                className="absolute top-1 right-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     {queue.length === 0 && (
                                         <div className="text-center text-slate-400 text-xs py-4">Pusta kolejka</div>
                                     )}

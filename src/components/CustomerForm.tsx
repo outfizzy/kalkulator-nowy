@@ -108,6 +108,13 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
 
     const handleSelectCustomer = (selectedCustomer: any) => {
         const normalized = normalizeCustomer(selectedCustomer.customer || {});
+
+        // Auto-assign: If customer has no representative, assign current user (Sales Rep)
+        // This prevents "stealing" if they already have one, but claims them if they are "orphan"
+        if (!normalized.representative_id && currentUser) {
+            normalized.representative_id = currentUser.id;
+        }
+
         setCustomer(normalized);
         setSearchQuery(`${normalized.firstName} ${normalized.lastName}`.trim());
         setShowDropdown(false);

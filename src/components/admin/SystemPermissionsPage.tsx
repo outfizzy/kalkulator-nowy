@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-import { NotificationRulesService, NotificationRule } from '../../services/database/notificationRules.service';
-import { PermissionsService, ModulePermission, AVAILABLE_MODULES } from '../../services/database/permissions.service';
+import { NotificationRulesService } from '../../services/database/notificationRules.service';
+import type { NotificationRule } from '../../services/database/notificationRules.service';
+import { PermissionsService, AVAILABLE_MODULES } from '../../services/database/permissions.service';
+import type { ModulePermission } from '../../services/database/permissions.service';
 import type { UserRole } from '../../types';
 
 export const SystemPermissionsPage: React.FC = () => {

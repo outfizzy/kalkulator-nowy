@@ -20,6 +20,13 @@ import { toast } from 'react-hot-toast';
 import { PricingService, type AdditionalCost } from '../services/pricing.service';
 
 // === OFFER BASKET TYPES ===
+interface ProductDefinition {
+    id: string;
+    code: string;
+    name: string;
+    description: string;
+}
+
 interface ExternalOfferItem {
     id: string;
     supplier: 'selt' | 'aliplast' | 'other';
@@ -64,7 +71,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         glassType: 'standard',
         installationType: 'wall-mounted',
         addons: [],
-        selectedAccessories: []
+        selectedAccessories: [],
+        selectedSurcharges: []
     });
 
     // Dynamic Pricing state
@@ -72,6 +80,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [priceLoading, setPriceLoading] = useState(false);
     const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
     const [surchargesBreakdown, setSurchargesBreakdown] = useState<{ name: string, price: number }[]>([]);
+    const [availableSurcharges, setAvailableSurcharges] = useState<{ id: string, name: string, price_table_id: string }[]>([]);
+    const [products, setProducts] = useState<ProductDefinition[]>([]);
 
     // Component Lists (Imported Components)
     const [componentLists, setComponentLists] = useState<{ table: any, entries: any[] }[]>([]);
@@ -86,11 +96,23 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
             try {
                 // 1. Prepare Attributes Context
+                let calculatedSubtype = (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard';
+
+                // MAPPING FIX: imported Aluxe tables use generic 'glass'/'polycarbonate' subtypes for standard variants
+                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId)) {
+                    if (config.roofType === 'glass' && calculatedSubtype === 'standard') {
+                        calculatedSubtype = 'glass' as any;
+                    }
+                    if (config.roofType === 'polycarbonate' && calculatedSubtype === 'standard') {
+                        calculatedSubtype = 'polycarbonate' as any;
+                    }
+                }
+
                 const attributes: Record<string, string> = {
                     snow_zone: config.snowZone ? String(config.snowZone) : '1',
                     roof_type: config.roofType, // 'polycarbonate', 'glass', or 'tin'
                     mounting: config.installationType === 'wall-mounted' ? 'wall' : 'freestanding',
-                    subtype: (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard',
+                    subtype: calculatedSubtype,
                     // Add other attributes if needed (e.g. post height range)
                 };
 
@@ -122,8 +144,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 }
                 setSurchargesBreakdown(surchargeResult.items);
 
-                // NEW: Apply Table Discount (Cascaded)
-                // If the selected table has a discount (e.g. "10+5"), apply it to the calculated price (matrix + surcharges)
                 if (tableAttributes?.discount) {
                     const originalPrice = price;
                     price = PricingService.calculateDiscountedPrice(price, tableAttributes.discount);
@@ -131,6 +151,25 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         console.log(`[Pricing] Applied Discount '${tableAttributes.discount}': ${originalPrice} -> ${price}`);
                     }
                 }
+
+                // 2.6 User Selected Surcharges (New)
+                if (config.selectedSurcharges && config.selectedSurcharges.length > 0 && availableSurcharges.length > 0) {
+                    for (const surchargeId of config.selectedSurcharges) {
+                        const surchargeMeta = availableSurcharges.find(s => s.id === surchargeId);
+                        if (surchargeMeta) {
+                            const surchargePrice = await PricingService.getSurchargePrice(surchargeMeta.price_table_id, config.width, config.projection);
+                            if (surchargePrice > 0) {
+                                price += surchargePrice;
+                                surchargeResult.items.push({
+                                    name: surchargeMeta.name,
+                                    price: surchargePrice
+                                });
+                            }
+                        }
+                    }
+                }
+
+                setSurchargesBreakdown(surchargeResult.items);
 
                 if (price > 0) {
                     setDynamicBasePrice(price);
@@ -151,7 +190,35 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
         const timeoutId = setTimeout(calculatePrice, 500); // Debounce
         return () => clearTimeout(timeoutId);
-    }, [config.modelId, config.width, config.projection, config.snowZone, config.roofType, config.installationType]);
+    }, [config.modelId, config.width, config.projection, config.snowZone, config.roofType, config.installationType, config.selectedSurcharges, config.glassType, config.polycarbonateType, availableSurcharges]);
+
+    // Fetch Available Surcharges
+    useEffect(() => {
+        const fetchSurcharges = async () => {
+            if (!config.modelId) return;
+            try {
+                let calculatedSubtype: string = (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard';
+                // Normalization for Aluxe defaults
+                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId)) {
+                    if (config.roofType === 'glass' && calculatedSubtype === 'standard') calculatedSubtype = 'glass' as any;
+                    if (config.roofType === 'polycarbonate' && calculatedSubtype === 'standard') calculatedSubtype = 'polycarbonate' as any;
+                }
+
+                const attributes: Record<string, string> = {
+                    snow_zone: config.snowZone ? String(config.snowZone) : '1',
+                    roof_type: config.roofType,
+                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'freestanding',
+                    subtype: calculatedSubtype
+                };
+
+                const surcharges = await PricingService.getAvailableSurcharges(config.modelId, attributes);
+                setAvailableSurcharges(surcharges);
+            } catch (error) {
+                console.error("Error fetching surcharges:", error);
+            }
+        };
+        fetchSurcharges();
+    }, [config.modelId, config.roofType, config.snowZone, config.installationType, config.glassType, config.polycarbonateType]);
 
     // Fetch Component Lists
     useEffect(() => {
@@ -172,7 +239,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 const lists = await PricingService.getComponentLists(attributes);
                 setComponentLists(lists);
 
-                const matrices = await PricingService.getMatrixTables();
+                const matrices = await PricingService.getAccessoryMatrices(['keilfenster', 'frontwand', 'seitenwand', 'schiebetür']);
                 setMatrixTables(matrices);
             } catch (error) {
                 console.error("Error fetching component lists:", error);
@@ -183,6 +250,26 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
         fetchComponents();
     }, [config.modelId]);
+
+    // Fetch Dynamic Products
+    useEffect(() => {
+        const loadProducts = async () => {
+            try {
+                const data = await PricingService.getMainProducts();
+                console.log("Loaded products:", data);
+                if (data && data.length > 0) {
+                    setProducts(data);
+                } else {
+                    console.warn("No products found in DB.");
+                    toast.error('Brak produktów w bazie.');
+                }
+            } catch (error) {
+                console.error("Failed to load products:", error);
+                toast.error('Błąd ładowania produktów. Odśwież stronę.');
+            }
+        };
+        loadProducts();
+    }, []);
 
     // === EXTERNAL ITEMS BASKET ===
     const [externalItems, setExternalItems] = useState<ExternalOfferItem[]>(initialExternalItems);
@@ -556,241 +643,83 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                     Zadaszenia Aluxe (konfigurowane)
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {[
-                                        { id: 'orangestyle', name: 'Orangestyle', desc: 'Klasyczny design, do 1.5 kN/m²', features: ['Softline Design', 'Rynna zintegrowana'] },
-                                        { id: 'trendstyle', name: 'Trendstyle', desc: 'Nowoczesny, do 2.0 kN/m²', features: ['Płaskie profile', 'Wzmocniona konstrukcja'] },
-                                        { id: 'trendstyle_plus', name: 'Trendstyle+', desc: 'Premium, do 2.5 kN/m²', features: ['Extra wzmocnienia', 'Duże rozpiętości'] },
-                                        { id: 'topstyle', name: 'Topstyle', desc: 'Premium, do 2.5 kN/m²', features: ['Ukryty odpływ', 'Nowoczesny design'] },
-                                        { id: 'topstyle_xl', name: 'Topstyle XL', desc: 'Premium XL, szerokości 6-7m', features: ['Większe rozpiętości', 'Ukryty odpływ'] },
-                                        { id: 'skystyle', name: 'Skystyle', desc: 'Tylko szkło VSG, 4-7m szerokości', features: ['Tylko szkło VSG', 'Przyścienny / wolnostojący'] },
-                                        { id: 'ultrastyle', name: 'Ultrastyle', desc: 'Minimalistyczny design', features: ['Ultra cienkie profile', 'Modern look'] },
-                                        { id: 'carport', name: 'Carport', desc: 'Zadaszenie samochodowe', features: ['Wiata garażowa', 'Do 2 samochodów'] }
-                                    ].map(model => (
-                                        <div
-                                            key={model.id}
-                                            onClick={() => {
-                                                handleBasicConfigChange('modelId', model.id);
-                                                if (model.id === 'skystyle') {
-                                                    handleBasicConfigChange('roofType', 'glass');
-                                                    handleBasicConfigChange('glassType', 'standard');
-                                                }
-                                            }}
-                                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${config.modelId === model.id
-                                                ? 'border-accent bg-accent/5 shadow-md'
-                                                : 'border-slate-100 hover:border-accent/30'
-                                                }`}
-                                        >
-                                            <h3 className="text-lg font-bold mb-1 text-slate-900 flex justify-between items-center gap-2">
-                                                <span>{model.name}</span>
-                                                <span className="text-[10px] text-slate-400 font-normal bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 font-mono" title={`Kod systemowy: ${model.id}`}>
-                                                    {model.id}
-                                                </span>
-                                            </h3>
-                                            <p className="text-xs text-slate-500 mb-3">{model.desc}</p>
-                                            <ul className="text-[10px] text-slate-600 space-y-0.5">
-                                                {model.features.map((f, i) => <li key={i}>• {f}</li>)}
-                                            </ul>
+                                    {products.length > 0 ? (
+                                        products.map(product => (
+                                            <div
+                                                key={product.id}
+                                                onClick={() => {
+                                                    handleBasicConfigChange('modelId', product.code);
+                                                    if (product.code === 'skystyle') {
+                                                        handleBasicConfigChange('roofType', 'glass');
+                                                        handleBasicConfigChange('glassType', 'standard');
+                                                    }
+                                                }}
+                                                className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${config.modelId === product.code
+                                                    ? 'border-accent bg-accent/5 shadow-md'
+                                                    : 'border-slate-100 hover:border-accent/30'
+                                                    }`}
+                                            >
+                                                <h3 className="text-lg font-bold mb-1 text-slate-900 flex justify-between items-center gap-2">
+                                                    <span>{product.name}</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 font-mono" title={`Kod systemowy: ${product.code}`}>
+                                                        {product.code}
+                                                    </span>
+                                                </h3>
+                                                <p className="text-xs text-slate-500 mb-3">{product.description || 'System aluminiowy'}</p>
+                                                <ul className="text-[10px] text-slate-600 space-y-0.5">
+                                                    {/* Placeholder features - can be added to DB later */}
+                                                    <li>• Konfigurowalny</li>
+                                                </ul>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="col-span-full p-8 text-center text-slate-400">
+                                            Ładowanie produktów...
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
 
                             {/* Deponti - Zadaszenia Gotowe */}
-                            <div className="border-t border-slate-200 pt-6">
-                                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-                                    Zadaszenia Gotowe (Deponti) — wkrótce cenniki
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {[
-                                        { id: 'nebbiolo', name: 'Nebbiolo' },
-                                        { id: 'bosco', name: 'Bosco' },
-                                        { id: 'ribolla', name: 'Ribolla' },
-                                        { id: 'pigato', name: 'Pigato' },
-                                        { id: 'pigato_plus', name: 'Pigato Plus' },
-                                        { id: 'giallo', name: 'Giallo' },
-                                        { id: 'giallo_plus', name: 'Giallo Plus' },
-                                        { id: 'trebbiano', name: 'Trebbiano' },
-                                        { id: 'verdeca', name: 'Verdeca' },
-                                        { id: 'pinela', name: 'Pinela' },
-                                        { id: 'pinela_deluxe', name: 'Pinela Deluxe' },
-                                        { id: 'pinela_glass', name: 'Pinela Glass' },
-                                        { id: 'pinela_deluxe_plus', name: 'Pinela Deluxe+' }
-                                    ].map(product => (
-                                        <div
-                                            key={product.id}
-                                            onClick={() => {
-                                                handleBasicConfigChange('modelId', product.id);
-                                            }}
-                                            className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all ${config.modelId === product.id
-                                                ? 'border-purple-500 bg-purple-50 shadow-sm'
-                                                : 'border-slate-100 hover:border-purple-300 bg-slate-50'
-                                                }`}
-                                        >
-                                            <div className="flex flex-col items-center">
-                                                <span className="font-bold text-sm text-slate-800">{product.name}</span>
-                                                <span className="text-[10px] text-slate-400 font-mono scale-90 opacity-70">[{product.id}]</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-xs text-slate-400 mt-3 italic">
-                                    💡 Wybierz produkt Deponti, a następnie przejdź dalej do konfiguracji wymiarów i dodatków.
-                                </p>
-                            </div>
+
 
                             {/* Selt / Aliplast - External Suppliers */}
-                            <div className="border-t border-slate-200 pt-6 mt-6">
-                                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                                    Zewnętrzni Dostawcy (Selt, Aliplast)
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Selt */}
-                                    <div className="border-2 border-slate-100 rounded-xl p-4 bg-gradient-to-br from-blue-50 to-blue-100/50">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                                                    S
-                                                </div>
-                                                <div>
-                                                    <h5 className="font-bold text-slate-800">Selt</h5>
-                                                    <p className="text-xs text-slate-500">Pergole i zadaszenia</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <a
-                                            href="https://www.sfrpolska.pl/"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block w-full text-center py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors"
-                                        >
-                                            Otwórz Konfigurator Selt ↗
-                                        </a>
-                                        <button
-                                            onClick={() => setShowExternalForm('selt')}
-                                            className="block w-full text-center py-2 mt-2 border-2 border-blue-500 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors"
-                                        >
-                                            ➕ Dodaj produkt Selt
-                                        </button>
-                                    </div>
-
-                                    {/* Aliplast */}
-                                    <div className="border-2 border-slate-100 rounded-xl p-4 bg-gradient-to-br from-green-50 to-green-100/50">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                                                    A
-                                                </div>
-                                                <div>
-                                                    <h5 className="font-bold text-slate-800">Aliplast</h5>
-                                                    <p className="text-xs text-slate-500">Systemy aluminiowe</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <a
-                                            href="https://aliplast.com.pl/"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block w-full text-center py-2 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
-                                        >
-                                            Otwórz Konfigurator Aliplast ↗
-                                        </a>
-                                        <button
-                                            onClick={() => setShowExternalForm('aliplast')}
-                                            className="block w-full text-center py-2 mt-2 border-2 border-green-500 text-green-600 rounded-lg font-bold text-sm hover:bg-green-50 transition-colors"
-                                        >
-                                            ➕ Dodaj produkt Aliplast
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* External Product Form Modal */}
-                                {showExternalForm && (
-                                    <div className="mt-4 p-4 bg-white border-2 border-slate-200 rounded-xl shadow-lg">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h5 className="font-bold text-lg flex items-center gap-2">
-                                                <span className={`w-3 h-3 rounded-full ${showExternalForm === 'selt' ? 'bg-blue-500' : 'bg-green-500'}`}></span>
-                                                Dodaj produkt {showExternalForm === 'selt' ? 'Selt' : 'Aliplast'}
-                                            </h5>
-                                            <button
-                                                onClick={() => setShowExternalForm(null)}
-                                                className="text-slate-400 hover:text-slate-600"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Nazwa produktu *</label>
-                                                <input
-                                                    type="text"
-                                                    value={externalForm.productName}
-                                                    onChange={e => setExternalForm({ ...externalForm, productName: e.target.value })}
-                                                    className="w-full p-2 border border-slate-200 rounded-lg"
-                                                    placeholder="np. Pergola SR3500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Opis / Specyfikacja</label>
-                                                <textarea
-                                                    value={externalForm.description}
-                                                    onChange={e => setExternalForm({ ...externalForm, description: e.target.value })}
-                                                    className="w-full p-2 border border-slate-200 rounded-lg"
-                                                    rows={2}
-                                                    placeholder="np. 4000x3000mm, RAL 7016, LED..."
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={handleAddExternalItem}
-                                                className={`w-full py-3 rounded-xl font-bold text-white ${showExternalForm === 'selt'
-                                                    ? 'bg-blue-600 hover:bg-blue-700'
-                                                    : 'bg-green-600 hover:bg-green-700'
-                                                    }`}
-                                            >
-                                                ✓ Dodaj do oferty
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* External Items Basket */}
-                                {externalItems.length > 0 && (
-                                    <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl">
-                                        <h5 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
-                                            🛒 Dodane produkty zewnętrzne ({externalItems.length})
-                                        </h5>
-                                        <div className="space-y-2">
-                                            {externalItems.map(item => (
-                                                <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-2 h-2 rounded-full ${item.supplier === 'selt' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-                                                        <div>
-                                                            <div className="font-bold text-sm">{item.productName}</div>
-                                                            <div className="text-xs text-slate-500">
-                                                                {item.supplier.toUpperCase()} • {item.description || 'Brak opisu'}
-                                                            </div>
+                            {/* External Items Basket */}
+                            {externalItems.length > 0 && (
+                                <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl">
+                                    <h5 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
+                                        🛒 Dodane produkty zewnętrzne ({externalItems.length})
+                                    </h5>
+                                    <div className="space-y-2">
+                                        {externalItems.map(item => (
+                                            <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-2 h-2 rounded-full ${item.supplier === 'selt' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                                                    <div>
+                                                        <div className="font-bold text-sm">{item.productName}</div>
+                                                        <div className="text-xs text-slate-500">
+                                                            {item.supplier.toUpperCase()} • {item.description || 'Brak opisu'}
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="font-bold text-accent">{formatCurrency(item.sellingPrice)}</span>
-                                                        <button
-                                                            onClick={() => handleRemoveExternalItem(item.id)}
-                                                            className="text-red-500 hover:bg-red-50 p-1 rounded"
-                                                        >
-                                                            🗑️
-                                                        </button>
-                                                    </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
-                                            <span className="text-sm text-slate-600">Suma produktów zewnętrznych:</span>
-                                            <span className="font-bold text-lg text-accent">{formatCurrency(externalItemsTotal)}</span>
-                                        </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-bold text-accent">{formatCurrency(item.sellingPrice)}</span>
+                                                    <button
+                                                        onClick={() => handleRemoveExternalItem(item.id)}
+                                                        className="text-red-500 hover:bg-red-50 p-1 rounded"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
+                                    <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                                        <span className="text-sm text-slate-600">Suma produktów zewnętrznych:</span>
+                                        <span className="font-bold text-lg text-accent">{formatCurrency(externalItemsTotal)}</span>
+                                    </div>
+                                </div>
+                            )}
                         </section>
                     )}
 
@@ -1024,47 +953,146 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         </div>
                                     )}
 
-                                    {/* Sub-options */}
+                                    {/* Sub-options for Polycarbonate */}
                                     {config.modelId !== 'skystyle' && config.roofType === 'polycarbonate' && (
-                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={config.polycarbonateType === 'ir-gold'}
-                                                    onChange={(e) => handleBasicConfigChange('polycarbonateType', e.target.checked ? 'ir-gold' : 'standard')}
-                                                    className="w-5 h-5 text-accent rounded focus:ring-accent"
-                                                />
-                                                <div>
-                                                    <div className="font-medium text-slate-900">IR Gold (Odbijający ciepło)</div>
-                                                    <div className="text-xs text-slate-500">Redukuje nagrzewanie się tarasu</div>
-                                                </div>
-                                            </label>
+                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
+                                            <div className="text-sm font-medium text-slate-700 mb-3">Warianty Poliwęglanu</div>
+                                            <div className="space-y-2">
+                                                {/* Standard Options (Implicit) */}
+                                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                    <input
+                                                        type="radio"
+                                                        name="polyType"
+                                                        checked={config.polycarbonateType === 'standard'}
+                                                        onChange={() => handleBasicConfigChange('polycarbonateType', 'standard')}
+                                                        className="w-4 h-4 text-accent focus:ring-accent"
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">Standard (Klar/Opal)</div>
+                                                        <div className="text-xs text-slate-500">Bez dopłaty</div>
+                                                    </div>
+                                                </label>
+
+                                                {/* Dynamic Surcharges for Poly */}
+                                                {availableSurcharges
+                                                    .filter(s => s.name.toLowerCase().includes('ir') || s.name.toLowerCase().includes('heat') || s.name.toLowerCase().includes('gold') || s.name.toLowerCase().includes('clear'))
+                                                    .map(surcharge => {
+                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
+                                                        // If selected, we assume this is the "active" poly type variant, unless we want multiple? usually one poly type.
+                                                        // Let's treat these as Mutually Exclusive variants for Poly.
+                                                        return (
+                                                            <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="polyType"
+                                                                    checked={isSelected || false}
+                                                                    onChange={() => {
+                                                                        // Logic: Select this surcharge, deselect other poly surcharges (Mutual Exclusion)
+                                                                        const polySurcharges = availableSurcharges.filter(s => s.name.toLowerCase().match(/ir|heat|gold|clear|mat/)).map(s => s.id);
+                                                                        const current = config.selectedSurcharges || [];
+                                                                        const othersRemoved = current.filter(id => !polySurcharges.includes(id));
+                                                                        handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
+                                                                        handleBasicConfigChange('polycarbonateType', 'custom');
+                                                                    }}
+                                                                    className="w-4 h-4 text-accent focus:ring-accent"
+                                                                />
+                                                                <div>
+                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name}</div>
+                                                                    <div className="text-xs text-slate-500">Opcja dodatkowa</div>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                            </div>
                                         </div>
                                     )}
 
+                                    {/* Sub-options for Glass */}
                                     {config.roofType === 'glass' && (
-                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4 space-y-3">
                                             <div className="text-sm font-medium text-slate-700">Wariant szkła</div>
                                             <div className="space-y-2">
-                                                {[
-                                                    { id: 'standard', label: 'Klar (Przeźroczyste)', desc: 'Standard 44.2' },
-                                                    { id: 'mat', label: 'Mat (Mleczne)', desc: 'Dopłata wg cennika' },
-                                                    { id: 'sunscreen', label: 'Sunscreen (Przeciwsłoneczne)', desc: 'Dopłata wg cennika' }
-                                                ].map(opt => (
-                                                    <label key={opt.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
-                                                        <input
-                                                            type="radio"
-                                                            name="glassType"
-                                                            checked={config.glassType === opt.id}
-                                                            onChange={() => handleBasicConfigChange('glassType', opt.id)}
-                                                            className="w-4 h-4 text-accent focus:ring-accent"
-                                                        />
-                                                        <div>
-                                                            <div className="font-medium text-sm text-slate-900">{opt.label}</div>
-                                                            <div className="text-xs text-slate-500">{opt.desc}</div>
-                                                        </div>
-                                                    </label>
-                                                ))}
+                                                {/* Standard */}
+                                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                    <input
+                                                        type="radio"
+                                                        name="glassType"
+                                                        checked={config.glassType === 'standard' && (!config.selectedSurcharges || config.selectedSurcharges.filter(id => availableSurcharges.find(s => s.id === id)?.name.match(/mat|sun|milch/i)).length === 0)}
+                                                        onChange={() => {
+                                                            handleBasicConfigChange('glassType', 'standard');
+                                                            // Uncheck Glass Surcharges
+                                                            const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|sun|milch/i)).map(s => s.id);
+                                                            const current = config.selectedSurcharges || [];
+                                                            handleBasicConfigChange('selectedSurcharges', current.filter(id => !glassSurcharges.includes(id)));
+                                                        }}
+                                                        className="w-4 h-4 text-accent focus:ring-accent"
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">Standard (Przeźroczyste 44.2)</div>
+                                                        <div className="text-xs text-slate-500">Bez dopłaty</div>
+                                                    </div>
+                                                </label>
+
+                                                {/* Dynamic Surcharges for Glass (Matt, Sun Protection) */}
+                                                {availableSurcharges
+                                                    .filter(s => s.name.match(/mat|sun|milch|protec/i))
+                                                    .map(surcharge => {
+                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
+                                                        return (
+                                                            <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                                <input
+                                                                    type="radio" // Treat as Radio for Glass Types? usually mutually exclusive (Matt OR Sun Protection)
+                                                                    name="glassType"
+                                                                    checked={isSelected || false}
+                                                                    onChange={() => {
+                                                                        // Select this surcharge, deselect other glass surcharges
+                                                                        const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|sun|milch|protec/i)).map(s => s.id);
+                                                                        const current = config.selectedSurcharges || [];
+                                                                        const othersRemoved = current.filter(id => !glassSurcharges.includes(id));
+                                                                        handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
+                                                                        if (surcharge.name.match(/mat|milch/i)) handleBasicConfigChange('glassType', 'mat');
+                                                                        else handleBasicConfigChange('glassType', 'sunscreen');
+                                                                    }}
+                                                                    className="w-4 h-4 text-accent focus:ring-accent"
+                                                                />
+                                                                <div>
+                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name}</div>
+                                                                    <div className="text-xs text-slate-500">Dopłata specjalna</div>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Other/Generic Surcharges (Foundation, Special Color etc) */}
+                                    {availableSurcharges.some(s => !s.name.match(/ir|heat|gold|clear|mat|sun|milch|protec/i)) && (
+                                        <div className="mt-6 border-t border-slate-100 pt-4">
+                                            <h5 className="font-semibold text-slate-800 mb-3">Inne Opcje</h5>
+                                            <div className="space-y-3">
+                                                {availableSurcharges
+                                                    .filter(s => !s.name.match(/ir|heat|gold|clear|mat|sun|milch|protec/i))
+                                                    .map(surcharge => {
+                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
+                                                        return (
+                                                            <label key={surcharge.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-accent bg-accent/5' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected || false}
+                                                                    onChange={(e) => {
+                                                                        const current = config.selectedSurcharges || [];
+                                                                        let updated = [];
+                                                                        if (e.target.checked) updated = [...current, surcharge.id];
+                                                                        else updated = current.filter(id => id !== surcharge.id);
+                                                                        handleBasicConfigChange('selectedSurcharges', updated);
+                                                                    }}
+                                                                    className="w-5 h-5 text-accent rounded focus:ring-accent"
+                                                                />
+                                                                <div className="font-bold text-sm text-slate-900">{surcharge.name}</div>
+                                                            </label>
+                                                        );
+                                                    })}
                                             </div>
                                         </div>
                                     )}
@@ -1113,7 +1141,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             <div className="flex border-b border-slate-200">
                                 {[
                                     { id: 'enclosure', label: 'Zabudowa (Ściany)', icon: '🏗️' },
-                                    { id: 'comfort', label: 'Komfort (Markizy, LED)', icon: '☀️' },
+                                    { id: 'comfort', label: 'Komfort (Markizy, LED, Ogrzewanie)', icon: '☀️' },
                                     { id: 'floor', label: 'Podłoga', icon: '🪵' },
                                     { id: 'extras', label: 'Pozostałe Dodatki', icon: '✨' }
                                 ].map(tab => (
@@ -1175,8 +1203,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    al22List={componentLists.find(l => l.table.attributes?.system === 'AL22')?.entries || []}
-                                                    al23List={componentLists.find(l => l.table.attributes?.system === 'AL23')?.entries || []}
+                                                    al22List={componentLists.find(l => l.table.attributes?.system === 'AL22' || l.table.attributes?.system === 'panorama')?.entries || []}
+                                                    al23List={componentLists.find(l => l.table.attributes?.system === 'AL23' || l.table.attributes?.system === 'panorama')?.entries || []}
                                                 />
                                             )}
                                             {activeWallTab === 'walls' && (
@@ -1212,7 +1240,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-100 pb-2">
                                             {[
                                                 { id: 'awning', label: 'Markizy (Ochrona przed słońcem)' },
-                                                { id: 'lighting', label: 'Oświetlenie LED' },
+                                                { id: 'lighting', label: 'Oświetlenie i Ogrzewanie' },
                                             ].map(subTab => (
                                                 <button
                                                     key={subTab.id}
@@ -1235,6 +1263,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
+                                                    snowZone={config.snowZone}
                                                 />
                                             )}
                                             {activeWallTab === 'lighting' && (
@@ -1242,7 +1271,11 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    availableItems={componentLists.find(l => l.table.attributes?.system === 'lighting')?.entries || []}
+                                                    availableItems={
+                                                        componentLists.find(l => l.table.attributes?.system === 'lighting')?.entries ||
+                                                        componentLists.find(l => l.table.attributes?.system === 'accessories')?.entries || // Fallback for mixed lists
+                                                        []
+                                                    }
                                                 />
                                             )}
                                         </div>
@@ -1281,7 +1314,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                         .filter(list => {
                                                             const system = list.table.attributes?.system;
                                                             // Exclude special systems handled elsewhere
-                                                            if (['lighting', 'wpc_floor', 'AL22', 'AL23', 'alu_walls', 'keilfenster'].includes(system)) return false;
+                                                            if (['lighting', 'wpc_floor', 'AL22', 'AL23', 'alu_walls', 'keilfenster', 'schiebetür', 'schiebetuer'].includes(system)) return false;
 
                                                             // Compatibility Logic for Standard Accessories
                                                             const productCode = list.table.product?.code;
@@ -1589,6 +1622,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 };

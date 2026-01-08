@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 interface ClipboardImportModalProps {
     onClose: () => void;
     onSave: (data: any[], attributes?: any) => void;
+    products: any[];
 }
 
 type ColumnType = 'ignore' | 'width' | 'projection' | 'dimension_attributes' | 'price' | 'structure_price' | 'glass_price' | 'surcharge' | 'notes' | 'fields' | 'posts' | 'area' | 'name' | 'unit';
@@ -13,7 +14,7 @@ interface ColumnConfig {
     surchargeName?: string; // Only if type === 'surcharge'
 }
 
-export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onClose, onSave }) => {
+export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onClose, onSave, products }) => {
     const [step, setStep] = useState<1 | 2>(1);
     const [rawText, setRawText] = useState('');
     const [parsedRows, setParsedRows] = useState<string[][]>([]);
@@ -23,6 +24,8 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
     const [manufacturer, setManufacturer] = useState<'Aluxe' | 'Deponti' | 'Inny'>('Aluxe');
     const [productHint, setProductHint] = useState<string>('');
     const [tableType, setTableType] = useState<'standard' | 'component_list'>('standard');
+    const [selectedProductId, setSelectedProductId] = useState<string>('');
+    const [lastFailureReason, setLastFailureReason] = useState<string | null>(null);
 
     // Templates definition
     const applyTemplate = (type: 'glass' | 'poly' | 'carport' | 'carport_tin') => {
@@ -350,61 +353,175 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         }
     };
 
-    const parseText = () => {
+    const [parseMode, setParseMode] = useState<'auto' | 'excel' | 'text' | 'matrix'>('auto'); // Added 'matrix'
+    const [reverseOrder, setReverseOrder] = useState<boolean>(false); // Added reverse toggl
+
+    const reset = () => {
+        setStep(1);
+        setRawText('');
+        setParsedRows([]);
+        setColumnConfigs([]);
+        setLastFailureReason(null);
+        setParseMode('auto');
+        setReverseOrder(false);
+    };
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setRawText(e.target.value);
+    };
+
+    // ... (helper functions omitted for brevity if not changed) ...
+
+    const parseText = (append: boolean = false) => {
         if (!rawText.trim()) return;
 
         let rows: string[][] = [];
-        const dimensionPattern = /^(\d{3,5})x(\d{3,5})([*+]*)$/i; // Updated to capture suffix group 3
+        let headerRow: string[] = []; // Hoisted for shared usage
+        const dimensionPattern = /^(\d{3,5})x(\d{3,5})([*+]*)$/i;
 
-        // Strategy: Tokenize everything and reconstruct rows based on Dimension anchors
-        // This handles weird line breaks, "sequence" inputs, and noise like "€" better than line-based logic.
+        // DETECT PARSING STRATEGY
+        // 1. Explicit Excel Mode -> Strict Tab Split
+        // 2. Auto + Tabs Detected -> Strict Tab Split
+        // 3. Text/PDF Mode -> Token/Dimension Strategy
 
-        // 1. Tokenize: Split by any whitespace/newline, filter noise
-        const tokens = rawText.split(/[\s\n\t]+/)
-            .map(t => t.trim())
-            .filter(t => t !== '' && t !== '€' && t !== 'EUR' && t !== 'zł' && t !== 'PLN' && t !== '+');
+        const hasTabs = rawText.includes('\t');
+        // SMART LAYOUT DETECTION
+        // Heuristics to determine: Reverse, Matrix, Transposed
 
-        // 2. Scan tokens
-        let currentRow: string[] = [];
+        let workingText = rawText;
+        let detectedReverse = false;
+        let detectedLayout: 'matrix' | 'stream' | 'excel' = 'stream'; // Default to stream
+        let detectedTranspose = false;
 
-        tokens.forEach(token => {
-            // Check if token is a Dimension Anchor (Start of new row)
-            const match = token.match(dimensionPattern);
-            if (match) {
-                // If we have a current row built up, push it
-                if (currentRow.length > 0) {
-                    rows.push(currentRow);
-                }
-                // Start new row with THREE tokens: Width, Projection, Suffix
-                // match[1] = Width, match[2] = Projection, match[3] = Suffix (may be empty)
-                currentRow = [match[1], match[2], match[3] || ''];
-            } else {
-                // Append to current row if it exists (skip leading noise before first row)
-                if (currentRow.length > 0) {
-                    currentRow.push(token);
+        // 1. Check for Reverse Order (Last line is Header-like, First line is Data-like)
+        const rawLines = workingText.split('\n').filter(l => l.trim());
+        if (rawLines.length > 3) {
+            const firstLineTokens = rawLines[0].split(/[\t\s]+/).filter(t => /^\d+$/.test(t.replace(/[.,]/g, '')));
+            const lastLineTokens = rawLines[rawLines.length - 1].split(/[\t\s]+/).filter(t => /^\d+$/.test(t.replace(/[.,]/g, '')));
+
+            // Header usually has many numbers (Projections/Widths). Data line has 1 (Side Header) + Prices.
+            // If Last Line has > 2 numbers (Header) AND First Line has fewer, assume Reverse.
+            if (lastLineTokens.length > 2 && firstLineTokens.length < lastLineTokens.length) {
+                detectedReverse = true;
+                if (!reverseOrder && parseMode === 'auto') { // Only auto-reverse if not manually overridden
+                    workingText = rawLines.reverse().join('\n');
+                    toast('Wykryto odwróconą kolejność - automatycznie naprawiono.', { icon: '🔃' });
                 }
             }
-        });
-
-        // Push the last row
-        if (currentRow.length > 0) {
-            rows.push(currentRow);
+        }
+        if (reverseOrder) { // Manual override takes precedence
+            const lines = rawText.split('\n'); // Use original rawText for manual reverse
+            workingText = lines.reverse().join('\n');
         }
 
-        // Fallback to line splitting if token strategy fails (e.g. no 4000x3000 pattern found)
-        // OR if the user pasted headers which don't have dimensions, we might want to capture headers first!
+        const lines = workingText.split(/\n+/).filter(l => l.trim().length > 0);
 
-        // BETTER STRATEGY:
-        // Identify if the first line looks like a header (text words, no numbers).
-        const lines = rawText.split(/\n+/).filter(l => l.trim());
-        let headerRow: string[] = [];
+        // 2. Check for Matrix Pattern
+        // Line 0: Header (Many numbers)
+        // Line 1..N: Start with Number (Side Header) + Prices
+        if (lines.length > 1) {
+            const headerTokens = lines[0].split(/[\t\s]+/).filter(t => /^\d+$/.test(t.replace(/[.,]/g, '')));
+            const nextLineTokens = lines[1].split(/[\t\s]+/).filter(t => /^\d+$/.test(t.replace(/[.,]/g, '')));
 
-        // Check first line for keywords
-        if (lines.length > 0) {
-            const firstLine = lines[0];
-            // Simple check: does it contain "Preis", "Breite", "Tiefe", "Felder"?
+            // Matrix if Header has > 2 nums.
+            if (headerTokens.length > 2) {
+                detectedLayout = 'matrix';
+            }
+        }
+
+        // 3. Check for Transpose (Widths Vertical?)
+        // If "Header" values are SMALL (Projections < 3000) and "Side" values are LARGE (Widths > 3000)
+        // Then we are Transposed.
+        if (detectedLayout === 'matrix') {
+            const headerTokens = lines[0].split(/[\t\s]+/).filter(t => /^\d+$/.test(t.replace(/[.,]/g, '')));
+            const sideToken = lines[1].split(/[\t\s]+/)[0].replace(/[.,]/g, ''); // 2nd line first element
+
+            const headerAvg = headerTokens.reduce((s, n) => s + parseFloat(n), 0) / headerTokens.length;
+            const sideVal = parseFloat(sideToken);
+
+            // Heuristic: Widths are usually > 2500. Projections < 5000 (overlap).
+            // But if Header Avg < 3000 (Projections) and Side > 3000 (Width) -> Transposed.
+            if (headerAvg < 3000 && sideVal > 3000) {
+                detectedTranspose = true;
+                toast('Wykryto transpozycję (Szerokości w pionie).', { icon: '📐' });
+            }
+        }
+
+        // FORCE MODES based on detection if AUTO
+        const actualMode = parseMode === 'auto' ? (detectedLayout === 'matrix' ? 'matrix' : (hasTabs ? 'excel' : 'stream')) : parseMode;
+
+        if (actualMode === 'matrix') {
+            // MATRIX PARSING LOGIC
+            let headerLineIdx = 0;
+            let headerValues: number[] = [];
+
+            // Find first line that looks like a header (numbers)
+            for (let i = 0; i < Math.min(lines.length, 5); i++) {
+                const tokens = lines[i].split(/[\t\s]+/).filter(t => /^\d+$/.test(t.replace(/[.,]/g, '')));
+                const nums = tokens.map(t => parseFloat(t.replace(/[.,]/g, '')));
+                if (nums.length > 1) { // Relaxed: > 1 number is enough
+                    headerValues = nums;
+                    headerLineIdx = i;
+                    break;
+                }
+            }
+
+            if (headerValues.length === 0) {
+                // If explicit matrix mode, warn. If auto, allow fallback.
+                if (parseMode === 'matrix') {
+                    toast.error('Nie znaleziono wiersza nagłówkowego.');
+                    return;
+                }
+            } else {
+                const matrixRows: string[][] = [];
+                for (let i = headerLineIdx + 1; i < lines.length; i++) {
+                    const line = lines[i];
+                    const tokens = line.split(/[\t\s]+/).filter(t => t.trim() !== '' && !['€', 'PLN'].includes(t));
+
+                    if (tokens.length === 0) continue;
+
+                    const sideHeaderStr = tokens[0];
+                    const cleanSide = parseFloat(sideHeaderStr.replace(/[.,]/g, ''));
+
+                    if (isNaN(cleanSide)) continue;
+
+                    const prices = tokens.slice(1);
+
+                    prices.forEach((priceStr, colIdx) => {
+                        if (colIdx < headerValues.length) {
+                            let width: number, proj: number;
+                            if (detectedTranspose) {
+                                width = cleanSide;
+                                proj = headerValues[colIdx];
+                            } else {
+                                width = headerValues[colIdx];
+                                proj = cleanSide;
+                            }
+                            matrixRows.push([width.toString(), proj.toString(), '', priceStr]);
+                        }
+                    });
+                }
+                if (matrixRows.length > 0) {
+                    rows = matrixRows;
+                    toast.success(`Macierz przetworzona: ${headerValues.length} x ${lines.length - headerLineIdx - 1}`);
+                }
+            }
+        }
+
+        // Fallback or Excel Mode
+        // Fallback or Excel Mode
+        if (rows.length === 0 && actualMode === 'excel') {
+            const lines = workingText.split(/\n+/).filter(l => l.trim().length > 0);
+            rows = lines.map(line => line.split('\t').map(c => c.trim()));
+            if (lines.length > 0) headerRow = lines[0].split('\t').map(c => c.trim());
+            toast.success(`Użyto trybu Excel/Tab (Zachowano puste kolumny).`);
+        } else if (rows.length === 0) {
+            // Stream / Fallback
+            const lines = workingText.split(/\n+/).filter(l => l.trim().length > 0);
+            const firstLine = lines[0] || '';
             const keywords = ['preis', 'price', 'breite', 'tiefe', 'ausfall', 'felder', 'pfosten', 'm2', 'oberfläche', 'surcharge', 'width', 'projection', 'fields', 'posts', 'area', 'structure', 'glass', 'netto', 'brutto', 'aufpreis', 'extra'];
-            if (keywords.some(k => firstLine.toLowerCase().includes(k)) && !firstLine.match(/^[\d.,\s]+$/)) { // Ensure it's not just numbers
+
+            if (keywords.some(k => firstLine.toLowerCase().includes(k)) && !firstLine.match(/^[\d.,\s]+$/)) {
                 // It's likely a header. Parse it with tab/space logic
                 const hasTabs = firstLine.includes('\t');
                 const delimiter = hasTabs ? '\t' : / {2,}|;/;
@@ -455,11 +572,10 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             // Let's stick to Body Parsing for rows, but use Header for Config Detection (Index matching).
         }
 
-        // NEW: "Block Stream" Strategy (Best for interleaved tables with fragmented rows)
-        // 1. Identify all Dimension Tokens and their indices in the raw tokens list
-        // 2. Group them into "Blocks" (sequences of dimensions)
-        // 3. For each Block, capture the "Data Tokens" following it until the next Block
-        // 4. Distribute Data Tokens evenly among the Dimensions in the Block
+        // NEW: "Unified Queue" Strategy (Handles Interleaved & Columnar Streams)
+        // 1. Queue all Dimensions FIRST.
+        // 2. Distribute Prices to the Queue (FIFO).
+        // 3. Distribute Triplets (Data) to the Queue (FIFO or Batch).
 
         const dimRegex = new RegExp(dimensionPattern);
         // Robust tokenizer: preserve "3000x2000" but also "1.200,00"
@@ -470,315 +586,240 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
             .map(t => t.trim())
             .filter(t => t !== '' && validTokenRegex.test(t) && !['€', 'EUR', 'zł', 'PLN'].includes(t));
 
-        // Identify indices of dimensions
-        const dimIndices: number[] = [];
-        allTokens.forEach((t, i) => {
-            if (dimRegex.test(t)) dimIndices.push(i);
-        });
+        // State Queues
+        interface PendingRow {
+            width: string;
+            projection: string;
+            suffix: string;
+            prices: string[];
+            data: string[];
+        }
+        const pendingRows: PendingRow[] = [];
 
-        if (dimIndices.length > 0) {
-            const refinedRows: string[][] = [];
+        // Cursor for assigning data
+        let priceCursor = 0;
+        let dataCursor = 0;
 
-            // 1. Split Dims into Blocks based on Projection Reset
-            // e.g. 3000x2000...3000x5000 followed by 4000x2000. 5000->2000 is a reset.
-            // Or just contiguous check? The user paste had 5000,6000,7000 contiguous.
-            // We need to queue ALL dimensions first.
+        // Helper to qualify tokens
+        const isDim = (t: string) => dimRegex.test(t);
+        const isPrice = (t: string) => {
+            // Heuristic: Has comma/dot AND usually > 50 (to avoid small ints like '4')
+            // OR explicitly currency-like (handled by filter, but check values)
+            const val = parseFloat(t.replace(/\./g, '').replace(',', '.'));
+            if (val > 50) return true;
+            // If contains comma, it's likely a price (e.g. 7,5 is small but decimal)
+            if (t.includes(',')) return true;
+            return false;
+        };
+        const isSurcharge = (t: string) => {
+            // Stars or Plus
+            return t.includes('*') || t.includes('+');
+        };
 
-            // 2. Identify Data Tokens (everything NOT in dimIndices)
-            // Actually, the structure is Dims... then Data...
-            // Let's deduce where Data starts. 
-            // Ideally: Dims are at the start.
-            // But if interleaved, we need a stream.
+        // 1. PASS 1: Identify Dims & Separate Stream
+        const stream: string[] = [];
 
-            // Let's consume tokens.
-            // If token is Dim -> Queue it as "Awaiting Data".
-            // If token is Data -> Accumulate.
-            // How do we know when a Row ends? Triplet Heuristic!
+        for (const token of allTokens) {
+            const match = token.match(dimensionPattern);
+            if (match) {
+                pendingRows.push({
+                    width: match[1],
+                    projection: match[2],
+                    suffix: match[3] || '',
+                    prices: [],
+                    data: []
+                });
+            } else {
+                stream.push(token);
+            }
+        }
 
-            const dimQueue: string[] = [];
-            let currentDataBuffer: string[] = [];
+        // 2. PASS 2: Consume Stream (Prices & Data)
+        // We assume stream order matches row order (FIFO)
+        // Data pattern: [Price1, Price2..., Data1, Data2...] OR [Price1, Data1, Price2, Data2]
 
-            for (let i = 0; i < allTokens.length; i++) {
-                const token = allTokens[i];
-                const isDim = dimRegex.test(token);
+        // We need to identify "Blocks" in the stream.
+        // Price is a block. Data (Triplet) is a block.
+        // Triplet: 3 numbers [Fields, Posts, Area]. 
+        // - Fields (3-30), Posts (2-10), Area (Float)
+        // - "4 2 6" -> 4, 2, 6.
 
-                if (isDim) {
-                    dimQueue.push(token);
-                } else {
-                    currentDataBuffer.push(token);
+        let i = 0;
+        while (i < stream.length) {
+            const t = stream[i];
 
-                    // Check for End-of-Row Pattern in the last 3 tokens
-                    // Pattern: [Fields (3-15)], [Posts (2-5)], [Area (Num)]
-                    if (currentDataBuffer.length >= 3) {
-                        const tArea = currentDataBuffer[currentDataBuffer.length - 1];
-                        const tPosts = currentDataBuffer[currentDataBuffer.length - 2];
-                        const tFields = currentDataBuffer[currentDataBuffer.length - 3];
+            // Check for Triplet (3 tokens)
+            let foundTriplet = false;
+            if (i + 2 < stream.length) {
+                const t1 = stream[i];
+                const t2 = stream[i + 1];
+                const t3 = stream[i + 2];
 
-                        const isNum = (s: string) => /^[0-9,.]+$/.test(s);
-                        const parseLoc = (s: string) => parseFloat(s.replace(/\./g, '').replace(',', '.'));
+                const v1 = parseFloat(t1.replace(',', '.'));
+                const v2 = parseFloat(t2.replace(',', '.'));
+                const v3 = parseFloat(t3.replace(',', '.'));
 
-                        if (isNum(tArea) && isNum(tPosts) && isNum(tFields)) {
-                            const vFields = parseLoc(tFields);
-                            const vPosts = parseLoc(tPosts);
-                            const vArea = parseLoc(tArea);
+                // Fields: 2-50 (int), Posts: 2-20 (int), Area: >0 (float)
+                // Posts usually smaller than Fields? No, usually 2 posts vs 4 fields.
+                // Area depends on size.
 
-                            // Heuristic checks
-                            const isInt = (n: number) => Math.abs(n - Math.round(n)) < 0.01;
-                            const validFields = vFields >= 3 && vFields <= 30 && isInt(vFields); // User says "od 3"
-                            const validPosts = vPosts >= 2 && vPosts <= 10 && isInt(vPosts); // "od 2"
-                            const validArea = vArea >= 5.0; // User says "od 6", let's use 5.0 to be safe but stricter than 0.1
+                const isInt = (n: number) => Math.abs(n - Math.round(n)) < 0.01;
 
-                            if (validFields && validPosts && validArea) {
-                                // Found a row end!
+                // Loose constraints to catch "4 2 6"
+                if (v1 <= 50 && isInt(v1) && v2 <= 20 && isInt(v2) && v3 > 0) {
+                    // Found Triplet!
+                    // Assign to CURRENT DataCursor
+                    if (dataCursor < pendingRows.length) {
+                        // SPECIAL RULE: "4 2 6" applies to which row?
+                        // If we have 5 pending rows and 1 triplet, maybe it applies to ALL?
+                        // Or just the one at dataCursor?
+                        // User example: 1 triplet at the very end of a block of 5 dims.
+                        // BUT user example "4 2 6" was relatively small area (6m2).
+                        // The last dim was 3000x5000 (15m2). 
+                        // So "4 2 6" likely matches 3000x2000 (6m2).
+                        // Conclusion: This triplet belongs to the "matching" row, usually the first in the block?
+                        // Let's stick to FIFO. If "4 2 6" is found, assign to dataCursor.
 
-                                // SELECTIVE CONSUMPTION STRATEGY
-                                // The buffer might contain: [S1, G1, S2, G2, ... T1, Su1, Triplet1]
-                                // We need to find S1, G1 that sum to T1.
+                        const targetRow = pendingRows[dataCursor];
+                        targetRow.data = [t1, t2, t3];
 
-                                // 1. Identify Candidate 'Total' (T1). Usually immediately before Triplet.
-                                // Or maybe separated by Surcharges.
-                                // Let's scan backwards from Triplet for a number that could be Total.
+                        // If this triplet repeats (User says "to dodałeś... coś jest nie tak", implying bad distribution)
+                        // Maybe we should replicate strict stream behavior.
+                        // If FIFO: we assign to Row 0. Row 1..4 get nothing.
+                        // This is safer than random guessing.
 
-                                const bufferVals = currentDataBuffer.map(t => ({ token: t, val: parseLoc(t) }));
-                                const tripletStartIdx = currentDataBuffer.length - 3; // Index of tFields
-
-                                let totalIdx = -1;
-                                let structIdx = -1;
-                                let glassIdx = -1;
-
-                                // Look for Total in the 5 tokens before Triplet (Total, Surch1, Surch2...)
-                                const scanStart = Math.max(0, tripletStartIdx - 5);
-
-                                // We match Total against ANY pair in the buffer (A + B = Total)
-                                // Preferring A and B that are at the START of the buffer?
-                                // Yes, S1 G1 should be early.
-
-                                for (let t = tripletStartIdx - 1; t >= scanStart; t--) {
-                                    const candTotal = bufferVals[t].val;
-                                    if (candTotal < 100) continue; // Unlikely to be Total
-
-                                    // Find A + B = candTotal
-                                    for (let i = 0; i < t; i++) {
-                                        for (let j = i + 1; j < t; j++) {
-                                            const sum = bufferVals[i].val + bufferVals[j].val;
-                                            if (Math.abs(sum - candTotal) < 1.0) {
-                                                // Found Match!
-                                                totalIdx = t;
-                                                // Determine Struct vs Glass (Struct > Glass usually)
-                                                if (bufferVals[i].val > bufferVals[j].val) {
-                                                    structIdx = i;
-                                                    glassIdx = j;
-                                                } else {
-                                                    structIdx = j;
-                                                    glassIdx = i;
-                                                }
-                                                break;
-                                            }
-                                        }
-                                        if (totalIdx !== -1) break;
-                                    }
-                                    if (totalIdx !== -1) break;
-                                }
-
-                                // If match found, consume SPECIFIC tokens
-                                if (totalIdx !== -1 && structIdx !== -1) {
-                                    const structToken = currentDataBuffer[structIdx];
-                                    const glassToken = currentDataBuffer[glassIdx];
-                                    const totalToken = currentDataBuffer[totalIdx];
-                                    const structVal = parseLoc(structToken);
-
-                                    // Collect Surcharges
-                                    // 1. Post-Total: Always Surcharges
-                                    // 2. Pre-Total (Sandwiched): Check magnitude. 
-                                    //    If small (< 0.4 * Struct), it's likely a Surcharge for THIS row.
-                                    //    If large, it's likely Data for NEXT row (Interleaved).
-
-                                    const surcharges: string[] = [];
-                                    const indicesToConsume = new Set([structIdx, glassIdx, totalIdx]);
-
-                                    // Scan all tokens before Triplet
-                                    for (let k = 0; k < tripletStartIdx; k++) {
-                                        if (k === structIdx || k === glassIdx || k === totalIdx) continue;
-
-                                        if (k > totalIdx) {
-                                            // Post-Total: Definitely Surcharge
-                                            surcharges.push(currentDataBuffer[k]);
-                                            indicesToConsume.add(k);
-                                        } else {
-                                            // Pre-Total (Sandwiched or Leading)
-                                            const val = parseLoc(currentDataBuffer[k]);
-                                            // Heuristic: Surcharge is usually small. Structure Price is big.
-                                            // Threshold: 40% of Structure Price.
-                                            if (val < (structVal * 0.4)) {
-                                                surcharges.push(currentDataBuffer[k]);
-                                                indicesToConsume.add(k);
-                                            }
-                                            // Else: It's a big number (e.g. S2), leave it in buffer.
-                                        }
-                                    }
-
-                                    const rowData = [
-                                        structToken,
-                                        glassToken,
-                                        totalToken,
-                                        ...surcharges,
-                                        ...currentDataBuffer.slice(tripletStartIdx) // Triplet
-                                    ];
-
-                                    // ASSIGN ROW
-                                    const nextDim = dimQueue.shift();
-                                    if (nextDim) {
-                                        const dimMatch = nextDim.match(dimensionPattern);
-                                        if (dimMatch) {
-                                            refinedRows.push([dimMatch[1], dimMatch[2], dimMatch[3] || '', ...rowData]);
-                                        }
-                                    }
-
-                                    // CLEAN BUFFER
-                                    // Keep only indices NOT in indicesToConsume (and NOT Triplet which is implicit consume)
-                                    // We iterate up to tripletStartIdx because Triplet is consumed by definition
-                                    // Wait, if we leave 'Big Numbers' before triplet, we keep them.
-                                    // Triplet indices (tripletStartIdx to end) are consumed.
-
-                                    const newBuffer: string[] = [];
-                                    for (let k = 0; k < tripletStartIdx; k++) {
-                                        if (!indicesToConsume.has(k)) {
-                                            newBuffer.push(currentDataBuffer[k]);
-                                        }
-                                    }
-                                    currentDataBuffer = newBuffer;
-
-                                } else { // Fallback: No Sum match found.
-                                    // Maybe simple row? Consume everything?
-                                    // If we are in "7000" interleaved mode, blindly consuming is BAD.
-                                    // But if we don't consume, we get stuck.
-                                    // Let's assume strict sum match is required for interleaved robustness.
-                                    // If check fails, maybe we wait for more data? (Maybe Total is defined later?)
-                                    // No, Triplet is end of row. Total MUST be present.
-
-                                    // Let's try to match Total with ONE element? (Maybe only Struct provided?)
-                                    // Or maybe just consume all?
-                                    // For safety, if no match, we consume ALL to avoid infinite loop, 
-                                    // but warn/toast?
-                                    // Actually, standard rows should match.
-                                    // If simple row: S, G, T. Match found.
-                                    // If interleaved S1, G1, S2, G2, T1... Match found.
-                                    // If no match, data is weird.
-
-                                    const nextDim = dimQueue.shift();
-                                    if (nextDim) {
-                                        const dimMatch = nextDim.match(dimensionPattern);
-                                        if (dimMatch) {
-                                            refinedRows.push([dimMatch[1], dimMatch[2], dimMatch[3] || '', ...currentDataBuffer]);
-                                        }
-                                    }
-                                    currentDataBuffer = [];
-                                }
-                            }
-                        }
+                        dataCursor++;
+                        i += 3;
+                        foundTriplet = true;
+                        continue;
                     }
                 }
             }
 
-            if (refinedRows.length > 0) {
-                // Smart Column Mapping: Normalize data column order based on A + B = Total relationship
-                // Standard Order required for Templates: [Struct, Glass, Total, Surch1, Surch2...]
+            if (!foundTriplet) {
+                // It's likely a Price or Surcharge
+                if (priceCursor < pendingRows.length) {
+                    const targetRow = pendingRows[priceCursor];
 
-                const structuredRows = refinedRows.map(row => {
-                    const [w, p, suffix, ...data] = row;
+                    // If row already has 2 prices, maybe move to next? 
+                    // Limit to e.g. 5 prices (Struct, Glass, Surcharges...)
+                    // But if we encounter a "break" (like next token is huge jump), maybe next row?
+                    // Let's blindly accumulate prices until we hit a Triplet or run out?
+                    // NO. In "Columnar" paste: P1, P2, P3... correspond to R1, R2, R3...
+                    // One price per row? Or Two?
+                    // user ex: "2.439,47 € 2.709,23 €". Two prices.
+                    // But just 2 dims before.
+                    // So P1 -> D1. P2 -> D2.
+                    // This implies 1 Price per Row in that block.
+                    // What if there are 2 prices per row? (Struct + Glass)?
+                    // Then we'd see P1a P1b P2a P2b.
+                    // User ex has P1 P2. Dims D1 D2.
+                    // Perfect match 1:1.
 
-                    // Identify the Triplet at the end (Fields, Posts, Area)
-                    // We know the last 3 are the triplet because Smart Segmentation put them there.
-                    // But let's be safe.
-                    const triplet = data.slice(-3);
-                    const values = data.slice(0, -3);
+                    // STRATEGY: One "Major Price" per row advances the cursor?
+                    // "2.439,47" is major.
+                    // "441,60" is ...? Surcharge? Or Price for another item?
+                    // "3000x3500*" -> 441,60. (Maybe just Surcharge?)
+                    // "3000x4000**" -> 110,40.
 
-                    // Try to identify Struct/Glass/Total in 'values'
-                    const nums = values.map(v => parseFloat(v.replace(/\./g, '').replace(',', '.')));
+                    // If it's a Surcharge (small), append to current cursor.
+                    // If it's a Major Price (large), assign to current cursor, then Advance?
+                    // Or if current cursor HAS Major Price, then Advance?
+                    // YES. If targetRow already has "Main Price" and we see another "Main Price", Advance!
 
-                    let structIdx = -1;
-                    let glassIdx = -1;
-                    let totalIdx = -1;
+                    const val = parseFloat(t.replace(/\./g, '').replace(',', '.'));
+                    // Threshold for "Main Price" vs Surcharge?
+                    // Maybe > 600? Or relative?
+                    // Let's assume > 1000 is Main Price? No, cheap items exist.
+                    // Let's assume if we already have a "Big Number" (>500), and we see another "Big Number", it belongs to next row.
 
-                    // Find A + B = C
-                    for (let i = 0; i < nums.length; i++) {
-                        for (let j = 0; j < nums.length; j++) {
-                            if (i === j) continue;
-                            for (let k = 0; k < nums.length; k++) {
-                                if (k === i || k === j) continue;
+                    const hasMainPrice = targetRow.prices.some(p => parseFloat(p.replace(/\./g, '').replace(',', '.')) > 500);
 
-                                if (Math.abs(nums[i] + nums[j] - nums[k]) < 1.0) {
-                                    totalIdx = k;
-                                    // Struct is usually larger than Glass
-                                    if (nums[i] > nums[j]) {
-                                        structIdx = i;
-                                        glassIdx = j;
-                                    } else {
-                                        structIdx = j;
-                                        glassIdx = i;
-                                    }
-                                    break;
-                                }
-                            }
-                            if (totalIdx !== -1) break;
+                    if (hasMainPrice && val > 500) {
+                        // Move to next row
+                        priceCursor++;
+                        if (priceCursor < pendingRows.length) {
+                            pendingRows[priceCursor].prices.push(t);
                         }
-                        if (totalIdx !== -1) break;
+                    } else {
+                        // Append to current (as 2nd price or surcharge)
+                        targetRow.prices.push(t);
                     }
-
-                    if (totalIdx !== -1) {
-                        // Found relationship! Reorder.
-                        const structToken = values[structIdx];
-                        const glassToken = values[glassIdx];
-                        const totalToken = values[totalIdx];
-
-                        const surcharges = values.filter((_, idx) => idx !== totalIdx && idx !== structIdx && idx !== glassIdx);
-
-                        return {
-                            header: [w, p, suffix],
-                            prices: [structToken, glassToken, totalToken],
-                            surcharges: surcharges,
-                            triplet: triplet
-                        };
-                    }
-
-                    // Fallback: If no relation, assume standard order or just split
-                    // Since we don't know structure, we can't easily separate Surcharges.
-                    // But usually fallback means messy data.
-                    // Let's assume standard: S, G, T, [Sur], Triplet
-                    if (values.length >= 3) {
-                        return {
-                            header: [w, p, suffix],
-                            prices: [values[0], values[1], values[2]],
-                            surcharges: values.slice(3),
-                            triplet: triplet
-                        };
-                    }
-                    return null; // Skip invalid
-                }).filter(r => r !== null) as any[]; // Intermediate type
-
-                // 2. Determine Max Surcharges
-                const maxSurcharges = Math.max(0, ...structuredRows.map(r => r.surcharges.length));
-                // Force at least 1 surcharge column for consistency with Poly template if expected
-                // Actually, let's just make it rectangular.
-
-                // 3. Reconstruct Rectangular Rows
-                rows = structuredRows.map(r => {
-                    const currentSurcharges = r.surcharges;
-                    const paddingCount = maxSurcharges - currentSurcharges.length;
-                    const padding = Array(paddingCount).fill('');
-
-                    return [
-                        ...r.header,
-                        ...r.prices,
-                        ...currentSurcharges,
-                        ...padding,
-                        ...r.triplet
-                    ];
-                });
-
-                toast.success(`Zrekonstruowano i wyrównano ${rows.length} wierszy (Max dopłat: ${maxSurcharges}).`);
+                }
+                i++;
             }
         }
+
+        // Convert PendingRows to Result Rows
+        if (pendingRows.length > 0) {
+            rows = pendingRows.map(pr => {
+                // Prices: Struct, Glass, Total...
+                // We just dump them in columns.
+                // Data: [Fields, Posts, Area]
+
+                // Padding for alignment handled by existing logic?
+                // We need to return rectangular data.
+                // [Width, Proj, Suffix, Price1, Price2..., Data1, Data2, Data3]
+
+                return [
+                    pr.width,
+                    pr.projection,
+                    pr.suffix,
+                    ...pr.prices,
+                    ...pr.data
+                ];
+            });
+            toast.success(`Zkolejkowano ${rows.length} wierszy (Tryb Strumieniowy).`);
+        }
+
+        // FALLBACK LOGIC (Restored for non-standard formats)
+        const lineCount = rawText.split('\n').filter(l => l.trim().length > 0).length;
+        if (rows.length === 0 || (rows.length < lineCount * 0.5 && lineCount > 5)) {
+            const fallbackHeaderRow: string[] = [];
+
+            // Legacy Line Logic
+            const lines = rawText.split(/\n+/).filter(l => l.trim());
+            // Check for headers
+            if (lines.length > 0) {
+                const firstLine = lines[0];
+                const keywords = ['preis', 'price', 'breite', 'tiefe', 'ausfall', 'felder', 'pfosten', 'm2', 'oberfläche', 'surcharge', 'width', 'projection', 'fields', 'posts', 'area', 'structure', 'glass', 'netto', 'brutto', 'aufpreis', 'extra'];
+                if (keywords.some(k => firstLine.toLowerCase().includes(k)) && !firstLine.match(/^[\d.,\s]+$/)) {
+                    const hasTabs = firstLine.includes('\t');
+                    const delimiter = hasTabs ? '\t' : / {2,}|;/;
+                    const cols = firstLine.split(delimiter).map(c => c.trim()).filter(c => c !== '');
+                    fallbackHeaderRow.push(...cols);
+                    if (headerRow.length === 0) headerRow.push(...cols);
+                }
+            }
+
+            const lineRows = lines.map(line => {
+                const hasTabs = line.includes('\t');
+                const isDataLike = /^[\d\s.,€EURzłPLN+%*()-]+$/i.test(line);
+
+                let delimiter: string | RegExp;
+                if (hasTabs) {
+                    delimiter = '\t';
+                } else if (isDataLike) {
+                    delimiter = /[\s\t]+|;/;
+                } else {
+                    delimiter = / {2,}|;/;
+                }
+
+                return line.split(delimiter)
+                    .map(c => c.trim())
+                    .filter(c => c !== '' && !['€', 'EUR', 'PLN', 'zł'].includes(c));
+            });
+
+            if (fallbackHeaderRow.length > 0 && lineRows.length > 0 && lineRows[0].join('') === fallbackHeaderRow.join('')) {
+                lineRows.shift();
+            }
+
+            if (lineRows.length > rows.length) {
+                rows = lineRows;
+                toast('Użyto standardowego trybu wierszowego (Fallback).', { icon: '🔄' });
+            }
+        }
+
 
         if (rows.length === 0) {
             toast.error('Nie udało się odczytać żadnych danych.');
@@ -786,78 +827,101 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
         }
 
         const maxCols = Math.max(...rows.map(r => r.length));
-        setParsedRows(rows);
 
-        // SMART CONFIG DETECTION
-        const initialConfigs: ColumnConfig[] = Array(maxCols).fill(null).map(() => ({ type: 'ignore' }));
+        if (append) {
+            // APPEND MODE
+            const existingMaxCols = parsedRows.length > 0 ? Math.max(...parsedRows.map(r => r.length)) : 0;
 
-        // Try to map based on headerRow if matched
-        if (headerRow.length > 0) {
-            // We need to match header cols to data cols. 
-            // If data has split dimensions (2 cols) but header has 1 "Maß", we need to offset.
-            // Heuristic: Check if data[0] looks like split dimension.
-            // We need to match header cols to data cols. 
-            let headerIdx = 0;
-            for (let i = 0; i < maxCols; i++) {
-                if (headerIdx >= headerRow.length) break;
-                const header = headerRow[headerIdx].toLowerCase();
-
-                // Apply mapping
-                if (header.includes('breite') || header.includes('width')) {
-                    initialConfigs[i] = { type: 'width' };
-                    headerIdx++;
-                    // If next data col is projection but header didn't specify?
-                } else if (header.includes('tiefe') || header.includes('ausfall') || header.includes('projection')) {
-                    initialConfigs[i] = { type: 'projection' };
-                    headerIdx++;
-                } else if (header.includes('maß') || header.includes('mass')) {
-                    // "Maß" usually implies Width AND Projection in one header col, but data has 2 cols.
-                    initialConfigs[i] = { type: 'width' };
-                    if (i + 1 < maxCols) {
-                        initialConfigs[i + 1] = { type: 'projection' };
-                        i++; // Skip next data col
-                    }
-                    headerIdx++;
-                } else if (header.includes('felder') || header.includes('fields')) {
-                    initialConfigs[i] = { type: 'fields' };
-                    headerIdx++;
-                } else if (header.includes('pfosten') || header.includes('posts')) {
-                    initialConfigs[i] = { type: 'posts' };
-                    headerIdx++;
-                } else if (header.includes('oberfläche') || header.includes('area') || header.includes('m2')) {
-                    initialConfigs[i] = { type: 'area' };
-                    headerIdx++;
-                } else if (header.includes('exkl') || header.includes('netto') || header.includes('structure')) {
-                    initialConfigs[i] = { type: 'structure_price' };
-                    headerIdx++;
-                } else if (header.includes('inkl') || header.includes('brutto') || header.includes('glass')) {
-                    // Heuristic: if structure_price is present, incl might be full price or glass price
-                    initialConfigs[i] = { type: 'price' }; // Default to Price (Total)
-                    headerIdx++;
-                } else if (header.includes('preis') || header.includes('price')) {
-                    initialConfigs[i] = { type: 'price' };
-                    headerIdx++;
-                } else if (header.includes('aufpreis') || header.includes('extra') || header.includes('surcharge')) {
-                    initialConfigs[i] = { type: 'surcharge', surchargeName: headerRow[headerIdx] };
-                    headerIdx++;
-                } else {
-                    headerIdx++;
-                }
+            // CHECK FOR COLUMN MISMATCH
+            if (maxCols !== existingMaxCols) {
+                toast('Uwaga: Nowe dane mają inną liczbę kolumn niż istniejąca tabela!', { icon: '⚠️' });
             }
-            if (headerRow.length > 0) toast.success('Automatycznie rozpoznano nagłówki!');
+
+            // If new data has more columns than existing, we need to extend config
+            if (maxCols > existingMaxCols) {
+                const newColsCount = maxCols - existingMaxCols;
+                const extension = Array(newColsCount).fill(null).map(() => ({ type: 'ignore' as ColumnType }));
+                setColumnConfigs(prev => [...prev, ...extension]);
+                toast('Rozszerzono liczbę kolumn dla nowych danych.', { icon: '↔️' });
+            }
+
+            setParsedRows(prev => [...prev, ...rows]);
+            toast.success(`Dopisano ${rows.length} wierszy! Łącznie: ${parsedRows.length + rows.length}`);
+        } else {
+            // REPLACE MODE
+            setParsedRows(rows);
+            // SMART CONFIG DETECTION
+            const initialConfigs: ColumnConfig[] = Array(maxCols).fill(null).map(() => ({ type: 'ignore' }));
+
+            // Try to map based on headerRow if matched
+            if (headerRow.length > 0) {
+                // We need to match header cols to data cols. 
+                // If data has split dimensions (2 cols) but header has 1 "Maß", we need to offset.
+                // Heuristic: Check if data[0] looks like split dimension.
+                // We need to match header cols to data cols. 
+                let headerIdx = 0;
+                for (let i = 0; i < maxCols; i++) {
+                    if (headerIdx >= headerRow.length) break;
+                    const header = headerRow[headerIdx].toLowerCase();
+
+                    // Apply mapping
+                    if (header.includes('breite') || header.includes('width')) {
+                        initialConfigs[i] = { type: 'width' };
+                        headerIdx++;
+                        // If next data col is projection but header didn't specify?
+                    } else if (header.includes('tiefe') || header.includes('ausfall') || header.includes('projection')) {
+                        initialConfigs[i] = { type: 'projection' };
+                        headerIdx++;
+                    } else if (header.includes('maß') || header.includes('mass')) {
+                        // "Maß" usually implies Width AND Projection in one header col, but data has 2 cols.
+                        initialConfigs[i] = { type: 'width' };
+                        if (i + 1 < maxCols) {
+                            initialConfigs[i + 1] = { type: 'projection' };
+                            i++; // Skip next data col
+                        }
+                        headerIdx++;
+                    } else if (header.includes('felder') || header.includes('fields')) {
+                        initialConfigs[i] = { type: 'fields' };
+                        headerIdx++;
+                    } else if (header.includes('pfosten') || header.includes('posts')) {
+                        initialConfigs[i] = { type: 'posts' };
+                        headerIdx++;
+                    } else if (header.includes('oberfläche') || header.includes('area') || header.includes('m2')) {
+                        initialConfigs[i] = { type: 'area' };
+                        headerIdx++;
+                    } else if (header.includes('exkl') || header.includes('netto') || header.includes('structure')) {
+                        initialConfigs[i] = { type: 'structure_price' };
+                        headerIdx++;
+                    } else if (header.includes('inkl') || header.includes('brutto') || header.includes('glass')) {
+                        // Heuristic: if structure_price is present, incl might be full price or glass price
+                        initialConfigs[i] = { type: 'price' }; // Default to Price (Total)
+                        headerIdx++;
+                    } else if (header.includes('preis') || header.includes('price')) {
+                        initialConfigs[i] = { type: 'price' };
+                        headerIdx++;
+                    } else if (header.includes('aufpreis') || header.includes('extra') || header.includes('surcharge')) {
+                        initialConfigs[i] = { type: 'surcharge', surchargeName: headerRow[headerIdx] };
+                        headerIdx++;
+                    } else {
+                        headerIdx++;
+                    }
+                }
+                if (headerRow.length > 0) toast.success('Automatycznie rozpoznano nagłówki!');
+                setColumnConfigs(initialConfigs);
+            }
+
+            if (!append) { // Only force step change if not appending (start fresh)
+                setStep(2);
+            }
+
+            // Auto-detect template?
+            // If 10 cols -> Glass? If 8 cols -> Poly?
+            if (maxCols === 10) {
+                // Defer to user or auto-apply? Let's just notify or define separate button.
+                // Let's not auto-override without user asking, but specific button is fast.
+            }
+            toast.success(`Wykryto ${rows.length} wierszy. Maks. kolumn: ${maxCols}`);
         }
-
-        setColumnConfigs(initialConfigs);
-
-        setStep(2);
-
-        // Auto-detect template?
-        // If 10 cols -> Glass? If 8 cols -> Poly?
-        if (maxCols === 10) {
-            // Defer to user or auto-apply? Let's just notify or define separate button.
-            // Let's not auto-override without user asking, but specific button is fast.
-        }
-        toast.success(`Wykryto ${rows.length} wierszy. Maks. kolumn: ${maxCols}`);
     };
 
     const updateConfig = (index: number, updates: Partial<ColumnConfig>) => {
@@ -974,29 +1038,105 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                     }
                 });
 
-                // Validation: Must have structure_price OR price.
-                // For Components, width might be Length. Projection = 0.
-                if (hasValidData && (entry.price || entry.structure_price)) {
-                    // Default dims if missing
-                    if (!entry.width_mm && entry.properties.name) entry.width_mm = 0; // Accept 0 width for pure items? 
-                    // Actually database requires NON NULL? schema says width_mm can be null? No, usually required.
-                    // But for components, maybe we map Length to Width.
+                // SANITIZATION HELPERS
+                const toNum = (v: any) => {
+                    if (typeof v === 'number' && !isNaN(v)) return v;
+                    if (typeof v === 'string') {
+                        // Handle "1.200,50" -> 1200.50
+                        let clean = v.replace(/\s/g, '').replace('€', '').replace('zł', '').replace('PLN', '');
+                        // Check format: 1.200,00 vs 1,200.00
+                        if (clean.includes(',') && clean.includes('.')) {
+                            if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
+                                // 1.200,50
+                                clean = clean.replace(/\./g, '').replace(',', '.');
+                            } else {
+                                // 1,200.50
+                                clean = clean.replace(/,/g, '');
+                            }
+                        } else if (clean.includes(',')) {
+                            // 1200,50 -> 1200.50
+                            clean = clean.replace(',', '.');
+                        }
+                        const p = parseFloat(clean);
+                        return isNaN(p) ? 0 : p;
+                    }
+                    return 0;
+                };
 
-                    if (!entry.width_mm) entry.width_mm = 0;
-                    if (!entry.projection_mm) entry.projection_mm = 0;
+                // Apply Strict Numbers
+                if (hasValidData) {
+                    entry.width_mm = toNum(entry.width_mm);
+                    entry.projection_mm = toNum(entry.projection_mm);
+                    entry.price = toNum(entry.price);
+                    entry.structure_price = toNum(entry.structure_price);
+                    entry.glass_price = toNum(entry.glass_price);
+
+                    if (entry.properties?.area_m2) entry.properties.area_m2 = toNum(entry.properties.area_m2);
 
                     // Logic to ensure price fields
-                    if (!entry.price) entry.price = (entry.structure_price || 0) + (entry.glass_price || 0);
-                    if (!entry.structure_price) entry.structure_price = entry.price;
+                    if (!entry.price || entry.price === 0) entry.price = (entry.structure_price || 0) + (entry.glass_price || 0);
+                    if (!entry.structure_price || entry.structure_price === 0) entry.structure_price = entry.price;
 
-                    resultData.push(entry);
+                    // STRICT VALIDATION
+                    // Must have Width AND (Price OR StructurePrice)
+                    // If Width is 0 but it's a Named Item (Component), it might be valid?
+                    // Let's assume Valid Price is Key.
+                    if (entry.price > 0 || entry.structure_price > 0) {
+                        resultData.push(entry);
+                    }
                 }
             }
 
             if (resultData.length === 0) {
-                toast.error('Nie znaleziono poprawnych wierszy z danymi (Szerokość + Wysięg + Cena). Sprawdź mapowanie.');
+                toast.error('Błąd: Żaden wiersz nie zawiera poprawnej ceny i wymiarów.');
                 return;
             }
+
+            const skipped = parsedRows.length - resultData.length;
+            if (skipped > 0) {
+                toast(`Pominięto ${skipped} nieprawidłowych/pustych wierszy.`, { icon: '🧹' });
+            }
+
+            // --- PRICE CONSISTENCY CHECK --- //
+            const prices = resultData.map(r => r.price).sort((a, b) => a - b);
+            if (prices.length > 3) {
+                // 1. Calculate Median
+                const mid = Math.floor(prices.length / 2);
+                const median = prices.length % 2 !== 0 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+
+                // 2. Identify Suspiciously Low Prices (e.g. < 10% of Median)
+                // This catches scenarios where "Posts" (5) was mapped to "Price".
+                const threshold = median * 0.1;
+                const outliers = resultData.filter(r => r.price < threshold);
+
+                if (outliers.length > 0) {
+                    const confirmSave = window.confirm(
+                        `⚠️ UWAGA: Wykryto ${outliers.length} wierszy z bardzo niską ceną (poniżej ${(threshold).toFixed(2)}).\n\n` +
+                        `Przykłady: ${outliers.slice(0, 3).map(r => r.price).join(', ')}...\n\n` +
+                        `Czy na pewno chcesz zapisać? (Może to być błąd mapowania kolumn)`
+                    );
+                    if (!confirmSave) return;
+                }
+
+                // 3. Monotonic Check (Optional but useful)
+                // If sorted by width/projection, price should roughly correlate.
+                // Simple heuristic: Count how many times price DROPS by > 50% vs previous row
+                // This implies "interleaved data" or "misalignment".
+                let drops = 0;
+                for (let i = 1; i < resultData.length; i++) {
+                    if (resultData[i].price < resultData[i - 1].price * 0.5) {
+                        drops++;
+                    }
+                }
+                if (drops > resultData.length * 0.2) { // more than 20% significant drops
+                    const confirmChaotic = window.confirm(
+                        `⚠️ UWAGA: Ceny w liście wydają się chaotyczne (nagłe spadki). \n` +
+                        `Upewnij się, że kolumny są poprawnie przypisane.\n\nCzy zapisać mimo to?`
+                    );
+                    if (!confirmChaotic) return;
+                }
+            }
+            // ------------------------------- //
 
             // Pass detected attributes
             onSave(resultData, {
@@ -1004,7 +1144,8 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                 mounting_type: mountingType,
                 provider: manufacturer,
                 product_code: productHint,
-                table_type: tableType
+                table_type: tableType,
+                product_id: selectedProductId // Pass selected product
             });
             onClose();
             toast.success(`Zaimportowano ${resultData.length} wierszy!`);
@@ -1041,14 +1182,66 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                                 className="flex-1 w-full p-4 border border-slate-300 rounded-lg font-mono text-sm focus:border-accent focus:ring-1 focus:ring-accent"
                                 placeholder="Wklej tutaj dane..."
                             />
-                            <div className="flex justify-end pt-2">
-                                <button
-                                    onClick={parseText}
-                                    disabled={!rawText.trim()}
-                                    className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-accent/90 disabled:opacity-50"
-                                >
-                                    Dalej → Analizuj Kolumny
-                                </button>
+                            <div className="flex justify-between pt-2 items-center">
+                                <div className="text-sm text-slate-500">
+                                    {parsedRows.length > 0 && <span>W pamięci: <strong>{parsedRows.length}</strong> wierszy.</span>}
+                                    <div className="flex gap-4 mt-2">
+                                        <label className="flex items-center gap-1 text-xs cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="parseMode"
+                                                checked={parseMode === 'auto'}
+                                                onChange={() => setParseMode('auto')}
+                                            />
+                                            Auto (Wykryj)
+                                        </label>
+                                        <label className="flex items-center gap-1 text-xs cursor-pointer" title="Wymusza podział wg tabulatorów. Zachowuje puste kolumny.">
+                                            <input
+                                                type="radio"
+                                                name="parseMode"
+                                                checked={parseMode === 'excel'}
+                                                onChange={() => setParseMode('excel')}
+                                            />
+                                            Excel (Tabulatory)
+                                        </label>
+                                        <label className="flex items-center gap-1 text-xs cursor-pointer" title="Inteligentne wykrywanie 3000x2000. Dobre dla PDF.">
+                                            <input
+                                                type="radio"
+                                                name="parseMode"
+                                                checked={parseMode === 'text'}
+                                                onChange={() => setParseMode('text')}
+                                            />
+                                            PDF/Tekst (Smart)
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    {parsedRows.length > 0 && (
+                                        <button
+                                            onClick={() => parseText(true)}
+                                            disabled={!rawText.trim()}
+                                            className="px-4 py-2 bg-blue-100 text-blue-700 font-bold rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                                            title="Dodaj te dane do istniejącej tabeli (nie usuwaj poprzednich)"
+                                        >
+                                            + Analizuj i Dopisz
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => parseText(false)}
+                                        disabled={!rawText.trim()}
+                                        className="px-6 py-2 bg-accent text-white font-bold rounded-lg hover:bg-accent/90 disabled:opacity-50"
+                                    >
+                                        {parsedRows.length > 0 ? 'Zastąp Wszystko' : 'Dalej → Analizuj Kolumny'}
+                                    </button>
+                                    {parsedRows.length > 0 && (
+                                        <button
+                                            onClick={() => setStep(2)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+                                        >
+                                            Przejdź do edycji →
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -1090,6 +1283,21 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                                                     <option value="Inny">Inny</option>
                                                 </select>
                                             </div>
+                                        </div>
+
+                                        {/* Product Selection Group */}
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-700 block mb-1">Model (Opcjonalnie):</span>
+                                            <select
+                                                value={selectedProductId}
+                                                onChange={(e) => setSelectedProductId(e.target.value)}
+                                                className="p-1.5 text-sm border rounded bg-white w-[180px]"
+                                            >
+                                                <option value="">-- Wybierz lub Auto --</option>
+                                                {products.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
 

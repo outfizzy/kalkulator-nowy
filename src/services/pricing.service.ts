@@ -64,6 +64,92 @@ export interface AdditionalCost {
 
 export const PricingService = {
     /**
+     * Fetch active product definitions
+     */
+    /**
+     * getProducts now returns ALL products (for admin/debug).
+     * Use getMainProducts for the Calculator UI.
+     */
+    async getProducts(): Promise<{ id: string, code: string, name: string, description: string, category: string }[]> {
+        const { data } = await supabase
+            .from('product_definitions')
+            .select('id, code, name, description, category')
+            .order('name');
+        return data || [];
+    },
+
+    /**
+     * Fetches only the main models for the Product Configurator.
+     * Filters out accessories (Markisen, Walls) and sorts by priority.
+     */
+    async getMainProducts(): Promise<{ id: string, code: string, name: string, description: string, category: string }[]> {
+        // Fetch ALL products first, then filter in memory to ensure exact matching
+        const { data } = await supabase
+            .from('product_definitions')
+            .select('id, code, name, description, category')
+            .in('category', ['roof', 'carport']); // Only Roofs and Carports
+
+        if (!data) return [];
+
+        // STRICT WHITELIST
+        // Keys: The start of the 'code' in DB.
+        // Values: The 'Display Name' requested by user.
+        const whitelistMap: Record<string, string> = {
+            'orangestyle': 'Orangestyle (Orangeline)',
+            'trendstyle': 'Trendstyle (Trendline)',
+            'topstyle': 'Topstyle',
+            'ultrastyle': 'Ultrastyle (Ultraline)',
+            'skystyle': 'Skystyle (Skyline)',
+            'carport': 'Carport'
+        };
+
+        const filtered = data.filter(p => {
+            // Check if product code starts with any of the whitelist keys
+            // AND explicitly exclude accessories if they slip through category check
+            if (p.code.includes('markise') || p.code.includes('screen')) return false;
+
+            return Object.keys(whitelistMap).some(key => p.code.startsWith(key));
+        });
+
+        // Map Names
+        const mapped = filtered.map(p => {
+            const key = Object.keys(whitelistMap).find(k => p.code.startsWith(k));
+            if (!key) return p;
+
+            let displayName = whitelistMap[key];
+
+            // If it's a "Plus" variant, adjust the name
+            if (p.code.includes('_plus') || p.name.includes('+')) {
+                // Heuristic: "Trendstyle (Trendline)" -> "Trendstyle+ (Trendline+)"
+                displayName = displayName.replace(/\)/, '+)').replace(/ \(/, '+ (');
+            }
+
+            // If it's "XL" variant, append XL
+            if (p.code.includes('_xl') || p.name.includes('XL')) {
+                displayName += ' XL';
+            }
+
+            return { ...p, name: displayName };
+        });
+
+        // Custom Sort Order
+        const priority = ['orangestyle', 'trendstyle', 'topstyle', 'ultrastyle', 'skystyle', 'carport'];
+
+        return mapped.sort((a, b) => {
+            const idxA = priority.findIndex(p => a.code.startsWith(p));
+            const idxB = priority.findIndex(p => b.code.startsWith(p));
+
+            if (idxA !== -1 && idxB !== -1) {
+                if (idxA === idxB) return a.code.length - b.code.length; // Check for Plus variants (longer code)
+                return idxA - idxB;
+            }
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return a.name.localeCompare(b.name);
+        });
+    },
+
+    /**
      * Fetch pricing matrix for a specific product code, considering attributes (e.g. Snow Zone)
      */
     async getPriceMatrix(productCode: string, contextAttributes: Record<string, string> = {}): Promise<PriceMatrixEntry[]> {
@@ -310,6 +396,108 @@ export const PricingService = {
             });
         }
 
+        // NEW: Process User-Selected Surcharges (Calculator V2)
+        if (product.selectedSurcharges && product.selectedSurcharges.length > 0) {
+            try {
+                // 1. Resolve Product ID (Cache or fetch)
+                const { data: prodDef } = await supabase.from('product_definitions').select('id').eq('code', product.modelId).single();
+
+                if (prodDef) {
+                    // 2. Fetch all active tables to find the surcharge ones
+                    // Optimization: We could filter by name like '%surcharge%' but fetching all for product is usually fine (10-20 tables max per product usually, though Aluxe has 140 total, maybe 20 per product)
+                    const { data: allTables } = await supabase.from('price_tables')
+                        .select('*')
+                        .eq('product_definition_id', prodDef.id)
+                        .eq('is_active', true);
+
+                    if (allTables) {
+                        for (const surchargeKey of product.selectedSurcharges) {
+                            // Match table by name AND context (attributes)
+                            const matchingTable = allTables.find(t => {
+                                const nameMatch = t.name.includes(`surcharge_${surchargeKey}`);
+                                if (!nameMatch) return false;
+
+                                // Context Awareness Check (Zone, Roof Type) using 'attributes' column
+                                const attrs = t.attributes || {};
+
+                                // Check Attributes (if present in table metadata)
+                                if (attrs.subtype && product.attributes && attrs.subtype !== product.attributes.roofType) return false;
+
+                                // Robust check for Snow Zone
+                                if (attrs.snow_zone && product.attributes && product.attributes.snowZone &&
+                                    String(attrs.snow_zone) !== String(product.attributes.snowZone)) return false;
+
+                                return true;
+                            });
+
+                            if (matchingTable) {
+                                // 3. Get Price for this surcharge table
+                                let entries: PriceMatrixEntry[] = [];
+
+                                if (matchingTable.data) {
+                                    // JSON Data
+                                    const matrix = matchingTable.data;
+                                    if (matrix.data && Array.isArray(matrix.data)) {
+                                        entries = matrix.data.map((e: any) => ({
+                                            width_mm: e.width_mm || e.width,
+                                            projection_mm: e.projection_mm || e.projection,
+                                            price: e.price,
+                                            structure_price: e.structure_price || e.price,
+                                            glass_price: e.glass_price || 0,
+                                            properties: e.properties || {}
+                                        }));
+                                    } else if (matrix.rows && matrix.headers) {
+                                        // Pivoted
+                                        matrix.rows.forEach((row: any) => {
+                                            matrix.headers.forEach((w: number, idx: number) => {
+                                                const p = row.prices[idx];
+                                                if (p > 0) {
+                                                    entries.push({
+                                                        width_mm: w,
+                                                        projection_mm: row.projection,
+                                                        price: p
+                                                    });
+                                                }
+                                            });
+                                        });
+                                    }
+                                } else {
+                                    // DB Entries
+                                    const { data: dbEntries } = await supabase
+                                        .from('price_matrix_entries')
+                                        .select('*')
+                                        .eq('price_table_id', matchingTable.id);
+
+                                    if (dbEntries) {
+                                        entries = dbEntries.map((d: any) => ({
+                                            width_mm: d.width_mm,
+                                            projection_mm: d.projection_mm,
+                                            price: d.price,
+                                            structure_price: d.structure_price || d.price,
+                                            glass_price: d.glass_price || 0,
+                                            properties: d.properties || {}
+                                        }));
+                                    }
+                                }
+
+                                // 4. Calculate Surcharge Value
+                                const surchargeValue = this.calculateMatrixPrice(entries, product.width, product.projection);
+                                if (surchargeValue > 0) {
+                                    surcharges.items.push({
+                                        name: matchingTable.name.split('surcharge_')[1]?.replace(/_/g, ' ').toUpperCase() || surchargeKey,
+                                        price: surchargeValue
+                                    });
+                                    surcharges.total += surchargeValue;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error calculating selected surcharges:", err);
+            }
+        }
+
         if (surcharges.total > 0) {
             basePrice += surcharges.total;
         }
@@ -486,6 +674,51 @@ export const PricingService = {
     },
 
     /**
+     * Optimized fetch for specific accessory matrices (e.g. Keilfenster, Walls).
+     * Avoids loading the entire database.
+     */
+    async getAccessoryMatrices(keywords: string[]): Promise<{ table: PriceTable, entries: PriceMatrixEntry[] }[]> {
+        if (keywords.length === 0) return [];
+
+        // Build OR query for filtering by name
+        // name.ilike.%k1%,name.ilike.%k2%
+        const orQuery = keywords.map(k => `name.ilike.%${k}%`).join(',');
+
+        const { data: tables } = await supabase
+            .from('price_tables')
+            .select('*, product:product_definitions(name, code)')
+            .eq('is_active', true)
+            .or(orQuery);
+
+        if (!tables || tables.length === 0) return [];
+
+        const tableIds = tables.map(t => t.id);
+        const { data: entries } = await supabase
+            .from('price_matrix_entries')
+            .select('*')
+            .in('price_table_id', tableIds);
+
+        const entriesByTable = (entries || []).reduce((acc: any, curr: any) => {
+            if (!acc[curr.price_table_id]) acc[curr.price_table_id] = [];
+            acc[curr.price_table_id].push({
+                ...curr,
+                structure_price: curr.structure_price || curr.price,
+                glass_price: curr.glass_price || 0,
+                properties: curr.properties || {}
+            });
+            return acc;
+        }, {});
+
+        // Cast to PriceTable[] to satisfy TS
+        const castTables = tables as unknown as PriceTable[];
+
+        return castTables.map(table => ({
+            table,
+            entries: entriesByTable[table.id] || []
+        }));
+    },
+
+    /**
      * Calculates price after applying discount (supports simple "10" or cascaded "10+5+2")
      */
     calculateDiscountedPrice(price: number, discountStr?: string): number {
@@ -621,6 +854,34 @@ export const PricingService = {
         return validEntries[0];
     },
 
+    /**
+     * Calculates the price for a specific surcharge table given dimensions.
+     */
+    async getSurchargePrice(tableId: string, width: number, projection: number): Promise<number> {
+        try {
+            const { data: entries } = await supabase
+                .from('price_matrix_entries')
+                .select('*')
+                .eq('price_table_id', tableId);
+
+            if (!entries || entries.length === 0) return 0;
+
+            const matrixEntries: PriceMatrixEntry[] = entries.map((d: any) => ({
+                width_mm: d.width_mm,
+                projection_mm: d.projection_mm,
+                price: d.price,
+                structure_price: d.structure_price || 0,
+                glass_price: d.glass_price || 0,
+                properties: d.properties || {}
+            }));
+
+            return this.calculateMatrixPrice(matrixEntries, width, projection);
+        } catch (error) {
+            console.error("Error calculating surcharge price:", error);
+            return 0;
+        }
+    },
+
     async getSupplierCosts(provider: string): Promise<SupplierCost[]> {
         const { data } = await supabase
             .from('supplier_costs')
@@ -683,6 +944,67 @@ export const PricingService = {
 
         return { total, breakdown };
     },
+    async getAvailableSurcharges(productCode: string, contextAttributes: Record<string, string> = {}): Promise<{ id: string; name: string; price_table_id: string }[]> {
+        // 1. Get Product Definition
+        const { data: product } = await supabase
+            .from('product_definitions')
+            .select('id')
+            .eq('code', productCode)
+            .single();
+
+        if (!product) return [];
+
+        // 2. Get All Surcharge Tables for this Product
+        const { data: tables } = await supabase
+            .from('price_tables')
+            .select('*')
+            .eq('product_definition_id', product.id)
+            .eq('is_active', true);
+        // .eq('type', 'surcharge'); // We might need to add 'type' column to DB or check naming convention?
+        // Current DB schema has 'type', but typically used for 'matrix' | 'simple'.
+        // Surcharges are identified by naming convention `... - surcharge_...` OR explicitly by variant_config
+
+        if (!tables) return [];
+
+        const surchargeTables = (tables as PriceTable[]).filter(t => {
+            // Filter logic: Must look like a surcharge table
+            // Naming convention: " - surcharge_"
+            const isSurcharge = t.name.includes('surcharge_');
+            if (!isSurcharge) return false;
+
+            // Context Matching Logic (using attributes)
+            const attrs = t.attributes || {};
+            const vc = t.variant_config || {}; // Fallback for legacy
+
+            // Check Roof Type (Subtype)
+            const tableSubtype = attrs.subtype || vc.roofType;
+            if (tableSubtype && tableSubtype !== contextAttributes.roofType) return false;
+
+            // Check Snow Zone
+            const tableZone = attrs.snow_zone || vc.snowZone;
+            if (tableZone && contextAttributes.snowZone && String(tableZone) !== String(contextAttributes.snowZone)) return false;
+
+            return true;
+        });
+
+        // Map to simplified structure
+        return surchargeTables.map(t => {
+            // Extract pretty name from table name or attributes
+            // format: "Product - Zone - Type - surcharge_variant"
+            const parts = t.name.split('surcharge_');
+            const variantName = parts.length > 1 ? parts[1] : t.name;
+
+            // Capitalize
+            const label = variantName.charAt(0).toUpperCase() + variantName.slice(1).replace(/_/g, ' ');
+
+            return {
+                id: variantName, // e.g. "ir_gold"
+                name: label,
+                price_table_id: t.id
+            };
+        });
+    },
+
     async getProductImage(productCode: string, contextAttributes: Record<string, string> = {}): Promise<string | null> {
         // reuse table config lookup logic to find best matching table
         const { config, attributes } = await this.getTableConfig(productCode, contextAttributes);
