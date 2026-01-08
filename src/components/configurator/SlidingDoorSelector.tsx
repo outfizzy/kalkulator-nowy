@@ -239,7 +239,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
                         {existingAddon ? 'Zaktualizuj Ofertę' : `Dodaj do Oferty (+${formatCurrency(totalPrice)})`}
                     </button>
 
-                    {(!matrixEntries || matrixEntries.length === 0) && (
+                    {(!tables || tables.length === 0) && (
                         <div className="mt-2 text-center text-xs text-red-500">
                             Uwaga: Brak cennika w bazie danych!
                         </div>
