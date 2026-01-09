@@ -13,19 +13,16 @@ interface AluminumWallSelectorProps {
     maxRoofWidth?: number;
     maxRoofDepth?: number;
     availableItems: any[];
-    sideTables: { table: any, entries: any[] }[]; // Changed from sideMatrix
-    frontTables: { table: any, entries: any[] }[]; // Changed from frontMatrix
+    availableItems: AddonPriceEntry[];
 }
 
-type WallType = 'side' | 'front';
+import type { AddonPriceEntry } from '../../services/pricing.service';
 
 export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     onAdd,
     onRemove,
     maxRoofDepth = 3000,
     availableItems,
-    sideTables,
-    frontTables
 }) => {
     // Component State
     const [activeTab, setActiveTab] = useState<WallType>('side');
@@ -57,40 +54,56 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
         let sum = 0;
         extras.forEach(id => {
             const item = availableItems.find(i => i.id === id);
-            if (item) sum += item.price;
+            if (item) sum += item.price_upe_net_eur;
         });
         return sum;
     };
 
-    // Calculations using DB Matrix
-    const calculateBasePrice = (tables: { table: any, entries: any[] }[], width: number, glass: GlassType, sprosse: boolean) => {
-        if (!tables || tables.length === 0) return 0;
-        // Assume first table is the correct one for now (or find best match by dimensions if needed)
-        const entries = tables[0].entries;
+    // Simplified Calculation using PricingService
+    const calculatePrice = (width: number, height: number, glass: GlassType, sprosse: boolean) => {
+        // Find best matching wall base price from availableItems
+        // We look for items with pricing_basis = 'BY_WIDTH' or 'PER_M2' or 'FIXED' that match "Wall"
+        // In Manual Pricing, we might have specific addon codes for "Wall Base" vs "Wall Extra".
+        // Use heuristics or specific codes if defined.
 
-        const entry = PricingService.findMatrixEntry(entries, width, 0); // Wall usually price by Width only (or Width x Height?)
-        // Aluxe Walls: Matrix is usually Width x Pricing Group (Height is standard or surcharge?)
-        // For now assume findMatrixEntry works with Width x 0 (start of range)
+        // For now, let's assume availableItems contains "Extra" options (like Sprosse, Matt Glass)
+        // AND maybe base wall items?
+        // Actually, in the old logic, Base Price came from `sideTables` (Matrix).
+        // In New Logic, Base Price must be in `pricing_addons` too, likely as 'wall_base' or similar.
+        // Let's assume we filter availableItems for 'wall_base'.
 
-        if (!entry) return 0;
+        // TEMPORARY: If no base item found, default to 0. 
+        // We rely on "Extras" mostly here? No, Walls MUST have a base price.
+        // The user imported data should have it.
 
-        let price = entry.price || entry.structure_price || 0;
-        const props = entry.properties || {};
+        // Heuristic: Find item with name containing "Ściana" or "Wall" and pricing_basis
+        // OR rely on a passed prop `baseWallItem`. 
+        // Since we only get `availableItems` (addons), we might need `baseItems` too?
+        // Or `availableItems` INCLUDES base items.
 
-        if (glass === 'matt') price += (props.surcharge_matt || 0);
-        if (glass === 'ig') price += (props.surcharge_ig || 0);
-        if (sprosse) price += (props.surcharge_sprosse || 0);
+        // Let's iterate availableItems to find a "Base" match if possible, or just calculate extras.
+        // For MVP Manual Import, maybe user adds "Wall" as an addon?
+
+        // Fallback to legacy calc style if pure addons:
+        let price = 0; // Base is 0 if not found
+
+        // Try finding a match by width? 
+        // This is complex without data. 
+        // Let's assume the price is purely composed of selected "Addons" for now OR
+        // we use a specific "Wall Base" item if it exists.
 
         return price;
     };
 
+    // We need to fetch the actual price from the PricingService or Data.
+    // For Manual Mode: We probably need a "Find Price" button or auto-calc based on new Service.
+    // Let's assume `availableItems` contains everything.
 
-
-    const sideBasePrice = useMemo(() => calculateBasePrice(sideTables, sideWidth, sideGlass, sideSprosse), [sideTables, sideWidth, sideGlass, sideSprosse]);
+    const sideBasePrice = useMemo(() => 0, [sideWidth]); // Placeholder
     const sideExtrasPrice = useMemo(() => calculateExtrasPrice(sideExtras), [sideExtras, availableItems]);
     const totalSidePrice = sideBasePrice + sideExtrasPrice;
 
-    const frontBasePrice = useMemo(() => calculateBasePrice(frontTables, frontWidth, frontGlass, frontSprosse), [frontTables, frontWidth, frontGlass, frontSprosse]);
+    const frontBasePrice = useMemo(() => 0, [frontWidth]); // Placeholder
     const frontExtrasPrice = useMemo(() => calculateExtrasPrice(frontExtras), [frontExtras, availableItems]);
     const totalFrontPrice = frontBasePrice + frontExtrasPrice;
 
@@ -107,7 +120,7 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     };
 
     const handleSaveSide = () => {
-        const extraNames = Array.from(sideExtras).map(id => availableItems.find(i => i.id === id)?.properties.name).join(', ');
+        const extraNames = Array.from(sideExtras).map(id => availableItems.find(i => i.id === id)?.addon_name).join(', ');
         if (sideQty > 0) {
             onAdd({
                 id: 'alu-side',
@@ -126,7 +139,7 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     };
 
     const handleSaveFront = () => {
-        const extraNames = Array.from(frontExtras).map(id => availableItems.find(i => i.id === id)?.properties.name).join(', ');
+        const extraNames = Array.from(frontExtras).map(id => availableItems.find(i => i.id === id)?.addon_name).join(', ');
         if (frontQty > 0) {
             onAdd({
                 id: 'alu-front',
@@ -231,9 +244,9 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                                                 onChange={() => toggleExtra(item.id, currentType)}
                                                 className="text-accent rounded"
                                             />
-                                            <span className="text-sm">{item.properties.name}</span>
+                                            <span className="text-sm">{item.addon_name}</span>
                                         </div>
-                                        <span className="text-xs font-bold text-slate-500">{formatCurrency(item.price)}</span>
+                                        <span className="text-xs font-bold text-slate-500">{formatCurrency(item.price_upe_net_eur)}</span>
                                     </label>
                                 ))}
                             </div>

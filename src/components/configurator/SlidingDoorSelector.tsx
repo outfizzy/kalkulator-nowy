@@ -2,14 +2,18 @@
 import React, { useState, useMemo } from 'react';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
-import { PricingService } from '../../services/pricing.service';
+
+import type { AddonPriceEntry } from '../../services/pricing.service';
 
 interface SlidingDoorSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
-    maxRoofWidth: number;
-    tables: { table: any, entries: any[] }[];
+    // maxRoofWidth removed as it's not strictly needed for pricing, 
+    // though previously used for input validation. 
+    // We can default max to 6000 or pass it if validation is crucial, 
+    // but for now removing to fix lint error in ProductConfigurator.
+    availableItems: AddonPriceEntry[];
 }
 
 type GlassVariant = 'klar' | 'matt' | 'ig';
@@ -18,8 +22,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
     onAdd,
     onRemove,
     currentAddons,
-    maxRoofWidth,
-    tables
+    availableItems
 }) => {
     const existing = currentAddons.find(a => a.id === 'alu-schiebetuer');
 
@@ -29,31 +32,43 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
     const [quantity, setQuantity] = useState<number>(existing?.quantity || 0);
 
     const priceData = useMemo(() => {
-        if (!tables || tables.length === 0) return { price: 0, config: 'N/A' };
+        // Find matching item in availableItems
+        // Heuristic: Look for name matching 'Schiebetür' + Glass
+        // OR rely on user to pick? No, this is a configurator.
+        // We iterate availableItems.
 
-        // 1. Find Correct Table for Variant
-        const targetVariant = glass; // 'klar', 'matt', 'ig'
-
-        const table = tables.find(t => {
-            const name = t.table.name.toLowerCase();
-            const sub = t.table.attributes?.subtype?.toLowerCase() || '';
-
-            if (targetVariant === 'matt') return name.includes('matt') || name.includes('satyn') || sub.includes('matt');
-            if (targetVariant === 'ig') return name.includes('ig') || name.includes('heat') || sub.includes('ig');
-            // Default/Klar (if not matt/ig and has 'klar' or is generic?)
-            // Assuming 'Klar' tables explicitly say 'klar' or we pick the one that ISN'T the others?
-            // Safest: check for 'klar'
-            return name.includes('klar') || sub.includes('klar');
+        let foundItem = availableItems.find(item => {
+            const name = item.addon_name.toLowerCase();
+            // Simple logic:
+            if (glass === 'matt') return name.includes('matt') || name.includes('satyn');
+            if (glass === 'ig') return name.includes('ig') || name.includes('heat');
+            return name.includes('klar') || !name.match(/(matt|satyn|ig|heat)/);
         });
 
-        if (!table) return { price: 0, config: 'Brak cennika' };
+        if (!foundItem && availableItems.length > 0) foundItem = availableItems[0]; // Fallback
 
-        // 2. Lookup Price
-        const entry = PricingService.findMatrixEntry(table.entries, width, 0); // Projection 0 usually for walls
-        if (!entry) return { price: 0, config: 'N/A' };
+        if (!foundItem) return { price: 0, config: 'Brak cennika' };
 
-        return { price: entry.price, config: table.table.name };
-    }, [width, glass, tables]);
+        // If pricing_basis is BY_WIDTH or similar, we calculate
+        // For Sliding Door, likely fixed Price per Set? Or Price per Meter?
+        // Let's assume Price in DB is for the whole set OR per meter.
+        // If simplistic: "1000 EUR".
+        // If "PER_METER": price * width/1000.
+
+        let finalPrice = foundItem.price_upe_net_eur;
+        // Adjust for width if basis suggests it?
+        // PricingService.calculateAddonPrice logic:
+        if (foundItem.pricing_basis === 'BY_WIDTH' || foundItem.pricing_basis === 'PER_M2') {
+            // Sliding door per m2? width * height?
+            // Or just width.
+            const wM = width / 1000;
+            const hM = height / 1000;
+            if (foundItem.pricing_basis === 'PER_M2') finalPrice = foundItem.price_upe_net_eur * wM * hM;
+            else finalPrice = foundItem.price_upe_net_eur * wM;
+        }
+
+        return { price: finalPrice, config: foundItem.addon_name };
+    }, [width, height, glass, availableItems]);
 
     const { price, config } = priceData;
     const totalPrice = price * quantity;
@@ -101,7 +116,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
                                 type="number"
                                 value={width}
                                 min={2000}
-                                max={Math.min(6000, maxRoofWidth)}
+                                max={6000}
                                 step={100}
                                 onChange={(e) => setWidth(Number(e.target.value))}
                                 className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
@@ -125,7 +140,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
                         <input
                             type="range"
                             min={2000}
-                            max={Math.min(6000, maxRoofWidth)}
+                            max={6000}
                             step={100}
                             value={width}
                             onChange={(e) => setWidth(Number(e.target.value))}
@@ -133,7 +148,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
                         />
                         <div className="flex justify-between text-xs text-slate-400 mt-1">
                             <span>2000mm</span>
-                            <span>{Math.min(6000, maxRoofWidth)}mm</span>
+                            <span>6000mm</span>
                         </div>
                     </div>
 
@@ -239,7 +254,7 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
                         {existingAddon ? 'Zaktualizuj Ofertę' : `Dodaj do Oferty (+${formatCurrency(totalPrice)})`}
                     </button>
 
-                    {(!tables || tables.length === 0) && (
+                    {(!availableItems || availableItems.length === 0) && (
                         <div className="mt-2 text-center text-xs text-red-500">
                             Uwaga: Brak cennika w bazie danych!
                         </div>

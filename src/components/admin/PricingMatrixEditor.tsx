@@ -44,7 +44,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
     const [smartPasteRows, setSmartPasteRows] = useState<number[][]>([]);
     const [isSmartPasteLoading, setIsSmartPasteLoading] = useState(false);
     const [pasteOrigin, setPasteOrigin] = useState<{ width: number, projection: number, targetField?: keyof MatrixEntry } | null>(null);
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups'>('list'); // Default to list as requested
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups' | 'manual_list'>('list'); // Default to list as requested
     const uniqueSurchargeNames = React.useMemo(() => {
         const names = new Set<string>();
         entries.forEach(e => {
@@ -70,6 +70,64 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
 
     const loadMatrix = async () => {
         setLoading(true);
+
+        // 1. Fetch Table Metadata & Check for Manual Data Priority
+        const { data: tableData } = await supabase.from('price_tables').select('attributes, type, product_definition_id, variant_config').eq('id', tableId).single();
+        if (tableData?.product_definition_id) setSelectedProductId(tableData.product_definition_id);
+        if (tableData?.attributes?.component_images) setComponentImages(tableData.attributes.component_images);
+
+        const { data: manualData } = await supabase
+            .from('pricing_base')
+            .select('*')
+            .eq('source_import_id', tableId)
+            .order('width_mm', { ascending: true })
+            .order('depth_mm', { ascending: true });
+
+        if (manualData && manualData.length > 0) {
+            console.log("Loading Manual Data (Priority)", manualData.length);
+            const mappedEntries: MatrixEntry[] = manualData.map(d => ({
+                id: d.id,
+                width_mm: d.width_mm,
+                projection_mm: d.depth_mm, // Map depth to projection
+                price: d.price_upe_net_eur,
+                structure_price: d.price_upe_net_eur,
+                glass_price: 0,
+                properties: {
+                    cover_type: d.cover_type,
+                    model_family: d.model_family,
+                    construction_type: d.construction_type,
+                    zone: d.zone,
+                    posts: d.posts_count,
+                    fields: d.fields_count,
+                    area: d.area_m2,
+                    variant_note: d.variant_note,
+                    surcharges: d.properties?.surcharges,
+                    ...d.properties
+                },
+                price_table_id: tableId
+            }));
+            setEntries(mappedEntries);
+            updateDimensions(mappedEntries);
+            setViewMode('manual_list');
+            setLoading(false);
+            return;
+        } else {
+            // Diagnostic: Check if we EXPECT manual data
+            if (tableData?.variant_config?.subtype?.includes('Poly') || tableData?.variant_config?.subtype?.includes('Glass') || tableData?.variant_config?.subtype === 'Manual') {
+                console.warn("Manual Data Expected but NOT FOUND. RLS Check Required.");
+                setViewMode('manual_list'); // FORCE VIEW MODE so we see the empty table/headers
+                setEntries([]); // Clear entries
+                toast.error((t) => (
+                    <div>
+                        <b>Brak danych manualnych!</b>
+                        <p className="text-xs">Cennik oznaczony jako manualny, ale tabela `pricing_base` jest pusta.</p>
+                        <p className="text-xs mt-1 text-red-600 font-bold">Wymagana naprawa uprawnień (RLS).</p>
+                    </div>
+                ), { duration: 5000, id: 'missing-data-warning' });
+                setLoading(false); // Stop loading here, don't fallback to standard
+                return;
+            }
+        }
         const { data, error } = await supabase
             .from('price_matrix_entries')
             .select('*')
@@ -80,7 +138,8 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         if (error) {
             toast.error('Błąd pobierania danych');
             console.error(error);
-        } else if (data) {
+        } else if (data && data.length > 0) {
+            // Standard Matrix Data
             setEntries(data.map(d => ({
                 ...d,
                 structure_price: d.structure_price || d.price, // Fallback
@@ -88,28 +147,19 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                 properties: d.properties || { rafters: 0, posts: 2 }
             })));
 
-            // Fetch table attributes and TYPE and Product ID
             const { data: tableData } = await supabase.from('price_tables').select('attributes, type, product_definition_id').eq('id', tableId).single();
+            if (tableData?.product_definition_id) setSelectedProductId(tableData.product_definition_id);
+            if (tableData?.attributes?.component_images) setComponentImages(tableData.attributes.component_images);
 
-            if (tableData?.product_definition_id) {
-                setSelectedProductId(tableData.product_definition_id);
-            }
-
-            if (tableData?.attributes?.component_images) {
-                setComponentImages(tableData.attributes.component_images);
-            }
-
-            // Check if we have grouped data (components) OR explicit simple type
             const hasGroups = data.some(d => d.properties?.name);
             const isSimpleType = tableData?.type === 'simple' || tableData?.type === 'component';
-
-            if (hasGroups || isSimpleType) {
-                setViewMode('groups');
-            } else {
-                updateDimensions(data);
-            }
+            if (hasGroups || isSimpleType) setViewMode('groups');
+            else updateDimensions(data);
+        } else {
+            setLoading(false);
+            return;
         }
-        setLoading(false);
+
     };
 
     const updateDimensions = (data: MatrixEntry[]) => {
@@ -118,6 +168,45 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         setWidths(distinctWidths);
         setProjections(distinctProjections);
     };
+
+    // Grouping Logic for Pivot View (Manual Mode)
+    const groupedManualEntries = React.useMemo(() => {
+        if (viewMode !== 'manual_list') return [];
+
+        const groups: Record<string, {
+            width: number;
+            depth: number;
+            zone: number;
+            baseEntry?: MatrixEntry;
+            relaxEntry?: MatrixEntry;
+            otherEntries: MatrixEntry[];
+        }> = {};
+
+        entries.forEach(e => {
+            const key = `${e.width_mm}-${e.projection_mm}-${e.properties?.zone || 1}`;
+            if (!groups[key]) {
+                groups[key] = {
+                    width: e.width_mm,
+                    depth: e.projection_mm,
+                    zone: parseInt(e.properties?.zone || '1'),
+                    otherEntries: []
+                };
+            }
+
+            // Classify Entry
+            const cv = (e.properties?.cover_type || '').toLowerCase();
+            const isRelax = cv.includes('relax') || cv.includes('tinted') || cv.includes('ir-gold');
+
+            if (isRelax) {
+                groups[key].relaxEntry = e;
+            } else {
+                if (!groups[key].baseEntry) groups[key].baseEntry = e;
+                else groups[key].otherEntries.push(e);
+            }
+        });
+
+        return Object.values(groups).sort((a, b) => a.width - b.width || a.depth - b.depth);
+    }, [entries, viewMode]);
 
     useEffect(() => {
         loadMatrix();
@@ -245,33 +334,66 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
             return;
         }
 
-        const payload = changed.map(e => ({
-            id: e.id, // If undefined, supabase handles insert if we strip it? No, need to handle insert/update logic. 
-            // Actually upsert works if we provide conflict key. But generic ID is UUID.
-            // If it's new, we should NOT send 'id'.
-            price_table_id: tableId,
-            width_mm: e.width_mm,
-            projection_mm: e.projection_mm,
-            price: e.price,
-            structure_price: e.structure_price,
-            glass_price: e.glass_price,
-            properties: e.properties
-        }));
+        // Determine target table logic
+        // If these entries came from pricing_base, they have a virtual ID or we know from context.
+        // We can check if `source_import_id` matches current tableId in a quick check, 
+        // OR simpler: Try to save to `pricing_base` if we loaded from it. 
+        // But `entries` doesn't strictly store source.
 
-        // Split into inserts (no ID) and updates (ID)
-        const toInsert = payload.filter(p => !p.id);
-        const toUpdate = payload.filter(p => p.id);
+        // Strategy: Check if we have ANY entry in `pricing_base` for this table.
+        const { count } = await supabase.from('pricing_base').select('*', { count: 'exact', head: true }).eq('source_import_id', tableId);
+        const isManualTable = (count || 0) > 0;
 
         let error = null;
 
-        if (toInsert.length > 0) {
-            const { error: insertErr } = await supabase.from('price_matrix_entries').insert(toInsert);
-            if (insertErr) error = insertErr;
-        }
+        if (isManualTable) {
+            // Save to pricing_base
+            const manualPayload = changed.map(e => ({
+                id: e.id && e.id.includes('-') ? e.id : undefined, // Check if valid UUID, though we might not have it for new rows
+                source_import_id: tableId,
+                width_mm: e.width_mm,
+                depth_mm: e.projection_mm, // Map projection -> depth
+                price_upe_net_eur: e.price,
+                // Reconstruct fields from properties
+                model_family: e.properties?.model_family || 'Unknown',
+                construction_type: e.properties?.construction_type || 'wall',
+                cover_type: e.properties?.cover_type || 'unknown',
+                zone: e.properties?.zone || 1,
+                posts_count: e.properties?.posts,
+                fields_count: e.properties?.fields,
+                area_m2: e.properties?.area,
+                variant_note: e.properties?.variant_note
+            }));
 
-        if (toUpdate.length > 0 && !error) {
-            const { error: updateErr } = await supabase.from('price_matrix_entries').upsert(toUpdate);
-            if (updateErr) error = updateErr;
+            const { error: manualErr } = await supabase.from('pricing_base').upsert(manualPayload, { onConflict: 'model_family, construction_type, cover_type, zone, width_mm, depth_mm' });
+            if (manualErr) error = manualErr;
+
+        } else {
+            // Standard Save
+            const payload = changed.map(e => ({
+                id: e.id,
+                price_table_id: tableId,
+                width_mm: e.width_mm,
+                projection_mm: e.projection_mm,
+                price: e.price,
+                structure_price: e.structure_price,
+                glass_price: e.glass_price,
+                properties: e.properties
+            }));
+
+            // Split into inserts (no ID) and updates (ID)
+            const toInsert = payload.filter(p => !p.id);
+            const toUpdate = payload.filter(p => p.id);
+
+            if (toInsert.length > 0) {
+                const { error: insertErr } = await supabase.from('price_matrix_entries').insert(toInsert);
+                if (insertErr) error = insertErr;
+            }
+
+            if (toUpdate.length > 0 && !error) {
+                const { error: updateErr } = await supabase.from('price_matrix_entries').upsert(toUpdate);
+                if (updateErr) error = updateErr;
+            }
         }
 
         if (error) {
@@ -284,7 +406,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         setSaving(false);
     };
 
-    const handlePaste = async (e: React.ClipboardEvent, width: number, projection: number) => {
+    const handlePaste = async (e: React.ClipboardEvent, width: number, projection: number, targetField?: string) => {
         // Try getting text from clipboard
         const text = e.clipboardData.getData('text');
 
@@ -304,7 +426,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         e.preventDefault();
         console.log('Smart Paste Activated');
 
-        setPasteOrigin({ width, projection });
+        setPasteOrigin({ width, projection, targetField: targetField as keyof MatrixEntry });
         setSmartPasteText(text);
 
         // Open modal immediately to show feedback
@@ -501,7 +623,9 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                     <div className="flex bg-slate-800 rounded p-1">
                         <button onClick={() => setViewMode('list')} className={`px-3 py-1 rounded text-xs ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>Lista</button>
                         <button onClick={() => setViewMode('grid')} className={`px-3 py-1 rounded text-xs ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>Siatka</button>
+                        <button onClick={() => setViewMode('grid')} className={`px-3 py-1 rounded text-xs ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>Siatka</button>
                         <button onClick={() => setViewMode(viewMode === 'groups' ? 'list' : 'groups')} className={`px-3 py-1 rounded text-xs ${viewMode === 'groups' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}>Komponenty</button>
+                        <button onClick={() => setViewMode('manual_list')} className={`px-3 py-1 rounded text-xs ${viewMode === 'manual_list' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}>Manual</button>
                     </div>
 
                     <div className="flex gap-2">
@@ -930,44 +1054,161 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                                     </table>
                                 </div>
                             )}
+
+                            {viewMode === 'manual_list' && (
+                                <div className="p-0">
+                                    <div className="bg-amber-50 border-b border-amber-100 p-2 text-center text-xs text-amber-800 font-medium sticky top-0 z-20 flex justify-between items-center px-4">
+                                        <span>Tryb edycji manualnej (Aluxe) - Widok Scalony</span>
+                                        <button onClick={loadMatrix} className="text-amber-600 hover:text-amber-900 border border-amber-200 rounded px-2 hover:bg-amber-100 transition-colors">Odśwież</button>
+                                    </div>
+                                    <table className="w-full text-xs border-collapse bg-white">
+                                        <thead className="bg-slate-50 text-slate-500 font-bold border-b sticky top-8 z-10 shadow-sm">
+                                            <tr>
+                                                <th className="p-2 border-r min-w-[60px]">Szer.</th>
+                                                <th className="p-2 border-r min-w-[60px]">Głęb.</th>
+                                                <th className="p-2 border-r min-w-[120px]">Model/Strefa</th>
+
+                                                {/* Base Price Column */}
+                                                <th className="p-2 border-r min-w-[100px] text-right bg-blue-50 text-blue-900 border-l border-blue-200">
+                                                    Cena Podstawowa<br />
+                                                    <span className="text-[9px] font-normal opacity-70">(Clear/Opal/Konstr.)</span>
+                                                </th>
+
+                                                {/* Relax Price Column */}
+                                                <th className="p-2 border-r min-w-[100px] text-right bg-purple-50 text-purple-900 border-l border-purple-200">
+                                                    Cena Relax<br />
+                                                    <span className="text-[9px] font-normal opacity-70">(IQ Relax/Tinted)</span>
+                                                </th>
+
+                                                <th className="p-2 border-r min-w-[50px]">Słupy</th>
+                                                <th className="p-2 border-r min-w-[50px]">Pola</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {groupedManualEntries.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-8 text-center text-slate-400 bg-slate-50/50">
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <span className="text-2xl">📭</span>
+                                                            <span className="font-bold">Brak danych w tym cenniku</span>
+                                                            <p className="text-xs max-w-xs">
+                                                                Może to oznaczać brak importu lub brak uprawnień (RLS) do odczytu danych manualnych.
+                                                            </p>
+                                                            <button
+                                                                onClick={() => loadMatrix()}
+                                                                className="mt-2 text-blue-600 hover:text-blue-800 text-xs font-bold underline"
+                                                            >
+                                                                Odśwież dane
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                groupedManualEntries.map((group, idx) => (
+                                                    <tr key={`${group.width}-${group.depth}-${idx}`} className="hover:bg-slate-50 font-mono">
+                                                        <td className="p-1 border-r text-center">{group.width}</td>
+                                                        <td className="p-1 border-r text-center">{group.depth}</td>
+                                                        <td className="p-1 border-r">
+                                                            <div className="text-[10px] text-slate-400 mb-0.5 flex items-center gap-1">
+                                                                <span>{group.baseEntry?.properties?.model_family || group.relaxEntry?.properties?.model_family}</span>
+                                                                {(group.baseEntry?.properties?.variant_note || group.relaxEntry?.properties?.variant_note) && (
+                                                                    <span title="Dopisek / Wzmocnienie" className="text-red-600 font-extrabold bg-red-100 px-1.5 rounded text-[10px] border border-red-200 shadow-sm">
+                                                                        {group.baseEntry?.properties?.variant_note || group.relaxEntry?.properties?.variant_note}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <select
+                                                                className="bg-transparent w-full text-[10px]"
+                                                                value={group.zone}
+                                                                onChange={e => {
+                                                                    // Update all entries in this group
+                                                                    [group.baseEntry, group.relaxEntry, ...group.otherEntries].forEach(entry => {
+                                                                        if (entry) handleEntryChange(entry.id, 'prop_zone', e.target.value);
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <option value="1">Strefa 1</option>
+                                                                <option value="2">Strefa 2</option>
+                                                                <option value="3">Strefa 3</option>
+                                                            </select>
+                                                        </td>
+
+                                                        {/* Base Price Input */}
+                                                        <td className="p-1 border-r text-right bg-blue-50/10">
+                                                            {group.baseEntry ? (
+                                                                <input
+                                                                    className={`text-right font-bold w-full p-1 border rounded ${group.baseEntry._changed ? 'bg-amber-50 border-amber-300' : 'border-transparent hover:border-blue-200'}`}
+                                                                    value={group.baseEntry.price}
+                                                                    onChange={e => handleEntryChange(group.baseEntry!.id, 'price', e.target.value)}
+                                                                />
+                                                            ) : (
+                                                                <span className="text-slate-300 text-center block">-</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Relax Price Input */}
+                                                        <td className="p-1 border-r text-right bg-purple-50/10">
+                                                            {group.relaxEntry ? (
+                                                                <input
+                                                                    className={`text-right font-bold w-full p-1 border rounded text-purple-700 ${group.relaxEntry._changed ? 'bg-amber-50 border-amber-300' : 'border-transparent hover:border-purple-200'}`}
+                                                                    value={group.relaxEntry.price}
+                                                                    onChange={e => handleEntryChange(group.relaxEntry!.id, 'price', e.target.value)}
+                                                                />
+                                                            ) : (
+                                                                <span className="text-slate-300 text-center block text-xs italic opacity-50">Brak wariantu</span>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="p-1 border-r text-center text-slate-400">{group.baseEntry?.properties?.posts || group.relaxEntry?.properties?.posts || '-'}</td>
+                                                        <td className="p-1 border-r text-center text-slate-400">{group.baseEntry?.properties?.fields || group.relaxEntry?.properties?.fields || '-'}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
                         </>
                     )
                 }
                 {/* Smart Paste Modal */}
-                {isSmartPasteOpen && pasteOrigin && (
-                    <SmartPastePreviewModal
-                        isOpen={isSmartPasteOpen}
-                        onClose={() => setIsSmartPasteOpen(false)}
-                        onConfirm={confirmSmartPaste}
-                        parsedRows={smartPasteRows}
-                        startColIndex={widths.indexOf(pasteOrigin.width)}
-                        startRowIndex={projections.indexOf(pasteOrigin.projection)}
-                        targetWidths={widths}
-                        targetProjections={projections}
-                        isLoading={isSmartPasteLoading}
-                        originalText={smartPasteText}
-                        // Product Context
-                        products={products}
-                        selectedProductId={selectedProductId}
-                        onProductChange={async (id) => {
-                            setSelectedProductId(id);
-                            // Also update the table in DB immediately if user changes it here
-                            try {
-                                await supabase.from('price_tables').update({ product_definition_id: id }).eq('id', tableId);
-                                toast.success('Zaktualizowano model zadaszenia');
-                            } catch (e) {
-                                console.error(e);
-                                toast.error('Błąd zapisu modelu');
+                {
+                    isSmartPasteOpen && pasteOrigin && (
+                        <SmartPastePreviewModal
+                            isOpen={isSmartPasteOpen}
+                            onClose={() => setIsSmartPasteOpen(false)}
+                            onConfirm={confirmSmartPaste}
+                            parsedRows={smartPasteRows}
+                            startColIndex={widths.indexOf(pasteOrigin.width)}
+                            startRowIndex={projections.indexOf(pasteOrigin.projection)}
+                            targetWidths={widths}
+                            targetProjections={projections}
+                            isLoading={isSmartPasteLoading}
+                            originalText={smartPasteText}
+                            // Product Context
+                            products={products}
+                            selectedProductId={selectedProductId}
+                            onProductChange={async (id) => {
+                                setSelectedProductId(id);
+                                // Also update the table in DB immediately if user changes it here
+                                try {
+                                    await supabase.from('price_tables').update({ product_definition_id: id }).eq('id', tableId);
+                                    toast.success('Zaktualizowano model zadaszenia');
+                                } catch (e) {
+                                    console.error(e);
+                                    toast.error('Błąd zapisu modelu');
+                                }
+                            }}
+                            targetFieldName={
+                                pasteOrigin.targetField === 'glass_price' ? 'Szklane' :
+                                    pasteOrigin.targetField === 'structure_price' ? 'Konstrukcja' :
+                                        'Cena Całkowita'
                             }
-                        }}
-                        targetFieldName={
-                            pasteOrigin.targetField === 'glass_price' ? 'Szklane' :
-                                pasteOrigin.targetField === 'structure_price' ? 'Konstrukcja' :
-                                    'Cena Całkowita'
-                        }
-                    />
-                )}
-            </div>
+                        />
+                    )
+                }
+            </div >
         </div >
     );
 };

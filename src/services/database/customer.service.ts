@@ -130,34 +130,49 @@ export const CustomerService = {
     },
 
     async createCustomer(customer: Omit<Customer, 'id'>): Promise<Customer> {
+        // [Sanitization] Convert empty strings to null to avoid Unique Constraint violations
+        const safeCustomer = {
+            ...customer,
+            email: customer.email?.trim() || null,
+            phone: customer.phone?.trim() || null,
+            companyName: customer.companyName?.trim() || null,
+            postalCode: customer.postalCode?.trim() || null,
+            city: customer.city?.trim() || null,
+            street: customer.street?.trim() || null,
+            houseNumber: customer.houseNumber?.trim() || null,
+        };
+
         const { data, error } = await supabase
             .from('customers')
-            .insert([customer])
+            .insert([safeCustomer])
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error creating customer:', error);
+            throw error;
+        }
         return data;
     },
 
     async ensureCustomer(customer: Omit<Customer, 'id'>): Promise<Customer> {
         // 1. Try to find by email
-        if (customer.email) {
+        if (customer.email && customer.email.trim()) {
             const { data: existing } = await supabase
                 .from('customers')
                 .select('*')
-                .eq('email', customer.email)
+                .eq('email', customer.email.trim())
                 .maybeSingle();
 
             if (existing) return existing;
         }
 
         // 2. Try to find by Phone
-        if (customer.phone) {
+        if (customer.phone && customer.phone.trim()) {
             const { data: existing } = await supabase
                 .from('customers')
                 .select('*')
-                .eq('phone', customer.phone) // Note: Phone normalization might be needed
+                .eq('phone', customer.phone.trim())
                 .maybeSingle();
 
             if (existing) return existing;

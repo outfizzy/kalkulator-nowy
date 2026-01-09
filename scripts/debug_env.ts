@@ -1,16 +1,16 @@
 
-import * as dotenv from 'dotenv';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+import * as dotenv from 'dotenv'; // Ensure wildcart import if using typical setup
 
 const envPath = path.resolve(process.cwd(), '.env.local');
-console.log('Loading env from:', envPath);
+console.log('Checking env file at:', envPath);
 
-try {
-    const file = fs.readFileSync(envPath);
-    console.log('File found, size:', file.length);
-    const envConfig = dotenv.parse(file);
-    console.log('Keys found:', Object.keys(envConfig));
-} catch (e) {
-    console.error('Error reading env:', e);
+if (fs.existsSync(envPath)) {
+    console.log('File exists.');
+    const fileContent = fs.readFileSync(envPath);
+    const config = dotenv.parse(fileContent);
+    console.log('Keys found:', Object.keys(config));
+} else {
+    console.log('File does NOT exist.');
 }

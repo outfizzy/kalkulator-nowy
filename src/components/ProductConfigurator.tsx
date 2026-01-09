@@ -8,13 +8,13 @@ import { SlidingDoorSelector } from './configurator/SlidingDoorSelector';
 import { AluminumWallSelector } from './configurator/AluminumWallSelector';
 import { AwningSelector } from './configurator/AwningSelector';
 import { WPCFlooringSelector } from './configurator/WPCFlooringSelector';
-import trendstyleData from '../data/trendstyle_full.json';
-import orangelineData from '../data/orangeline_full.json';
-import topstyleData from '../data/topstyle_full.json';
-import topstyleXlData from '../data/topstyle_xl_full.json';
-import skystyleData from '../data/skystyle_full.json';
-import ultrastyleData from '../data/ultrastyle_full.json';
-import carportData from '../data/carport_full.json';
+// import trendstyleData from '../data/trendstyle_full.json'; // Removed legacy
+// import orangelineData from '../data/orangeline_full.json'; // Removed legacy
+// import topstyleData from '../data/topstyle_full.json'; // Removed legacy
+// import topstyleXlData from '../data/topstyle_xl_full.json'; // Removed legacy
+// import skystyleData from '../data/skystyle_full.json'; // Removed legacy
+// import ultrastyleData from '../data/ultrastyle_full.json'; // Removed legacy
+// import carportData from '../data/carport_full.json'; // Removed legacy
 import { formatCurrency } from '../utils/translations';
 import { toast } from 'react-hot-toast';
 import { PricingService, type AdditionalCost } from '../services/pricing.service';
@@ -25,6 +25,9 @@ interface ProductDefinition {
     code: string;
     name: string;
     description: string;
+    image_url?: string;
+    standard_colors?: string[];
+    custom_color_surcharge_percentage?: number;
 }
 
 interface ExternalOfferItem {
@@ -80,13 +83,47 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [priceLoading, setPriceLoading] = useState(false);
     const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
     const [surchargesBreakdown, setSurchargesBreakdown] = useState<{ name: string, price: number }[]>([]);
-    const [availableSurcharges, setAvailableSurcharges] = useState<{ id: string, name: string, price_table_id: string }[]>([]);
+    const [availableSurcharges, setAvailableSurcharges] = useState<{ id: string, name: string, price?: number }[]>([]);
     const [products, setProducts] = useState<ProductDefinition[]>([]);
 
-    // Component Lists (Imported Components)
-    const [componentLists, setComponentLists] = useState<{ table: any, entries: any[] }[]>([]);
-    const [matrixTables, setMatrixTables] = useState<{ table: any, entries: any[] }[]>([]);
+    // Addons Data
+    const [addonGroups, setAddonGroups] = useState<{
+        walls: any[];
+        sliding: any[];
+        keilfenster: any[];
+        lighting: any[];
+        heating: any[];
+        awnings: any[];
+        panorama: any[];
+        wpc: any[];
+        accessories: any[]; // General accessories
+    }>({
+        walls: [],
+        sliding: [],
+        keilfenster: [],
+        lighting: [],
+        heating: [],
+        awnings: [],
+        panorama: [],
+        wpc: [],
+        accessories: []
+    });
+
     const [loadingComponents, setLoadingComponents] = useState(false);
+
+    // New: Effective Dimensions & Error State
+    const [matchedDimensions, setMatchedDimensions] = useState<{ width: number, projection: number } | null>(null);
+    const [priceError, setPriceError] = useState<string | null>(null);
+    const [variantNote, setVariantNote] = useState<string | null>(null);
+
+    // Dynamic Limits State
+    const [limits, setLimits] = useState({ minWidth: 2000, maxWidth: 10000, minDepth: 2000, maxDepth: 5000 });
+
+    // Fetch Limits when model changes
+    useEffect(() => {
+        if (!config.modelId) return;
+        PricingService.getProductLimits(config.modelId).then(setLimits);
+    }, [config.modelId]);
 
     // Fetch Price when attributes change
     useEffect(() => {
@@ -99,19 +136,21 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 let calculatedSubtype = (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard';
 
                 // MAPPING FIX: imported Aluxe tables use generic 'glass'/'polycarbonate' subtypes for standard variants
-                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId)) {
+                // AND map specific dropdown keys (ir-gold) to DB keys (poly_iq_relax)
+                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId.toLowerCase())) {
                     if (config.roofType === 'glass' && calculatedSubtype === 'standard') {
-                        calculatedSubtype = 'glass' as any;
+                        calculatedSubtype = 'glass_clear' as any;
                     }
-                    if (config.roofType === 'polycarbonate' && calculatedSubtype === 'standard') {
-                        calculatedSubtype = 'polycarbonate' as any;
+                    if (config.roofType === 'polycarbonate') {
+                        if (calculatedSubtype === 'standard') calculatedSubtype = 'poly_clear' as any;
+                        if (calculatedSubtype === 'ir-gold') calculatedSubtype = 'poly_iq_relax' as any; // Map Gold -> Relax
                     }
                 }
 
                 const attributes: Record<string, string> = {
                     snow_zone: config.snowZone ? String(config.snowZone) : '1',
                     roof_type: config.roofType, // 'polycarbonate', 'glass', or 'tin'
-                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'freestanding',
+                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'free',
                     subtype: calculatedSubtype,
                     // Add other attributes if needed (e.g. post height range)
                 };
@@ -119,12 +158,58 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 // 2. Get Matrix Price
                 const matrix = await PricingService.getPriceMatrix(config.modelId, attributes);
                 let price = 0;
+                let foundBasePrice = false;
+                let currentVariantNote: string | null = null;
 
                 if (matrix.length > 0) {
-                    price = PricingService.calculateMatrixPrice(matrix, config.width, config.projection);
+                    const detail = PricingService.getDetailedPrice(matrix, config.width, config.projection);
+                    if (detail && detail.total > 0) {
+                        price = detail.total;
+                        // Extract variant note if present
+                        if ('variant_note' in detail && typeof detail.variant_note === 'string') {
+                            currentVariantNote = detail.variant_note;
+                        }
+                        foundBasePrice = true;
+
+                        // Update Structural Config (Posts/Fields) from DB
+                        const newPosts = detail.properties?.posts_count || detail.properties?.posts;
+                        const newFields = detail.properties?.fields_count || detail.properties?.fields;
+
+                        // Only update if changed to avoid unnecessary re-renders (though safe due to dep array)
+                        if (newPosts && newFields && (newPosts !== config.numberOfPosts || newFields !== config.numberOfFields)) {
+                            setConfig(prev => ({ ...prev, numberOfPosts: newPosts, numberOfFields: newFields }));
+                        }
+
+                        if (detail.properties?.matchedWidth && detail.properties?.matchedProjection) {
+                            setMatchedDimensions({
+                                width: detail.properties.matchedWidth,
+                                projection: detail.properties.matchedProjection
+                            });
+                        } else {
+                            setMatchedDimensions(null);
+                        }
+                    } else {
+                        setMatchedDimensions(null);
+                    }
+                } else {
+                    setMatchedDimensions(null);
                 }
 
-                // 2.5 Apply Table Configuration Surcharges (e.g. Free Standing, Glass, Color)
+                // Check for missing table (Snow Zone Gap)
+                if (!foundBasePrice) {
+                    const tableExists = await PricingService.checkPriceTableExists();
+                    if (!tableExists) {
+                        setPriceError('Brak cennika dla wybranej strefy śniegowej. Prosimy o kontakt w celu wyceny indywidualnej.');
+                    } else {
+                        // Table exists but no price for dimension? Either 0 or just not found.
+                        // If it's 0, it might be valid (unlikely for base price).
+                        setPriceError(null);
+                    }
+                } else {
+                    setPriceError(null);
+                }
+
+                // 2.5 Apply Table Configuration Surcharges (e.g. Glass, Color)
                 const { config: tableConfig, attributes: tableAttributes } = await PricingService.getTableConfig(config.modelId, attributes);
 
                 const surchargeResult = PricingService.calculateSurcharges(
@@ -137,6 +222,16 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         roofType: config.roofType
                     }
                 );
+
+                // --- NEW: Apply Database Surcharges for Freestanding (Global Logic) ---
+                if (config.installationType === 'freestanding') {
+                    const fsSurcharge = await PricingService.getSurchargePrice(config.modelId, 'freestanding', config.width);
+                    if (fsSurcharge > 0) {
+                        surchargeResult.total += fsSurcharge;
+                        surchargeResult.items.push({ name: 'Dopłata: Konstrukcja Wolnostojąca', price: fsSurcharge });
+                    }
+                }
+                // ---------------------------------------------------------------------
 
                 if (surchargeResult.total > 0) {
                     price += surchargeResult.total;
@@ -157,7 +252,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     for (const surchargeId of config.selectedSurcharges) {
                         const surchargeMeta = availableSurcharges.find(s => s.id === surchargeId);
                         if (surchargeMeta) {
-                            const surchargePrice = await PricingService.getSurchargePrice(surchargeMeta.price_table_id, config.width, config.projection);
+                            const surchargePrice = await PricingService.getSurchargePrice(config.modelId, surchargeMeta.id, config.width);
                             if (surchargePrice > 0) {
                                 price += surchargePrice;
                                 surchargeResult.items.push({
@@ -165,6 +260,21 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                     price: surchargePrice
                                 });
                             }
+                        }
+                    }
+                }
+
+                // 2.7 Custom Color Surcharge
+                if (config.customColor) {
+                    const selectedProduct = products.find(p => p.code === config.modelId);
+                    if (selectedProduct && selectedProduct.custom_color_surcharge_percentage) {
+                        const colorSurcharge = price * (selectedProduct.custom_color_surcharge_percentage / 100);
+                        if (colorSurcharge > 0) {
+                            price += colorSurcharge;
+                            surchargeResult.items.push({
+                                name: `Kolor Niestandardowy (+${selectedProduct.custom_color_surcharge_percentage}%)`,
+                                price: colorSurcharge
+                            });
                         }
                     }
                 }
@@ -180,6 +290,16 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 // 3. Get Additional Costs (Surcharges for this specific variant)
                 const surcharges = await PricingService.getAdditionalCosts(config.modelId, attributes);
                 setAdditionalCosts(surcharges);
+
+                // Set variant note for UI display
+                if (currentVariantNote) {
+                    setPriceError(null); // Clear errors if any
+                    // We might want to store this in a state variable to display it
+                    setVariantNote(currentVariantNote);
+                } else {
+                    setVariantNote(null);
+                }
+
 
             } catch (err) {
                 console.error("Pricing error", err);
@@ -199,15 +319,15 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             try {
                 let calculatedSubtype: string = (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard';
                 // Normalization for Aluxe defaults
-                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId)) {
-                    if (config.roofType === 'glass' && calculatedSubtype === 'standard') calculatedSubtype = 'glass' as any;
-                    if (config.roofType === 'polycarbonate' && calculatedSubtype === 'standard') calculatedSubtype = 'polycarbonate' as any;
+                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId.toLowerCase())) {
+                    if (config.roofType === 'glass' && calculatedSubtype === 'standard') calculatedSubtype = 'glass_clear' as any;
+                    if (config.roofType === 'polycarbonate' && calculatedSubtype === 'standard') calculatedSubtype = 'poly_clear' as any;
                 }
 
                 const attributes: Record<string, string> = {
                     snow_zone: config.snowZone ? String(config.snowZone) : '1',
                     roof_type: config.roofType,
-                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'freestanding',
+                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'free',
                     subtype: calculatedSubtype
                 };
 
@@ -220,36 +340,44 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         fetchSurcharges();
     }, [config.modelId, config.roofType, config.snowZone, config.installationType, config.glassType, config.polycarbonateType]);
 
-    // Fetch Component Lists
+    // Fetch Addon Groups
     useEffect(() => {
         const fetchComponents = async () => {
-            if (!config.modelId) return;
             setLoadingComponents(true);
             try {
-                // Determine context attributes if needed
-                const attributes: Record<string, string> = {
-                    provider: 'Aluxe' // Or detect based on model
-                };
-                // Fetch all component lists that are active
-                // For now we fetch ALL and maybe filter by provider later? 
-                // Or simply show all available lists regardless of model?
-                // Ideally we should filter by provider or model family if tagged.
-                // But the requirement implies "Imported Component Lists" are generic or manually selected.
+                // Fetch all groups in parallel
+                const [walls, sliding, keil, light, heat, awnings, panorama, wpc, accessories] = await Promise.all([
+                    PricingService.getAddonsByGroup('walls_aluminum'),
+                    PricingService.getAddonsByGroup('sliding_doors'),
+                    PricingService.getAddonsByGroup('keilfenster'),
+                    PricingService.getAddonsByGroup('lighting'),
+                    PricingService.getAddonsByGroup('heating'),
+                    PricingService.getAddonsByGroup('awnings'),
+                    PricingService.getAddonsByGroup('panorama'),
+                    PricingService.getAddonsByGroup('wpc_floor'),
+                    PricingService.getAddonsByGroup('accessories')
+                ]);
 
-                const lists = await PricingService.getComponentLists(attributes);
-                setComponentLists(lists);
-
-                const matrices = await PricingService.getAccessoryMatrices(['keilfenster', 'frontwand', 'seitenwand', 'schiebetür']);
-                setMatrixTables(matrices);
-            } catch (error) {
-                console.error("Error fetching component lists:", error);
+                setAddonGroups({
+                    walls,
+                    sliding,
+                    keilfenster: keil,
+                    lighting: light,
+                    heating: heat,
+                    awnings,
+                    panorama,
+                    wpc,
+                    accessories
+                });
+            } catch (e) {
+                console.error("Error loading addons", e);
             } finally {
                 setLoadingComponents(false);
             }
         };
 
         fetchComponents();
-    }, [config.modelId]);
+    }, []);
 
     // Fetch Dynamic Products
     useEffect(() => {
@@ -258,7 +386,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 const data = await PricingService.getMainProducts();
                 console.log("Loaded products:", data);
                 if (data && data.length > 0) {
-                    setProducts(data);
+                    // Filter out Orangestyle+ (missing data)
+                    const filtered = data.filter(p => !p.code.includes('orangestyle_plus'));
+                    setProducts(filtered);
                 } else {
                     console.warn("No products found in DB.");
                     toast.error('Brak produktów w bazie.');
@@ -319,44 +449,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [activeWallTab, setActiveWallTab] = useState<'sliding' | 'panorama' | 'walls' | 'keil' | 'awning' | 'lighting' | 'accessories' | 'floor'>('sliding');
 
     const basePrice = useMemo(() => {
-        // If we have a dynamic price from the Matrix Service, use it!
-        if (dynamicBasePrice > 0) return dynamicBasePrice;
-
-        if (!config.modelId) return 0;
-
-        let data: any = null;
-        switch (config.modelId) {
-            case 'trendstyle': data = trendstyleData; break;
-            case 'orangeline': data = orangelineData; break;
-            case 'topstyle': data = topstyleData; break;
-            case 'topstyle_xl': data = topstyleXlData; break;
-            case 'skystyle': data = skystyleData; break;
-            case 'ultrastyle': data = ultrastyleData; break;
-            case 'carport': data = carportData; break;
-            default: return 0;
-        }
-
-        if (!data) return 0;
-
-        // Find matching product
-        // Find matching product (Smart Lookup: Next Size Up)
-        const candidates = data.products.filter((p: any) => {
-            // For Skystyle check mounting type
-            if (config.modelId === 'skystyle') {
-                const mountingType = config.installationType === 'wall-mounted' ? 'wall' : 'freestanding';
-                if (p.mounting_type !== mountingType) return false;
-            }
-            // Check if product dimensions fit the requested ones
-            return p.width_mm >= config.width && p.depth_mm >= config.projection;
-        });
-
-        // Sort candidates by size (area) to find the "Next Size Up" (smallest sufficient)
-        candidates.sort((a: any, b: any) => (a.width_mm * a.depth_mm) - (b.width_mm * b.depth_mm));
-
-        const product = candidates[0];
-
-        return product ? product.price_eur : 0;
-    }, [config.modelId, config.width, config.projection, config.installationType, dynamicBasePrice]);
+        return dynamicBasePrice;
+    }, [dynamicBasePrice]);
 
     const additionalCostsTotal = useMemo(() => {
         if (!additionalCosts || additionalCosts.length === 0) return 0;
@@ -385,105 +479,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
     // --- Logic & Calculations ---
 
-    const limits = useMemo(() => {
-        const defaultLimits = { minWidth: 2000, maxWidth: 10000, minDepth: 2000, maxDepth: 5000 };
-        if (!config.modelId) return defaultLimits;
-
-        if (config.modelId === 'trendstyle' || config.modelId === 'trendstyle_plus') {
-            const modelKey = config.modelId === 'trendstyle_plus' ? 'Trendstyle+' : 'Trendstyle';
-            const entries = (trendstyleData as any).products.filter((p: any) => p.model === modelKey);
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        if (config.modelId === 'orangestyle') {
-            const entries = (orangelineData as any).products.filter((p: any) => p.model === 'Orangeline');
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        if (config.modelId === 'topstyle') {
-            const entries = (topstyleData as any).products.filter((p: any) => p.model === 'Topstyle');
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        if (config.modelId === 'topstyle_xl') {
-            const entries = (topstyleXlData as any).products.filter((p: any) => p.model === 'Topstyle XL');
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        if (config.modelId === 'skystyle') {
-            const mountingType = config.installationType === 'wall-mounted' ? 'wall' : 'freestanding';
-            const entries = (skystyleData as any).products.filter((p: any) =>
-                p.model === 'Skystyle' && p.mounting_type === mountingType
-            );
-            if (!entries.length) {
-                // Brak danych dla danego typu montażu – wracamy do domyślnego zakresu,
-                // zamiast psuć slider nieskończonymi wartościami
-                return defaultLimits;
-            }
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        if (config.modelId === 'ultrastyle') {
-            const entries = (ultrastyleData as any).products.filter((p: any) => p.model === 'Ultrastyle');
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        if (config.modelId === 'carport') {
-            const entries = (carportData as any).products.filter((p: any) => p.model === 'Carport');
-            const widths = entries.map((p: any) => p.width_mm);
-            const depths = entries.map((p: any) => p.depth_mm);
-            return {
-                minWidth: Math.min(...widths),
-                maxWidth: Math.max(...widths),
-                minDepth: Math.min(...depths),
-                maxDepth: Math.max(...depths)
-            };
-        }
-
-        return defaultLimits;
-    }, [config.modelId, config.installationType]);
+    // Limits are now handled by state `limits` fetched from DB
+    // Removed legacy local limits calculation
 
 
 
@@ -646,7 +643,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                     {products.length > 0 ? (
                                         products.map(product => (
                                             <div
-                                                key={product.id}
+                                                key={product.id || product.code}
                                                 onClick={() => {
                                                     handleBasicConfigChange('modelId', product.code);
                                                     if (product.code === 'skystyle') {
@@ -654,11 +651,30 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                         handleBasicConfigChange('glassType', 'standard');
                                                     }
                                                 }}
-                                                className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${config.modelId === product.code
+                                                className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative overflow-hidden group ${config.modelId === product.code
                                                     ? 'border-accent bg-accent/5 shadow-md'
                                                     : 'border-slate-100 hover:border-accent/30'
                                                     }`}
                                             >
+                                                {product.image_url && (
+                                                    <div className="absolute top-0 right-0 w-24 h-24 -mt-4 -mr-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                        <img
+                                                            src={product.image_url}
+                                                            alt={product.name}
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => e.currentTarget.style.display = 'none'}
+                                                        />
+                                                    </div>
+                                                )}
+                                                {product.image_url && (
+                                                    <div className="mb-3 rounded-lg overflow-hidden h-32 bg-white border border-slate-100">
+                                                        <img
+                                                            src={product.image_url}
+                                                            alt={product.name}
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                        />
+                                                    </div>
+                                                )}
                                                 <h3 className="text-lg font-bold mb-1 text-slate-900 flex justify-between items-center gap-2">
                                                     <span>{product.name}</span>
                                                     <span className="text-[10px] text-slate-400 font-normal bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 font-mono" title={`Kod systemowy: ${product.code}`}>
@@ -958,28 +974,49 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
                                             <div className="text-sm font-medium text-slate-700 mb-3">Warianty Poliwęglanu</div>
                                             <div className="space-y-2">
-                                                {/* Standard Options (Implicit) */}
+                                                {/* Clear */}
                                                 <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
                                                     <input
                                                         type="radio"
                                                         name="polyType"
-                                                        checked={config.polycarbonateType === 'standard'}
-                                                        onChange={() => handleBasicConfigChange('polycarbonateType', 'standard')}
+                                                        checked={config.polycarbonateType === 'poly_clear' || config.polycarbonateType === 'standard'} // Handle legacy 'standard'
+                                                        onChange={() => {
+                                                            handleBasicConfigChange('polycarbonateType', 'poly_clear');
+                                                            // Clear surcharges
+                                                            handleBasicConfigChange('selectedSurcharges', []);
+                                                        }}
                                                         className="w-4 h-4 text-accent focus:ring-accent"
                                                     />
                                                     <div>
-                                                        <div className="font-medium text-sm text-slate-900">Standard (Klar/Opal)</div>
+                                                        <div className="font-medium text-sm text-slate-900">Clear (Przeźroczysty)</div>
                                                         <div className="text-xs text-slate-500">Bez dopłaty</div>
                                                     </div>
                                                 </label>
 
-                                                {/* Dynamic Surcharges for Poly */}
+                                                {/* Opal */}
+                                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                    <input
+                                                        type="radio"
+                                                        name="polyType"
+                                                        checked={config.polycarbonateType === 'poly_opal'}
+                                                        onChange={() => {
+                                                            handleBasicConfigChange('polycarbonateType', 'poly_opal');
+                                                            // Clear surcharges
+                                                            handleBasicConfigChange('selectedSurcharges', []);
+                                                        }}
+                                                        className="w-4 h-4 text-accent focus:ring-accent"
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">Opal (Mleczny)</div>
+                                                        <div className="text-xs text-slate-500">Bez dopłaty</div>
+                                                    </div>
+                                                </label>
+
+                                                {/* IQ Relax / Surcharges */}
                                                 {availableSurcharges
-                                                    .filter(s => s.name.toLowerCase().includes('ir') || s.name.toLowerCase().includes('heat') || s.name.toLowerCase().includes('gold') || s.name.toLowerCase().includes('clear'))
+                                                    .filter(s => s.name.toLowerCase().includes('ir') || s.name.toLowerCase().includes('heat') || s.name.toLowerCase().includes('gold') || s.name.toLowerCase().includes('relax'))
                                                     .map(surcharge => {
                                                         const isSelected = config.selectedSurcharges?.includes(surcharge.id);
-                                                        // If selected, we assume this is the "active" poly type variant, unless we want multiple? usually one poly type.
-                                                        // Let's treat these as Mutually Exclusive variants for Poly.
                                                         return (
                                                             <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
                                                                 <input
@@ -987,18 +1024,17 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                                     name="polyType"
                                                                     checked={isSelected || false}
                                                                     onChange={() => {
-                                                                        // Logic: Select this surcharge, deselect other poly surcharges (Mutual Exclusion)
-                                                                        const polySurcharges = availableSurcharges.filter(s => s.name.toLowerCase().match(/ir|heat|gold|clear|mat/)).map(s => s.id);
+                                                                        handleBasicConfigChange('polycarbonateType', 'poly_iq_relax'); // Internal type for logic
+                                                                        const polySurcharges = availableSurcharges.filter(s => s.name.toLowerCase().match(/ir|heat|gold|relax/)).map(s => s.id);
                                                                         const current = config.selectedSurcharges || [];
                                                                         const othersRemoved = current.filter(id => !polySurcharges.includes(id));
                                                                         handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
-                                                                        handleBasicConfigChange('polycarbonateType', 'custom');
                                                                     }}
                                                                     className="w-4 h-4 text-accent focus:ring-accent"
                                                                 />
                                                                 <div>
                                                                     <div className="font-medium text-sm text-slate-900">{surcharge.name}</div>
-                                                                    <div className="text-xs text-slate-500">Opcja dodatkowa</div>
+                                                                    <div className="text-xs text-slate-500">Opcja dodatkowa (+{surcharge.price} EUR)</div>
                                                                 </div>
                                                             </label>
                                                         );
@@ -1012,52 +1048,80 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4 space-y-3">
                                             <div className="text-sm font-medium text-slate-700">Wariant szkła</div>
                                             <div className="space-y-2">
-                                                {/* Standard */}
+                                                {/* Clear (Standard) */}
                                                 <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
                                                     <input
                                                         type="radio"
                                                         name="glassType"
-                                                        checked={config.glassType === 'standard' && (!config.selectedSurcharges || config.selectedSurcharges.filter(id => availableSurcharges.find(s => s.id === id)?.name.match(/mat|sun|milch/i)).length === 0)}
+                                                        checked={config.glassType === 'glass_clear' || config.glassType === 'standard'}
                                                         onChange={() => {
-                                                            handleBasicConfigChange('glassType', 'standard');
-                                                            // Uncheck Glass Surcharges
-                                                            const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|sun|milch/i)).map(s => s.id);
+                                                            handleBasicConfigChange('glassType', 'glass_clear');
+                                                            // Remove glass surcharges
+                                                            const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|sun|milch|opal|tint/i)).map(s => s.id);
                                                             const current = config.selectedSurcharges || [];
                                                             handleBasicConfigChange('selectedSurcharges', current.filter(id => !glassSurcharges.includes(id)));
                                                         }}
                                                         className="w-4 h-4 text-accent focus:ring-accent"
                                                     />
                                                     <div>
-                                                        <div className="font-medium text-sm text-slate-900">Standard (Przeźroczyste 44.2)</div>
-                                                        <div className="text-xs text-slate-500">Bez dopłaty</div>
+                                                        <div className="font-medium text-sm text-slate-900">Przeźroczyste (Clear 44.2)</div>
+                                                        <div className="text-xs text-slate-500">Standard</div>
                                                     </div>
                                                 </label>
 
-                                                {/* Dynamic Surcharges for Glass (Matt, Sun Protection) */}
+                                                {/* Opal (Matte) - Check if it's a surcharge or distinct type in DB */}
+                                                {/* Assuming Surcharge for Opal/Matt based on prior Importer logic */}
                                                 {availableSurcharges
-                                                    .filter(s => s.name.match(/mat|sun|milch|protec/i))
+                                                    .filter(s => s.name.match(/mat|milch|opal/i))
                                                     .map(surcharge => {
                                                         const isSelected = config.selectedSurcharges?.includes(surcharge.id);
                                                         return (
                                                             <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
                                                                 <input
-                                                                    type="radio" // Treat as Radio for Glass Types? usually mutually exclusive (Matt OR Sun Protection)
+                                                                    type="radio"
                                                                     name="glassType"
                                                                     checked={isSelected || false}
                                                                     onChange={() => {
-                                                                        // Select this surcharge, deselect other glass surcharges
-                                                                        const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|sun|milch|protec/i)).map(s => s.id);
+                                                                        handleBasicConfigChange('glassType', 'glass_opal');
+                                                                        // Handle mutually exclusive glass surcharges
+                                                                        const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|milch|opal|tint|sun/i)).map(s => s.id);
                                                                         const current = config.selectedSurcharges || [];
                                                                         const othersRemoved = current.filter(id => !glassSurcharges.includes(id));
                                                                         handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
-                                                                        if (surcharge.name.match(/mat|milch/i)) handleBasicConfigChange('glassType', 'mat');
-                                                                        else handleBasicConfigChange('glassType', 'sunscreen');
                                                                     }}
                                                                     className="w-4 h-4 text-accent focus:ring-accent"
                                                                 />
                                                                 <div>
-                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name}</div>
-                                                                    <div className="text-xs text-slate-500">Dopłata specjalna</div>
+                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name} (Opal)</div>
+                                                                    <div className="text-xs text-slate-500">Dopłata (+{surcharge.price} EUR)</div>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+
+                                                {/* Tinted (Sun Protection) */}
+                                                {availableSurcharges
+                                                    .filter(s => s.name.match(/sun|tint|protec/i))
+                                                    .map(surcharge => {
+                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
+                                                        return (
+                                                            <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="glassType"
+                                                                    checked={isSelected || false}
+                                                                    onChange={() => {
+                                                                        handleBasicConfigChange('glassType', 'glass_tinted');
+                                                                        const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|milch|opal|tint|sun/i)).map(s => s.id);
+                                                                        const current = config.selectedSurcharges || [];
+                                                                        const othersRemoved = current.filter(id => !glassSurcharges.includes(id));
+                                                                        handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
+                                                                    }}
+                                                                    className="w-4 h-4 text-accent focus:ring-accent"
+                                                                />
+                                                                <div>
+                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name} (Przyciemniane)</div>
+                                                                    <div className="text-xs text-slate-500">Dopłata (+{surcharge.price} EUR)</div>
                                                                 </div>
                                                             </label>
                                                         );
@@ -1102,27 +1166,90 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                 <div className="space-y-4">
                                     <label className="block text-sm font-medium text-slate-700">Kolor konstrukcji</label>
                                     <div className="grid grid-cols-2 gap-3">
-                                        {[
-                                            { name: 'RAL 7016', label: 'Anthrazit', hex: '#383e42' },
-                                            { name: 'RAL 9016', label: 'Weiß', hex: '#f1f0ea' },
-                                            { name: 'RAL 9005', label: 'Schwarz', hex: '#0e0e10' },
-                                            { name: 'RAL 9007', label: 'Graualuminium', hex: '#878581' }
-                                        ].map(c => (
-                                            <div
-                                                key={c.name}
-                                                onClick={() => handleBasicConfigChange('color', c.name)}
-                                                className={`cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all ${config.color === c.name
-                                                    ? 'border-accent bg-accent/5 ring-1 ring-accent/20'
-                                                    : 'border-slate-200 hover:border-accent/30'
-                                                    }`}
-                                            >
-                                                <div className="w-8 h-8 rounded-full border border-slate-300 shadow-sm" style={{ backgroundColor: c.hex }} />
-                                                <div>
-                                                    <div className="font-bold text-sm text-slate-900">{c.name}</div>
-                                                    <div className="text-xs text-slate-500">{c.label}</div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                        {(() => {
+                                            const selectedProduct = products.find(p => p.code === config.modelId);
+                                            // Default colors if none defined
+                                            const defaultColors = ['RAL 7016', 'RAL 9016', 'RAL 9005', 'RAL 9007'];
+                                            const productColors = (selectedProduct?.standard_colors && selectedProduct.standard_colors.length > 0)
+                                                ? selectedProduct.standard_colors
+                                                : defaultColors;
+
+                                            // Helper to get hex for preview (simple mapping)
+                                            const getHex = (name: string) => {
+                                                const n = name.toUpperCase();
+                                                if (n.includes('7016')) return '#383e42';
+                                                if (n.includes('9016')) return '#f1f0ea';
+                                                if (n.includes('9005')) return '#0e0e10';
+                                                if (n.includes('9007')) return '#878581';
+                                                if (n.includes('9001')) return '#fdf4e3'; // Cream
+                                                if (n.includes('8014')) return '#4f3b33'; // Sepia brown
+                                                return '#cccccc'; // Default gray
+                                            };
+
+                                            return (
+                                                <>
+                                                    {productColors.map(c => (
+                                                        <div
+                                                            key={c}
+                                                            onClick={() => handleBasicConfigChange('color', c)}
+                                                            className={`cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all ${config.color === c && !config.customColor
+                                                                ? 'border-accent bg-accent/5 ring-1 ring-accent/20'
+                                                                : 'border-slate-200 hover:border-accent/30'
+                                                                }`}
+                                                        >
+                                                            <div className="w-8 h-8 rounded-full border border-slate-300 shadow-sm" style={{ backgroundColor: getHex(c) }} />
+                                                            <div>
+                                                                <div className="font-bold text-sm text-slate-900">{c}</div>
+                                                                <div className="text-xs text-slate-500">Standard</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Custom Color Option */}
+                                                    <div
+                                                        onClick={() => {
+                                                            handleBasicConfigChange('customColor', !config.customColor);
+                                                            // Reset specific color if toggling on
+                                                            if (!config.customColor) {
+                                                                handleBasicConfigChange('color', 'Niestandardowy');
+                                                            } else {
+                                                                handleBasicConfigChange('color', productColors[0]);
+                                                            }
+                                                        }}
+                                                        className={`cursor-pointer flex flex-col justify-center gap-1 p-3 rounded-xl border transition-all ${config.customColor
+                                                            ? 'border-accent bg-accent/5 ring-1 ring-accent/20'
+                                                            : 'border-slate-200 hover:border-accent/30'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full border border-slate-300 shadow-sm bg-gradient-to-br from-red-500 via-green-500 to-blue-500" />
+                                                            <div className="font-bold text-sm text-slate-900">Inny Kolor</div>
+                                                        </div>
+                                                        {selectedProduct?.custom_color_surcharge_percentage ? (
+                                                            <div className="text-xs text-red-500 font-medium mt-1">
+                                                                Dopłata +{selectedProduct.custom_color_surcharge_percentage}%
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-xs text-slate-500 mt-1">Wycena indywidualna</div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Custom Color Input */}
+                                                    {config.customColor && (
+                                                        <div className="col-span-2 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                            <label className="text-xs font-bold text-slate-700 block mb-1">Podaj kod koloru (np. RAL 1234)</label>
+                                                            <input
+                                                                type="text"
+                                                                value={config.customColorRAL || ''}
+                                                                onChange={(e) => handleBasicConfigChange('customColorRAL', e.target.value)}
+                                                                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-accent focus:border-accent"
+                                                                placeholder="Wpisz nazwę koloru..."
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -1194,8 +1321,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    maxRoofWidth={config.width}
-                                                    tables={matrixTables.filter(t => t.table.name.toLowerCase().includes('schiebetür'))}
+                                                    availableItems={addonGroups.sliding}
                                                 />
                                             )}
                                             {activeWallTab === 'panorama' && (
@@ -1203,8 +1329,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    al22List={componentLists.find(l => l.table.attributes?.system === 'AL22' || l.table.attributes?.system === 'panorama')?.entries || []}
-                                                    al23List={componentLists.find(l => l.table.attributes?.system === 'AL23' || l.table.attributes?.system === 'panorama')?.entries || []}
+                                                    availableItems={addonGroups.panorama}
                                                 />
                                             )}
                                             {activeWallTab === 'walls' && (
@@ -1214,9 +1339,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     onRemove={handleAddonRemove}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
-                                                    availableItems={componentLists.find(l => l.table.attributes?.system === 'alu_walls')?.entries || []}
-                                                    sideTables={matrixTables.filter(t => t.table.name.toLowerCase().includes('seitenwand'))}
-                                                    frontTables={matrixTables.filter(t => t.table.name.toLowerCase().includes('frontwand'))}
+                                                    availableItems={addonGroups.walls}
                                                 />
                                             )}
                                             {activeWallTab === 'keil' && (
@@ -1224,9 +1347,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    maxRoofDepth={config.projection}
-                                                    availableItems={componentLists.find(l => l.table.attributes?.system === 'keilfenster')?.entries || []}
-                                                    tables={matrixTables.filter(t => t.table.name.toLowerCase().includes('keilfenster'))}
+                                                    availableItems={addonGroups.keilfenster}
                                                 />
                                             )}
                                         </div>
@@ -1261,9 +1382,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
+                                                    availableItems={addonGroups.awnings}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
-                                                    snowZone={config.snowZone}
                                                 />
                                             )}
                                             {activeWallTab === 'lighting' && (
@@ -1271,11 +1392,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    availableItems={
-                                                        componentLists.find(l => l.table.attributes?.system === 'lighting')?.entries ||
-                                                        componentLists.find(l => l.table.attributes?.system === 'accessories')?.entries || // Fallback for mixed lists
-                                                        []
-                                                    }
+                                                    availableItems={addonGroups.lighting}
                                                 />
                                             )}
                                         </div>
@@ -1290,7 +1407,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         onRemove={handleAddonRemove}
                                         roofWidth={config.width}
                                         roofDepth={config.projection}
-                                        availableItems={componentLists.find(l => l.table.attributes?.system === 'wpc_floor')?.entries || []}
+                                        availableItems={addonGroups.wpc}
                                     />
                                 )}
 
@@ -1306,67 +1423,41 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         {loadingComponents ? (
                                             <div className="py-8 text-center text-slate-400">Ładowanie komponentów...</div>
                                         ) : (
-                                            componentLists.length > 0 && (
+                                            addonGroups.accessories.length > 0 && (
                                                 <div className="mt-8 pt-8 border-t border-slate-100">
-                                                    <h4 className="text-lg font-bold text-slate-800 mb-6">Dodatkowe Części / Elementy</h4>
+                                                    <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">Akcesoria Ogólne</h5>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                        {addonGroups.accessories.map((entry, idx) => {
+                                                            const itemName = entry.addon_name;
+                                                            const itemPrice = entry.price_upe_net_eur;
+                                                            const uniqueName = `[Akcesoria] ${itemName}`;
 
-                                                    {componentLists
-                                                        .filter(list => {
-                                                            const system = list.table.attributes?.system;
-                                                            // Exclude special systems handled elsewhere
-                                                            if (['lighting', 'wpc_floor', 'AL22', 'AL23', 'alu_walls', 'keilfenster', 'schiebetür', 'schiebetuer'].includes(system)) return false;
+                                                            const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
+                                                            const qty = selected?.quantity || 0;
 
-                                                            // Compatibility Logic for Standard Accessories
-                                                            const productCode = list.table.product?.code;
-                                                            if (productCode === 'trendstyle') {
-                                                                return (config.modelId || '').startsWith('trendstyle');
-                                                            }
-                                                            if (productCode === 'orangestyle') {
-                                                                // Fallback for everything else
-                                                                return !(config.modelId || '').startsWith('trendstyle');
-                                                            }
-                                                            // Default include others
-                                                            return true;
-                                                        })
-                                                        .map((list, listIdx) => (
-                                                            <div key={list.table.id || listIdx} className="mb-8">
-                                                                <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">{list.table.name}</h5>
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                                    {list.entries.map((entry: any, entryIdx: number) => {
-                                                                        const itemName = entry.properties?.name || entry.properties?.description || `Element ${entryIdx + 1}`;
-                                                                        const itemPrice = entry.structure_price || entry.price;
-                                                                        // Unique key for accessories selection
-                                                                        const uniqueName = `[${list.table.name}] ${itemName} ${entry.properties.width ? `(${entry.properties.width}mm)` : ''}`;
-
-                                                                        const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
-                                                                        const qty = selected?.quantity || 0;
-
-                                                                        return (
-                                                                            <div key={entry.id || entryIdx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
-                                                                                <div className="flex justify-between items-start mb-2">
-                                                                                    <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
-                                                                                        {itemName}
-                                                                                        {entry.properties.width && <span className="block text-xs text-slate-500">{entry.properties.width} mm</span>}
-                                                                                    </div>
-                                                                                    <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
-                                                                                </div>
-                                                                                <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
-                                                                                    <button
-                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, false)}
-                                                                                        className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                                                                                    >-</button>
-                                                                                    <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
-                                                                                    <button
-                                                                                        onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, true)}
-                                                                                        className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
-                                                                                    >+</button>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
+                                                            return (
+                                                                <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
+                                                                            {itemName}
+                                                                        </div>
+                                                                        <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
+                                                                        <button
+                                                                            onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, false)}
+                                                                            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+                                                                        >-</button>
+                                                                        <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
+                                                                        <button
+                                                                            onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, true)}
+                                                                            className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
+                                                                        >+</button>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )
                                         )}
@@ -1443,6 +1534,25 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         )}
                     </div>
 
+                    {/* Debug Info for Mobile/Tablet (< lg) */}
+                    <div className="lg:hidden mt-8 pt-4 border-t border-slate-200 text-[10px] text-slate-400">
+                        <details>
+                            <summary className="cursor-pointer hover:text-slate-600 font-mono select-none p-2 bg-slate-50 rounded">DEBUG: Parametry Wyceny (Mobile)</summary>
+                            <div className="mt-2 space-y-1 font-mono bg-slate-100 p-2 rounded overflow-x-auto">
+                                <div>Model ID: <span className="text-slate-600">{config.modelId}</span></div>
+                                <div>Wymiary: <span className="text-slate-600">{config.width} x {config.projection}</span></div>
+                                <div>Strefa: <span className="text-slate-600">{config.snowZone}</span></div>
+                                <div>Typ Dachu: <span className="text-slate-600">{config.roofType}</span></div>
+                                <div>Subtyp: <span className="text-slate-600">{config.roofType === 'glass' ? config.glassType : config.polycarbonateType}</span></div>
+                                <div>Montaż (App): <span className="text-slate-600">{config.installationType}</span></div>
+                                <div>Montaż (DB): <span className="text-slate-600 font-bold">{config.installationType === 'wall-mounted' ? 'wall' : 'free'}</span></div>
+                                <div>Cena Bazowa: <span className="text-slate-600">{dynamicBasePrice}</span></div>
+                                <div>Dopasowano: <span className={matchedDimensions ? "text-green-600 font-bold" : "text-red-500 font-bold"}>{matchedDimensions ? `${matchedDimensions.width}x${matchedDimensions.projection}` : 'BRAK DOPASOWANIA'}</span></div>
+                                {priceError && <div className="text-red-500 font-bold">Błąd: {priceError}</div>}
+                            </div>
+                        </details>
+                    </div>
+
                 </div>
             </div>
 
@@ -1468,7 +1578,14 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-sm">Wymiary</span>
-                                <span className="font-medium text-slate-800">{config.width} x {config.projection} mm</span>
+                                <div className="text-right">
+                                    <span className="font-medium text-slate-800 block">{config.width} x {config.projection} mm</span>
+                                    {matchedDimensions && (matchedDimensions.width !== config.width || matchedDimensions.projection !== config.projection) && (
+                                        <span className="text-[10px] text-green-600 font-semibold block bg-green-50 px-1 rounded">
+                                            (Wycena dla: {matchedDimensions.width} x {matchedDimensions.projection})
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-sm">Dach</span>
@@ -1570,13 +1687,37 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                 </span>
                             </div>
                         </div>
+                        {variantNote && (
+                            <div className="mt-2 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 flex items-center gap-1">
+                                <span>ℹ️</span>
+                                {variantNote}
+                            </div>
+                        )}
+
+                        {/* Debug Info for User/Dev */}
+                        <details className="mt-4 pt-4 border-t border-slate-200 text-[10px] text-slate-400">
+                            <summary className="cursor-pointer hover:text-slate-600 font-mono select-none">DEBUG: Parametry Wyceny</summary>
+                            <div className="mt-2 space-y-1 font-mono bg-slate-100 p-2 rounded overflow-x-auto">
+                                <div>Model ID: <span className="text-slate-600">{config.modelId}</span></div>
+                                <div>Wymiary: <span className="text-slate-600">{config.width} x {config.projection}</span></div>
+                                <div>Strefa: <span className="text-slate-600">{config.snowZone}</span></div>
+                                <div>Typ Dachu: <span className="text-slate-600">{config.roofType}</span></div>
+                                <div>Subtyp: <span className="text-slate-600">{config.roofType === 'glass' ? config.glassType : config.polycarbonateType}</span></div>
+                                <div>Montaż (App): <span className="text-slate-600">{config.installationType}</span></div>
+                                <div>Montaż (DB): <span className="text-slate-600 font-bold">{config.installationType === 'wall-mounted' ? 'wall' : 'free'}</span></div>
+                                <div>Cena Bazowa: <span className="text-slate-600">{dynamicBasePrice}</span></div>
+                                <div>Dopasowano: <span className={matchedDimensions ? "text-green-600 font-bold" : "text-red-500 font-bold"}>{matchedDimensions ? `${matchedDimensions.width}x${matchedDimensions.projection}` : 'BRAK DOPASOWANIA'}</span></div>
+                                {priceError && <div className="text-red-500 font-bold">Błąd: {priceError}</div>}
+                            </div>
+                        </details>
                     </div>
+
 
                     <div className="p-6 bg-slate-50 border-t border-slate-200">
                         <button
                             onClick={() => onComplete(config)}
-                            disabled={!config.modelId || invalidWidth || invalidDepth}
-                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${!config.modelId || invalidWidth || invalidDepth
+                            disabled={!config.modelId || invalidWidth || invalidDepth || !!priceError}
+                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${!config.modelId || invalidWidth || invalidDepth || !!priceError
                                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                                 : 'bg-accent text-white hover:bg-accent/90 hover:scale-[1.02]'
                                 }`}
@@ -1589,6 +1730,11 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         {(invalidWidth || invalidDepth) && (
                             <div className="mt-3 text-xs text-red-500 text-center font-medium">
                                 ⚠️ Wymiary poza zakresem dla wybranego modelu!
+                            </div>
+                        )}
+                        {priceError && (
+                            <div className="mt-3 text-xs text-red-500 text-center font-medium bg-red-50 p-2 rounded">
+                                ⚠️ {priceError}
                             </div>
                         )}
                     </div>

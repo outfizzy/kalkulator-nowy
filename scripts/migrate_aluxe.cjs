@@ -1,22 +1,26 @@
 
-import XLSX from 'xlsx';
-import { createClient } from '@supabase/supabase-js';
-import * as path from 'path';
-import * as fs from 'fs';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
+const XLSX = require('xlsx');
+const { createClient } = require('@supabase/supabase-js');
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
 
 // Load Environment Variables
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '..');
-dotenv.config({ path: path.resolve(rootDir, '.env.local') });
+const rootDir = __dirname.endsWith('scripts') ? path.resolve(__dirname, '..') : process.cwd();
+const envPath = path.resolve(rootDir, '.env.local');
 
+// Only load if exists (Node 22 built-in .env support might clash otherwise)
+if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+}
 // Configuration
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
     console.error('Missing Supabase Credentials!');
+    console.error('URL:', SUPABASE_URL);
+    console.error('KEY:', SERVICE_KEY ? '******' : 'MISSING');
     process.exit(1);
 }
 
@@ -28,9 +32,9 @@ const FILE_PATH = path.resolve(rootDir, 'imports', 'Aluxe Preisliste UPE 2026_DE
 
 // --- Helper Functions ---
 
-const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-const upsertProduct = async (name: string, category = 'roof') => {
+const upsertProduct = async (name, category = 'roof') => {
     const code = slugify(name);
 
     // Check existing
@@ -49,7 +53,7 @@ const upsertProduct = async (name: string, category = 'roof') => {
     return data.id;
 };
 
-const upsertPriceTable = async (productId: string, name: string, attributes: object) => {
+const upsertPriceTable = async (productId, name, attributes) => {
     const { data: existing } = await supabase.from('price_tables')
         .select('id')
         .eq('product_definition_id', productId)
@@ -79,8 +83,8 @@ const upsertPriceTable = async (productId: string, name: string, attributes: obj
 // --- Parsers ---
 
 // 1. Parsing Roof Sheets (Format: "3000x2000" in Col A)
-const parseDimensionListSheet = (ws: XLSX.WorkSheet) => {
-    const json = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+const parseDimensionListSheet = (ws) => {
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
     if (json.length < 5) return null;
 
     const prices = [];
@@ -96,7 +100,6 @@ const parseDimensionListSheet = (ws: XLSX.WorkSheet) => {
     for (let r = 0; r < Math.min(20, json.length); r++) {
         const row = json[r];
         if (!row) continue;
-
         const rowStr = JSON.stringify(row).toLowerCase();
         if (rowStr.includes('maß') || rowStr.includes('bxt')) {
             startRow = r + 1;
@@ -110,20 +113,6 @@ const parseDimensionListSheet = (ws: XLSX.WorkSheet) => {
                 else if (c.includes('sonnenschutz') || c.includes('aufpreis sonnenschutz')) sunColIdx = idx;
             });
             break;
-        }
-
-    }
-
-    // Secondary fix: if header scan failed or row 2 contains specific headers (Common in Aluxe sheets)
-    if (json.length > 2) {
-        const r2 = json[2];
-        if (r2) {
-            r2.forEach((cell, idx) => {
-                const c = String(cell).toLowerCase();
-                if (irGoldColIdx === -1 && (c.includes('ir-gold') || c.includes('ir gold'))) irGoldColIdx = idx;
-                if (mattColIdx === -1 && (c.includes('matt') || c.includes('milch'))) mattColIdx = idx;
-                if (sunColIdx === -1 && c.includes('sonnenschutz')) sunColIdx = idx;
-            });
         }
     }
 
@@ -174,8 +163,8 @@ const parseDimensionListSheet = (ws: XLSX.WorkSheet) => {
 };
 
 // 2. Parsing Material Sheets (Format: Name | Dim | Unit | Price)
-const parseAccessoryList = (ws: XLSX.WorkSheet) => {
-    const json = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+const parseAccessoryList = (ws) => {
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
     if (json.length < 5) return null;
 
     const variants = [];
@@ -220,14 +209,14 @@ const parseAccessoryList = (ws: XLSX.WorkSheet) => {
 };
 
 // 3. Parsing Matrix Sheets (Format: Width in Col A, Projections in Row X, Prices in Matrix)
-const parseMatrixSheet = (ws: XLSX.WorkSheet) => {
-    const json = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+const parseMatrixSheet = (ws) => {
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
     if (json.length < 5) return null;
 
     const prices = [];
     let projectionHeaderRowIndex = -1;
-    let projectionColumns: number[] = [];
-    let projections: number[] = [];
+    let projectionColumns = [];
+    let projections = [];
 
     // Find the header row for projections (row with multiple numbers)
     for (let r = 0; r < Math.min(json.length, 20); r++) { // Search in first 20 rows
@@ -288,8 +277,8 @@ const parseMatrixSheet = (ws: XLSX.WorkSheet) => {
 };
 
 // 4. Parsing Multi-Column Lists (Width/Name in Col 0, Variants/Prices in Cols > 0)
-const parseMultiColumnList = (ws: XLSX.WorkSheet) => {
-    const json = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+const parseMultiColumnList = (ws) => {
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
     if (json.length < 3) return null;
 
     const variants = [];
@@ -332,11 +321,10 @@ const parseMultiColumnList = (ws: XLSX.WorkSheet) => {
         }
     }
     return variants;
-    return variants;
 };
 
-const parseWidthList = (ws: XLSX.WorkSheet) => {
-    const json = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+const parseWidthList = (ws) => {
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
     if (json.length < 5) return null;
     const prices = [];
     for (let r = 3; r < json.length; r++) { // Start row 3 based on inspection
@@ -385,7 +373,7 @@ const run = async () => {
 
     console.log(`Found ${sheets.length} sheets. Processing...`);
 
-    let imageMap: Record<string, Record<string, string>> = {};
+    let imageMap = {};
     const imageMapPath = path.resolve(rootDir, 'scripts', 'sheet_image_map.json');
     if (fs.existsSync(imageMapPath)) {
         imageMap = JSON.parse(fs.readFileSync(imageMapPath, 'utf8'));
@@ -399,7 +387,7 @@ const run = async () => {
     console.log(`Found ${workbook.SheetNames.length} sheets. Processing...`);
 
     // Track which tables we have already cleared in this run to support merging multiple sheets into one table
-    const processedTableIds = new Set<string>();
+    const processedTableIds = new Set();
 
     for (const sheet of workbook.SheetNames) {
         if (sheet === 'Titelblatt' || sheet === 'Vorwort' || sheet === 'Einteilung (fertig)' || sheet === 'Sprache' || sheet === 'Algemene voorwaarden') continue;
@@ -407,7 +395,7 @@ const run = async () => {
         const nameLower = sheet.toLowerCase();
         let productCandidate = 'Unknown';
         let category = 'roof';
-        let items: any[] = [];
+        let items = [];
 
 
         // --- 1. Product & Category Detection ---
@@ -509,7 +497,6 @@ const run = async () => {
 
             if (isFreestanding) subtype += '_freestanding';
 
-            let items;
             if (category === 'matrix') {
                 items = parseMatrixSheet(workbook.Sheets[sheet]);
             } else {
@@ -520,8 +507,8 @@ const run = async () => {
                 const baseTableName = `${productCandidate} - Zone ${snowZone} - ${subtype}`;
 
                 // --- SPLIT ITEMS: Standard vs Surcharges ---
-                const standardItems = items.filter((i: any) => !i.type || i.type === 'standard');
-                const surchargeItems = items.filter((i: any) => i.type === 'surcharge');
+                const standardItems = items.filter((i) => !i.type || i.type === 'standard');
+                const surchargeItems = items.filter((i) => i.type === 'surcharge');
 
                 // 1. Process Standard Items
                 if (standardItems.length > 0) {
@@ -539,8 +526,8 @@ const run = async () => {
                         console.log(`[${sheet}] Appending to existing table ${baseTableName}`);
                     }
 
-                    const rows = standardItems.map((p: any) => {
-                        const row: any = {
+                    const rows = standardItems.map((p) => {
+                        const row = {
                             price_table_id: tableId,
                             width_mm: p.width_mm,
                             projection_mm: p.projection_mm,
@@ -559,20 +546,22 @@ const run = async () => {
                     }
                     console.log(`[${sheet}] Inserted ${rows.length} prices for ${baseTableName}`);
 
+
                     // Collect used rows for standard items only to avoid double counting images
-                    const usedRowIndices = new Set<number>();
-                    standardItems.forEach((p: any) => { if (p._rowIndex !== undefined) usedRowIndices.add(p._rowIndex); });
+                    const usedRowIndices = new Set();
+                    standardItems.forEach((p) => { if (p._rowIndex !== undefined) usedRowIndices.add(p._rowIndex); });
                     handleUnusedImages(sheet, tableId, baseTableName, usedRowIndices, imageMap);
                 }
 
+
                 // 2. Process Surcharge Items (Grouped by Variant)
                 if (surchargeItems.length > 0) {
-                    const surchargesByVariant = surchargeItems.reduce((acc: any, item: any) => {
+                    const surchargesByVariant = surchargeItems.reduce((acc, item) => {
                         const v = item.variant || 'misc';
                         if (!acc[v]) acc[v] = [];
                         acc[v].push(item);
                         return acc;
-                    }, {} as Record<string, typeof items>);
+                    }, {});
 
                     for (const [variant, sItems] of Object.entries(surchargesByVariant)) {
                         const surchargeTableName = `${baseTableName} - surcharge_${variant}`;
@@ -590,7 +579,7 @@ const run = async () => {
                             processedTableIds.add(sTableId);
                         }
 
-                        const sRows = (sItems as any[]).map(p => ({
+                        const sRows = sItems.map(p => ({
                             price_table_id: sTableId,
                             width_mm: p.width_mm,
                             projection_mm: p.projection_mm,
@@ -637,7 +626,7 @@ const run = async () => {
                 console.log(`[${sheet}] Inserted ${rows.length} items for ${tableName}`);
 
                 // Table Images
-                const usedRowIndices = new Set<number>();
+                const usedRowIndices = new Set();
                 items.forEach(i => { if (i._rowIndex) usedRowIndices.add(i._rowIndex); });
                 handleUnusedImages(sheet, tableId, tableName, usedRowIndices, imageMap);
             }
@@ -664,9 +653,9 @@ const run = async () => {
                     console.log(`[${sheet}] Appending to existing table ${tableName}`);
                 }
 
-                const usedRowIndices = new Set<number>();
+                const usedRowIndices = new Set();
                 const rows = variants.map(v => {
-                    const row: any = {
+                    const row = {
                         price_table_id: tableId,
                         width_mm: v.prices[0].width_mm,
                         projection_mm: 0,
@@ -696,7 +685,7 @@ const run = async () => {
     console.log('Migration Complete.');
 };
 
-const handleUnusedImages = async (sheet: string, tableId: string, tableName: string, usedRowIndices: Set<number>, imageMap: any) => {
+const handleUnusedImages = async (sheet, tableId, tableName, usedRowIndices, imageMap) => {
     const sheetImageMap = imageMap[sheet] || {};
     const allImageRowIndices = Object.keys(sheetImageMap).map(Number);
     const unusedImages = allImageRowIndices.filter(idx => !usedRowIndices.has(idx) && sheetImageMap[idx]);

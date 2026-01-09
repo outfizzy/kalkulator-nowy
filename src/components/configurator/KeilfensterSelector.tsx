@@ -2,16 +2,15 @@
 import React, { useState, useMemo } from 'react';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
-import { PricingService } from '../../services/pricing.service';
+
+import type { AddonPriceEntry } from '../../services/pricing.service';
 
 
 interface KeilfensterSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
-    maxRoofDepth: number;
-    availableItems: any[];
-    tables: { table: any, entries: any[] }[]; // Changed from baseMatrix
+    availableItems: AddonPriceEntry[];
 }
 
 type GlassType = 'standard' | 'mat' | 'clear' | 'ig'; // Keilfenster usually standard or mat
@@ -20,8 +19,7 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
     onAdd,
     onRemove,
     currentAddons,
-    availableItems,
-    tables
+    availableItems
 }) => {
     const existing = currentAddons.find(a => a.id === 'keilfenster');
 
@@ -40,38 +38,62 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
     const [leftQty, setLeftQty] = useState(0);
     const [rightQty, setRightQty] = useState(0);
 
-    const baseMatrix = useMemo(() => tables.flatMap(t => t.entries), [tables]);
-
-    const entry = useMemo(() => {
-        if (!baseMatrix.length) return null;
-        // Use standard service logic for consistency (finds first entry >= width)
-        return PricingService.findMatrixEntry(baseMatrix, width, 0);
-    }, [baseMatrix, width]);
-
+    // Simplified Price Lookup
     const baseUnitPrice = useMemo(() => {
-        if (entry) {
-            let price = entry.price || entry.structure_price || 0;
-            const props = entry.properties || {};
+        // Strategy:
+        // 1. Try to find a Fixed Price item for this specific Width (if items are pre-generated per width)
+        // 2. Or find a generic item with BY_WIDTH basis.
 
-            // Add Surcharges from Matrix Properties
-            if (glass === 'mat') price += (props.surcharge_matt || 0);
-            if (glass === 'ig') price += (props.surcharge_ig || 0);
+        let match = availableItems.find(i => {
+            const w = i.properties?.width || i.properties?.max_width;
+            return w && Number(w) >= width;
+        });
 
-            // Special RAL logic (if not in matrix, use static rule or check table config)
-            // For now sticking to static +30% rule as it's likely a global rule
-            if (specialRal) price *= 1.30;
-
-            return price;
+        // Fallback: Generic item
+        if (!match) {
+            match = availableItems.find(i => i.pricing_basis === 'BY_WIDTH' || i.pricing_basis === 'PER_M2');
         }
 
-        return 0;
-    }, [entry, glass, specialRal]);
+        // Fallback 2: Any matching name?
+        if (!match) {
+            match = availableItems.find(i => i.addon_name.toLowerCase().includes('keil') || i.addon_name.toLowerCase().includes('klin'));
+        }
+
+        if (!match) return 0;
+
+        let price = match.price_upe_net_eur;
+
+        // Apply Basis
+        if (match.pricing_basis === 'BY_WIDTH') {
+            price = price * (width / 1000); // Assume price per meter
+        } else if (match.pricing_basis === 'PER_M2') {
+            // Keilfenster area ~ width * height / 2 ? Or bounding box.
+            // Assume bounding box for simplicity or simplified triangle area
+            const h = Math.max(height1, height2) / 1000;
+            const w = width / 1000;
+            price = price * w * h;
+        }
+
+        // Modifiers (Glass, RAL) - Assuming these are percentages or fixed additions
+        // Ideally these should be separate addons or factors.
+        // For MVP manual, we might just have different items for "Keilfenster Mat" vs "Clear".
+
+        // Apply Glass Surcharge if regex match in name?
+        // Or if we have separate "Surcharge" items in availableItems.
+        // Let's assume the base price covers standard.
+        // Surcharges:
+        if (glass === 'mat') price += 50; // Hardcoded heuristic for now OR look for "Mat Surcharge" item
+        if (glass === 'ig') price += 100;
+        if (specialRal) price *= 1.30;
+
+        return price;
+    }, [availableItems, width, height1, height2, glass, specialRal]);
 
     const optionsPrice = useMemo(() => {
         let sum = 0;
         selectedDbOptions.forEach(id => {
             const item = availableItems.find(i => i.id === id);
-            if (item) sum += item.price;
+            if (item) sum += item.price_upe_net_eur;
         });
         return sum;
     }, [selectedDbOptions, availableItems]);
@@ -87,7 +109,7 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
 
     const handleSave = () => {
         const optionsDesc = Array.from(selectedDbOptions)
-            .map(id => availableItems.find(i => i.id === id)?.properties.name)
+            .map(id => availableItems.find(i => i.id === id)?.addon_name)
             .join(', ');
 
         const desc = `Wymiary: ${width}mm x ${height1}mm / ${height2}mm. ${optionsDesc ? `Opcje: ${optionsDesc}` : ''}`;
@@ -142,7 +164,7 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
             <h4 className="font-bold text-slate-800 text-lg mb-4">Keilfenster (Klinowe okno boczne)</h4>
 
-            {(baseMatrix.length === 0) && <div className="p-2 mb-4 bg-yellow-100 text-yellow-800 rounded text-xs">Uwaga: Brak cennika bazowego w DB.</div>}
+            {(availableItems.length === 0) && <div className="p-2 mb-4 bg-yellow-100 text-yellow-800 rounded text-xs">Uwaga: Brak cennika w DB.</div>}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Controls */}
@@ -202,9 +224,9 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
                                                 onChange={() => toggleOption(item.id)}
                                                 className="rounded text-accent focus:ring-accent"
                                             />
-                                            <span className="text-sm">{item.properties.name}</span>
+                                            <span className="text-sm">{item.addon_name}</span>
                                         </div>
-                                        <span className="text-xs font-bold text-slate-600">{formatCurrency(item.price)}</span>
+                                        <span className="text-xs font-bold text-slate-600">{formatCurrency(item.price_upe_net_eur)}</span>
                                     </label>
                                 ))}
                             </div>

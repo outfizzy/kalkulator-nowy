@@ -1,20 +1,22 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+// import { supabase } from '../../lib/supabase';
 import { awningsData } from '../../data/awnings';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
-import { PricingService } from '../../services/pricing.service';
+import type { AddonPriceEntry } from '../../services/pricing.service';
+// import { PricingService } from '../../services/pricing.service';
 
 interface AwningSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
+    availableItems: AddonPriceEntry[];
     maxRoofWidth: number;
     maxRoofDepth: number;
     snowZone?: string;
 }
 
-export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove, currentAddons, maxRoofWidth, maxRoofDepth, snowZone }) => {
+export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove, currentAddons, maxRoofWidth, maxRoofDepth, availableItems }) => {
     const existing = currentAddons.find(a => a.id.startsWith('awning-'));
 
     const [type, setType] = useState<'aufdachmarkise_zip' | 'unterdachmarkise_zip' | 'zip_screen'>(
@@ -29,40 +31,10 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
 
     const data = awningsData[type] as any;
 
-    // --- Dynamic Pricing State ---
-    const [matrix, setMatrix] = useState<any[]>([]);
-    const [supplierCosts, setSupplierCosts] = useState<any[]>([]);
-    // const [pricesLoading, setPricesLoading] = useState(false);
-
-    // Fetch dynamic pricing from Supabase
-    useEffect(() => {
-        const fetchPricing = async () => {
-            // setPricesLoading(true);
-            try {
-                // 1. Get Matrix (Context Aware)
-                // Pass snow_zone to ensure we get the correct table (e.g. Zone 1 vs Zone 2)
-                const attributes: Record<string, string> = {};
-                if (snowZone) attributes['snow_zone'] = snowZone;
-
-                const entries = await PricingService.getPriceMatrix(type, attributes);
-                setMatrix(entries);
-
-                // 2. Get Product & Supplier Costs
-                const { data: product } = await supabase.from('product_definitions').select('provider').eq('code', type).single();
-
-                if (product?.provider) {
-                    const costs = await PricingService.getSupplierCosts(product.provider);
-                    setSupplierCosts(costs);
-                } else {
-                    setSupplierCosts([]);
-                }
-            } catch (e) {
-                console.error("Pricing fetch error", e);
-            }
-            // setPricesLoading(false);
-        };
-        fetchPricing();
-    }, [type]);
+    // Simplified Manual Pricing Logic
+    // We expect availableItems (Pricing Addons) to contain entries for Awnings.
+    // Logic: Find item matching Type + Width + Projection.
+    // Or if Linear (BY_WIDTH).
 
     // Initialize color and fabric when data changes
     React.useEffect(() => {
@@ -78,90 +50,74 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
 
     const isZipScreen = type === 'zip_screen';
 
-    // Calculate Price
+    // Calculate Price using Manual/CSV Items
     const { totalPrice, breakdown } = useMemo(() => {
         if (!data) return { totalPrice: 0, breakdown: [] };
 
         const items: { name: string, price: number }[] = [];
         let total = 0;
 
-        // Base Price Calculation
-        if (isZipScreen) {
-            // ZIP Screen pricing logic (Still static for ZIP screen if not seeded? I seeded it!)
-            // Seed bucket: "zip_screen" -> inserted entries.
-            // Check if we use matrix for ZIP screen
+        // Find Base Item Logic
+        // Strategy: 
+        // 1. Look for Exact Item matching "Type" (e.g. "Aufdachmarkise") and dimensions?
+        //    Likely users upload "Aufdachmarkise 4000x3000".
+        // 2. Or "Aufdachmarkise" with BY_WIDTH basis.
 
-            let basePrice = 0;
+        // Filter for type
+        const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach']
+            : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
+                : ['zip', 'screen', 'pion'];
 
-            if (matrix.length > 0) {
-                // Dynamic Lookup
-                const price = PricingService.calculateMatrixPrice(matrix, width, projection);
-                basePrice = price || 0;
-            } else {
-                // Fallback Static
-                const zipData = data as any;
-                const widths = zipData.widths_mm;
-                const priceWidth = widths.find((w: number) => w >= width) || widths[widths.length - 1];
-                const drops = zipData.drops_mm;
-                const dropIndex = drops.findIndex((d: number) => d >= projection);
-                const finalDropIndex = dropIndex !== -1 ? dropIndex : drops.length - 1;
-                basePrice = zipData.prices[priceWidth.toString()]?.[finalDropIndex] || 0;
+        let candidates = availableItems.filter(i => {
+            const n = i.addon_name.toLowerCase();
+            return typeKeywords.some(k => n.includes(k));
+        });
+
+        // Find best match
+        let match = candidates.find(i => {
+            // Strict dimension check if properties exist
+            if (i.properties?.width && Number(i.properties.width) !== width) return false;
+            if (i.properties?.projection && Number(i.properties.projection) !== projection) return false;
+            return true;
+        });
+
+        // Fallback: Closest larger size?
+        if (!match) {
+            // naive find first that fits
+            match = candidates.find(i => {
+                const w = i.properties?.max_width || i.properties?.width;
+                const p = i.properties?.max_projection || i.properties?.projection || i.properties?.drop;
+                return (!w || Number(w) >= width) && (!p || Number(p) >= projection);
+            });
+        }
+
+        // Fallback: Generic BY_WIDTH match
+        if (!match) {
+            match = candidates.find(i => i.pricing_basis === 'BY_WIDTH');
+        }
+
+        if (match) {
+            let basePrice = match.price_upe_net_eur;
+
+            // Apply Basis Calc
+            // Note: Manual Pricing CSV logic for Awnings might be intricate.
+            // Assuming simpler rules for now as requested.
+            if (match.pricing_basis === 'BY_WIDTH') {
+                basePrice = match.price_upe_net_eur * (width / 1000);
+            } else if (match.pricing_basis === 'PER_M2') {
+                basePrice = match.price_upe_net_eur * (width / 1000) * (projection / 1000);
             }
 
             total += basePrice;
             items.push({
-                name: `Senkrechtmarkise ZIP(${width}x${projection}mm)`,
+                name: match.addon_name,
                 price: basePrice
             });
-
         } else {
-            // Aufdach/Unterdach pricing logic
-            const isTwoFields = width > data.limits.max_single_field_width_mm;
-
-            // NOTE: My seed script currently only migrated ONE FIELD prices for awnings.
-            // If isTwoFields is true, we unfortunately must rely on static data for now 
-            // until I improve the seed/schema to differentiate 1-field vs 2-field tables.
-
-            let basePrice = 0;
-
-            if (!isTwoFields && matrix.length > 0) {
-                // Dynamic from DB
-                const price = PricingService.calculateMatrixPrice(matrix, width, projection);
-                basePrice = price || 0;
-            } else {
-                // Static Fallback
-                const pricingData = isTwoFields ? data.two_fields : data.one_field;
-                const widths = Object.keys(pricingData.prices).map(Number).sort((a, b) => a - b);
-                const priceWidth = widths.find(w => w >= width) || widths[widths.length - 1];
-                const projections = pricingData.projection_mm;
-                const projIndex = projections.findIndex((p: number) => p >= projection);
-                const priceProjectionIndex = projIndex !== -1 ? projIndex : projections.length - 1;
-                basePrice = pricingData.prices[priceWidth.toString()]?.[priceProjectionIndex] || 0;
-            }
-
-            total += basePrice;
-            items.push({
-                name: `${data.type === 'aufdachmarkise_zip' ? 'Markiza Dachowa' : 'Markiza Poddachowa'} (${width}x${projection}mm)${isTwoFields ? ' - 2 pola' : ''} `,
-                price: basePrice
-            });
+            // Fail safe
+            // items.push({ name: 'Cena nie znana (brak w cenniku)', price: 0 });
         }
 
-        // Apply Supplier Costs (Automatically adds to total and breakdown)
-        if (supplierCosts.length > 0) {
-            const costResult = PricingService.calculateTotalWithCosts(total, supplierCosts);
-
-            // The service calculates total starting from base. We need diffs.
-            // Actually, calculateTotalWithCosts takes a 'basePrice' and adds costs.
-            // 'total' so far IS the base price for the costs calculation?
-            // Usually additional costs are on top of Product Price.
-            // Yes.
-
-            const costsOnly = costResult.breakdown.filter(b => b.name !== 'Cena Bazowa');
-            costsOnly.forEach(c => {
-                items.push({ name: c.name, price: c.value });
-            });
-            total = costResult.total;
-        }
 
         // Special Color
         if (data.colors && !data.colors.standard.includes(color)) {
@@ -169,16 +125,19 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
             items.push({ name: `Kolor niestandardowy: ${color} `, price: data.colors.special_color_surcharge_eur });
         }
 
-        // Extras (only for Aufdach/Unterdach)
-        if (!isZipScreen && data.extras) {
-            if (extras.includes('wind_sensor')) {
-                total += data.extras.wind_rain_sensor_eur;
-                items.push({ name: 'Czujnik wiatru/deszczu', price: data.extras.wind_rain_sensor_eur });
-            }
+        // Extras (Wind Sensor) - Look for item in availableItems?
+        // Or keep hardcoded if not in DB.
+        // Let's look for known extra items. (Global lookup?)
+        // Assuming currentAddons might handle extras, or just additive price here.
+        if (!isZipScreen && extras.includes('wind_sensor')) {
+            const sensorItem = availableItems.find(i => i.addon_name.toLowerCase().includes('sensor') || i.addon_name.toLowerCase().includes('czujnik'));
+            const sensorPrice = sensorItem ? sensorItem.price_upe_net_eur : 150; // Fallback 150
+            total += sensorPrice;
+            items.push({ name: 'Czujnik wiatru/deszczu', price: sensorPrice });
         }
 
         return { totalPrice: total, breakdown: items };
-    }, [data, type, width, projection, color, extras, isZipScreen, matrix, supplierCosts]);
+    }, [data, type, width, projection, color, extras, isZipScreen, availableItems]);
 
     const handleAdd = () => {
         const typeName = type === 'aufdachmarkise_zip'

@@ -28,8 +28,27 @@ export const SimulationService = {
         // const provider = table.product.provider;
 
         // 2. Get Matrix Entries for THIS table
-        const { data: matrix } = await supabase.from('price_matrix_entries').select('*').eq('price_table_id', tableId);
-        if (!matrix) throw new Error('Matrix empty');
+        // 2. Get Matrix Entries for THIS table
+        let matrix: any[] | null = null;
+        const { data: standardMatrix } = await supabase.from('price_matrix_entries').select('*').eq('price_table_id', tableId);
+
+        if (standardMatrix && standardMatrix.length > 0) {
+            matrix = standardMatrix;
+        } else {
+            // Fallback: Check pricing_base
+            const { data: manualData } = await supabase.from('pricing_base').select('*').eq('source_import_id', tableId);
+            if (manualData && manualData.length > 0) {
+                matrix = manualData.map(d => ({
+                    width_mm: d.width_mm,
+                    projection_mm: d.depth_mm,
+                    price: d.price_upe_net_eur,
+                    structure_price: d.price_upe_net_eur,
+                    glass_price: 0
+                }));
+            }
+        }
+
+        if (!matrix || matrix.length === 0) throw new Error('Matrix empty (No data in standard or manual tables)');
 
         // 3. Get Supplier Costs (Simulate with current active costs? Or assume costs constant?)
         // Usually simulator checks impact of MATRIX change. Costs are external.

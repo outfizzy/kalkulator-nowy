@@ -144,14 +144,11 @@ export const OfferService = {
         }
 
         // Ensure customer exists in customers table
+        // Ensure customer exists in customers table
         let customerId = offer.customer.id;
-        try {
-            const customer = await CustomerService.ensureCustomer(offer.customer);
-            customerId = customer.id;
-        } catch (e) {
-            console.error('Failed to ensure customer:', e);
-            // Fallback: proceed without strict link if needed
-        }
+        // Don't swallow errors here - if we can't ensure customer, we shouldn't create orphaned offer
+        const customer = await CustomerService.ensureCustomer(offer.customer);
+        customerId = customer.id;
 
         const { data, error } = await supabase
             .from('offers')

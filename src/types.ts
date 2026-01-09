@@ -124,7 +124,7 @@ export interface Communication {
 
 export type InstallationType = 'wall-mounted' | 'freestanding';
 export type RoofType = 'polycarbonate' | 'glass' | 'tin';
-export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected';
+export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
 // --- Leads Types ---
 export type LeadStatus = 'new' | 'contacted' | 'offer_sent' | 'negotiation' | 'won' | 'lost';
@@ -220,8 +220,8 @@ export interface ProductConfig {
     customColorRAL?: string; // RAL number when custom color is selected
     roofType: RoofType;
     imageUrl?: string;
-    polycarbonateType?: 'standard' | 'ir-gold' | 'iq-relax' | 'clear';
-    glassType?: 'standard' | 'mat' | 'sunscreen' | 'heat-protection';
+    polycarbonateType?: 'standard' | 'ir-gold' | 'iq-relax' | 'clear' | 'poly_clear' | 'poly_opal' | 'poly_iq_relax' | 'custom';
+    glassType?: 'standard' | 'mat' | 'sunscreen' | 'heat-protection' | 'glass_clear' | 'glass_opal' | 'glass_tinted' | 'custom';
     installationType: InstallationType;
     installationDays?: number;
     sideWedges?: boolean;
@@ -313,6 +313,9 @@ export interface PricingResult {
     // Cost Tracking
     orderCosts?: number; // Manual input for additional costs
     measurementCost?: number; // Calculated/Cached measurement cost
+
+    // Context from Pricing Engine
+    structuralNote?: string; // e.g. "inkl. XL-Sparren"
 
     // Debug Info (transient)
     _debuginfo?: unknown;

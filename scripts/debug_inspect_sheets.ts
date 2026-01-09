@@ -9,7 +9,11 @@ const rootDir = path.resolve(__dirname, '..');
 const FILE_PATH = path.resolve(rootDir, 'imports', 'Aluxe Preisliste UPE 2026_DE.xlsx');
 
 const sheets = [
-    'Trendline Glas zone 1R'
+
+    'Trendline MaterialienR',
+    'Trendline Zone2a+3R',
+    'Trendline Zone 1a +2R'
+
 ];
 
 async function inspect() {

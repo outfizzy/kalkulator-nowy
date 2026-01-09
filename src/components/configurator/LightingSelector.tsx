@@ -1,28 +1,28 @@
-
 import React, { useState } from 'react';
 import type { SelectedAddon } from '../../types';
 import { formatCurrency } from '../../utils/translations';
+import type { AddonPriceEntry } from '../../services/pricing.service';
 
 interface LightingSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
-    availableItems: any[]; // DB Entries
+    availableItems: AddonPriceEntry[];
 }
 
 export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRemove, currentAddons, availableItems }) => {
     // Identify DB items by known strings/identifiers
     // Case insensitive matching with multilingual support
     const spotItem = availableItems.find(i => {
-        const n = i.properties?.name?.toLowerCase() || '';
+        const n = i.addon_name?.toLowerCase() || '';
         return n.includes('spot') || n.includes('punkt');
     });
     const stripItem = availableItems.find(i => {
-        const n = i.properties?.name?.toLowerCase() || '';
+        const n = i.addon_name?.toLowerCase() || '';
         return n.includes('listwa') || n.includes('strip') || n.includes('led-band') || n.includes('band');
     });
     const heaterItem = availableItems.find(i => {
-        const n = i.properties?.name?.toLowerCase() || '';
+        const n = i.addon_name?.toLowerCase() || '';
         return n.includes('promiennik') || n.includes('heizstrahler') || n.includes('heater') || n.includes('wärme');
     });
 
@@ -43,9 +43,9 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
             onAdd({
                 id: 'led-spots',
                 type: 'lighting',
-                name: spotItem.properties.name,
+                name: spotItem.addon_name,
                 quantity: spotsQty,
-                price: spotsQty * spotItem.price
+                price: spotsQty * spotItem.price_upe_net_eur
             });
         } else {
             onRemove('led-spots');
@@ -57,10 +57,10 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
         if (stripLength > 0) {
             onAdd({
                 id: 'led-strip',
-                type: 'lighting',
-                name: stripItem.properties.name,
+                type: 'lighting', // Should be 'lighting'
+                name: stripItem.addon_name,
                 length: stripLength * 1000,
-                price: stripLength * stripItem.price
+                price: stripLength * stripItem.price_upe_net_eur
             });
         } else {
             onRemove('led-strip');
@@ -73,25 +73,25 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
             onAdd({
                 id: 'heater',
                 type: 'heater',
-                name: heaterItem.properties.name,
+                name: heaterItem.addon_name,
                 quantity: heaterQty,
-                price: heaterQty * heaterItem.price
+                price: heaterQty * heaterItem.price_upe_net_eur
             });
         } else {
             onRemove('heater');
         }
     };
 
-    const handleGenericAdd = (item: any, qty: number) => {
+    const handleGenericAdd = (item: AddonPriceEntry, qty: number) => {
         const id = `extra-${item.id}`;
         if (qty > 0) {
             onAdd({
                 id,
-                type: 'lighting', // Use valid type
-                name: item.properties.name,
+                type: 'lighting',
+                name: item.addon_name,
                 quantity: qty,
-                price: qty * item.price,
-                description: item.properties.description
+                price: qty * item.price_upe_net_eur,
+                description: item.properties?.description
             });
         } else {
             onRemove(id);
@@ -115,10 +115,10 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
                     <div className="space-y-3">
                         <div className="flex justify-between items-start">
                             <div>
-                                <h5 className="font-semibold text-slate-700">{spotItem.properties.name}</h5>
-                                <p className="text-xs text-slate-500">{spotItem.properties.description}</p>
+                                <h5 className="font-semibold text-slate-700">{spotItem.addon_name}</h5>
+                                <p className="text-xs text-slate-500">{spotItem.properties?.description}</p>
                             </div>
-                            <span className="text-xs font-bold text-accent">{formatCurrency(spotItem.price)} / {spotItem.properties.unit || 'szt'}</span>
+                            <span className="text-xs font-bold text-accent">{formatCurrency(spotItem.price_upe_net_eur)} / {spotItem.unit || 'szt'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <input type="number" min={0} value={spotsQty} onChange={e => setSpotsQty(Number(e.target.value))} className="w-16 border rounded-lg p-2 text-center" />
@@ -132,10 +132,10 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
                     <div className="space-y-3">
                         <div className="flex justify-between items-start">
                             <div>
-                                <h5 className="font-semibold text-slate-700">{stripItem.properties.name}</h5>
-                                <p className="text-xs text-slate-500">{stripItem.properties.description}</p>
+                                <h5 className="font-semibold text-slate-700">{stripItem.addon_name}</h5>
+                                <p className="text-xs text-slate-500">{stripItem.properties?.description}</p>
                             </div>
-                            <span className="text-xs font-bold text-accent">{formatCurrency(stripItem.price)} / {stripItem.properties.unit || 'mb'}</span>
+                            <span className="text-xs font-bold text-accent">{formatCurrency(stripItem.price_upe_net_eur)} / {stripItem.unit || 'mb'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <input type="number" min={0} value={stripLength} onChange={e => setStripLength(Number(e.target.value))} className="w-16 border rounded-lg p-2 text-center" />
@@ -149,10 +149,10 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
                     <div className="space-y-3">
                         <div className="flex justify-between items-start">
                             <div>
-                                <h5 className="font-semibold text-slate-700">{heaterItem.properties.name}</h5>
-                                <p className="text-xs text-slate-500">{heaterItem.properties.description}</p>
+                                <h5 className="font-semibold text-slate-700">{heaterItem.addon_name}</h5>
+                                <p className="text-xs text-slate-500">{heaterItem.properties?.description}</p>
                             </div>
-                            <span className="text-xs font-bold text-accent">{formatCurrency(heaterItem.price)}</span>
+                            <span className="text-xs font-bold text-accent">{formatCurrency(heaterItem.price_upe_net_eur)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <input type="number" min={0} value={heaterQty} onChange={e => setHeaterQty(Number(e.target.value))} className="w-16 border rounded-lg p-2 text-center" />
@@ -173,11 +173,11 @@ export const LightingSelector: React.FC<LightingSelectorProps> = ({ onAdd, onRem
                             return (
                                 <div key={item.id} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded px-2 -mx-2">
                                     <div>
-                                        <div className="text-sm font-medium text-slate-700">{item.properties.name}</div>
-                                        <div className="text-xs text-slate-500">{item.properties.description}</div>
+                                        <div className="text-sm font-medium text-slate-700">{item.addon_name}</div>
+                                        <div className="text-xs text-slate-500">{item.properties?.description}</div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <div className="text-sm font-bold text-accent">{formatCurrency(item.price)}</div>
+                                        <div className="text-sm font-bold text-accent">{formatCurrency(item.price_upe_net_eur)}</div>
                                         <div className="flex items-center border rounded-lg bg-white">
                                             <button onClick={() => handleGenericAdd(item, qty - 1)} className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-50 rounded-l">-</button>
                                             <span className="w-8 text-center text-sm font-bold">{qty}</span>

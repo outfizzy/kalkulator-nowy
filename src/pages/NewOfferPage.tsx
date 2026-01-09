@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { calculatePrice } from '../utils/pricing';
+// import { calculatePrice } from '../utils/pricing'; // Removed legacy import
 import { calculateCommission } from '../utils/commission';
 import { DatabaseService } from '../services/database';
 import { PricingService } from '../services/pricing.service';
@@ -70,10 +70,23 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
 
         if (customer && snowZone && currentUser) {
             try {
-                // Fetch transport settings
-                const transportSettings = await DatabaseService.getTransportSettings();
+                // const pricing = calculatePrice(config, margin, snowZone, customer.postalCode, transportSettings);
+                const pricing = await PricingService.calculateOfferPrice(config, margin, snowZone, customer.postalCode);
+                // Inject transport settings if returned or used (PricingService might not return it exactly same way or needs it passed differently if it uses distanceCalculator internally)
+                // PricingService.calculateOfferPrice uses calculateInstallationCosts internally which uses distanceCalculator.
+                // It returns transportConfig in the result.
 
-                const pricing = calculatePrice(config, margin, snowZone, customer.postalCode, transportSettings);
+                // Note: PricingService.calculateOfferPrice signature: (product, margin, snowZone, postalCode)
+                // It fetches transport settings internally or we might need to verify that.
+                // Looking at PricingService previously:
+                /*
+                   async calculateOfferPrice(
+                       product: ProductConfig,
+                       marginPercentage: number,
+                       snowZone?: SnowZoneInfo,
+                       postalCode?: string
+                   ): Promise<PricingResult> { ... }
+                */
 
                 // Partners might not have soldOffersCount logic or it might be different
                 const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
@@ -109,10 +122,8 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
         setMargin(newMargin);
         if (offer && currentUser) {
             try {
-                // Use existing transport config from offer if available, or fetch new
-                const transportSettings = offer.pricing.transportConfig || await DatabaseService.getTransportSettings();
-
-                const newPricing = calculatePrice(offer.product, newMargin, offer.snowZone, offer.customer.postalCode, transportSettings);
+                // const newPricing = calculatePrice(offer.product, newMargin, offer.snowZone, offer.customer.postalCode, transportSettings);
+                const newPricing = await PricingService.calculateOfferPrice(offer.product, newMargin, offer.snowZone, offer.customer.postalCode);
 
                 const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
                 const userCommissionRate = currentUser.commissionRate ?? 0.05;
@@ -263,8 +274,8 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
                                 <button
                                     onClick={() => setIsManualMode(false)}
                                     className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isManualMode
-                                            ? 'bg-white text-slate-800 shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700'
+                                        ? 'bg-white text-slate-800 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
                                     ⚡️ Konfigurator (Standard)
@@ -272,8 +283,8 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
                                 <button
                                     onClick={() => setIsManualMode(true)}
                                     className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isManualMode
-                                            ? 'bg-accent text-white shadow-md'
-                                            : 'text-slate-500 hover:text-slate-700'
+                                        ? 'bg-accent text-white shadow-md'
+                                        : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
                                     ✍️ Tryb Ręczny

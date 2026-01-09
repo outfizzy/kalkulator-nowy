@@ -3,20 +3,19 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
 
+import type { AddonPriceEntry } from '../../services/pricing.service';
 interface PanoramaWallSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
     onRemove: (id: string) => void;
     currentAddons: SelectedAddon[];
-    al22List: any[];
-    al23List: any[];
+    availableItems: AddonPriceEntry[];
 }
 
 export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
     onAdd,
     onRemove,
     currentAddons,
-    al22List,
-    al23List
+    availableItems
 }) => {
     const existing = currentAddons.find(a => a.id.startsWith('panorama-'));
 
@@ -26,30 +25,31 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
     const [numTracks, setNumTracks] = useState<number>(existing?.variant ? parseInt(existing.variant) : 3);
 
 
-    // Switch list based on system
-    const activeList = systemType === 'AL22' ? al22List : al23List;
-
     // Derive available track counts from DB items
     const availableTracks = useMemo(() => {
+        // In Manual Pricing, we assume availableItems contains "Panorama Base" items which might specify tracks in name
+        // OR we just allow standard 3,4,5,6 and look for price match later.
+        // Let's scrape availableItems for distinct track numbers if possible.
         const tracks = new Set<number>();
-        activeList.forEach(item => {
-            const name = item.properties.name || '';
-            // Match: "3-tor", "3 tor", "3-rail", "3 rail", "3-spurig", "3 spurig"
+        availableItems.forEach(item => {
+            const name = item.addon_name || '';
             const match = name.match(/(\d+)[- ](tor|rail|spur|gleis|lauf)/i);
             if (match) {
                 tracks.add(parseInt(match[1]));
             }
         });
-        // Default AL22 has 3 and 5 usually. AL23 has 3,4,5,6.
-        // If DB is empty, provide defaults or empty
-        if (tracks.size === 0) return [3, 4, 5];
+
+        if (tracks.size === 0) return [3, 4, 5, 6]; // Default if no specific items found
         return Array.from(tracks).sort((a, b) => a - b);
-    }, [activeList]);
+    }, [availableItems]);
 
     // Ensure numTracks is valid when switching systems
+    // Ensure valid track selection
     useEffect(() => {
         if (availableTracks.length > 0 && !availableTracks.includes(numTracks)) {
-            setNumTracks(availableTracks[0]);
+            // Defer update to avoid strict mode double invocation issues or warning
+            const t = setTimeout(() => setNumTracks(availableTracks[0]), 0);
+            return () => clearTimeout(t);
         }
     }, [availableTracks, numTracks]);
 
@@ -62,77 +62,59 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
 
     // Pricing Logic
     const { totalPrice, breakdown } = useMemo(() => {
-        if (activeList.length === 0) return { totalPrice: 0, breakdown: [] };
+        if (availableItems.length === 0) return { totalPrice: 0, breakdown: [] };
 
         let total = 0;
         const items: { name: string, price: number }[] = [];
 
-        // 1. Rails (Bottom and Top) - Find by string matching current tracks
-        // 1. Rails (Bottom and Top)
-        const bottomRail = activeList.find(i => {
-            const n = i.properties.name.toLowerCase();
-            return (n.includes('szyna dolna') || n.includes('bottom rail') || n.includes('unter') || n.includes('u-profil')) &&
-                n.match(new RegExp(`${numTracks}[- ](tor|rail|spur)`, 'i'));
-        });
-        const topRail = activeList.find(i => {
-            const n = i.properties.name.toLowerCase();
-            return (n.includes('szyna górna') || n.includes('top rail') || n.includes('ober') || n.includes('h-profil')) &&
-                n.match(new RegExp(`${numTracks}[- ](tor|rail|spur)`, 'i'));
+        // Find Base Price for System + Tracks + Width
+        // Look for items with pricing_basis = 'BY_OPENING_WIDTH' (or similar)
+        // Name should match System (AL22/23) (or just generic 'Panorama' if system not in name)
+        // AND Track count.
+
+        // Filter candidates
+        const candidates = availableItems.filter(i => {
+            const n = i.addon_name.toLowerCase();
+            return n.includes(systemType.toLowerCase()) && n.includes(`${numTracks}-`);
         });
 
-        // Helper: Price unit handling
-        const addCost = (item: any, qty: number, dim: number, label: string) => {
-            if (!item) return;
-            // Unit check: m1 vs piece
-            const unit = item.properties.unit || 'm1';
-            let cost = 0;
-            if (unit === 'm1') {
-                cost = item.price * (dim / 1000) * qty;
-            } else if (unit === 'm2') {
-                cost = item.price * dim * qty; // Area passed as dim for m2
-            } else {
-                cost = item.price * qty;
-            }
-            total += cost;
-            items.push({ name: label || item.properties.name, price: cost });
-        };
+        // Find best match by Width (if multiple items for different widths exist)
+        // OR find one item with BY_OPENING_WIDTH basis.
 
-        addCost(bottomRail, 1, width, `Szyna dolna (${numTracks}-tor)`);
-        // If top rail missing in DB for AL23 (maybe same as bottom?), skip. 
-        // SQL for AL23 didn't show Top Rail explicitly? Wait.
-        // SQL AL22 has both. AL23 only Bottom? Let's assume logic or fallback.
-        // If not found, ignore (maybe included in set).
-        addCost(topRail, 1, width, `Szyna górna (${numTracks}-tor)`);
+        let match = candidates.find(i => i.pricing_basis === 'BY_OPENING_WIDTH');
 
-        // 2. Side Profiles
-        const sideProfile = activeList.find(i => {
-            const n = i.properties.name.toLowerCase();
-            return n.includes('profil boczny') || n.includes('side') || n.includes('seit');
-        });
-        // Usually 2 sides * height
-        addCost(sideProfile, 2, height, 'Profile boczne');
-
-        // 3. Glass
-        // Default to ESG Klar or Planibel based on user selection? 
-        // For simplicity, let's assume Klar default, or add a selector.
-        // Let's add a Glass Selector.
-        const glassItem = activeList.find(i => {
-            const n = i.properties.name.toLowerCase();
-            return n.includes('esg klar') || n.includes('szyba') || n.includes('glass');
-        });
-        if (glassItem) {
-            const area = (width * height) / 1000000; // m2
-            // Glass overlap? Ignore for now.
-            addCost(glassItem, 1, area, `Szkło ESG (${area.toFixed(2)} m²)`);
+        // Fallback: Exact match on width property?
+        if (!match) {
+            match = candidates.find(i => {
+                const w = i.properties?.width || i.properties?.max_width;
+                return w && Number(w) >= width;
+            });
         }
 
-        // 4. Extras (Locks, Handles) - Simple loop over "Other" items
-        // Or if user selected them.
-        // Current Selector has `selectedExtras`.
-        // We need to list available extras first.
+        // Fallback 2: Any item matching system & tracks
+        if (!match && candidates.length > 0) match = candidates[0];
+
+        if (match) {
+            let price = match.price_upe_net_eur;
+
+            // Calculate Logic
+            if (match.pricing_basis === 'BY_OPENING_WIDTH') {
+                // Price per Meter of Opening Width
+                price = price * (width / 1000);
+            } else if (match.pricing_basis === 'PER_M2') {
+                price = price * (width / 1000) * (height / 1000);
+            }
+
+            total += price;
+            items.push({ name: match.addon_name, price });
+        } else {
+            // Cannot find price
+            // Maybe manual component logic?
+            // For now return 0 or maybe warn.
+        }
 
         return { totalPrice: total, breakdown: items };
-    }, [activeList, width, height, numTracks]);
+    }, [availableItems, width, height, numTracks, systemType]);
 
     const handleAdd = () => {
         onAdd({
@@ -148,7 +130,7 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
         });
     };
 
-    if (al22List.length === 0 && al23List.length === 0) {
+    if (availableItems.length === 0) {
         return <div className="p-4 text-center text-slate-400">Brak danych cennikowych dla systemów Panorama.</div>;
     }
 

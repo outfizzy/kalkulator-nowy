@@ -357,6 +357,11 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                                 <td className="py-4 text-slate-900">{translations.model}</td>
                                 <td className="py-4 text-slate-900 text-right uppercase">
                                     {modelName}
+                                    {offer.pricing.structuralNote && (
+                                        <div className="text-xs text-amber-600 font-semibold mt-1">
+                                            {offer.pricing.structuralNote}
+                                        </div>
+                                    )}
                                 </td>
                             </tr>
                             <tr>
