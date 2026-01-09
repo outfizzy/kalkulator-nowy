@@ -43,43 +43,60 @@ export const PricingService = {
      * Get distinct model families from pricing_base to populate Product Dropdown.
      */
     async getMainProducts(): Promise<{ id: string, code: string, name: string, description: string, category: string, image_url?: string, standard_colors?: string[], custom_color_surcharge_percentage?: number }[]> {
-        // Fetch from product_definitions primarily, but also include manual models from base
-        const { data: dbProducts, error } = await supabase
-            .from('product_definitions')
-            .select('*')
-            .order('name');
+        // Fetch Parallel: Definitions, Base Pricing, Table Pricing
+        const [
+            { data: dbProducts },
+            { data: manualData },
+            { data: tableData }
+        ] = await Promise.all([
+            supabase.from('product_definitions').select('*').order('name'),
+            supabase.from('pricing_base').select('model_family').limit(50000),
+            supabase.from('price_tables').select('name')
+        ]);
 
-        const { data: manualData } = await supabase
-            .from('pricing_base')
-            .select('model_family')
-            .limit(50000);
+        // 1. Identify "Active Models" from PRICING data
+        const activeModelNames = new Set<string>();
 
-        const uniqueManualModels = Array.from(new Set((manualData || []).map(d => d.model_family))).filter(m => m).sort();
+        // From Base Pricing (Legacy)
+        (manualData || []).forEach(d => {
+            if (d.model_family) activeModelNames.add(d.model_family.trim().toLowerCase());
+        });
 
-        // Merge DB products with Manual models (that don't exist in DB)
-        const combined = [...(dbProducts || [])];
+        // From Price Tables (New)
+        (tableData || []).forEach(t => {
+            if (t.name) {
+                // Heuristic: "ModelName - Variant" -> "ModelName"
+                const modelName = t.name.split(' - ')[0].trim().toLowerCase();
+                if (modelName) activeModelNames.add(modelName);
+            }
+        });
 
-        // Also fetch from price_tables to capture models that might have been imported into tables 
-        // but don't have a formal definition or base entry yet.
-        const { data: tableData } = await supabase
-            .from('price_tables')
-            .select('name');
+        // 2. Filter Database Definitions (Only keep if active)
+        // If a product is defined in DB but has NO pricing (neither base nor table), hide it.
+        const filteredDbProducts = (dbProducts || []).filter(p => {
+            const nameKey = (p.name || '').trim().toLowerCase();
+            const codeKey = (p.code || '').trim().toLowerCase();
+            return activeModelNames.has(nameKey) || activeModelNames.has(codeKey);
+        });
 
-        const tableModels = Array.from(new Set((tableData || []).map(t => {
-            // Extract model name from table name "Trendstyle - Glass..."
-            return t.name.split(' - ')[0].trim();
-        }))).filter(m => m);
+        const combined = [...filteredDbProducts];
 
-        // Unite all manual sources
-        const allManualModels = Array.from(new Set([...uniqueManualModels, ...tableModels]));
+        // 3. Add Psuedo-Products (If active in pricing but missing from DB)
+        activeModelNames.forEach(activeName => {
+            // Check if we already have it in combined (case-insensitive check)
+            const exists = combined.some(p =>
+                (p.name || '').trim().toLowerCase() === activeName ||
+                (p.code || '').trim().toLowerCase() === activeName
+            );
 
-        allManualModels.forEach(manualName => {
-            if (!combined.find(p => p.name === manualName || p.code === manualName)) {
-                // Add pseudo-product for manual entry
+            if (!exists) {
+                // Restore original casing heuristic (Capitalize first letter)
+                const displayName = activeName.charAt(0).toUpperCase() + activeName.slice(1);
+
                 combined.push({
-                    id: '', // No ID means it's purely manual
-                    code: manualName,
-                    name: manualName,
+                    id: '', // No ID
+                    code: activeName, // internal code matches pricing key
+                    name: displayName,
                     description: 'Manual Pricing Model',
                     category: 'roof',
                     image_url: undefined,
