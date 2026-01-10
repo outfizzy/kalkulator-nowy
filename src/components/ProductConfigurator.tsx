@@ -75,7 +75,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         installationType: 'wall-mounted',
         addons: [],
         selectedAccessories: [],
-        selectedSurcharges: []
+        selectedSurcharges: [],
+        installationDays: 0
     });
 
     // Dynamic Pricing state
@@ -83,6 +84,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [priceLoading, setPriceLoading] = useState(false);
     const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
     const [surchargesBreakdown, setSurchargesBreakdown] = useState<{ name: string, price: number }[]>([]);
+    const [installationData, setInstallationData] = useState<any>(null);
     const [availableSurcharges, setAvailableSurcharges] = useState<{ id: string, name: string, price?: number }[]>([]);
     const [products, setProducts] = useState<ProductDefinition[]>([]);
 
@@ -114,8 +116,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     // New: Effective Dimensions & Error State
     const [matchedDimensions, setMatchedDimensions] = useState<{ width: number, projection: number } | null>(null);
     const [priceError, setPriceError] = useState<string | null>(null);
+
     const [variantNote, setVariantNote] = useState<string | null>(null);
     const [detail, setDetail] = useState<any>({});
+    const [marginData, setMarginData] = useState<{ value: number, percentage: number } | null>(null);
 
     // Dynamic Limits State
     const [limits, setLimits] = useState({ minWidth: 2000, maxWidth: 10000, minDepth: 2000, maxDepth: 5000 });
@@ -169,8 +173,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 // Note: result.totalCost includes surcharges. result.basePrice is pure foundation.
                 setDynamicBasePrice(result.basePrice);
 
-                // 2. Update Surcharges Breakdown
+                // 2. Update Surcharges & Installation Breakdown
                 setSurchargesBreakdown(result.surchargesBreakdown || []);
+                setInstallationData(result.installationCosts || null);
 
                 // 3. Update Found/Error State
                 const isFound = (result._debuginfo as any)?.found;
@@ -192,6 +197,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     });
 
                     setVariantNote(result.structuralNote || null);
+                    setMarginData({
+                        value: result.marginValue || 0,
+                        percentage: result.marginPercentage || 0
+                    });
                 } else {
                     // Check if table missing completely
                     const tableExists = await PricingService.checkPriceTableExists();
@@ -379,14 +388,31 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         return sum;
     }, [additionalCosts, basePrice, dynamicBasePrice]);
 
-    const totalPrice = useMemo(() => {
+    const totalCost = useMemo(() => {
         const addonsTotal = config.addons.reduce((sum, a) => sum + a.price, 0);
         const accessoriesTotal = (config.selectedAccessories || []).reduce((sum, a) => sum + (a.price * a.quantity), 0);
         // External Items Total
         const extTotal = externalItems.reduce((sum, item) => sum + item.sellingPrice, 0);
 
-        return basePrice + addonsTotal + accessoriesTotal + extTotal + additionalCostsTotal;
-    }, [basePrice, config.addons, config.selectedAccessories, externalItems, additionalCostsTotal]);
+        // Sum Surcharges (handled in PricingService, but need to be included in Cost Total)
+        const surchargesTotal = surchargesBreakdown.reduce((sum, item) => sum + item.price, 0);
+
+        return basePrice + addonsTotal + accessoriesTotal + extTotal + additionalCostsTotal + surchargesTotal;
+    }, [basePrice, config.addons, config.selectedAccessories, externalItems, additionalCostsTotal, surchargesBreakdown]);
+
+    const totalPrice = useMemo(() => {
+        // Just use the totalCost + Margin Logic
+        // IF marginData is percentage based:
+        let productSelling = totalCost;
+        if (marginData && marginData.percentage) {
+            productSelling = totalCost / (1 - (marginData.percentage / 100));
+        }
+
+        // Add Services (Pass-through)
+        const services = (installationData?.dailyTotal || 0) + (installationData?.travelCost || 0);
+
+        return productSelling + services;
+    }, [totalCost, marginData, installationData]);
 
     // --- Logic & Calculations ---
 
@@ -1519,6 +1545,20 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             </div>
                         </div>
 
+                        {/* Base Price (Structure) */}
+                        <div className="space-y-3 pb-6 border-b border-slate-100">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Konstrukcja</span>
+                            <div className="flex justify-between text-sm">
+                                <div className="flex flex-col">
+                                    <span className="text-slate-600">Model Podstawowy</span>
+                                    <span className="text-[10px] text-slate-400">
+                                        {config.installationType === 'freestanding' ? 'Wersja wolnostojąca' : 'Montaż ścienny'}
+                                    </span>
+                                </div>
+                                <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(dynamicBasePrice)}</span>
+                            </div>
+                        </div>
+
                         {/* Addons List */}
                         {(config.addons.length > 0 || (config.selectedAccessories && config.selectedAccessories.length > 0)) && (
                             <div className="space-y-3 pb-6 border-b border-slate-100">
@@ -1561,6 +1601,27 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             </div>
                         )}
 
+                        {/* Installation & Services */}
+                        {installationData && (installationData.dailyTotal > 0 || installationData.travelCost > 0) && (
+                            <div className="space-y-3 pb-6 border-b border-slate-100">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Montaż i Transport</span>
+                                <div className="space-y-2">
+                                    {installationData.dailyTotal > 0 && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-600">Montaż ({installationData.days} dni)</span>
+                                            <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(installationData.dailyTotal)}</span>
+                                        </div>
+                                    )}
+                                    {installationData.travelCost > 0 && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-600">Transport / Dojazd ({installationData.distance} km)</span>
+                                            <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(installationData.travelCost)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Additional Costs (Surcharges) */}
                         {additionalCosts.length > 0 && (
                             <div className="space-y-3 pb-6 border-b border-slate-100">
@@ -1594,7 +1655,30 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             </div>
                         )}
 
-                        {/* Total Price */}
+                        {/* Margin Display (Explicit) */}
+                        {marginData && typeof marginData.value === 'number' && (
+                            <div className="space-y-3 pb-6 border-b border-slate-100">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Marża / Zysk</span>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-600">
+                                        Zysk z oferty ({Math.round(marginData.percentage || 0)}%)
+                                    </span>
+                                    <span className="font-medium text-emerald-600 whitespace-nowrap">
+                                        {formatCurrency(marginData.value)}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Total Cost (Visible for verification) */}
+                        <div className="space-y-3 pb-6 border-b border-slate-100">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="font-bold text-slate-500">Suma Kosztów (Materiał)</span>
+                                <span className="font-bold text-slate-700">{formatCurrency(totalCost)}</span>
+                            </div>
+                        </div>
+
+                        {/* Total Price (Selling) */}
                         <div className="space-y-1 pt-2">
                             <div className="flex justify-between items-baseline">
                                 <span className="text-slate-500 text-sm">Cena Netto</span>

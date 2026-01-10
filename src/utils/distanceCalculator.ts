@@ -41,16 +41,17 @@ const GERMAN_POSTAL_REGIONS: Record<string, Coordinates> = {
     '60': { lat: 50.1109, lng: 8.6821 },
     '61': { lat: 50.1109, lng: 8.6821 },
 
-    // Add more regions as needed - extending to cover more of Germany
-    '01': { lat: 51.0504, lng: 13.7373 }, // Dresden
-    '04': { lat: 51.3397, lng: 12.3731 }, // Leipzig
-    '99': { lat: 50.9787, lng: 11.0328 }, // Erfurt
-    '30': { lat: 52.3759, lng: 9.7320 }, // Hanover
-    '28': { lat: 53.0793, lng: 8.8017 }, // Bremen
-    '44': { lat: 51.5136, lng: 7.4653 }, // Dortmund
-    '40': { lat: 51.2277, lng: 6.7735 }, // Dusseldorf
-    '70': { lat: 48.7758, lng: 9.1829 }, // Stuttgart
-    '90': { lat: 49.4520, lng: 11.0768 }, // Nuremberg
+    // Generic 1-digit Fallbacks (Broad Coverage)
+    '0': { lat: 51.0504, lng: 13.7373 }, // Dresden/Leipzig
+    '1': { lat: 52.5200, lng: 13.4050 }, // Berlin/Potsdam
+    '2': { lat: 53.0793, lng: 8.8017 },  // Bremen/Hamburg
+    '3': { lat: 52.3759, lng: 9.7320 },  // Hanover
+    '4': { lat: 51.5136, lng: 7.4653 },  // Dortmund/Essen
+    '5': { lat: 50.9375, lng: 6.9603 },  // Cologne/Bonn
+    '6': { lat: 50.1109, lng: 8.6821 },  // Frankfurt/Mannheim
+    '7': { lat: 48.7758, lng: 9.1829 },  // Stuttgart/Freiburg
+    '8': { lat: 48.1351, lng: 11.5820 }, // Munich
+    '9': { lat: 49.4520, lng: 11.0768 }, // Nuremberg/Würzburg
 };
 
 /**
@@ -145,26 +146,41 @@ export interface InstallationCosts {
     totalInstallation: number;
 }
 
-// Installation daily rates (GROSS prices including VAT)
-// Day 1: €1,250, Day 2: €830, Day 3: €790
-// For days 4+: €790 per day
-const DAILY_RATES = [1250, 830, 790]; // First 3 days
-const ADDITIONAL_DAY_RATE = 790; // Day 4 and beyond
+export type InstallationDailyRates = {
+    day1: number;
+    day2: number;
+    day3: number;
+    additional: number;
+};
+
+// Default daily rates (Fallback)
+const DEFAULT_RATES: InstallationDailyRates = {
+    day1: 1250,
+    day2: 830,
+    day3: 790,
+    additional: 790
+};
+
 const DEFAULT_TRAVEL_RATE = 0.50; // EUR per km (one way)
 
 export function calculateInstallationCosts(
     days: number,
     distanceKm: number,
-    ratePerKm: number = DEFAULT_TRAVEL_RATE
+    ratePerKm: number = DEFAULT_TRAVEL_RATE,
+    customRates: InstallationDailyRates | null = null
 ): InstallationCosts {
     const validDays = Math.max(0, days); // Allow any number of days
 
     const dailyBreakdown = [];
     let dailyTotal = 0;
 
+    const rates = customRates || DEFAULT_RATES;
+
+    const dailyRates = [rates.day1, rates.day2, rates.day3];
+
     for (let i = 0; i < validDays; i++) {
-        // First 3 days use DAILY_RATES, after that use ADDITIONAL_DAY_RATE
-        const cost = i < DAILY_RATES.length ? DAILY_RATES[i] : ADDITIONAL_DAY_RATE;
+        // First 3 days use defined dailyRates, after that use additional rate
+        const cost = i < dailyRates.length ? dailyRates[i] : rates.additional;
         dailyBreakdown.push({ day: i + 1, cost });
         dailyTotal += cost;
     }

@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { ProductConfig, PricingResult, SnowZoneInfo, TransportSettings } from '../types';
-import { calculateInstallationCosts, calculateDistanceFromGubin } from '../utils/distanceCalculator';
+import { calculateInstallationCosts, calculateDistanceFromGubin, type InstallationDailyRates } from '../utils/distanceCalculator';
+import { DatabaseService } from './database';
 import catalogData from '../data/catalog.json';
 
 // --- Types for New Manual Pricing ---
@@ -53,6 +54,13 @@ export const PricingService = {
             supabase.from('pricing_base').select('model_family').limit(50000),
             supabase.from('price_tables').select('name')
         ]);
+
+        // Store settings globally or in a cache if possible, but for now we might need to fetch them in calculateOfferPrice
+        // Actually, mainsProducts doesn't calculate price. calculateOfferPrice does.
+        // So we leave this alone and go to calculateOfferPrice.
+
+        // Wait, calculateOfferPrice is static/arrow function in object.
+        // We will fetch settings inside calculateOfferPrice.
 
         // 1. Identify "Active Models" from PRICING data
         const activeModelNames = new Set<string>();
@@ -440,7 +448,11 @@ export const PricingService = {
                         const price = Number(row[matchedDepth]);
                         if (price && !isNaN(price)) {
                             console.log(`✅ Manual Table Match: ${match.name} (W:${row.width} x D:${matchedDepth}) = ${price}`);
-                            return { price, variant_note: 'Manual Table Price' };
+                            return {
+                                price,
+                                variant_note: 'Manual Table Price',
+                                tableAttributes: match.attributes
+                            };
                         }
                     }
                 }
@@ -472,6 +484,22 @@ export const PricingService = {
             if (product.polycarbonateType === 'poly_opal') coverType = 'poly_opal';
             else if (['iq-relax', 'ir-gold', 'poly_iq_relax'].includes(product.polycarbonateType || '')) coverType = 'poly_iq_relax';
             else coverType = 'poly_clear';
+        }
+
+        // 1b. Fetch Global Settings (Parallel with other fetches if possible, but here is fine)
+        // 1b. Fetch Global Settings (Parallel with other fetches if possible, but here is fine)
+        let transportSettings: TransportSettings | undefined;
+        let installationSettings: InstallationSettings | undefined;
+
+        try {
+            const [transport, installation] = await Promise.all([
+                DatabaseService.getTransportSettings(),
+                DatabaseService.getInstallationSettings()
+            ]);
+            transportSettings = transport;
+            installationSettings = installation;
+        } catch (e) {
+            console.warn('Failed to fetch logistics settings', e);
         }
 
         // Snow Zone
@@ -573,12 +601,27 @@ export const PricingService = {
         // A. Freestanding Surcharge
         let freestandingSurcharge = 0;
 
-        // Check if we are using a "Universal" table for a Freestanding request
-        // If so, we treat it as Additive (Universal Base + Surcharge)
-        const isUniversalTable = (priceResult as any)?.tableAttributes?.installationType === 'all';
-        const shouldApplySurcharge = useAdditiveLogic || (!priceResult && constructionType === 'free') || (isUniversalTable && constructionType === 'free');
+        // Check for Explicit Freestanding Table
+        const foundTableType = (priceResult as any)?.tableAttributes?.installationType;
+        const isExplicitlyFreestanding = foundTableType === 'free' || foundTableType === 'freestanding';
+        const isUniversalTable = foundTableType === 'all';
 
-        // Logical OR: It is additive config OR standard fallback scenario (Legacy) OR Universal Table usage
+        // Apply Surcharge Logic (Corrected to avoid Double Counting)
+        let shouldApplySurcharge = useAdditiveLogic;
+
+        if (constructionType === 'free' && !shouldApplySurcharge) {
+            if (!priceResult) {
+                // No base price found for 'free'. We MUST try Wall + Surcharge.
+                shouldApplySurcharge = true;
+            } else {
+                // We found a base price.
+                // Only add surcharge if it's a Universal table (Base Price is Wall-like)
+                // If foundTableType is undefined (Legacy), we assume it's CORRECT (Freestanding) because we queried structType='free'
+                if (isUniversalTable) {
+                    shouldApplySurcharge = true;
+                }
+            }
+        }
         if (shouldApplySurcharge) {
             if (!useAdditiveLogic && !isUniversalTable) console.log('⚠️ Freestanding base price not found. Attempting Wall Base + Surcharge fallback.');
             if (isUniversalTable) console.log('⚡ Universal Table used for Freestanding. Applying Surcharge.');
@@ -680,45 +723,71 @@ export const PricingService = {
             customItemsTotal += (item.price || 0) * (item.quantity || 1);
         });
 
-        // F. Installation
-        let transportSettings: TransportSettings | undefined;
-        try {
-            const { data } = await supabase.from('app_settings').select('value').eq('key', 'transport_settings').maybeSingle();
-            if (data?.value) {
-                transportSettings = data.value as TransportSettings;
-            }
-        } catch (e) {
-            console.warn('Failed to fetch transport settings', e);
-        }
+        // F. Installation & Logistics
+        // Settings fetched at start of function (1b)
 
         const distance = calculateDistanceFromGubin(postalCode || '', transportSettings?.baseLocation);
-        const installation = calculateInstallationCosts(product.installationDays || 1, distance || 0, transportSettings?.ratePerKm);
 
-        // Final Totals
-        const totalSafely = basePrice + totalSurcharges + addonsTotal + customItemsTotal + (installation.dailyTotal || 0) + (installation.travelCost || 0);
+        // Map to custom rates
+        let customRates: InstallationDailyRates | null = null;
+        if (installationSettings) {
+            customRates = {
+                day1: installationSettings.baseRatePerDay,
+                day2: installationSettings.baseRatePerDay,
+                day3: installationSettings.baseRatePerDay,
+                additional: installationSettings.additionalDayRate || installationSettings.baseRatePerDay
+            };
+        }
 
-        // Manual Override
-        const effectiveBase = (product.isManual && product.manualPrice) ? product.manualPrice : totalSafely; // Wait, manual price overrides TOTAL or BASE? Usually BASE.
-        // Let's assume manualPrice overrides BASE+Attributes.
-        // Or if we follow strict logic: effectiveTotal = manualPrice ?? calculatedTotal.
+        const installation = calculateInstallationCosts(
+            product.installationDays ?? 0,
+            distance || 0,
+            transportSettings?.ratePerKm,
+            customRates
+        );
 
-        // Margin Logic
+        // --- Final Calculation Logic (Fix: Services excluded from Margin) ---
+
+        // 1. Product Cost (Base + Surcharges + Addons + Custom Items)
+        // 2. Margin Logic (Applied to Product Only)
+        // Fix: Distribute margin to components so UI Breakdown sums to Total
+        const productTotal = basePrice + totalSurcharges + addonsTotal + customItemsTotal;
+
         const marginDecimal = marginPercentage > 1 ? marginPercentage / 100 : marginPercentage;
         const safeMargin = Math.min(Math.max(marginDecimal, 0), 0.99);
+        const productSellingNet = productTotal / (1 - safeMargin);
 
-        const sellingPriceNet = effectiveBase / (1 - safeMargin);
-        const marginValue = sellingPriceNet - effectiveBase;
+        // 3. Service Costs (Pass-through / Net)
+        // Installation and Travel are added directly to the NET price without margin markup
+        const servicesTotal = (installation.dailyTotal || 0) + (installation.travelCost || 0);
+
+        // 4. Final Totals
+        let sellingPriceNet: number;
+        let marginValue: number;
+
+        if (product.isManual && product.manualPrice) {
+            sellingPriceNet = product.manualPrice;
+            marginValue = sellingPriceNet - (productTotal + servicesTotal);
+        } else {
+            sellingPriceNet = productSellingNet + servicesTotal;
+            marginValue = productSellingNet - productTotal;
+        }
+
         const sellingPriceGross = sellingPriceNet * 1.19;
 
+
+
+        // Note: totalCost returned is usually for Reference. Here returns Selling Price Net to match UI.
         const dbPriceFound = priceResult !== null;
         const structuralNote = priceResult?.variant_note;
 
         return {
-            basePrice: basePrice, // Now Pure Base
-            surchargesBreakdown, // New Field!
-            addonsPrice: addonsTotal,
-            customItemsPrice: customItemsTotal,
-            totalCost: effectiveBase,
+            basePrice: basePrice, // Raw Cost
+            surchargesBreakdown, // Raw Cost
+            addonsPrice: addonsTotal, // Raw Cost
+            customItemsPrice: customItemsTotal, // Raw Cost
+
+            totalCost: parseFloat((productTotal + servicesTotal).toFixed(2)), // Total Raw Cost (Materials + Services)
             marginPercentage: safeMargin * 100,
             marginValue,
             sellingPriceNet: parseFloat(sellingPriceNet.toFixed(2)),
@@ -737,6 +806,7 @@ export const PricingService = {
             constructionType
         };
     },
+
 
     /**
      * Fetch Matrix (All Rows) for Client-Side Filtering
@@ -926,7 +996,7 @@ export const PricingService = {
             if (!product) return { config: {}, attributes: {} };
 
             // Find the active price table for this configuration
-            let query = supabase
+            const query = supabase
                 .from('price_tables')
                 .select('configuration, attributes')
                 .eq('product_definition_id', product.id)

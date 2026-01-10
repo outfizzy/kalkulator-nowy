@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { supabase } from '../services/database/base.service';
 import { GlobalSettingsPanel } from './admin/GlobalSettingsPanel';
+import { LogisticsSettingsManager } from './admin/LogisticsSettings';
 import { LegacyImportModal } from './contracts/LegacyImportModal';
 
 export const SettingsPage: React.FC = () => {
@@ -159,7 +160,7 @@ export const SettingsPage: React.FC = () => {
             window.location.reload();
         } catch (error) {
             console.error('Error saving profile:', JSON.stringify(error, null, 2));
-            const errorMessage = (error as any)?.message || 'Nieznany błąd';
+            const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
             if (errorMessage.includes('email_config') || errorMessage.includes('column')) {
                 toast.error('Błąd: Brak kolumny email_config w bazie. Uruchom migrację SQL.');
             } else {
@@ -229,8 +230,7 @@ export const SettingsPage: React.FC = () => {
             setTimeout(() => window.location.reload(), 1500);
         } catch (error) {
             console.error('System Wipe Failed:', error);
-            console.error('System Wipe Failed:', error);
-            const errMsg = (error as any)?.message || (error as any)?.details || 'Nieznany błąd';
+            const errMsg = error instanceof Error ? error.message : 'Nieznany błąd';
             toast.error(`Błąd resetowania: ${errMsg}`);
         }
     };
@@ -267,6 +267,7 @@ export const SettingsPage: React.FC = () => {
                 {/* Global Email Configuration (Admin Only) */}
                 {currentUser?.role === 'admin' && (
                     <div className="space-y-8">
+                        <LogisticsSettingsManager />
                         <GlobalSettingsPanel />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl border-l-4 border-l-purple-500">
                             <div className="flex items-center justify-between mb-4">
@@ -398,7 +399,7 @@ export const SettingsPage: React.FC = () => {
                                         className="w-32 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center font-bold"
                                     />
                                     <span className="text-sm text-slate-500">
-                                        Następna umowa otrzyma numer: <strong>UM/{new Date().getFullYear()}/{String(crypto.getRandomValues ? Math.max(contractStartNumber, 1) : 1).padStart(3, '0')}</strong> (przybliżenie)
+                                        Następna umowa otrzyma numer: <strong>UM/{new Date().getFullYear()}/{String(Math.max(contractStartNumber, 1)).padStart(3, '0')}</strong> (przybliżenie)
                                     </span>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-2">

@@ -606,6 +606,12 @@ export interface OrderedItem {
     purchaseCost?: number; // Cost in EUR, visible only to admin
 }
 
+export interface InstallationSettings {
+    baseRatePerDay: number;
+    minInstallationCost: number;
+    additionalDayRate?: number; // Optional override
+}
+
 export interface Contract {
     id: string;
     contractNumber: string; // Format: PL/001/11/2025

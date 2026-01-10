@@ -1,7 +1,13 @@
 import { supabase } from '../../lib/supabase';
-import type { TransportSettings, EmailConfig } from '../../types';
+import type { TransportSettings, EmailConfig, InstallationSettings } from '../../types';
 
 const SETTINGS_KEY = 'transport_settings';
+const INSTALLATION_KEY = 'installation_settings';
+
+const DEFAULT_INSTALLATION_SETTINGS: InstallationSettings = {
+    baseRatePerDay: 790, // Default team day rate
+    minInstallationCost: 1000
+};
 
 const DEFAULT_TRANSPORT_SETTINGS: TransportSettings = {
     ratePerKm: 0.50, // Default 0.50 EUR
@@ -39,6 +45,38 @@ export const SettingsService = {
             .from('app_settings')
             .upsert({
                 key: SETTINGS_KEY,
+                value: settings,
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+
+    },
+
+    async getInstallationSettings(): Promise<InstallationSettings> {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', INSTALLATION_KEY)
+                .single();
+
+            if (error || !data) {
+                return DEFAULT_INSTALLATION_SETTINGS;
+            }
+
+            return data.value as InstallationSettings;
+        } catch (e) {
+            console.error('Error fetching installation settings:', e);
+            return DEFAULT_INSTALLATION_SETTINGS;
+        }
+    },
+
+    async updateInstallationSettings(settings: InstallationSettings): Promise<void> {
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert({
+                key: INSTALLATION_KEY,
                 value: settings,
                 updated_at: new Date().toISOString()
             });
