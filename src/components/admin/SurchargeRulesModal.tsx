@@ -74,24 +74,25 @@ export const SurchargeRulesModal: React.FC<SurchargeRulesModalProps> = ({
                 free_standing_surcharge: validRules.length > 0 ? validRules : undefined
             };
 
-            if (applyToAll && productId) {
-                // Bulk update all tables for this product
+            if (productId) {
+                // ALWAYS Update Product Definition (Global for this model)
+                // This ensures PricingService (which looks at product_definitions) sees the rules.
                 const { error } = await supabase
-                    .from('price_tables')
+                    .from('product_definitions')
                     .update({ configuration: newConfig })
-                    .eq('product_definition_id', productId);
+                    .eq('id', productId);
 
                 if (error) throw error;
-                toast.success(`Zaktualizowano reguły dla wszystkich cenników ${productName}`);
+                toast.success(`Zaktualizowano reguły produktu ${productName}`);
             } else {
-                // Single update
+                // Fallback for orphaned tables (should not happen often)
                 const { error } = await supabase
                     .from('price_tables')
                     .update({ configuration: newConfig })
                     .eq('id', tableId);
 
                 if (error) throw error;
-                toast.success('Zapisano reguły');
+                toast.success('Zapisano reguły w tabeli (Lokalnie)');
             }
             onSave();
             onClose();

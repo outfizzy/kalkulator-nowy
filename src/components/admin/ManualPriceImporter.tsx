@@ -306,7 +306,9 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 // We proceed without product_definition_id. PricingService derives models from pricing_base, so it will appear.
             }
 
-            const tableName = `Manual Import - ${modelFamily} - S${snowZone} (${new Date().toLocaleDateString('pl-PL')} ${new Date().toLocaleTimeString('pl-PL')})`;
+            let tableName = `Manual Import - ${modelFamily}`;
+            if (constructionType === 'free') tableName += ' - Freestanding';
+            tableName += ` - S${snowZone} (${new Date().toLocaleDateString('pl-PL')} ${new Date().toLocaleTimeString('pl-PL')})`;
 
             // Determine Roof Type for Metadata
             let roofType = 'polycarbonate'; // Default

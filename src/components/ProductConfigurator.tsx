@@ -1174,15 +1174,38 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 ? selectedProduct.standard_colors
                                                 : defaultColors;
 
-                                            // Helper to get hex for preview (simple mapping)
+                                            // Helper to get hex for preview (expanded mapping)
                                             const getHex = (name: string) => {
                                                 const n = name.toUpperCase();
-                                                if (n.includes('7016')) return '#383e42';
-                                                if (n.includes('9016')) return '#f1f0ea';
-                                                if (n.includes('9005')) return '#0e0e10';
-                                                if (n.includes('9007')) return '#878581';
-                                                if (n.includes('9001')) return '#fdf4e3'; // Cream
-                                                if (n.includes('8014')) return '#4f3b33'; // Sepia brown
+                                                // Anthracite & Greys
+                                                if (n.includes('7016')) return '#383e42'; // Anthracite Grey
+                                                if (n.includes('9006')) return '#a5a5a5'; // White Aluminum
+                                                if (n.includes('9007')) return '#878581'; // Grey Aluminum
+                                                if (n.includes('7035')) return '#d7d7d7'; // Light Grey
+                                                if (n.includes('7039')) return '#6c6960'; // Quartz Grey
+                                                if (n.includes('DB 703') || n.includes('DB703')) return '#4e5452'; // DB 703 (Metallic Grey)
+
+                                                // Whites
+                                                if (n.includes('9016')) return '#f1f0ea'; // Traffic White
+                                                if (n.includes('9010')) return '#fdfbf7'; // Pure White
+                                                if (n.includes('9001')) return '#fdf4e3'; // Cream White
+
+                                                // Blacks
+                                                if (n.includes('9005') || n.includes('TEXTURE')) return '#0e0e10'; // Jet Black
+
+                                                // Browns
+                                                if (n.includes('8014')) return '#4f3b33'; // Sepia Brown
+                                                if (n.includes('8017')) return '#44322d'; // Chocolate Brown
+                                                if (n.includes('8019')) return '#3b3332'; // Grey Brown
+                                                if (n.includes('8001')) return '#9d6b38'; // Ochre Brown
+
+                                                // Greens
+                                                if (n.includes('6005')) return '#0e3a1f'; // Moss Green
+                                                if (n.includes('6009')) return '#213529'; // Fir Green
+
+                                                // Fallbacks
+                                                if (n.includes('SILVER') || n.includes('SREBR')) return '#c0c0c0';
+
                                                 return '#cccccc'; // Default gray
                                             };
 
@@ -1427,36 +1450,48 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 <div className="mt-8 pt-8 border-t border-slate-100">
                                                     <h5 className="font-semibold text-slate-700 mb-3 pl-1 border-l-4 border-accent">Akcesoria Ogólne</h5>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                        {addonGroups.accessories.map((entry, idx) => {
-                                                            const itemName = entry.addon_name;
-                                                            const itemPrice = entry.price_upe_net_eur;
-                                                            const uniqueName = `[Akcesoria] ${itemName}`;
+                                                        {addonGroups.accessories
+                                                            .filter(entry => {
+                                                                // HIDE "Freestanding" from addons if user already selected Freestanding Type
+                                                                // or if it's the redundant "Konstrukcja Wolnostojąca" item
+                                                                const nameLower = entry.addon_name.toLowerCase();
+                                                                const isFreestandingItem = nameLower.includes('free') || nameLower.includes('wolnostoj');
 
-                                                            const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
-                                                            const qty = selected?.quantity || 0;
+                                                                // If Config is set to Freestanding, HIDE the addon (it's built-in)
+                                                                if (config.constructionType === 'free' && isFreestandingItem) return false;
 
-                                                            return (
-                                                                <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
-                                                                    <div className="flex justify-between items-start mb-2">
-                                                                        <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
-                                                                            {itemName}
+                                                                return true;
+                                                            })
+                                                            .map((entry, idx) => {
+                                                                const itemName = entry.addon_name;
+                                                                const itemPrice = entry.price_upe_net_eur;
+                                                                const uniqueName = `[Akcesoria] ${itemName}`;
+
+                                                                const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
+                                                                const qty = selected?.quantity || 0;
+
+                                                                return (
+                                                                    <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
+                                                                        <div className="flex justify-between items-start mb-2">
+                                                                            <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
+                                                                                {itemName}
+                                                                            </div>
+                                                                            <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
                                                                         </div>
-                                                                        <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
+                                                                        <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
+                                                                            <button
+                                                                                onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, false)}
+                                                                                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+                                                                            >-</button>
+                                                                            <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
+                                                                            <button
+                                                                                onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, true)}
+                                                                                className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
+                                                                            >+</button>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
-                                                                        <button
-                                                                            onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, false)}
-                                                                            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                                                                        >-</button>
-                                                                        <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
-                                                                        <button
-                                                                            onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, true)}
-                                                                            className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
-                                                                        >+</button>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
+                                                                );
+                                                            })}
                                                     </div>
                                                 </div>
                                             )
@@ -1534,8 +1569,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         )}
                     </div>
 
-                    {/* Debug Info for Mobile/Tablet (< lg) */}
-                    <div className="lg:hidden mt-8 pt-4 border-t border-slate-200 text-[10px] text-slate-400">
+                    {/* Debug Info for Mobile/Tablet (< lg) - HIDDEN FOR PRODUCTION */}
+                    {/* <div className="lg:hidden mt-8 pt-4 border-t border-slate-200 text-[10px] text-slate-400">
                         <details>
                             <summary className="cursor-pointer hover:text-slate-600 font-mono select-none p-2 bg-slate-50 rounded">DEBUG: Parametry Wyceny (Mobile)</summary>
                             <div className="mt-2 space-y-1 font-mono bg-slate-100 p-2 rounded overflow-x-auto">
@@ -1551,7 +1586,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                 {priceError && <div className="text-red-500 font-bold">Błąd: {priceError}</div>}
                             </div>
                         </details>
-                    </div>
+                    </div> */}
 
                 </div>
             </div>
@@ -1630,7 +1665,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                     {surchargesBreakdown.map((item, idx) => (
                                         <div key={idx} className="flex justify-between text-sm">
                                             <span className="text-slate-600 truncate" title={item.name}>
-                                                {item.name}
+                                                {item.name === 'Freestanding Surcharge' ? 'Konstrukcja Wolnostojąca (Dopłata)' : item.name}
                                             </span>
                                             <span className="font-medium text-slate-900 whitespace-nowrap">{formatCurrency(item.price)}</span>
                                         </div>
