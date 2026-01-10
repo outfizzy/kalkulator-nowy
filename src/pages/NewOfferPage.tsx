@@ -46,6 +46,11 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
         return 0.40;
     });
 
+    // Scroll to top when step changes
+    React.useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [step]);
+
     const handleCustomerComplete = (data: Customer, zone: SnowZoneInfo) => {
         setCustomer(data);
         setSnowZone(zone);

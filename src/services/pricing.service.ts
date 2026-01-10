@@ -206,9 +206,9 @@ export const PricingService = {
     /**
      * Get Product Image URL based on configuration
      */
-    async getProductImage(modelId: string): Promise<string | undefined> {
+    async getProductImage(modelId: string, context?: { roofType?: string; snowZone?: string }): Promise<string | undefined> {
         // Simple lookup from catalog for now
-        // In future could query DB if images are variant-specific
+        // In future could query DB if images are variant-specific (using context)
         const models = catalogData.models as Array<{ id: string, image: string }>;
         const model = models.find(m => m.id.toLowerCase() === modelId.toLowerCase());
         return model?.image;
