@@ -291,11 +291,8 @@ export const PricingService = {
             .gte('width_mm', criteria.width)
             .gte('depth_mm', criteria.depth);
 
-        if (criteria.coverType.toLowerCase().includes('glass')) {
-            smartQuery = smartQuery.ilike('cover_type', '%glass%');
-        } else if (criteria.coverType.toLowerCase().includes('poly')) {
-            smartQuery = smartQuery.ilike('cover_type', '%poly%');
-        } else {
+        // Strict Cover Matching (Fixes Ambiguity between Opal/Clear)
+        if (criteria.coverType) {
             smartQuery = smartQuery.ilike('cover_type', criteria.coverType);
         }
 
