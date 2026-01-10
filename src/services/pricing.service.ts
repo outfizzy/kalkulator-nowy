@@ -538,21 +538,37 @@ export const PricingService = {
         // FALLBACK: If no config on Product, check duplicate products OR Price Tables
         let productConfig = defData?.configuration || {};
 
-        // If config is empty, check Price Tables (Legacy/Admin Store)
-        if (!productConfig.freestanding_surcharge_rules) {
-            console.log('🔄 Checking Price Tables for missing configuration (Smart Fallback)...');
+        // ALWAYS check Price Tables for the latest configuration (Priority: Latest Import > Static Definition)
+        // This ensures that if a user imports a new price list with updated Surcharge Rules, they are used.
+        try {
             const { data: tableData } = await supabase
                 .from('price_tables')
                 .select('configuration, product:product_definitions!inner(code)')
-                .eq('product.code', product.modelId) // Inner Join on Code
+                .eq('product.code', product.modelId)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
 
             if (tableData?.configuration) {
-                console.log('✅ Found Configuration in Price Table via Code Match (Super Fallback)');
+                // Merge strategies:
+                // 1. If table has rules, they OVERWRITE product definition rules.
+                // 2. Other config keys are also overwritten.
+                console.log('✅ Found Configuration in Price Table (Applying Overlay)');
+
+                // Special handling for freestanding_surcharge_rules to ensure we don't just merge objects but replace arrays if present
+                const tableRules = tableData.configuration.freestanding_surcharge_rules;
+                const defRules = productConfig.freestanding_surcharge_rules;
+
                 productConfig = { ...productConfig, ...tableData.configuration };
+
+                // If table has explicit empty rules, keep them. If undefined, maybe keep existing? 
+                // Usually table config is the source of truth if it exists.
+                if (tableRules) {
+                    productConfig.freestanding_surcharge_rules = tableRules;
+                    console.log(`⚡ Updated Freestanding Rules from Import (${tableRules.length} rules)`);
+                }
             } else if (defData?.id) {
+                // Fallback (Id-based lookup if Code match failed or ambiguous)
                 const { data: simpleTable } = await supabase
                     .from('price_tables')
                     .select('configuration')
@@ -560,10 +576,14 @@ export const PricingService = {
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
+
                 if (simpleTable?.configuration) {
+                    console.log('✅ Found Configuration in Price Table via ID (Fallback)');
                     productConfig = { ...productConfig, ...simpleTable.configuration };
                 }
             }
+        } catch (err) {
+            console.error('Error fetching Price Table overlay:', err);
         }
 
         const isAdditive = productConfig.freestanding_is_additive === true;
@@ -654,9 +674,27 @@ export const PricingService = {
                         freestandingSurcharge = Number(match.price);
                         console.log(`⚡ Surcharge Applied: ${freestandingSurcharge} EUR (Limit: ${match.max_width}mm)`);
                     } else {
+                        // Extrapolation Logic (User request: "powinna być wyższa")
                         const maxRule = sorted[sorted.length - 1];
-                        freestandingSurcharge = Number(maxRule.price);
-                        console.warn(`⚠️ Width ${product.width} exceeds max rule (${maxRule.max_width}). Using max price: ${freestandingSurcharge}`);
+                        console.warn(`⚠️ Width ${product.width} exceeds max rule (${maxRule.max_width}). Extrapolating price.`);
+
+                        let slope = 0;
+                        if (sorted.length > 1) {
+                            // Calculate slope from last two points
+                            const prevRule = sorted[sorted.length - 2];
+                            const priceDiff = Number(maxRule.price) - Number(prevRule.price);
+                            const widthDiff = Number(maxRule.max_width) - Number(prevRule.max_width);
+                            slope = widthDiff > 0 ? priceDiff / widthDiff : 0;
+                        } else {
+                            // Single rule: Linear from 0
+                            slope = Number(maxRule.price) / Number(maxRule.max_width);
+                        }
+
+                        const excessWidth = product.width - Number(maxRule.max_width);
+                        const addedValue = excessWidth * slope;
+
+                        freestandingSurcharge = Math.round((Number(maxRule.price) + addedValue) * 100) / 100;
+                        console.log(`⚡ Extrapolated Surcharge: ${freestandingSurcharge} EUR (Base: ${maxRule.price}, Added: ${addedValue.toFixed(2)})`);
                     }
                 } else {
                     console.log('ℹ️ No freestanding rules found. Surcharge = 0.');

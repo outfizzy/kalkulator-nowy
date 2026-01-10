@@ -1643,7 +1643,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     </span>
                                                     {Object.keys(cost.attributes || {}).length > 0 && (
                                                         <span className="text-[10px] text-slate-400">
-                                                            (Wymagane przez: {Object.values(cost.attributes).join(', ')})
+                                                            (Wymagane przez: {Object.values(cost.attributes || {}).join(', ')})
                                                         </span>
                                                     )}
                                                 </div>
@@ -1670,11 +1670,31 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                             </div>
                         )}
 
-                        {/* Total Cost (Visible for verification) */}
+                        {/* Cost Breakdown (Reference for User) */}
                         <div className="space-y-3 pb-6 border-b border-slate-100">
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="font-bold text-slate-500">Suma Kosztów (Materiał)</span>
-                                <span className="font-bold text-slate-700">{formatCurrency(totalCost)}</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Analiza Kosztów (Netto)</span>
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">Materiały (Suma):</span>
+                                    <span className="font-medium text-slate-700">{formatCurrency(totalCost)}</span>
+                                </div>
+                                {installationData && (installationData.dailyTotal > 0 || installationData.travelCost > 0) && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Usługi / Transport:</span>
+                                        <span className="font-medium text-slate-700">
+                                            {formatCurrency((installationData.dailyTotal || 0) + (installationData.travelCost || 0))}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-sm pt-2 mt-1 border-t border-slate-100">
+                                    <span className="font-bold text-slate-800">Całkowity Koszt Zakupu:</span>
+                                    <span className="font-bold text-slate-900">
+                                        {formatCurrency(totalCost + (installationData?.dailyTotal || 0) + (installationData?.travelCost || 0))}
+                                    </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 text-right italic">
+                                    (Podstawa do obliczenia marży)
+                                </div>
                             </div>
                         </div>
 
