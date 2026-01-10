@@ -575,9 +575,18 @@ export const PricingService = {
 
         // A. Freestanding Surcharge
         let freestandingSurcharge = 0;
-        // Logical OR: It is additive config OR standard fallback scenario (Legacy)
-        if (useAdditiveLogic || (!priceResult && constructionType === 'free')) {
-            if (!useAdditiveLogic) console.log('⚠️ Freestanding base price not found. Attempting Wall Base + Surcharge fallback.');
+
+        // Check if we are using a "Universal" table for a Freestanding request
+        // If so, we treat it as Additive (Universal Base + Surcharge)
+        const isUniversalTable = (priceResult as any)?.tableAttributes?.installationType === 'all';
+        const shouldApplySurcharge = useAdditiveLogic || (!priceResult && constructionType === 'free') || (isUniversalTable && constructionType === 'free');
+
+        // Logical OR: It is additive config OR standard fallback scenario (Legacy) OR Universal Table usage
+        if (shouldApplySurcharge) {
+            if (!useAdditiveLogic && !isUniversalTable) console.log('⚠️ Freestanding base price not found. Attempting Wall Base + Surcharge fallback.');
+            if (isUniversalTable) console.log('⚡ Universal Table used for Freestanding. Applying Surcharge.');
+
+            // If we don't have a price yet (Fallback case), try fetching Wall price
 
             // If we don't have a price yet (Fallback case), try fetching Wall price
             if (!priceResult) {
