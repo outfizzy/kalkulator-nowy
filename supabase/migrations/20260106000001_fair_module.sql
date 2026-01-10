@@ -17,7 +17,11 @@ ADD COLUMN IF NOT EXISTS fair_id UUID REFERENCES public.fairs(id),
 ADD COLUMN IF NOT EXISTS fair_prize JSONB; -- { type: 'discount', value: 5, label: '5% rabatu' }
 
 -- RLS Policies for Fairs
+-- RLS Policies for Fairs
 ALTER TABLE public.fairs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can manage fairs" ON public.fairs;
+DROP POLICY IF EXISTS "Users can view active fairs" ON public.fairs;
 
 -- Admins can do everything
 CREATE POLICY "Admins can manage fairs" ON public.fairs

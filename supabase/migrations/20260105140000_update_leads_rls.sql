@@ -16,12 +16,16 @@ AS $$
   SELECT role FROM profiles WHERE id = auth.uid();
 $$;
 
--- 2. Drop existing policies to be clean
+-- 2. Drop existing policies to be clean (updated to include ALL policies defined below)
 DROP POLICY IF EXISTS "Enable read access for all leads" ON "public"."leads";
 DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON "public"."leads";
 DROP POLICY IF EXISTS "Enable update for users based on email" ON "public"."leads";
 DROP POLICY IF EXISTS "Sales Reps can view own leads" ON "public"."leads";
 DROP POLICY IF EXISTS "Management can view all leads" ON "public"."leads";
+DROP POLICY IF EXISTS "leads_select_policy" ON "public"."leads";
+DROP POLICY IF EXISTS "leads_insert_policy" ON "public"."leads";
+DROP POLICY IF EXISTS "leads_update_policy" ON "public"."leads";
+DROP POLICY IF EXISTS "leads_delete_policy" ON "public"."leads";
 
 -- 3. SELECT Policy
 CREATE POLICY "leads_select_policy" ON "public"."leads"

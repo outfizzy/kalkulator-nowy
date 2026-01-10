@@ -31,18 +31,24 @@ create table if not exists pricing_base (
 alter table pricing_base enable row level security;
 
 -- Policies
+-- Policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON pricing_base;
 create policy "Enable read access for all users" on pricing_base
   for select using (true);
 
+DROP POLICY IF EXISTS "Enable write access for authenticated users" ON pricing_base;
 create policy "Enable write access for authenticated users" on pricing_base
   for insert with check (auth.role() = 'authenticated'); -- Or strictly 'service_role' / specific users
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON pricing_base;
 create policy "Enable update for authenticated users" on pricing_base
   for update using (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON pricing_base;
 create policy "Enable delete for authenticated users" on pricing_base
   for delete using (auth.role() = 'authenticated');
 
 -- Indexes for Fast Lookup
-create index idx_pricing_base_lookup 
+-- Indexes for Fast Lookup
+create index if not exists idx_pricing_base_lookup 
   on pricing_base(model_family, construction_type, cover_type, zone, width_mm, depth_mm);

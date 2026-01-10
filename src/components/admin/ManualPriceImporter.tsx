@@ -300,10 +300,32 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 p.name.trim().toLowerCase() === modelFamily.trim().toLowerCase()
             );
 
-            if (!detectedProduct) {
-                console.warn("Product Match Failed. Proceeding as new model:", modelFamily);
-                // toast('Tworzenie nowego modelu...', { icon: '🆕', id: toastId });
-                // We proceed without product_definition_id. PricingService derives models from pricing_base, so it will appear.
+            let productId = detectedProduct?.id;
+
+            // FIX: If product does not exist, CREATE IT to avoid "null value in column product_definition_id" error
+            // The constraint requires a valid ID.
+            if (!productId) {
+                console.log('✨ Creating new Product Definition for:', modelFamily);
+                const { data: newProd, error: createError } = await supabase
+                    .from('product_definitions')
+                    .insert({
+                        code: modelFamily.toLowerCase().replace(/\s+/g, ''),
+                        name: modelFamily,
+                        category: roofType === 'glass' ? 'roof' : 'other', // Best guess
+                        provider: 'Manual Import'
+                    })
+                    .select('id')
+                    .single();
+
+                if (createError) {
+                    console.error('Failed to auto-create product:', createError);
+                    // If creation fails (e.g. duplicate code that wasn't found by name), try one last specific fetch by code
+                    const { data: fallback } = await supabase.from('product_definitions').select('id').ilike('code', modelFamily.toLowerCase().replace(/\s+/g, '')).maybeSingle();
+                    if (fallback) productId = fallback.id;
+                    else throw new Error(`Nie można utworzyć ani znaleźć produktu dla "${modelFamily}". Tabela cenników wymaga powiązania z produktem.`);
+                } else {
+                    productId = newProd.id;
+                }
             }
 
             let tableName = `Manual Import - ${modelFamily}`;
@@ -320,14 +342,14 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
 
             const { data: tableData, error: tableError } = await supabase.from('price_tables').insert({
                 name: tableName,
-                product_definition_id: detectedProduct?.id || null, // Best effort link
-                type: 'matrix', // 'manual' not allowed by DB constraint
+                product_definition_id: productId, // Now guaranteed to be valid or throw
+                type: 'matrix',
                 is_active: true,
                 variant_config: {
                     snowZone: snowZone,
                     constructionType: constructionType,
                     manualModel: modelFamily,
-                    roofType: roofType, // NOW INCLUDED
+                    roofType: roofType,
                     subtype: activeMode === 'aluxe_poly' ? 'Poly (Mix)' : activeMode === 'aluxe_glass' ? 'Glass (Mix)' : 'Manual'
                 },
                 attributes: activeTab === 'surcharges' ? { type: 'surcharges', surchargeType } : { type: 'base' }

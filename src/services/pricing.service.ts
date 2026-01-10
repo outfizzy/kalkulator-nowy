@@ -817,6 +817,33 @@ export const PricingService = {
     async getSurchargePrice(modelFamily: string, surchargeType: string, width: number): Promise<number> {
         console.log(`💰 Surcharge Lookup: ${modelFamily} - ${surchargeType} (Width: ${width})`);
 
+        // 1. Priority: Check Configuration Rules (e.g. Freestanding Rules from Admin)
+        if (surchargeType === 'freestanding') {
+            const { data: defData } = await supabase
+                .from('product_definitions')
+                .select('configuration')
+                .ilike('code', modelFamily)
+                .maybeSingle();
+
+            const rules = defData?.configuration?.freestanding_surcharge_rules;
+            if (rules && Array.isArray(rules) && rules.length > 0) {
+                console.log('⚡ Found Freestanding Rules in Configuration');
+                const sorted = [...rules].sort((a: any, b: any) => a.max_width - b.max_width);
+                const match = sorted.find((r: any) => Number(r.max_width) >= width);
+
+                if (match) {
+                    console.log(`✅ Rule Matched: ${match.price} EUR (Limit: ${match.max_width}mm)`);
+                    return Number(match.price);
+                } else {
+                    // Exceeds max rule - use largest
+                    const maxRule = sorted[sorted.length - 1];
+                    console.warn(`⚠️ Width ${width} exceeds max rule. Using max: ${maxRule.price}`);
+                    return Number(maxRule.price);
+                }
+            }
+        }
+
+        // 2. Fallback: Legacy Table (pricing_surcharges)
         const { data } = await supabase
             .from('pricing_surcharges')
             .select('price_eur, width_mm')
@@ -828,7 +855,7 @@ export const PricingService = {
             .maybeSingle();
 
         if (data) {
-            console.log(`✅ Surcharge Found: ${data.price_eur} EUR (Matched Width: ${data.width_mm})`);
+            console.log(`✅ Surcharge Found (Legacy Table): ${data.price_eur} EUR (Matched Width: ${data.width_mm})`);
             return data.price_eur;
         }
 

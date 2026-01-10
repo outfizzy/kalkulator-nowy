@@ -1130,36 +1130,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         </div>
                                     )}
 
-                                    {/* Other/Generic Surcharges (Foundation, Special Color etc) */}
-                                    {availableSurcharges.some(s => !s.name.match(/ir|heat|gold|clear|mat|sun|milch|protec/i)) && (
-                                        <div className="mt-6 border-t border-slate-100 pt-4">
-                                            <h5 className="font-semibold text-slate-800 mb-3">Inne Opcje</h5>
-                                            <div className="space-y-3">
-                                                {availableSurcharges
-                                                    .filter(s => !s.name.match(/ir|heat|gold|clear|mat|sun|milch|protec/i))
-                                                    .map(surcharge => {
-                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
-                                                        return (
-                                                            <label key={surcharge.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-accent bg-accent/5' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={isSelected || false}
-                                                                    onChange={(e) => {
-                                                                        const current = config.selectedSurcharges || [];
-                                                                        let updated = [];
-                                                                        if (e.target.checked) updated = [...current, surcharge.id];
-                                                                        else updated = current.filter(id => id !== surcharge.id);
-                                                                        handleBasicConfigChange('selectedSurcharges', updated);
-                                                                    }}
-                                                                    className="w-5 h-5 text-accent rounded focus:ring-accent"
-                                                                />
-                                                                <div className="font-bold text-sm text-slate-900">{surcharge.name}</div>
-                                                            </label>
-                                                        );
-                                                    })}
-                                            </div>
-                                        </div>
-                                    )}
+
                                 </div>
 
                                 {/* Colors */}

@@ -26,17 +26,23 @@ create table if not exists product_components (
 alter table product_components enable row level security;
 
 -- Policies
+-- Policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON product_components;
 create policy "Enable read access for all users" on product_components
   for select using (true);
 
+DROP POLICY IF EXISTS "Enable write access for authenticated users" ON product_components;
 create policy "Enable write access for authenticated users" on product_components
   for insert with check (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON product_components;
 create policy "Enable update for authenticated users" on product_components
   for update using (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON product_components;
 create policy "Enable delete for authenticated users" on product_components
   for delete using (auth.role() = 'authenticated');
 
 -- Indexes
-create index idx_product_components_key on product_components(component_key);
+-- Indexes
+create index if not exists idx_product_components_key on product_components(component_key);
