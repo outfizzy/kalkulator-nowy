@@ -358,7 +358,7 @@ export const PricingService = {
                 // A. Construction Type Check (Attribute Priority > Name Heuristic)
                 const attrType = t.attributes?.installationType;
 
-                if (attrType && attrType !== 'all') {
+                if (attrType) {
                     // Strict Attribute Matching
                     if (attrType === 'freestanding' && requestIsWall) return; // Requested Wall, Table is Free -> Skip
                     if (attrType === 'wall-mounted' && !requestIsWall) return; // Requested Free, Table is Wall -> Skip
