@@ -240,6 +240,28 @@ export const TableSettingsModal: React.FC<TableSettingsModalProps> = ({
                             </div>
                         </div>
 
+                        {/* 1.5 Construction Type (New Section) */}
+                        <div className="space-y-3">
+                            <h4 className="font-bold text-slate-700 text-sm border-b pb-2">
+                                🏗️ Typ Konstrukcji (Przypisanie)
+                            </h4>
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                <label className="block text-xs font-bold text-slate-500 mb-1">Ten cennik dotyczy:</label>
+                                <select
+                                    value={attributes.installationType || 'all'}
+                                    onChange={(e) => handleAttributeChange('installationType', e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none"
+                                >
+                                    <option value="all">Uniwersalny (Przyścienny i Wolnostojący)</option>
+                                    <option value="wall-mounted">Tylko Przyścienne</option>
+                                    <option value="freestanding">Tylko Wolnostojące</option>
+                                </select>
+                                <p className="text-xs text-slate-400 mt-2">
+                                    Jeśli ustawisz "Tylko Wolnostojące", kalkulator użyje tego cennika <b>tylko</b> gdy użytkownik wybierze opcję wolnostojącą.
+                                </p>
+                            </div>
+                        </div>
+
                         {/* 2. Component Images (New Section) */}
                         <div className="space-y-3">
                             <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2 border-b pb-2">

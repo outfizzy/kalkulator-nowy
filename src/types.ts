@@ -258,6 +258,8 @@ export interface ProductConfig {
         description?: string;
         attributes?: Record<string, unknown>; // For multilingual names
     }[];
+
+
     // Visualizer 3.0 Context
     contextConfig?: {
         hasWall: boolean;
@@ -295,6 +297,7 @@ export interface InstallationCostResult {
 
 export interface PricingResult {
     basePrice: number;
+    surchargesBreakdown?: { name: string; price: number }[];
     addonsPrice: number;
     customItemsPrice?: number;
     totalCost: number;
@@ -316,6 +319,9 @@ export interface PricingResult {
 
     // Context from Pricing Engine
     structuralNote?: string; // e.g. "inkl. XL-Sparren"
+    matchedWidth?: number;
+    matchedProjection?: number;
+    constructionType?: string;
 
     // Debug Info (transient)
     _debuginfo?: unknown;

@@ -39,11 +39,35 @@ export const SurchargeRulesModal: React.FC<SurchargeRulesModalProps> = ({
     const [applyToAll, setApplyToAll] = useState(false);
 
     useEffect(() => {
-        if (isOpen) {
-            setConfig(initialConfig || {});
-            setRules(initialConfig?.free_standing_surcharge || []);
-        }
-    }, [isOpen, initialConfig]);
+        const loadConfig = async () => {
+            if (isOpen) {
+                if (productId) {
+                    // Fetch GLOBAL configuration from product_definitions
+                    const { data } = await supabase
+                        .from('product_definitions')
+                        .select('configuration')
+                        .eq('id', productId)
+                        .single();
+
+                    if (data?.configuration) {
+                        // Merge with initialConfig but prioritize global
+                        const mergedConfig = { ...initialConfig, ...data.configuration };
+                        setConfig(mergedConfig);
+                        // Check compat keys
+                        setRules(mergedConfig.free_standing_surcharge || mergedConfig.freestanding_surcharge_rules || []);
+                    } else {
+                        setConfig(initialConfig || {});
+                        setRules(initialConfig?.free_standing_surcharge || initialConfig?.freestanding_surcharge_rules || []);
+                    }
+                } else {
+                    // Local table config
+                    setConfig(initialConfig || {});
+                    setRules(initialConfig?.free_standing_surcharge || initialConfig?.freestanding_surcharge_rules || []);
+                }
+            }
+        };
+        loadConfig();
+    }, [isOpen, initialConfig, productId]);
 
     const handleAddRule = () => {
         setRules([...rules, { width: 0, price: 0 }]);

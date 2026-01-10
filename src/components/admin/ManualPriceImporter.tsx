@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { FileText } from 'lucide-react';
+import { ProductEditorModal } from './ProductEditorModal';
 
 interface ManualPriceImporterProps {
     isOpen: boolean;
@@ -61,8 +62,23 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
     // 3. Column Mapping (Standard Mode)
     const [columnMapping, setColumnMapping] = useState<Record<number, string>>({});
 
+
+
     // Custom Model State
     const [isCustomMode, setIsCustomMode] = useState(false);
+    const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
+
+    // -- Freestanding Auto-Generation --
+    const [genFreestanding, setGenFreestanding] = useState(false);
+    const [fsRules, setFsRules] = useState([
+        { maxWidth: 3000, price: 0 },
+        { maxWidth: 4000, price: 0 },
+        { maxWidth: 5000, price: 0 },
+        { maxWidth: 6000, price: 0 },
+        { maxWidth: 7000, price: 0 },
+    ]);
+    const [fsBaseSurcharge, setFsBaseSurcharge] = useState(0); // Fallback / Base
+
 
     const availableCoverTypes = [
         { id: 'glass_clear', label: 'Szkło Przeźroczyste (8mm/44.2)' },
@@ -79,6 +95,43 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
         const val = parseFloat(clean);
         return !isNaN(val) ? Math.round(val * 100) / 100 : null;
     };
+
+    // -- Auto-Load Rules Logic --
+    useEffect(() => {
+        if (!modelFamily || modelFamily === '__CUSTOM__') return;
+
+        const loadRules = async () => {
+            const product = products?.find(p => p.name.trim().toLowerCase() === modelFamily.trim().toLowerCase());
+            if (!product) return;
+
+            const { data } = await supabase
+                .from('product_definitions')
+                .select('configuration')
+                .eq('id', product.id)
+                .single();
+
+            if (data?.configuration?.freestanding_surcharge_rules) {
+                console.log('⚡ Auto-loading Freestanding Rules for', modelFamily);
+                const loadedRules = data.configuration.freestanding_surcharge_rules.map((r: any) => ({
+                    maxWidth: r.max_width,
+                    price: r.price
+                })).sort((a: any, b: any) => a.maxWidth - b.maxWidth);
+
+                if (loadedRules.length > 0) {
+                    setFsRules(loadedRules);
+                    toast.success(`Wczytano zapisane reguły dopłat dla ${modelFamily}`, { icon: '🪄' });
+                }
+            } else {
+                // If no rules found for this product, KEEP the current rules (don't reset).
+                // This allows the user to set rules once and apply them to multiple models by switching and saving.
+                // UNLESS the current rules are all zero (fresh start), in which case we might want to stay zero.
+                // But generally, persistence is preferred here as per user request ("dla szkła też niech zasysa...").
+                console.log('ℹ️ No specific rules for', modelFamily, '- keeping current values.');
+            }
+        };
+
+        loadRules();
+    }, [modelFamily, products]);
 
     // -- Parsing Logic --
     useEffect(() => {
@@ -293,6 +346,7 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
 
         // 1. Create Tracker in price_tables
         let assignedTableId: string | null = null;
+        let productId: string | undefined;
         try {
             // Find product ID by name mapping
             // Note: DB names might differ slightly (Trendstyle vs TRENDSTYLE), checking rough match with trim
@@ -300,18 +354,28 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 p.name.trim().toLowerCase() === modelFamily.trim().toLowerCase()
             );
 
-            let productId = detectedProduct?.id;
+            productId = detectedProduct?.id;
+
+            // Determine Roof Type for Metadata (Moved UP to be available for Product Creation)
+            let roofType = 'polycarbonate'; // Default
+            if (activeMode === 'aluxe_glass' || (activeMode === 'standard' && (activeTab === 'base' && Object.values(columnMapping).some(v => v?.includes('glass'))))) {
+                roofType = 'glass';
+            } else if (activeMode === 'aluxe_poly' || (activeMode === 'standard' && (activeTab === 'base' && Object.values(columnMapping).some(v => v?.includes('poly'))))) {
+                roofType = 'polycarbonate';
+            }
 
             // FIX: If product does not exist, CREATE IT to avoid "null value in column product_definition_id" error
             // The constraint requires a valid ID.
             if (!productId) {
                 console.log('✨ Creating new Product Definition for:', modelFamily);
+                const codeCandidate = modelFamily.trim().toLowerCase().replace(/\s+/g, '');
+
                 const { data: newProd, error: createError } = await supabase
                     .from('product_definitions')
                     .insert({
-                        code: modelFamily.toLowerCase().replace(/\s+/g, ''),
-                        name: modelFamily,
-                        category: roofType === 'glass' ? 'roof' : 'other', // Best guess
+                        code: codeCandidate,
+                        name: modelFamily.trim(),
+                        category: roofType === 'glass' ? 'roof' : 'other',
                         provider: 'Manual Import'
                     })
                     .select('id')
@@ -319,10 +383,43 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
 
                 if (createError) {
                     console.error('Failed to auto-create product:', createError);
-                    // If creation fails (e.g. duplicate code that wasn't found by name), try one last specific fetch by code
-                    const { data: fallback } = await supabase.from('product_definitions').select('id').ilike('code', modelFamily.toLowerCase().replace(/\s+/g, '')).maybeSingle();
-                    if (fallback) productId = fallback.id;
-                    else throw new Error(`Nie można utworzyć ani znaleźć produktu dla "${modelFamily}". Tabela cenników wymaga powiązania z produktem.`);
+
+                    // If failed due to DUPLICATE (23505), we MUST be able to find it.
+                    // Retry with exact match on code first.
+                    const { data: fallbackCode } = await supabase
+                        .from('product_definitions')
+                        .select('id')
+                        .eq('code', codeCandidate) // Use eq to be exact if unique constraint failed this specific code
+                        .maybeSingle();
+
+                    if (fallbackCode) {
+                        productId = fallbackCode.id;
+                    } else {
+                        // Fallback 2: Try finding by NAME (maybe code is different)
+                        const { data: fallbackName } = await supabase
+                            .from('product_definitions')
+                            .select('id')
+                            .ilike('name', modelFamily.trim())
+                            .maybeSingle();
+
+                        if (fallbackName) {
+                            productId = fallbackName.id;
+                        } else {
+                            // Fallback 3: Try ignoring case on code (ilike)
+                            const { data: fallbackCodeLoose } = await supabase
+                                .from('product_definitions')
+                                .select('id')
+                                .ilike('code', codeCandidate)
+                                .maybeSingle();
+
+                            if (fallbackCodeLoose) {
+                                productId = fallbackCodeLoose.id;
+                            } else {
+                                // Give up with detailed error
+                                throw new Error(`Nie można utworzyć produktu "${modelFamily}". Błąd DB: ${createError.message} (Kod: ${createError.code}) - Produkt prawdopodobnie istnieje, ale nie mogę go pobrać (sprawdź RLS).`);
+                            }
+                        }
+                    }
                 } else {
                     productId = newProd.id;
                 }
@@ -331,14 +428,6 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
             let tableName = `Manual Import - ${modelFamily}`;
             if (constructionType === 'free') tableName += ' - Freestanding';
             tableName += ` - S${snowZone} (${new Date().toLocaleDateString('pl-PL')} ${new Date().toLocaleTimeString('pl-PL')})`;
-
-            // Determine Roof Type for Metadata
-            let roofType = 'polycarbonate'; // Default
-            if (activeMode === 'aluxe_glass' || (activeMode === 'standard' && (activeTab === 'base' && Object.values(columnMapping).some(v => v?.includes('glass'))))) {
-                roofType = 'glass';
-            } else if (activeMode === 'aluxe_poly' || (activeMode === 'standard' && (activeTab === 'base' && Object.values(columnMapping).some(v => v?.includes('poly'))))) {
-                roofType = 'polycarbonate';
-            }
 
             const { data: tableData, error: tableError } = await supabase.from('price_tables').insert({
                 name: tableName,
@@ -429,6 +518,107 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                     });
                 }
             });
+
+            // --- SURCHARGE APPLICATION LOGIC ---
+            // Case A: Wall -> Generate Freestanding Copy (Old Logic)
+            // Case B: Freestanding -> Apply to Current Rows (Direct Math)
+
+            if (genFreestanding) {
+                console.log('⚡ Applying Surcharge Rules...');
+
+                // Helper to find surcharge
+                const getSurcharge = (width: number) => {
+                    const sorted = [...fsRules].sort((a, b) => a.maxWidth - b.maxWidth);
+                    const match = sorted.find(r => width <= r.maxWidth);
+                    if (match && match.price > 0) return match.price;
+                    return fsBaseSurcharge;
+                };
+
+                // Logic A: Construction = Wall -> Create COPY with Surcharge
+                if (constructionType === 'wall') {
+                    console.log(' -> Generating Separate Freestanding Variant');
+                    parsedRows.forEach(row => {
+                        const surcharge = getSurcharge(row.width);
+                        if (activeMode !== 'standard' && row.entries.length > 0) {
+                            row.entries.forEach(entry => {
+                                entriesToInsert.push({
+                                    model_family: modelFamily,
+                                    construction_type: 'freestanding',
+                                    cover_type: entry.coverType,
+                                    zone: zoneInt,
+                                    width_mm: row.width,
+                                    depth_mm: row.depth,
+                                    price_upe_net_eur: parseFloat((entry.price + surcharge).toFixed(2)),
+                                    currency: 'EUR',
+                                    posts_count: row.posts,
+                                    fields_count: row.fields,
+                                    area_m2: row.area,
+                                    variant_note: row.variantNote,
+                                    source_import_id: assignedTableId,
+                                    properties: (entry as any).properties || {}
+                                });
+                            });
+                        } else {
+                            Object.entries(columnMapping).forEach(([colIdxStr, coverType]) => {
+                                if (!coverType || coverType === 'IGNORE') return;
+                                const price = row.prices[parseInt(colIdxStr)];
+                                if (price) {
+                                    entriesToInsert.push({
+                                        model_family: modelFamily,
+                                        construction_type: 'freestanding',
+                                        cover_type: coverType,
+                                        zone: zoneInt,
+                                        width_mm: row.width,
+                                        depth_mm: row.depth,
+                                        price_upe_net_eur: price + surcharge,
+                                        currency: 'EUR',
+                                        variant_note: row.variantNote,
+                                        source_import_id: assignedTableId
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+
+                // Logic B: Construction = Pure Freestanding -> Apply to PRIMARY rows (Modify entriesToInsert directly?)
+                // Actually, entriesToInsert is already populated above. 
+                // If constructionType is 'free', entriesToInsert contains 'freestanding' rows with base price.
+                // We need to UPDATE their prices.
+                else if (constructionType === 'free') {
+                    console.log(' -> Updating Primary Freestanding Prices');
+                    // We need to iterate over entriesToInsert and ADD surcharge
+                    // entriesToInsert is mutable array.
+                    entriesToInsert.forEach(entry => {
+                        const surcharge = getSurcharge(entry.width_mm);
+                        if (surcharge > 0) {
+                            entry.price_upe_net_eur = parseFloat((entry.price_upe_net_eur + surcharge).toFixed(2));
+                        }
+                    });
+                }
+
+                // 3. ALWAYS SAVE RULES if enabled (So calculator knows about them for future reference or display)
+                // We can reuse the logic from 'surcharge type' tab, but here we do it for base tab save too?
+                // Yes, let's auto-update product config if we have new rules.
+                if (productId) {
+                    const rules = fsRules.map(r => ({ max_width: r.maxWidth, price: r.price }));
+                    // We'll update silently or with small toast?
+                    // Let's do it.
+                    supabase.from('product_definitions').select('configuration').eq('id', productId).single()
+                        .then(({ data }) => {
+                            const currentConfig = data?.configuration || {};
+                            supabase.from('product_definitions').update({
+                                configuration: {
+                                    ...currentConfig,
+                                    freestanding_surcharge_rules: rules,
+                                    freestanding_is_additive: true
+                                }
+                            }).eq('id', productId).then(({ error }) => {
+                                if (!error) console.log('✅ Updated Product Rules (Background)');
+                            });
+                        });
+                }
+            }
         }
 
         let error;
@@ -451,6 +641,7 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 // source_import_id: assignedTableId // Does pricing_surcharges have this? Probably not yet.
             }));
 
+            // 1. Save to Legacy Table (Backup)
             const { error: err } = await supabase
                 .from('pricing_surcharges')
                 .upsert(surchargesToInsert, {
@@ -458,6 +649,45 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                     ignoreDuplicates: false
                 });
             error = err;
+
+            // 2. NEW: Save Freestanding Rules to Product Configuration (Primary for Calculator)
+            if (!err && surchargeType === 'freestanding' && productId) {
+                console.log('⚡ Saving Freestanding Rules to Product Config:', productId);
+
+                // Convert parsed rows to cleaner rule format
+                const rules = parsedRows.map(row => ({
+                    max_width: row.width,
+                    price: row.entries[0]?.price || 0
+                }));
+
+                // Fetch current config first to merge (avoid overwriting other config)
+                const { data: currentProd } = await supabase
+                    .from('product_definitions')
+                    .select('configuration')
+                    .eq('id', productId)
+                    .single();
+
+                const currentConfig = currentProd?.configuration || {};
+
+                // Update configuration
+                const { error: configError } = await supabase
+                    .from('product_definitions')
+                    .update({
+                        configuration: {
+                            ...currentConfig,
+                            freestanding_surcharge_rules: rules,
+                            freestanding_is_additive: true // EXPLICITLY MARK AS ADDITIVE
+                        }
+                    })
+                    .eq('id', productId);
+
+                if (configError) {
+                    console.error('Failed to update product config:', configError);
+                    toast.error('Zapisano w tabeli, ale nie udało się zaktualizować konfiguracji produktu (Kalkulator może tego nie widzieć).', { id: toastId });
+                } else {
+                    toast.success('Zaktualizowano reguły wolnostojące w produkcie!', { id: toastId });
+                }
+            }
         }
 
         if (error) {
@@ -543,6 +773,60 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
 
                 {/* Content */}
                 <div className="flex-1 flex overflow-hidden">
+                    {/* --- Freestanding Generator Options --- */}
+                    {activeTab === 'base' && (
+                        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 mb-4">
+                            <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                <input
+                                    type="checkbox"
+                                    checked={genFreestanding}
+                                    onChange={e => setGenFreestanding(e.target.checked)}
+                                    className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500"
+                                />
+                                <span className="font-bold text-slate-800">
+                                    {constructionType === 'wall'
+                                        ? 'Generuj TAKŻE wariant Wolnostojący (Kopia + Dopłata)'
+                                        : 'Dolicz dopłatę do cen (Reguły szerokości)'}
+                                </span>
+                            </label>
+
+                            {genFreestanding && (
+                                <div className="animate-in slide-in-from-top-2">
+                                    <p className="text-xs text-slate-500 mb-3">
+                                        {constructionType === 'wall'
+                                            ? 'System utworzy kopię cennika przyściennego z typem "Freestanding" i doliczy poniższe kwoty.'
+                                            : 'System doliczy do zaimportowanych cen poniższe wartości w zależności od szerokości.'}
+                                    </p>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {fsRules.map((rule, idx) => (
+                                            <div key={idx} className="bg-white p-2 rounded border border-amber-200 shadow-sm">
+                                                <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">
+                                                    Do {rule.maxWidth}mm
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-slate-400 text-xs">+</span>
+                                                    <input
+                                                        type="number"
+                                                        value={rule.price || ''}
+                                                        onChange={e => {
+                                                            const newRules = [...fsRules];
+                                                            newRules[idx].price = parseFloat(e.target.value) || 0;
+                                                            setFsRules(newRules);
+                                                        }}
+                                                        placeholder="0"
+                                                        className="w-full text-sm font-bold text-slate-700 focus:outline-none"
+                                                    />
+                                                    <span className="text-slate-400 text-xs">EUR</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {/* Optional Base Surcharge if needed, currently reusing rules */}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Left Panel */}
                     <div className="w-[30%] border-r bg-slate-50 p-4 flex flex-col gap-4 overflow-y-auto">
 
@@ -566,16 +850,26 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                             <h3 className="text-xs font-bold text-slate-500 uppercase">Parametry Importu</h3>
                             <div>
                                 <div>
-                                    <label className="text-xs font-bold flex justify-between">
+                                    <label className="text-xs font-bold flex justify-between items-center">
                                         Model
-                                        {isCustomMode && (
-                                            <button
-                                                onClick={() => setIsCustomMode(false)}
-                                                className="text-[10px] text-blue-600 hover:underline cursor-pointer"
-                                            >
-                                                (Wróć do listy)
-                                            </button>
-                                        )}
+                                        <div className="flex gap-2">
+                                            {modelFamily && modelFamily !== '__CUSTOM__' && (
+                                                <button
+                                                    onClick={() => setIsProductEditorOpen(true)}
+                                                    className="text-[10px] text-accent font-bold hover:underline cursor-pointer bg-accent/10 px-2 py-0.5 rounded"
+                                                >
+                                                    📷 Edytuj (Zdjęcie/Info)
+                                                </button>
+                                            )}
+                                            {isCustomMode && (
+                                                <button
+                                                    onClick={() => setIsCustomMode(false)}
+                                                    className="text-[10px] text-blue-600 hover:underline cursor-pointer"
+                                                >
+                                                    (Wróć do listy)
+                                                </button>
+                                            )}
+                                        </div>
                                     </label>
 
                                     {!isCustomMode ? (
@@ -817,6 +1111,14 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                     </div>
                 </div>
             </div>
+            <ProductEditorModal
+                isOpen={isProductEditorOpen}
+                onClose={() => setIsProductEditorOpen(false)}
+                productName={modelFamily}
+                onSuccess={() => {
+                    // Refresh not strictly needed as we just edited metadata
+                }}
+            />
         </div>
     );
 };

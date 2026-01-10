@@ -3,6 +3,7 @@ import type { Offer } from '../types';
 import { generateOfferPDF } from '../utils/pdfGenerator';
 import { translations, translate, formatCurrency } from '../utils/translations';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { DatabaseService } from '../services/database';
 import { PricingService } from '../services/pricing.service';
 import { toast } from 'react-hot-toast';
@@ -22,6 +23,29 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
 
     const [isGenerating, setIsGenerating] = React.useState(false);
     const { currentUser } = useAuth();
+
+    // Product Image
+    const [productImageUrl, setProductImageUrl] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        const fetchImage = async () => {
+            // Look for product definition by modelId 
+            if (!offer.product.modelId) return;
+
+            const { data } = await supabase
+                .from('product_definitions')
+                .select('image_url')
+                .ilike('name', offer.product.modelId)
+                .limit(1)
+                .maybeSingle();
+
+            if (data?.image_url) {
+                setProductImageUrl(data.image_url);
+            }
+        };
+
+        fetchImage();
+    }, [offer.product.modelId]);
 
     // isAdminOrManager removed as it's unused now
 
@@ -344,7 +368,18 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
 
                 {/* Product Details */}
                 <div className="mb-8">
-                    <h3 className="text-sm uppercase tracking-wider text-slate-500 font-semibold mb-4">{translations.specification}</h3>
+                    <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-sm uppercase tracking-wider text-slate-500 font-semibold">{translations.specification}</h3>
+                        {productImageUrl && (
+                            <div className="h-40 w-60 bg-white rounded-lg border border-slate-100 p-2 shadow-sm">
+                                <img
+                                    src={productImageUrl}
+                                    alt={modelName || offer.product.modelId}
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
+                        )}
+                    </div>
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-slate-200">

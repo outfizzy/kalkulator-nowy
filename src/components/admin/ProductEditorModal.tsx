@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../lib/supabase';
 import { PricingService } from '../../services/pricing.service';
-import { X, Save, Image as ImageIcon, Palette, AlertCircle } from 'lucide-react';
+import { X, Save, Image as ImageIcon, Palette, AlertCircle, Upload } from 'lucide-react';
 
 interface ProductEditorModalProps {
     isOpen: boolean;
@@ -149,16 +150,69 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({ isOpen, 
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-2">
                             <ImageIcon className="w-3 h-3" /> Link do zdjęcia (URL)
                         </label>
-                        <input
-                            type="text"
-                            placeholder="https://..."
-                            value={formData.image_url}
-                            onChange={e => setFormData({ ...formData, image_url: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-accent/20 outline-none font-mono text-sm"
-                        />
+
+                        <div className="flex gap-2 mb-2">
+                            <input
+                                type="text"
+                                placeholder="https://..."
+                                value={formData.image_url}
+                                onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                                className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-accent/20 outline-none font-mono text-sm"
+                            />
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+
+                                        const toastId = toast.loading('Wysyłanie zdjęcia...');
+                                        try {
+                                            // 1. Upload
+                                            const fileExt = file.name.split('.').pop();
+                                            const fileName = `${formData.code || 'product'}_${Date.now()}.${fileExt}`;
+                                            const filePath = `${fileName}`;
+
+                                            // Check bucket existence? Assuming 'product-images' exists or RLS allows creation.
+                                            // Ideally we should create bucket if not exists but admin panel usually assumes setup.
+
+                                            const { error: uploadError } = await supabase.storage
+                                                .from('product-images')
+                                                .upload(filePath, file);
+
+                                            if (uploadError) throw uploadError;
+
+                                            // 2. Get Public URL
+                                            const { data: { publicUrl } } = supabase.storage
+                                                .from('product-images')
+                                                .getPublicUrl(filePath);
+
+                                            setFormData(prev => ({ ...prev, image_url: publicUrl }));
+                                            toast.success('Zdjęcie wgrane!', { id: toastId });
+                                        } catch (err: any) {
+                                            console.error(err);
+                                            toast.error('Błąd wgrywania: ' + err.message, { id: toastId });
+                                        }
+                                    }}
+                                />
+                                <button className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200 flex items-center gap-2 text-sm font-medium h-full">
+                                    <Upload className="w-4 h-4" /> Wgraj
+                                </button>
+                            </div>
+                        </div>
+
                         {formData.image_url && (
-                            <div className="mt-2 h-32 bg-slate-50 rounded border flex items-center justify-center overflow-hidden relative">
+                            <div className="mt-2 h-40 bg-slate-50 rounded border flex items-center justify-center overflow-hidden relative group">
                                 <img src={formData.image_url} alt="Preview" className="h-full object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                                <button
+                                    onClick={() => setFormData({ ...formData, image_url: '' })}
+                                    className="absolute top-2 right-2 bg-red-white text-red-500 bg-white p-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                                    title="Usuń zdjęcie"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
                         )}
                     </div>

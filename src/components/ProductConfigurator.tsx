@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ProductConfig, SelectedAddon } from '../types';
+import type { ProductConfig, SelectedAddon, PricingResult } from '../types';
 
 import { LightingSelector } from './configurator/LightingSelector';
 import { KeilfensterSelector } from './configurator/KeilfensterSelector';
@@ -115,6 +115,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const [matchedDimensions, setMatchedDimensions] = useState<{ width: number, projection: number } | null>(null);
     const [priceError, setPriceError] = useState<string | null>(null);
     const [variantNote, setVariantNote] = useState<string | null>(null);
+    const [detail, setDetail] = useState<any>({});
 
     // Dynamic Limits State
     const [limits, setLimits] = useState({ minWidth: 2000, maxWidth: 10000, minDepth: 2000, maxDepth: 5000 });
@@ -155,150 +156,60 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     // Add other attributes if needed (e.g. post height range)
                 };
 
-                // 2. Get Matrix Price
-                const matrix = await PricingService.getPriceMatrix(config.modelId, attributes);
-                let price = 0;
-                let foundBasePrice = false;
-                let currentVariantNote: string | null = null;
+                // 2. Get Matrix Price (Removed legacy matrix fetch)
 
-                if (matrix.length > 0) {
-                    const detail = PricingService.getDetailedPrice(matrix, config.width, config.projection);
-                    if (detail && detail.total > 0) {
-                        price = detail.total;
-                        // Extract variant note if present
-                        if ('variant_note' in detail && typeof detail.variant_note === 'string') {
-                            currentVariantNote = detail.variant_note;
-                        }
-                        foundBasePrice = true;
+                // --- REFACTORED PRICING LOGIC (Centralized in PricingService) ---
+                const priceConfig: ProductConfig = {
+                    ...config
+                };
 
-                        // Update Structural Config (Posts/Fields) from DB
-                        const newPosts = detail.properties?.posts_count || detail.properties?.posts;
-                        const newFields = detail.properties?.fields_count || detail.properties?.fields;
+                const result: PricingResult = await PricingService.calculateOfferPrice(priceConfig);
 
-                        // Only update if changed to avoid unnecessary re-renders (though safe due to dep array)
-                        if (newPosts && newFields && (newPosts !== config.numberOfPosts || newFields !== config.numberOfFields)) {
-                            setConfig(prev => ({ ...prev, numberOfPosts: newPosts, numberOfFields: newFields }));
-                        }
+                // 1. Update Base Price
+                // Note: result.totalCost includes surcharges. result.basePrice is pure foundation.
+                setDynamicBasePrice(result.basePrice);
 
-                        if (detail.properties?.matchedWidth && detail.properties?.matchedProjection) {
-                            setMatchedDimensions({
-                                width: detail.properties.matchedWidth,
-                                projection: detail.properties.matchedProjection
-                            });
-                        } else {
-                            setMatchedDimensions(null);
-                        }
-                    } else {
-                        setMatchedDimensions(null);
-                    }
+                // 2. Update Surcharges Breakdown
+                setSurchargesBreakdown(result.surchargesBreakdown || []);
+
+                // 3. Update Found/Error State
+                const isFound = (result._debuginfo as any)?.found;
+
+                if (isFound) {
+                    setPriceError(null);
+                    setMatchedDimensions(result.matchedWidth && result.matchedProjection ? { width: result.matchedWidth, projection: result.matchedProjection } : null);
+
+                    // Update Detail for Posts/Fields
+                    setDetail({
+                        matchedWidth: result.matchedWidth,
+                        matchedProjection: result.matchedProjection,
+                        properties: {
+                            posts_count: result.numberOfPosts,
+                            fields_count: result.numberOfFields
+                        },
+                        construction_type: result.constructionType,
+                        variant_note: result.structuralNote
+                    });
+
+                    setVariantNote(result.structuralNote || null);
                 } else {
-                    setMatchedDimensions(null);
-                }
-
-                // Check for missing table (Snow Zone Gap)
-                if (!foundBasePrice) {
+                    // Check if table missing completely
                     const tableExists = await PricingService.checkPriceTableExists();
                     if (!tableExists) {
                         setPriceError('Brak cennika dla wybranej strefy śniegowej. Prosimy o kontakt w celu wyceny indywidualnej.');
                     } else {
-                        // Table exists but no price for dimension? Either 0 or just not found.
-                        // If it's 0, it might be valid (unlikely for base price).
                         setPriceError(null);
                     }
-                } else {
-                    setPriceError(null);
-                }
-
-                // 2.5 Apply Table Configuration Surcharges (e.g. Glass, Color)
-                const { config: tableConfig, attributes: tableAttributes } = await PricingService.getTableConfig(config.modelId, attributes);
-
-                const surchargeResult = PricingService.calculateSurcharges(
-                    price,
-                    config.width,
-                    config.projection,
-                    tableConfig,
-                    {
-                        mountingType: config.installationType === 'wall-mounted' ? 'wall' : 'free_standing',
-                        roofType: config.roofType
-                    }
-                );
-
-                // --- NEW: Apply Database Surcharges for Freestanding (Global Logic) ---
-                if (config.installationType === 'freestanding') {
-                    const fsSurcharge = await PricingService.getSurchargePrice(config.modelId, 'freestanding', config.width);
-                    if (fsSurcharge > 0) {
-                        surchargeResult.total += fsSurcharge;
-                        surchargeResult.items.push({ name: 'Dopłata: Konstrukcja Wolnostojąca', price: fsSurcharge });
-                    }
-                }
-                // ---------------------------------------------------------------------
-
-                if (surchargeResult.total > 0) {
-                    price += surchargeResult.total;
-                    console.log('[Pricing] Surcharges applied:', surchargeResult.items);
-                }
-                setSurchargesBreakdown(surchargeResult.items);
-
-                if (tableAttributes?.discount) {
-                    const originalPrice = price;
-                    price = PricingService.calculateDiscountedPrice(price, tableAttributes.discount);
-                    if (price !== originalPrice) {
-                        console.log(`[Pricing] Applied Discount '${tableAttributes.discount}': ${originalPrice} -> ${price}`);
-                    }
-                }
-
-                // 2.6 User Selected Surcharges (New)
-                if (config.selectedSurcharges && config.selectedSurcharges.length > 0 && availableSurcharges.length > 0) {
-                    for (const surchargeId of config.selectedSurcharges) {
-                        const surchargeMeta = availableSurcharges.find(s => s.id === surchargeId);
-                        if (surchargeMeta) {
-                            const surchargePrice = await PricingService.getSurchargePrice(config.modelId, surchargeMeta.id, config.width);
-                            if (surchargePrice > 0) {
-                                price += surchargePrice;
-                                surchargeResult.items.push({
-                                    name: surchargeMeta.name,
-                                    price: surchargePrice
-                                });
-                            }
-                        }
-                    }
-                }
-
-                // 2.7 Custom Color Surcharge
-                if (config.customColor) {
-                    const selectedProduct = products.find(p => p.code === config.modelId);
-                    if (selectedProduct && selectedProduct.custom_color_surcharge_percentage) {
-                        const colorSurcharge = price * (selectedProduct.custom_color_surcharge_percentage / 100);
-                        if (colorSurcharge > 0) {
-                            price += colorSurcharge;
-                            surchargeResult.items.push({
-                                name: `Kolor Niestandardowy (+${selectedProduct.custom_color_surcharge_percentage}%)`,
-                                price: colorSurcharge
-                            });
-                        }
-                    }
-                }
-
-                setSurchargesBreakdown(surchargeResult.items);
-
-                if (price > 0) {
-                    setDynamicBasePrice(price);
-                } else {
-                    // Keep old logic if 0 (backward compatibility)
-                }
-
-                // 3. Get Additional Costs (Surcharges for this specific variant)
-                const surcharges = await PricingService.getAdditionalCosts(config.modelId, attributes);
-                setAdditionalCosts(surcharges);
-
-                // Set variant note for UI display
-                if (currentVariantNote) {
-                    setPriceError(null); // Clear errors if any
-                    // We might want to store this in a state variable to display it
-                    setVariantNote(currentVariantNote);
-                } else {
+                    setMatchedDimensions(null);
+                    setDetail({});
                     setVariantNote(null);
                 }
+
+                // Legacy Additional Costs
+                // Reconstruct attributes roughly for legacy support (if needed)
+
+                const surcharges = await PricingService.getAdditionalCosts(config.modelId, attributes);
+                setAdditionalCosts(surcharges);
 
 
             } catch (err) {
@@ -1039,6 +950,22 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                             </label>
                                                         );
                                                     })}
+                                                {/* IR Gold (New Option) */}
+                                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                    <input
+                                                        type="radio"
+                                                        name="polyType"
+                                                        checked={config.polycarbonateType === 'poly_iq_relax'}
+                                                        onChange={() => {
+                                                            handleBasicConfigChange('polycarbonateType', 'poly_iq_relax');
+                                                        }}
+                                                        className="w-4 h-4 text-accent focus:ring-accent"
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">IR Gold (Heat Protection)</div>
+                                                        <div className="text-xs text-slate-500">Dopłata</div>
+                                                    </div>
+                                                </label>
                                             </div>
                                         </div>
                                     )}
@@ -1071,61 +998,50 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
                                                 {/* Opal (Matte) - Check if it's a surcharge or distinct type in DB */}
                                                 {/* Assuming Surcharge for Opal/Matt based on prior Importer logic */}
-                                                {availableSurcharges
-                                                    .filter(s => s.name.match(/mat|milch|opal/i))
-                                                    .map(surcharge => {
-                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
-                                                        return (
-                                                            <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="glassType"
-                                                                    checked={isSelected || false}
-                                                                    onChange={() => {
-                                                                        handleBasicConfigChange('glassType', 'glass_opal');
-                                                                        // Handle mutually exclusive glass surcharges
-                                                                        const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|milch|opal|tint|sun/i)).map(s => s.id);
-                                                                        const current = config.selectedSurcharges || [];
-                                                                        const othersRemoved = current.filter(id => !glassSurcharges.includes(id));
-                                                                        handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
-                                                                    }}
-                                                                    className="w-4 h-4 text-accent focus:ring-accent"
-                                                                />
-                                                                <div>
-                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name} (Opal)</div>
-                                                                    <div className="text-xs text-slate-500">Dopłata (+{surcharge.price} EUR)</div>
-                                                                </div>
-                                                            </label>
-                                                        );
-                                                    })}
+                                                {/* Opal (Matte) */}
+                                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                    <input
+                                                        type="radio"
+                                                        name="glassType"
+                                                        checked={config.glassType === 'glass_opal'}
+                                                        onChange={() => {
+                                                            handleBasicConfigChange('glassType', 'glass_opal');
+                                                        }}
+                                                        className="w-4 h-4 text-accent focus:ring-accent"
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">Opal (Mleczne)</div>
+                                                        <div className="text-xs text-slate-500">
+                                                            {(() => {
+                                                                const sur = availableSurcharges.find(s => s.name.match(/mat|milch|opal/i));
+                                                                return sur ? `Dopłata (+${sur.price} EUR)` : 'Dopłata';
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                </label>
 
                                                 {/* Tinted (Sun Protection) */}
-                                                {availableSurcharges
-                                                    .filter(s => s.name.match(/sun|tint|protec/i))
-                                                    .map(surcharge => {
-                                                        const isSelected = config.selectedSurcharges?.includes(surcharge.id);
-                                                        return (
-                                                            <label key={surcharge.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="glassType"
-                                                                    checked={isSelected || false}
-                                                                    onChange={() => {
-                                                                        handleBasicConfigChange('glassType', 'glass_tinted');
-                                                                        const glassSurcharges = availableSurcharges.filter(s => s.name.match(/mat|milch|opal|tint|sun/i)).map(s => s.id);
-                                                                        const current = config.selectedSurcharges || [];
-                                                                        const othersRemoved = current.filter(id => !glassSurcharges.includes(id));
-                                                                        handleBasicConfigChange('selectedSurcharges', [...othersRemoved, surcharge.id]);
-                                                                    }}
-                                                                    className="w-4 h-4 text-accent focus:ring-accent"
-                                                                />
-                                                                <div>
-                                                                    <div className="font-medium text-sm text-slate-900">{surcharge.name} (Przyciemniane)</div>
-                                                                    <div className="text-xs text-slate-500">Dopłata (+{surcharge.price} EUR)</div>
-                                                                </div>
-                                                            </label>
-                                                        );
-                                                    })}
+                                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                                    <input
+                                                        type="radio"
+                                                        name="glassType"
+                                                        checked={config.glassType === 'glass_tinted'}
+                                                        onChange={() => {
+                                                            handleBasicConfigChange('glassType', 'glass_tinted');
+                                                        }}
+                                                        className="w-4 h-4 text-accent focus:ring-accent"
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">Sun Protection (Przyciemniane)</div>
+                                                        <div className="text-xs text-slate-500">
+                                                            {(() => {
+                                                                const sur = availableSurcharges.find(s => s.name.match(/sun|tint|protec/i));
+                                                                return sur ? `Dopłata (+${sur.price} EUR)` : 'Dopłata';
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                </label>
+
                                             </div>
                                         </div>
                                     )}
@@ -1429,7 +1345,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                                 const isFreestandingItem = nameLower.includes('free') || nameLower.includes('wolnostoj');
 
                                                                 // If Config is set to Freestanding, HIDE the addon (it's built-in)
-                                                                if (config.constructionType === 'free' && isFreestandingItem) return false;
+                                                                if (config.installationType === 'freestanding' && isFreestandingItem) return false;
 
                                                                 return true;
                                                             })
