@@ -549,17 +549,17 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                     value={currentConfig.width || ''}
                                                     onChange={e => setCurrentConfig(c => ({ ...c, width: e.target.value }))}
                                                     className="w-full p-4 border rounded-xl text-center text-2xl font-bold font-mono" />
-                                                <div className="flex gap-1 justify-center">{[3000, 4000, 5000].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, width: v.toString() }))} className="px-3 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-200">{v}</button>)}</div>
+                                                <div className="flex gap-2 justify-center">{[3000, 4000, 5000].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, width: v.toString() }))} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">{v}</button>)}</div>
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-400 uppercase">
+                                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                                     {currentConfig.type === 'zip_screen' || currentConfig.type === 'sliding_glass' ? 'Wysokość' : 'Wysięg'}
                                                 </label>
                                                 <input type="number"
                                                     value={currentConfig.projection || ''}
                                                     onChange={e => setCurrentConfig(c => ({ ...c, projection: e.target.value }))}
-                                                    className="w-full p-4 border rounded-xl text-center text-2xl font-bold font-mono" />
-                                                <div className="flex gap-1 justify-center">{[2500, 3000, 3500].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, projection: v.toString() }))} className="px-3 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-200">{v}</button>)}</div>
+                                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-lg font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                                                <div className="flex gap-2 justify-center">{[2500, 3000, 3500].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, projection: v.toString() }))} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">{v}</button>)}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -567,8 +567,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                                 {/* 2. Roof Fill (Roof Only) */}
                                 {currentConfig.type === 'roof' && (
-                                    <div className="space-y-3 mb-6">
-                                        <label className="section-label">Wypełnienie Dachu</label>
+                                    <div className="space-y-3 mb-8">
+                                        <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Wypełnienie Dachu</label>
                                         <div className="grid grid-cols-2 gap-3">
                                             <OptionCard active={currentConfig.roofFill === 'polycarbonate'} onClick={() => setCurrentConfig(c => ({ ...c, roofFill: 'polycarbonate' }))} label="Poliwęglan" />
                                             <OptionCard active={currentConfig.roofFill === 'glass'} onClick={() => setCurrentConfig(c => ({ ...c, roofFill: 'glass' }))} label="Szkło" />
@@ -578,8 +578,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                                 {/* 3. Walls (Roof, Pergola, Sliding Glass) */}
                                 {['roof', 'pergola'].includes(currentConfig.type!) && (
-                                    <div className="space-y-3 mb-6">
-                                        <label className="section-label">Ściany / Zabudowa</label>
+                                    <div className="space-y-3 mb-8">
+                                        <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Ściany / Zabudowa</label>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                             {['none', 'framed', 'frameless', 'fixed', 'aluminum'].map((wType) => {
                                                 const isActive = currentConfig.wallTypes?.includes(wType);
@@ -588,7 +588,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                         const current = currentConfig.wallTypes || [];
                                                         const newTypes = isActive ? current.filter(t => t !== wType) : [...current, wType];
                                                         setCurrentConfig(c => ({ ...c, wallTypes: newTypes }));
-                                                    }} className={`p-3 rounded-lg border text-sm font-bold transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}`}>
+                                                    }} className={`p-2.5 rounded-lg border text-sm font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
                                                         {wType === 'none' ? 'Brak' : wType === 'framed' ? 'Ramowe' : wType === 'frameless' ? 'Bezramowe' : wType === 'fixed' ? 'Stałe' : 'Aluminium'}
                                                     </button>
                                                 );
@@ -599,8 +599,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                                 {/* 3b. Sliding Glass Specific */}
                                 {currentConfig.type === 'sliding_glass' && (
-                                    <div className="space-y-3 mb-6">
-                                        <label className="section-label">Typ Systemu</label>
+                                    <div className="space-y-3 mb-8">
+                                        <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Typ Systemu</label>
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                             {['framed', 'frameless', 'fixed'].map((wType) => {
                                                 const isActive = currentConfig.wallTypes?.includes(wType);
@@ -609,15 +609,15 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                         const current = currentConfig.wallTypes || [];
                                                         const newTypes = isActive ? current.filter(t => t !== wType) : [...current, wType];
                                                         setCurrentConfig(c => ({ ...c, wallTypes: newTypes }));
-                                                    }} className={`p-3 rounded-lg border text-sm font-bold transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}`}>
+                                                    }} className={`p-2.5 rounded-lg border text-sm font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
                                                         {wType === 'framed' ? 'Ramowe' : wType === 'frameless' ? 'Bezramowe' : 'Stałe'}
                                                     </button>
                                                 );
                                             })}
                                         </div>
-                                        <div className="mt-4">
-                                            <label className="text-xs font-bold text-slate-400">Ilość stron / odcinków</label>
-                                            <input type="number" value={currentConfig.wallSidesCount || 1} onChange={e => setCurrentConfig(c => ({ ...c, wallSidesCount: parseInt(e.target.value) }))} className="w-20 p-2 ml-2 border rounded-lg text-center font-bold" />
+                                        <div className="mt-4 flex items-center gap-3">
+                                            <label className="text-sm font-medium text-slate-600">Ilość stron / odcinków:</label>
+                                            <input type="number" value={currentConfig.wallSidesCount || 1} onChange={e => setCurrentConfig(c => ({ ...c, wallSidesCount: parseInt(e.target.value) }))} className="w-20 p-2 border border-slate-300 rounded-md text-center font-semibold" />
                                         </div>
                                     </div>
                                 )}
@@ -625,20 +625,20 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                                 {/* 4. ZIP Screens (Roof, Pergola - toggle; Zip Standalone - implied) */}
                                 {['roof', 'pergola'].includes(currentConfig.type!) && (
-                                    <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-100 mb-6">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-slate-700">Rolety ZIP Screen</span>
-                                            <button onClick={() => setCurrentConfig(c => ({ ...c, zipEnabled: !c.zipEnabled }))} className={`w-14 h-8 rounded-full transition-colors relative ${currentConfig.zipEnabled ? 'bg-accent' : 'bg-slate-300'}`}>
-                                                <div className={`absolute top-1 left-1 bg-white w-6 h-6 rounded-full transition-transform ${currentConfig.zipEnabled ? 'translate-x-6' : ''}`} />
+                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-8">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="font-semibold text-slate-900">Rolety ZIP Screen</span>
+                                            <button onClick={() => setCurrentConfig(c => ({ ...c, zipEnabled: !c.zipEnabled }))} className={`w-12 h-6 rounded-full transition-colors relative ${currentConfig.zipEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${currentConfig.zipEnabled ? 'translate-x-6' : ''}`} />
                                             </button>
                                         </div>
                                         {currentConfig.zipEnabled && (
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-400">Ilość rolet</label>
+                                            <div className="flex items-center gap-3">
+                                                <label className="text-sm text-slate-600">Ilość rolet:</label>
                                                 <div className="flex gap-2">
                                                     {[1, 2, 3, 4].map(n =>
                                                         <button key={n} onClick={() => setCurrentConfig(c => ({ ...c, zipSidesCount: n }))}
-                                                            className={`px-3 py-1 rounded border ${currentConfig.zipSidesCount === n ? 'bg-slate-800 text-white' : 'bg-white'}`}>{n}</button>
+                                                            className={`w-8 h-8 flex items-center justify-center rounded border ${currentConfig.zipSidesCount === n ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-slate-200 text-slate-600'}`}>{n}</button>
                                                     )}
                                                 </div>
                                             </div>
@@ -648,8 +648,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                                 {/* 5. Common Notes */}
                                 <div className="space-y-2">
-                                    <label className="section-label">Uwagi do produktu</label>
-                                    <textarea value={currentConfig.notes || ''} onChange={e => setCurrentConfig(c => ({ ...c, notes: e.target.value }))} placeholder="Specyficzne wymagania, kolor, etc..." className="w-full p-3 border rounded-xl min-h-[80px]" />
+                                    <label className="text-sm font-semibold text-slate-900">Uwagi do produktu</label>
+                                    <textarea value={currentConfig.notes || ''} onChange={e => setCurrentConfig(c => ({ ...c, notes: e.target.value }))} placeholder="Dodatkowe informacje..." className="w-full p-3 border border-slate-300 rounded-lg min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
                                 </div>
                             </div>
 
@@ -665,19 +665,19 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                 {/* VIEW: INTERVIEW (Questions & Next Actions) */}
                 {viewMode === 'interview' && (
                     <div className="max-w-4xl mx-auto space-y-8">
-                        <div className="text-center mb-8">
-                            <h3 className="text-3xl font-bold text-slate-800 mb-2">Szybki Wywiad</h3>
-                            <p className="text-lg text-slate-500">Zadaj kluczowe pytania i ustal co robimy dalej.</p>
+                        <div>
+                            <h3 className="text-2xl font-semibold text-slate-900">Wywiad</h3>
+                            <p className="text-slate-500 mt-1">Szybka weryfikacja potrzeb i ustalenie kolejnych kroków.</p>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Left: Client Questions */}
-                            <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col">
-                                <h4 className="font-bold text-slate-700 mb-6 flex items-center gap-3 text-xl">
-                                    <HelpCircle className="w-6 h-6 text-slate-400" />
-                                    Pytania / Kwestie Techniczne
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                    <HelpCircle className="w-5 h-5 text-slate-400" />
+                                    Pytania Kluczowe
                                 </h4>
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <div className="flex gap-2">
                                         <input
                                             value={newQuestion}
@@ -688,8 +688,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                     setNewQuestion('');
                                                 }
                                             }}
-                                            placeholder="Np. Czy budynek jest ocieplony?"
-                                            className="flex-1 p-4 border-2 border-slate-200 rounded-xl text-base lg:text-lg focus:border-slate-800 focus:ring-4 focus:ring-slate-100 transition-all outline-none"
+                                            placeholder="Dodaj pytanie/uwagę..."
+                                            className="flex-1 p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                         />
                                         <button
                                             onClick={() => {
@@ -698,23 +698,25 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                     setNewQuestion('');
                                                 }
                                             }}
-                                            className="bg-slate-800 text-white px-4 rounded-xl font-bold"
+                                            className="bg-slate-100 text-slate-600 px-3.5 rounded-lg font-medium hover:bg-slate-200"
                                         >
                                             +
                                         </button>
                                     </div>
                                     {/* List */}
-                                    <div className="space-y-2 mt-4">
+                                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
                                         {clientQuestions.map((q, i) => (
-                                            <div key={i} className="flex items-start gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
-                                                <span className="text-slate-400 font-mono select-none">{i + 1}.</span>
-                                                <span className="flex-1 text-slate-700">{q}</span>
-                                                <button onClick={() => setClientQuestions(curr => curr.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 font-bold px-2">×</button>
+                                            <div key={i} className="flex items-start gap-3 p-3 bg-white hover:bg-slate-50 group">
+                                                <span className="text-slate-400 font-mono text-xs mt-0.5">{i + 1}.</span>
+                                                <span className="flex-1 text-sm text-slate-700 leading-snug">{q}</span>
+                                                <button onClick={() => setClientQuestions(curr => curr.filter((_, idx) => idx !== i))} className="text-slate-300 group-hover:text-red-500 transition-colors">
+                                                    <X className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         ))}
                                         {clientQuestions.length === 0 && (
-                                            <div className="text-center py-4 text-slate-300 italic border-2 border-dashed border-slate-100 rounded-lg">
-                                                Brak pytań
+                                            <div className="p-4 text-center text-xs text-slate-400 italic">
+                                                Brak dodanych pytań
                                             </div>
                                         )}
                                     </div>
@@ -722,18 +724,18 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
 
                             {/* Right: Next Actions */}
-                            <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200 shadow-xl">
-                                <h4 className="font-bold text-slate-700 mb-6 flex items-center gap-3 text-xl">
-                                    <ClipboardList className="w-6 h-6 text-slate-400" />
-                                    Next Steps
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                    <ClipboardList className="w-5 h-5 text-slate-400" />
+                                    Działania
                                 </h4>
-                                <div className="flex flex-col gap-2">
+                                <div className="space-y-2">
                                     {[
                                         'Wysłać Katalog PDF',
-                                        'Wycena Wstępna (Na już)',
+                                        'Wycena Wstępna',
                                         'Umówić Pomiar',
-                                        'Kontakt Telefoniczny (Standard)',
-                                        'Kontakt Pilny! (Gorący Lead)'
+                                        'Kontakt Telefoniczny',
+                                        'Pilny Lead 🔥'
                                     ].map(action => {
                                         const active = nextActions.includes(action);
                                         return (
@@ -744,10 +746,10 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                         active ? prev.filter(a => a !== action) : [...prev, action]
                                                     );
                                                 }}
-                                                className={`text-left px-5 py-4 rounded-xl border-2 text-base lg:text-lg font-bold transition-all flex items-center gap-4 ${active ? 'bg-blue-600 text-white border-blue-600 shadow-lg transform scale-[1.02]' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-blue-300 hover:bg-white'}`}
+                                                className={`w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center gap-3 ${active ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
                                             >
-                                                <div className={`w-6 h-6 rounded border flex items-center justify-center ${active ? 'bg-white border-white text-blue-600' : 'border-slate-300 text-transparent'}`}>
-                                                    ✓
+                                                <div className={`w-5 h-5 rounded border flex items-center justify-center bg-white ${active ? 'border-blue-500 text-blue-600' : 'border-slate-300 text-transparent'}`}>
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
                                                 </div>
                                                 {action}
                                             </button>
@@ -757,12 +759,12 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
                         </div>
 
-                        <div className="flex justify-between pt-8 border-t border-slate-200">
-                            <button onClick={() => setViewMode('hub')} className="text-slate-500 hover:text-slate-800">
-                                ← Wróć do Produktów
+                        <div className="flex justify-between pt-6 border-t border-slate-200">
+                            <button onClick={() => setViewMode('hub')} className="text-slate-500 hover:text-slate-800 text-sm font-medium">
+                                ← Wróć
                             </button>
-                            <button onClick={() => setViewMode('finalize')} className="px-8 py-3 bg-accent text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:bg-accent-dark transition-all">
-                                Dalej: Dane Klienta →
+                            <button onClick={() => setViewMode('finalize')} className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-medium shadow-sm hover:bg-black transition-all">
+                                Dane Klienta →
                             </button>
                         </div>
                     </div>
@@ -770,23 +772,22 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: FINALIZE (Data & Photos) */}
                 {viewMode === 'finalize' && (
-                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8">
-                        {/* CONTACT FORM - Polished UI */}
-                        <div className="bg-white p-6 lg:p-10 rounded-3xl border border-slate-200 shadow-xl">
-                            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-slate-100">
-                                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
-                                    <UserIcon className="w-6 h-6 text-slate-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-2xl font-bold text-slate-800">Dane Kontaktowe</h3>
-                                    <p className="text-sm text-slate-500">Wypełnij podstawowe informacje</p>
-                                </div>
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        {/* CONTACT FORM - Pro Clean */}
+                        <div className="bg-white p-6 lg:p-8 rounded-xl border border-slate-200 shadow-sm">
+                            <div className="mb-6 border-b border-slate-100 pb-4">
+                                <h3 className="text-xl font-semibold text-slate-800">Dane Klienta</h3>
+                                <p className="text-sm text-slate-500">Uzupełnij wymagane informacje kontaktowe.</p>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-8 mb-6">
-                                <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><UserIcon size={14} /> Imię *</label>
-                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Jan" />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-slate-700">Imię *</label>
+                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400"
+                                        placeholder="Jan" />
                                 </div>
+
                                 <div className="group">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><UserIcon size={14} /> Nazwisko *</label>
                                     <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Kowalski" />
