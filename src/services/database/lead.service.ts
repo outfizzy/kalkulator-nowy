@@ -46,10 +46,14 @@ export const LeadService = {
                     country: 'Deutschland'
                 };
 
-                const customer = await CustomerService.ensureCustomer(customerInput);
+                // Use SECURE version to bypass RLS (especially important for fair leads)
+                const customer = await CustomerService.ensureCustomerSecure(customerInput);
                 customerId = customer.id;
             } catch (e) {
                 console.error('Failed to ensure customer for lead:', e);
+                // Log detailed error for debugging
+                console.error('Customer data:', lead.customerData);
+                console.error('Error details:', e instanceof Error ? e.message : JSON.stringify(e));
                 throw new Error('Could not create/link customer for this lead. ' + (e instanceof Error ? e.message : 'Unknown error'));
             }
         }
