@@ -339,9 +339,9 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
                                 <span className="text-3xl">🎪</span>
                             </div>
-                            <div className="min-w-0">
-                                <h1 className="text-lg font-bold text-slate-800 truncate">{fairName}</h1>
-                                <p className="text-sm text-slate-500">Formularz Leada</p>
+                            <div className="min-w-0 flex flex-col justify-center">
+                                <h1 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 leading-tight">{fairName}</h1>
+                                <p className="text-xs sm:text-sm text-slate-500 font-medium">Formularz Leada</p>
                             </div>
                         </div>
                     </div>
@@ -410,8 +410,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             <p className="text-slate-500">Wybierz produkt aby dodać go do listy zainteresowań klienta.</p>
                         </div>
 
-                        {/* Main Categories - Responsive Grid (2 cols mobile, 4 cols tablet/desktop) */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                        {/* Main Categories - Responsive Grid (2 cols mobile/tablet, 4 cols large desktop) */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-2 sm:px-0">
                             {(['roof', 'pergola', 'carport', 'other'] as const).map(type => (
                                 <button
                                     key={type}
@@ -432,8 +432,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                         </div>
 
                         {/* Standalone Accessories */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-200 pt-8">
-                            <div className="col-span-full text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Tylko dodatki / Solo</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-slate-200 pt-8 mt-8">
+                            <div className="col-span-full text-base font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Tylko dodatki / Solo</div>
 
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
                                 className="flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left">
@@ -766,15 +766,15 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-8 mb-6">
                                 <div className="group">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Imię *</label>
-                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Jan" />
+                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Jan" />
                                 </div>
                                 <div className="group">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Nazwisko *</label>
-                                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Kowalski" />
+                                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Kowalski" />
                                 </div>
                                 <div className="group">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">📞 Telefon *</label>
-                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-green-500 focus:bg-green-50/20 focus:ring-4 focus:ring-green-100 transition-all outline-none font-mono font-bold text-slate-800 shadow-sm placeholder:text-slate-300 placeholder:font-sans group-hover:border-slate-300" placeholder="+48 500 600 700" />
+                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-green-500 focus:bg-green-50/20 focus:ring-4 focus:ring-green-100 transition-all outline-none font-mono font-bold text-slate-800 shadow-sm placeholder:text-slate-300 placeholder:font-sans group-hover:border-slate-300" placeholder="+48 500 600 700" />
                                     <div className="text-xs text-slate-400 mt-2 ml-1">Min. 9 cyfr</div>
                                 </div>
                                 <div className="group">
