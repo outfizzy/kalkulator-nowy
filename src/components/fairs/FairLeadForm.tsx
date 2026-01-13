@@ -361,8 +361,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                     <React.Fragment key={i}>
                                         <div className="flex flex-col items-center gap-1.5">
                                             <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${completed ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg' :
-                                                    active ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-2xl ring-4 ring-blue-200/50 scale-110' :
-                                                        'bg-slate-100 text-slate-400 border-2 border-slate-200'
+                                                active ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-2xl ring-4 ring-blue-200/50 scale-110' :
+                                                    'bg-slate-100 text-slate-400 border-2 border-slate-200'
                                                 }`}>
                                                 {completed ? '✓' : step}
                                             </div>
@@ -399,12 +399,12 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                 </div>
             </div>
 
-            {/* MAIN CONTENT AREA */}
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+            {/* MAIN CONTENT AREA - WIDER FOR DESKTOP */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
                 {/* VIEW: HUB (Product Selection) */}
                 {viewMode === 'hub' && (
-                    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
+                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8 animate-in fade-in duration-300">
                         <div className="text-center mb-8">
                             <h3 className="text-3xl font-bold text-slate-800 mb-2">Czego szukamy?</h3>
                             <p className="text-slate-500">Wybierz produkt aby dodać go do listy zainteresowań klienta.</p>
@@ -751,9 +751,9 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: FINALIZE (Data & Photos) */}
                 {viewMode === 'finalize' && (
-                    <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right duration-500">
+                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8 animate-in slide-in-from-right duration-500">
                         {/* CONTACT FORM - Polished UI */}
-                        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
+                        <div className="bg-white p-6 lg:p-10 rounded-3xl border border-slate-200 shadow-xl">
                             <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-slate-100">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
                                     <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -765,7 +765,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                     <p className="text-sm text-slate-500">Wypełnij podstawowe informacje</p>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-8 mb-6">
                                 <div className="group">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Imię *</label>
                                     <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Jan" />
