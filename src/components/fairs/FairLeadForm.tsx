@@ -329,7 +329,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
     // --- RENDERERS ---
 
     return (
-        <div className="min-h-screen bg-slate-50/50">
+        <div className="min-h-screen bg-slate-50 text-slate-900">
             {/* CLEAN STICKY HEADER */}
             <div className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
@@ -404,7 +404,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: HUB (Product Selection) */}
                 {viewMode === 'hub' && (
-                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8 animate-in fade-in duration-300">
+                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8">
                         <div className="text-center mb-8">
                             <h3 className="text-3xl font-bold text-slate-800 mb-2">Czego szukamy?</h3>
                             <p className="text-slate-500">Wybierz produkt aby dodać go do listy zainteresowań klienta.</p>
@@ -418,11 +418,11 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                     onClick={() => { setCurrentConfig(c => ({ ...c, type })); setViewMode('config'); }}
                                     className="p-6 lg:p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-slate-800 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col justify-between min-h-[160px] lg:min-h-[200px]"
                                 >
-                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity text-8xl">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity text-6xl lg:text-7xl">
                                         {type === 'roof' ? '🏠' : type === 'pergola' ? '☀️' : type === 'carport' ? '🚗' : '🔧'}
                                     </div>
                                     <div className="relative z-10">
-                                        <div className="text-5xl lg:text-6xl mb-4 group-hover:scale-110 transition-transform origin-left">
+                                        <div className="text-5xl lg:text-6xl mb-4 transition-transform origin-left">
                                             {type === 'roof' ? '🏠' : type === 'pergola' ? '☀️' : type === 'carport' ? '🚗' : '🔧'}
                                         </div>
                                         <div className="font-extrabold text-xl lg:text-2xl text-slate-800 leading-tight">{getProductLabel(type)}</div>
@@ -501,7 +501,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: CONFIG (Product Details) */}
                 {viewMode === 'config' && (
-                    <div className="max-w-2xl mx-auto animate-in slide-in-from-right duration-300">
+                    <div className="max-w-2xl mx-auto">
                         <button
                             onClick={() => { setViewMode('hub'); setCurrentConfig({}); }}
                             className="mb-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 px-3 py-2 hover:bg-white rounded-lg transition-colors"
@@ -647,7 +647,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: INTERVIEW (Questions & Next Actions) */}
                 {viewMode === 'interview' && (
-                    <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-right duration-300">
+                    <div className="max-w-4xl mx-auto space-y-8">
                         <div className="text-center mb-8">
                             <h3 className="text-3xl font-bold text-slate-800 mb-2">Szybki Wywiad</h3>
                             <p className="text-lg text-slate-500">Zadaj kluczowe pytania i ustal co robimy dalej.</p>
@@ -751,7 +751,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: FINALIZE (Data & Photos) */}
                 {viewMode === 'finalize' && (
-                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8 animate-in slide-in-from-right duration-500">
+                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8">
                         {/* CONTACT FORM - Polished UI */}
                         <div className="bg-white p-6 lg:p-10 rounded-3xl border border-slate-200 shadow-xl">
                             <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-slate-100">
@@ -921,7 +921,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                 {/* VIEW: WHEEL (Final) */}
                 {viewMode === 'wheel' && (
-                    <div className="h-full flex flex-col items-center justify-center animate-in zoom-in duration-300">
+                    <div className="h-full flex flex-col items-center justify-center">
                         {loading ? (
                             <div className="text-center">
                                 <div className="text-6xl mb-4 animate-bounce">💾</div>
