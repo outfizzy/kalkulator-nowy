@@ -329,78 +329,19 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
     // --- RENDERERS ---
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-purple50/10">
-            {/* MODERN STICKY HEADER WITH PROGRESS */}
-            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/60 shadow-lg">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-                    {/* Top Row: Fair Info + Close */}
-                    <div className="flex items-center justify-between gap-4 mb-4">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 flex items-center justify-center shadow-xl flex-shrink-0 animate-in zoom-in duration-500">
-                                <span className="text-3xl">🎪</span>
-                            </div>
-                            <div className="min-w-0">
-                                <h1 className="text-xl font-bold text-slate-800 truncate">{fairName}</h1>
-                                <p className="text-sm text-slate-500">Formularz Leada</p>
-                            </div>
-                        </div>
+        <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
+            {/* Top Bar with Progress */}
+            <div className="bg-white border-b pt-4 pb-2 shadow-sm shrink-0 z-10">
+                <div className="px-6 flex justify-between items-center mb-4">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Targi 2026</h2>
+                        {fairId && <p className="text-xs text-slate-400">ID: {fairId}</p>}
                     </div>
-
-                    {/* Progress Indicator - Desktop */}
-                    {viewMode !== 'wheel' && (
-                        <div className="hidden md:flex items-center justify-center gap-2">
-                            {['Produkty', 'Wywiad', 'Dane', 'Nagroda'].map((label, i) => {
-                                const step = i + 1;
-                                const currentStep = viewMode === 'hub' || viewMode === 'config' ? 1 :
-                                    viewMode === 'interview' ? 2 :
-                                        viewMode === 'finalize' ? 3 : 4;
-                                const completed = step < currentStep;
-                                const active = step === currentStep;
-
-                                return (
-                                    <React.Fragment key={i}>
-                                        <div className="flex flex-col items-center gap-1.5">
-                                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${completed ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg' :
-                                                    active ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-2xl ring-4 ring-blue-200/50 scale-110' :
-                                                        'bg-slate-100 text-slate-400 border-2 border-slate-200'
-                                                }`}>
-                                                {completed ? '✓' : step}
-                                            </div>
-                                            <span className={`text-xs font-semibold transition-colors ${active ? 'text-blue-600' : completed ? 'text-emerald-600' : 'text-slate-400'
-                                                }`}>
-                                                {label}
-                                            </span>
-                                        </div>
-                                        {i < 3 && (
-                                            <div className={`w-16 h-1.5 rounded-full mb-6 transition-all duration-500 ${step < currentStep ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : 'bg-slate-200'
-                                                }`} />
-                                        )}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* Progress Bar - Mobile */}
-                    {viewMode !== 'wheel' && (
-                        <div className="md:hidden">
-                            <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
-                                <span>Krok {viewMode === 'hub' || viewMode === 'config' ? 1 : viewMode === 'interview' ? 2 : viewMode === 'finalize' ? 3 : 4} z 4</span>
-                                <span className="text-blue-600">{Math.round(((viewMode === 'hub' || viewMode === 'config' ? 1 : viewMode === 'interview' ? 2 : viewMode === 'finalize' ? 3 : 4) / 4) * 100)}%</span>
-                            </div>
-                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                <div
-                                    className="h-full bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 transition-all duration-700 ease-out"
-                                    style={{ width: `${((viewMode === 'hub' || viewMode === 'config' ? 1 : viewMode === 'interview' ? 2 : viewMode === 'finalize' ? 3 : 4) / 4) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                    )}
                 </div>
+                {viewMode !== 'wheel' && <ProgressBar />}
             </div>
 
-            {/* MAIN CONTENT AREA */}
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+            <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
 
                 {/* VIEW: HUB (Product Selection) */}
                 {viewMode === 'hub' && (
