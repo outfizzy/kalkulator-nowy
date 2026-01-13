@@ -416,16 +416,16 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                 <button
                                     key={type}
                                     onClick={() => { setCurrentConfig(c => ({ ...c, type })); setViewMode('config'); }}
-                                    className="p-6 bg-white border-2 border-slate-200 rounded-2xl hover:border-slate-800 hover:shadow-lg transition-all group text-left relative overflow-hidden"
+                                    className="p-6 lg:p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-slate-800 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col justify-between min-h-[160px] lg:min-h-[200px]"
                                 >
-                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-6xl">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity text-8xl">
                                         {type === 'roof' ? '🏠' : type === 'pergola' ? '☀️' : type === 'carport' ? '🚗' : '🔧'}
                                     </div>
                                     <div className="relative z-10">
-                                        <div className="text-4xl mb-3 group-hover:scale-110 transition-transform origin-left">
+                                        <div className="text-5xl lg:text-6xl mb-4 group-hover:scale-110 transition-transform origin-left">
                                             {type === 'roof' ? '🏠' : type === 'pergola' ? '☀️' : type === 'carport' ? '🚗' : '🔧'}
                                         </div>
-                                        <div className="font-bold text-lg text-slate-800 leading-tight">{getProductLabel(type)}</div>
+                                        <div className="font-extrabold text-xl lg:text-2xl text-slate-800 leading-tight">{getProductLabel(type)}</div>
                                     </div>
                                 </button>
                             ))}
@@ -454,11 +454,11 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </button>
 
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'accessory' })); setViewMode('config'); }}
-                                className="flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left">
-                                <div className="text-2xl">🔌</div>
+                                className="flex items-center gap-4 p-5 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left shadow-sm hover:shadow-md">
+                                <div className="text-3xl">🔌</div>
                                 <div>
-                                    <div className="font-bold text-slate-700">Akcesoria / Serwis</div>
-                                    <div className="text-xs text-slate-400">Promienniki, LED, Części</div>
+                                    <div className="font-bold text-lg text-slate-800">Akcesoria / Serwis</div>
+                                    <div className="text-sm text-slate-500">Promienniki, LED, Części</div>
                                 </div>
                             </button>
                         </div>
@@ -473,10 +473,10 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                 <button
                                     onClick={() => setViewMode('interview')}
                                     disabled={products.length === 0}
-                                    className="px-8 py-3 bg-accent hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
+                                    className="px-8 py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg lg:text-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
                                 >
                                     Dalej: Wywiad
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                                 </button>
                             </div>
 
@@ -648,15 +648,15 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                 {/* VIEW: INTERVIEW (Questions & Next Actions) */}
                 {viewMode === 'interview' && (
                     <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-right duration-300">
-                        <div className="text-center mb-6">
-                            <h3 className="text-2xl font-bold text-slate-800">Szybki Wywiad</h3>
-                            <p className="text-slate-500">Zadaj kluczowe pytania i ustal co robimy dalej.</p>
+                        <div className="text-center mb-8">
+                            <h3 className="text-3xl font-bold text-slate-800 mb-2">Szybki Wywiad</h3>
+                            <p className="text-lg text-slate-500">Zadaj kluczowe pytania i ustal co robimy dalej.</p>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* Left: Client Questions */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2 text-lg">
+                            <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col">
+                                <h4 className="font-bold text-slate-700 mb-6 flex items-center gap-3 text-xl">
                                     ❓ Pytania / Kwestie Techniczne
                                 </h4>
                                 <div className="space-y-3">
@@ -671,7 +671,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                 }
                                             }}
                                             placeholder="Np. Czy budynek jest ocieplony?"
-                                            className="flex-1 p-3 border rounded-xl text-sm"
+                                            className="flex-1 p-4 border-2 border-slate-200 rounded-xl text-base lg:text-lg focus:border-slate-800 focus:ring-4 focus:ring-slate-100 transition-all outline-none"
                                         />
                                         <button
                                             onClick={() => {
@@ -704,8 +704,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
 
                             {/* Right: Next Actions */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2 text-lg">
+                            <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200 shadow-xl">
+                                <h4 className="font-bold text-slate-700 mb-6 flex items-center gap-3 text-xl">
                                     👉 Next Steps
                                 </h4>
                                 <div className="flex flex-col gap-2">
@@ -725,7 +725,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                                         active ? prev.filter(a => a !== action) : [...prev, action]
                                                     );
                                                 }}
-                                                className={`text-left px-4 py-4 rounded-xl border text-sm font-medium transition-all flex items-center gap-3 ${active ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-[1.02]' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-blue-300 hover:bg-white'}`}
+                                                className={`text-left px-5 py-4 rounded-xl border-2 text-base lg:text-lg font-bold transition-all flex items-center gap-4 ${active ? 'bg-blue-600 text-white border-blue-600 shadow-lg transform scale-[1.02]' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-blue-300 hover:bg-white'}`}
                                             >
                                                 <div className={`w-6 h-6 rounded border flex items-center justify-center ${active ? 'bg-white border-white text-blue-600' : 'border-slate-300 text-transparent'}`}>
                                                     ✓
