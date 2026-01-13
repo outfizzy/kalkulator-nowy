@@ -499,10 +499,41 @@ export const ContractDetails: React.FC = () => {
                                     Kolor: {contract.product.color} | Dach: {contract.product.roofType}
                                 </div>
                             </div>
-                            {contract.product.addons.length > 0 && (
+
+                            {/* Manual Contract Multiple Items Display */}
+                            {contract.product.customItems && contract.product.customItems.length > 0 && (
+                                <div className="mt-4">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Elementy Umowy</h4>
+                                    <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-slate-100 border-b border-slate-200">
+                                                <tr>
+                                                    <th className="p-2 text-left text-xs font-bold text-slate-500">Nazwa / Opis</th>
+                                                    <th className="p-2 text-center text-xs font-bold text-slate-500">Ilość</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {contract.product.customItems.map((item, i) => (
+                                                    <tr key={i}>
+                                                        <td className="p-2">
+                                                            <div className="font-medium text-slate-800">{item.name}</div>
+                                                        </td>
+                                                        <td className="p-2 text-center font-bold text-slate-700">
+                                                            {item.quantity}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(!contract.product.customItems || contract.product.customItems.length === 0) && contract.product.addons && contract.product.addons.length > 0 && (
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Dodatki</h4>
                                     <ul className="space-y-1">
+
                                         {contract.product.addons.map((addon, i) => (
                                             <li key={i} className="text-sm text-slate-600 flex justify-between">
                                                 <span>{addon.name}</span>

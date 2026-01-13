@@ -15,13 +15,14 @@ import { TableSettingsModal } from './TableSettingsModal';
 import { ImportManual } from './ManualPriceImporter';
 import { ProductEditorModal } from './ProductEditorModal';
 import { ComponentsEditorModal } from './ComponentsEditorModal';
+import { AddonEditor } from './AddonEditor';
 import { PricingService } from '../../services/pricing.service';
 
 export const PricingPage = () => {
     // Simplified State - Only Tables
     const [priceTables, setPriceTables] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [editingTable, setEditingTable] = useState<{ id: string, name: string } | null>(null);
+    const [editingTable, setEditingTable] = useState<{ id: string, name: string, type?: string } | null>(null);
     const [duplicatingTable, setDuplicatingTable] = useState<{ id: string, name: string } | null>(null);
     const [configTable, setConfigTable] = useState<{ id: string, name: string, config: any, productId?: string, productName?: string } | null>(null);
     const [settingsTable, setSettingsTable] = useState<{ id: string, name: string, attributes: any } | null>(null);
@@ -231,12 +232,20 @@ export const PricingPage = () => {
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
             {editingTable && (
-                <MatrixEditor
-                    tableId={editingTable.id}
-                    tableName={editingTable.name}
-                    products={products}
-                    onClose={() => setEditingTable(null)}
-                />
+                editingTable.type === 'addons' ? (
+                    <AddonEditor
+                        tableId={editingTable.id}
+                        tableName={editingTable.name}
+                        onClose={() => setEditingTable(null)}
+                    />
+                ) : (
+                    <MatrixEditor
+                        tableId={editingTable.id}
+                        tableName={editingTable.name}
+                        products={products}
+                        onClose={() => setEditingTable(null)}
+                    />
+                )
             )}
 
             {duplicatingTable && (
@@ -552,7 +561,7 @@ export const PricingPage = () => {
                                                     Usuń
                                                 </button>
                                                 <button
-                                                    onClick={() => setEditingTable({ id: table.id, name: table.name })}
+                                                    onClick={() => setEditingTable({ id: table.id, name: table.name, type: table.type })}
                                                     className="text-sm font-medium text-accent hover:text-accent/80 hover:underline"
                                                 >
                                                     Edytuj

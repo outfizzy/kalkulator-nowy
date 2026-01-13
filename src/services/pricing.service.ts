@@ -332,10 +332,43 @@ export const PricingService = {
         // UNLESS the table explicitly says "Freestanding".
         const requestIsWall = criteria.constructionType === 'wall';
 
+        // Normalize Model Name for Lookup (e.g. 'topstyle_xl' -> 'topstyle xl')
+        // Strip 'aluxe' prefix to avoid "Aluxe Ultrastyle" vs "Ultrastyle" mismatches
+        const normalizedFamily = criteria.modelFamily.toLowerCase().replace('aluxe', '').replace(/_/g, ' ').trim();
+        let searchName = normalizedFamily;
+
+        // HEURISTIC: Simplify search for known Aluxe Families to ensure match even if Product Name has suffix (e.g. "Ultrastyle Premium")
+        if (normalizedFamily.includes('ultrastyle')) searchName = 'ultrastyle';
+        if (normalizedFamily.includes('trendstyle')) searchName = 'trendstyle';
+        if (normalizedFamily.includes('orangestyle')) searchName = 'orangestyle';
+        // For Topstyle, keep XL distinction if it exists, or just fallback if needed. `topstyle_xl` became `topstyle xl`.
+        // If table is "Topstyle", `%topstyle xl%` fails.
+        // If table is "Topstyle XL", `%topstyle%` matches.
+        // Let's try to match broader.
+        if (normalizedFamily.includes('topstyle')) {
+            // If we search for 'topstyle', we match 'Topstyle' and 'Topstyle XL'. 
+            // Logic later filters by zone, etc.
+            // But 'Topstyle' table might not cover 'Topstyle XL' prices correctly?
+            // Usually they are separate tables.
+            // If I search 'topstyle', I get BOTH tables. Then JS filtering logic picks the best one.
+            // THIS IS BETTER than missing it.
+            searchName = 'topstyle';
+        }
+
+        console.log(`🔎 Searching Tables for normalized name: '${searchName}' (Derived from: '${criteria.modelFamily}')`);
+
         const { data: manualTables } = await supabase
             .from('price_tables')
             .select('*')
-            .ilike('name', `%${criteria.modelFamily}%`) as { data: { name: string; id: string; description?: string; attributes?: Record<string, any> }[] | null }; // Broad match on model name
+            .ilike('name', `%${searchName}%`) as {
+                data: {
+                    name: string;
+                    id: string;
+                    description?: string;
+                    attributes?: Record<string, any>;
+                    variant_config?: { snowZone?: string | number;[key: string]: any };
+                }[] | null
+            }; // Broad match on model name
 
         if (manualTables && manualTables.length > 0) {
             // Filter in JS for best match using Scoring System
@@ -376,11 +409,25 @@ export const PricingService = {
                 score += 10; // Construction type matches
 
                 // B. Zone Check (Critical)
-                // "Trendstyle - S1" matches "s1"
-                // Also support "Zone 1" or "Z1"
-                const hasZone = name.includes(` ${zoneKey.toLowerCase()}`) || name.includes(`-${zoneKey.toLowerCase()}`) || name.includes(`s${criteria.zone}`);
-                if (!hasZone) return; // Disqualify (Zone mismatch is fatal usually)
-                score += 10;
+                // New: Check variant_config first (Explicit Importer Logic)
+                const configZone = t.variant_config?.snowZone;
+                if (configZone) {
+                    if (String(configZone) === String(criteria.zone)) {
+                        score += 100; // Major Boost for explicit intent
+                    } else {
+                        // Explicit Mismatch -> Disqualify immediately
+                        return;
+                    }
+                } else {
+                    // Legacy Name Matching with Robust Regex
+                    // Matches: "S1", "S-1", "S 1", "Zone 1", "Zone-1", "Strefa 1"
+                    // \b boundary ensures we don't match "S12" for "S1"
+                    const zoneRegex = new RegExp(`([sS]|zone|strefa)[\\s-_]*${criteria.zone}\\b`, 'i');
+                    const hasZone = zoneRegex.test(name);
+
+                    if (!hasZone) return; // Disqualify (Zone mismatch is fatal usually)
+                    score += 10;
+                }
 
                 // C. Material Check (High Priority)
                 if (typeKey === 'Glass' && !name.includes('glass') && !name.includes('szkło')) {
@@ -503,9 +550,12 @@ export const PricingService = {
         }
 
         // Snow Zone
+        // Fix: Check product.snowZone if argument is missing (Frontend sends it in product config)
         let zone = 1;
-        if (snowZone && snowZone.id) {
-            const parsed = parseInt(String(snowZone.id));
+        const zoneInput = snowZone?.id || product.snowZone;
+
+        if (zoneInput) {
+            const parsed = parseInt(String(zoneInput));
             if (!isNaN(parsed)) zone = parsed;
         }
 
@@ -1217,21 +1267,34 @@ export const PricingService = {
     async getMatrixTables() { return []; },
     async getComponentLists() { return []; },
 
-    async getAddonsByGroup(group: string) {
+    async getAddonsByGroup(group: string, modelContext?: string) {
         try {
             const { data: addons } = await supabase.from('pricing_addons').select('*').eq('addon_group', group);
 
             if (!addons || addons.length === 0) return [];
 
+            // Filter by Scope (Global vs Model-Specific)
+            const filteredAddons = addons.filter(addon => {
+                const scope = addon.properties?.imported_from;
+                // 1. Global (No scope defined) -> Always Show
+                if (!scope) return true;
+
+                // 2. Specific Scope -> Check match
+                if (!modelContext) return false; // Hide scoped items if no context
+                return scope.toLowerCase().trim() === modelContext.toLowerCase().trim();
+            });
+
+            if (filteredAddons.length === 0) return [];
+
             // Fetch metadata from product_components
-            const keys = addons.map(a => a.addon_code).filter(k => k);
+            const keys = filteredAddons.map(a => a.addon_code).filter(k => k);
             const { data: meta } = await supabase
                 .from('product_components')
                 .select('component_key, image_url, description')
                 .in('component_key', keys);
 
             // Map metadata
-            const merged = addons.map(addon => {
+            const merged = filteredAddons.map(addon => {
                 const info = meta?.find(m => m.component_key === addon.addon_code);
                 return {
                     ...addon,
@@ -1245,5 +1308,74 @@ export const PricingService = {
             console.error('Error fetching addons group:', group, e);
             return [];
         }
+    },
+    /**
+     * Calculate price for a specific Addon based on context (dimensions, etc.)
+     */
+    async calculateAddonPrice(addon: any, width: number, depth: number): Promise<number> {
+        if (!addon) return 0;
+
+        // 1. Fixed Price
+        if (addon.pricing_basis === 'FIXED' || !addon.pricing_basis) {
+            return Number(addon.price_upe_net_eur) || 0;
+        }
+
+        // 2. Matrix Price (New)
+        if (addon.pricing_basis === 'MATRIX') {
+            const tableId = addon.properties?.price_table_id;
+            if (!tableId) {
+                console.warn(`⚠️ Matrix Addon ${addon.addon_name} missing price_table_id`);
+                return 0;
+            }
+
+            // Determine dimensions based on addon type
+            // Default: Match Roof Dimensions
+            // If "dimension_type" property exists, use it?
+            // For now assume Width x Height (where Height = Roof Projection usually for side screens, or Roof Depth for awnings)
+            // Let's rely on the arguments passed: width, depth.
+
+            // Fetch Matrix Row
+            // We need to query pricing_base by source_import_id (= tableId)
+            // and find the best match for width/depth.
+
+            // Reuse logic from findBasePrice but simpler?
+            // "getMatrixPrice" fetches ALL rows. We can use getDetailedPrice.
+
+            // Use internal cache or fetch fresh? Fetch fresh for safety.
+            const query = supabase
+                .from('pricing_base')
+                .select('price_upe_net_eur, width_mm, depth_mm')
+                .eq('source_import_id', tableId) // Link to the specific matrix import
+                // .eq('construction_type', 'wall') // We used 'wall' as placeholder in Importer
+                // .eq('cover_type', 'matrix_entry') // We used this too
+                .order('width_mm', { ascending: true })
+                .order('depth_mm', { ascending: true }); // Important for sorting
+
+            const { data: rows } = await query;
+
+            if (rows && rows.length > 0) {
+                // Logic: Find smallest row where width >= target AND depth >= target
+                // Or exact match logic.
+                // Filter applicable rows
+                const applicable = rows.filter((r: any) => r.width_mm >= width && r.depth_mm >= depth);
+
+                if (applicable.length > 0) {
+                    // Sort by size (area or width then depth)
+                    applicable.sort((a: any, b: any) => (a.width_mm * a.depth_mm) - (b.width_mm * b.depth_mm));
+                    const match = applicable[0];
+                    console.log(`✅ Addon Matrix Match: ${addon.addon_name} -> ${match.price_upe_net_eur} (Size: ${match.width_mm}x${match.depth_mm})`);
+                    return Number(match.price_upe_net_eur);
+                } else {
+                    console.warn(`⚠️ No Matrix match for ${addon.addon_name} (Req: ${width}x${depth}) - Largest available?`);
+                    // Return 0 or largest? Safest is 0 (unavailable).
+                }
+            } else {
+                console.warn(`⚠️ Matrix table empty for ${addon.addon_name} (${tableId})`);
+            }
+
+            return 0;
+        }
+
+        return Number(addon.price_upe_net_eur) || 0;
     }
 };

@@ -110,6 +110,10 @@ export const MailPage: React.FC = () => {
     const [showOfferSelector, setShowOfferSelector] = useState(false);
     const [recentOffers, setRecentOffers] = useState<Offer[]>([]);
 
+    // Template State (Moved to top to fix React #310)
+    const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+    const [templates, setTemplates] = useState<any[]>([]);
+
     const toggleOfferSelector = async () => {
         if (!showOfferSelector) {
             try {
@@ -140,8 +144,39 @@ export const MailPage: React.FC = () => {
             const token = await OfferService.ensurePublicToken(offer.id);
             const link = `${window.location.origin}/p/offer/${token}`;
 
-            // German Template requested by user
-            const template = `Exklusiv für Sie vorbereitet:\n📄 Angebot ${offer.offerNumber}: ${link}\n\nBitte öffnen Sie die beigefügte PDF-Datei.\nDas detaillierte Angebot finden Sie im Anhang dieser E-Mail.\n`;
+            // Context for template
+            const context: Record<string, string> = {
+                user_name: `${currentUser?.firstName} ${currentUser?.lastName}`,
+                company_name: currentUser?.emailConfig?.companyName || 'Polendach',
+                client_name: leadInitialData.customerData?.firstName || '', // Best effort if lead loaded
+            };
+
+            // Fetch Default Template ("Domyślna Oferta")
+            // If exists, use it. Else fallback.
+            let templateBody = `Exklusiv für Sie vorbereitet:\n📄 Angebot ${offer.offerNumber}: ${link}\n\nBitte öffnen Sie die beigefügte PDF-Datei.\nDas detaillierte Angebot finden Sie im Anhang dieser E-Mail.\n`; // Fallback
+
+            try {
+                const { supabase } = await import('../lib/supabase');
+                const { data: tmpl } = await supabase.from('email_templates').select('body').eq('name', 'Domyślna Oferta').maybeSingle();
+                if (tmpl && tmpl.body) {
+                    // Check if it's HTML or Text. If template body contains HTML tags, we might want to respect that.
+                    // But we are inserting into a textarea (likely plaintext currently in logic?). 
+                    // Wait, composeData.body is used in handleSend. 
+                    // handleSend checks for HTML tags. 
+                    // IMPORTANT: 'parseTemplate' is needed to replace {{offer_number}} and {{offer_link}}.
+
+                    const { EmailTemplateService } = await import('../services/database/email-template.service');
+                    templateBody = EmailTemplateService.parseTemplate(tmpl.body, {
+                        offer_number: offer.offerNumber,
+                        offer_link: link,
+                        ...context
+                    });
+                }
+            } catch (e) {
+                console.error('Error fetching default offer template', e);
+            }
+
+            const template = templateBody;
 
             if (textareaRef.current) {
                 const start = textareaRef.current.selectionStart;
@@ -315,8 +350,68 @@ export const MailPage: React.FC = () => {
         }
     };
 
-    const handleCreateLead = () => {
+    const uploadAttachments = async (email: EmailDetails): Promise<any[]> => {
+        if (!email.attachments || email.attachments.length === 0) return [];
+
+        const uploaded: any[] = [];
+        const toastId = toast.loading(`Wysyłanie ${email.attachments.length} załączników...`);
+
+        try {
+            const { supabase } = await import('../lib/supabase');
+
+            for (const att of email.attachments) {
+                // Decode Base64 to Blob
+                const byteCharacters = atob(att.content);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: att.contentType });
+
+                // Upload
+                // Path: lead-attachments/{email_id}/{filename}
+                const path = `${email.id}/${att.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+                const { data, error } = await supabase.storage
+                    .from('lead-attachments')
+                    .upload(path, blob, {
+                        contentType: att.contentType,
+                        upsert: true
+                    });
+
+                if (error) {
+                    console.error(`Failed to upload ${att.filename}`, error);
+                    continue;
+                }
+
+                // Get Public URL
+                const { data: { publicUrl } } = supabase.storage
+                    .from('lead-attachments')
+                    .getPublicUrl(path);
+
+                uploaded.push({
+                    name: att.filename,
+                    url: publicUrl,
+                    type: att.contentType,
+                    size: att.size || blob.size
+                });
+            }
+
+            toast.success(`Przesłano ${uploaded.length} z ${email.attachments.length}`, { id: toastId });
+            return uploaded;
+        } catch (e) {
+            console.error('Upload Error:', e);
+            toast.error('Błąd wysyłania załączników', { id: toastId });
+            return [];
+        }
+    };
+
+    const handleCreateLead = async () => {
         if (!selectedEmail) return;
+
+        // Upload attachments first
+        const uploadedAttachments = await uploadAttachments(selectedEmail);
 
         // Parse "From" field. Expected formats: "Name <email>" or "email"
         let name = '';
@@ -344,7 +439,8 @@ export const MailPage: React.FC = () => {
             },
             source: 'email',
             emailMessageId: selectedEmail.id,
-            notes: `Utworzono z wiadomości e-mail: "${selectedEmail.subject}" z dnia ${new Date(selectedEmail.date).toLocaleDateString()}`
+            notes: `Utworzono z wiadomości e-mail: "${selectedEmail.subject}" z dnia ${new Date(selectedEmail.date).toLocaleDateString()}`,
+            attachments: uploadedAttachments
         });
         setShowLeadForm(true);
     };
@@ -614,7 +710,8 @@ export const MailPage: React.FC = () => {
                     },
                     source: 'email',
                     emailMessageId: selectedEmail.id,
-                    notes: extracted.notes || `Utworzono z wiadomości e-mail: "${selectedEmail.subject}"`
+                    notes: extracted.notes || `Utworzono z wiadomości e-mail: "${selectedEmail.subject}"`,
+                    attachments: await uploadAttachments(selectedEmail)
                 });
                 setShowLeadForm(true);
             }
@@ -682,8 +779,88 @@ export const MailPage: React.FC = () => {
         }
     };
 
+    // Template Logic - Moved to top
+    // const [showTemplateSelector, setShowTemplateSelector] = React.useState(false);
+    // const [templates, setTemplates] = React.useState<any[]>([]);
+
+    const handleLoadTemplates = async () => {
+        try {
+            const { EmailTemplateService } = await import('../services/database/email-template.service');
+            const data = await EmailTemplateService.getTemplates(true);
+            setTemplates(data);
+            setShowTemplateSelector(true);
+        } catch (e) {
+            console.error(e);
+            toast.error('Błąd ładowania szablonów');
+        }
+    };
+
+    const handleSelectTemplate = async (template: any) => {
+        // Prepare Context
+        const context: Record<string, string> = {
+            user_name: `${currentUser?.firstName} ${currentUser?.lastName}`,
+            company_name: currentUser?.emailConfig?.companyName || 'Polendach',
+            // If leadInitialData is present, use it, otherwise empty or prompt
+            client_name: leadInitialData.customerData?.firstName || '',
+            client_lastname: leadInitialData.customerData?.lastName || '',
+        };
+
+        // If context missing, we could prompt user or just leave empty variables
+        // Let's at least ensure user_name is there.
+        // For 'offer_link', we can't easily guess unless we selected an offer.
+        // The user can use "Insert Offer" after loading template.
+
+        try {
+            const { EmailTemplateService } = await import('../services/database/email-template.service');
+            const parsedBody = EmailTemplateService.parseTemplate(template.body, context);
+
+            setComposeData(prev => ({
+                ...prev,
+                subject: prev.subject || template.subject, // Don't overwrite if user typed something? Or overwrite? Usually overwrite if template selected.
+                body: parsedBody
+            }));
+
+            setShowTemplateSelector(false);
+            toast.success('Szablon załadowany');
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-4">
+            {/* Template Selector Modal */}
+            {showTemplateSelector && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
+                            <h3 className="font-bold text-slate-800">Wybierz Szablon</h3>
+                            <button onClick={() => setShowTemplateSelector(false)}>✕</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2">
+                            {templates.length === 0 ? (
+                                <p className="text-center p-4 text-slate-500">Brak aktywnych szablonów.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {templates.map(t => (
+                                        <button
+                                            key={t.id}
+                                            onClick={() => handleSelectTemplate(t)}
+                                            className="w-full text-left p-3 hover:bg-slate-50 rounded-lg border border-slate-100 transition-colors group"
+                                        >
+                                            <div className="font-medium text-slate-800">{t.name}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{t.subject}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
             {/* 1. Sidebar (Navigation) - Fixed width */}
             <div className="w-full md:w-48 flex flex-col gap-2 flex-shrink-0">
                 <div className="mb-2">

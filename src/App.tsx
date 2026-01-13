@@ -59,6 +59,8 @@ import { MailPage } from './components/MailPage';
 import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
 import { FairDashboard } from './components/fairs/FairDashboard';
 import { FairManagement } from './components/admin/FairManagement';
+import { EmailTemplatesPage } from './pages/admin/EmailTemplatesPage';
+import { ErrorReportsPage } from './pages/admin/ErrorReportsPage';
 import { AIAssistantPage } from './components/admin/AIAssistantPage';
 import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
@@ -180,6 +182,8 @@ function App() {
               <Route path="/admin/profitability" element={<InstallationProfitability />} />
               <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><SystemPermissionsPage /></ProtectedRoute>} />
               <Route path="/admin/fairs" element={<ProtectedRoute allowedRoles={['admin']}><FairManagement /></ProtectedRoute>} />
+              <Route path="/admin/email-templates" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}><EmailTemplatesPage /></ProtectedRoute>} />
+              <Route path="/admin/error-reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorReportsPage /></ProtectedRoute>} />
               <Route path="/fairs" element={<FairDashboard />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
               <Route path="/fuel-logs" element={<FuelPage />} />

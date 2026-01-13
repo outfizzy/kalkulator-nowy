@@ -99,6 +99,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         panorama: any[];
         wpc: any[];
         accessories: any[]; // General accessories
+        zip_screens: any[];
     }>({
         walls: [],
         sliding: [],
@@ -106,6 +107,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         lighting: [],
         heating: [],
         awnings: [],
+        zip_screens: [],
         panorama: [],
         wpc: [],
         accessories: []
@@ -142,7 +144,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
                 // MAPPING FIX: imported Aluxe tables use generic 'glass'/'polycarbonate' subtypes for standard variants
                 // AND map specific dropdown keys (ir-gold) to DB keys (poly_iq_relax)
-                if (['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport'].includes(config.modelId.toLowerCase())) {
+                // Added topstyle_xl to validation list
+                const aluxeModels = ['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport', 'topstyle_xl', 'grillo_rigid'];
+                if (aluxeModels.some(m => config.modelId.toLowerCase().includes(m))) {
                     if (config.roofType === 'glass' && calculatedSubtype === 'standard') {
                         calculatedSubtype = 'glass_clear' as any;
                     }
@@ -167,7 +171,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     ...config
                 };
 
-                const result: PricingResult = await PricingService.calculateOfferPrice(priceConfig);
+                const result: PricingResult = await PricingService.calculateOfferPrice(priceConfig, 0);
 
                 // 1. Update Base Price
                 // Note: result.totalCost includes surcharges. result.basePrice is pure foundation.
@@ -265,17 +269,24 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         const fetchComponents = async () => {
             setLoadingComponents(true);
             try {
+                // Derive Model Name from products list + config.modelId
+                // config.modelId matches 'code'. product.name matches 'imported_from'.
+                const activeModelName = products.find(p => p.code === config.modelId?.toLowerCase())?.name;
+
+                console.log('📦 Fetching Addons for Context:', activeModelName || 'Global');
+
                 // Fetch all groups in parallel
-                const [walls, sliding, keil, light, heat, awnings, panorama, wpc, accessories] = await Promise.all([
-                    PricingService.getAddonsByGroup('walls_aluminum'),
-                    PricingService.getAddonsByGroup('sliding_doors'),
-                    PricingService.getAddonsByGroup('keilfenster'),
-                    PricingService.getAddonsByGroup('lighting'),
-                    PricingService.getAddonsByGroup('heating'),
-                    PricingService.getAddonsByGroup('awnings'),
-                    PricingService.getAddonsByGroup('panorama'),
-                    PricingService.getAddonsByGroup('wpc_floor'),
-                    PricingService.getAddonsByGroup('accessories')
+                const [walls, sliding, keil, light, heat, awnings, zips, panorama, wpc, accessories] = await Promise.all([
+                    PricingService.getAddonsByGroup('walls_aluminum', activeModelName),
+                    PricingService.getAddonsByGroup('sliding_doors', activeModelName),
+                    PricingService.getAddonsByGroup('keilfenster', activeModelName),
+                    PricingService.getAddonsByGroup('lighting', activeModelName),
+                    PricingService.getAddonsByGroup('heating', activeModelName),
+                    PricingService.getAddonsByGroup('awnings', activeModelName),
+                    PricingService.getAddonsByGroup('zip_screens', activeModelName),
+                    PricingService.getAddonsByGroup('panorama', activeModelName),
+                    PricingService.getAddonsByGroup('wpc_floor', activeModelName),
+                    PricingService.getAddonsByGroup('accessories', activeModelName)
                 ]);
 
                 setAddonGroups({
@@ -285,6 +296,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     lighting: light,
                     heating: heat,
                     awnings,
+                    zip_screens: zips,
                     panorama,
                     wpc,
                     accessories
@@ -296,8 +308,10 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             }
         };
 
-        fetchComponents();
-    }, []);
+        if (products.length > 0) {
+            fetchComponents();
+        }
+    }, [products, config.modelId]);
 
     // Fetch Dynamic Products
     useEffect(() => {
@@ -438,7 +452,64 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         setConfig(prev => ({ ...prev, addons: prev.addons.filter(a => a.id !== id) }));
     };
 
-    const toggleAccessory = (acc: any, increment: boolean) => {
+    // Recalculate Matrix Addon Prices when Dimensions Change
+    useEffect(() => {
+        const recalculatePrices = async () => {
+            if (!config.selectedAccessories || config.selectedAccessories.length === 0) return;
+
+            const hasMatrixItems = config.selectedAccessories.some(a => a.pricing_basis === 'MATRIX');
+            if (!hasMatrixItems) return;
+
+            console.log('🔄 Recalculating Matrix Addon Prices...');
+
+            const updated = await Promise.all(config.selectedAccessories.map(async (acc) => {
+                if (acc.pricing_basis === 'MATRIX') {
+                    // We need the full addon object (properties, etc)
+                    // But selectedAccessories only has { name, price, quantity, attributes }.
+                    // We are missing properties/id needed for calculation!
+                    // FIX: We need to store full metadata in selectedAccessories or fetch it.
+                    // Ideally, selectedAccessories should store 'addonId' or full object.
+
+                    // Assuming we update toggleAccessory to store 'properties' and 'pricing_basis'
+                    // acc.attributes currently stores 'properties' based on line 460 in original code
+                    // Let's rely on acc.attributes (which is properties) and acc.pricing_basis
+
+                    // Wait, calculateAddonPrice needs properties.price_table_id.
+                    // In original code: properties: entry.properties.
+                    // So acc.attributes is the properties object.
+
+                    // We need to reconstruct the "addon" object structure expected by PricingService
+                    const mockAddon = {
+                        addon_name: acc.name,
+                        pricing_basis: 'MATRIX',
+                        properties: acc.attributes
+                    };
+
+                    const newPrice = await PricingService.calculateAddonPrice(mockAddon, config.width, config.projection);
+
+                    if (newPrice !== acc.price) {
+                        return { ...acc, price: newPrice };
+                    }
+                }
+                return acc;
+            }));
+
+            // Only update if changes found
+            const changed = updated.some((u, i) => u.price !== config.selectedAccessories![i].price);
+            if (changed) {
+                setConfig(prev => ({ ...prev, selectedAccessories: updated }));
+            }
+        };
+
+        const timeoutId = setTimeout(recalculatePrices, 500); // Debounce
+        return () => clearTimeout(timeoutId);
+
+    }, [config.width, config.projection, config.selectedAccessories?.length]); // Dep on length to run when new items added, but avoid loop on update
+
+    const toggleAccessory = async (acc: any, increment: boolean) => {
+        // If incrementing a new item that is MATRIX, we should calculate price first
+        // But for "Toggle" logic with +/- buttons, we need to be careful not to double add
+
         const newAccessories = [...(config.selectedAccessories || [])];
         const existingIdx = newAccessories.findIndex(a => a.name === acc.description);
 
@@ -452,15 +523,32 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     newAccessories.splice(existingIdx, 1);
                 }
             }
+            setConfig(prev => ({ ...prev, selectedAccessories: newAccessories }));
         } else if (increment) {
+            // NEW ITEM
+            let finalPrice = acc.price_net;
+
+            if (acc.pricing_basis === 'MATRIX') {
+                // Calculate initial price
+                toast.loading('Obliczanie ceny dodatku...', { id: 'calc-addon' });
+                finalPrice = await PricingService.calculateAddonPrice(acc, config.width, config.projection);
+                toast.dismiss('calc-addon');
+                if (finalPrice === 0) {
+                    toast.error('Nie znaleziono ceny dla podanych wymiarów.');
+                    // Add anyway? Or block?
+                    // Lets add with 0 price but warn.
+                }
+            }
+
             newAccessories.push({
                 name: acc.description,
-                price: acc.price_net,
+                price: finalPrice,
                 quantity: 1,
-                attributes: acc.properties || acc.attributes // Save multilingual props
+                attributes: acc.properties || acc.attributes,
+                pricing_basis: acc.pricing_basis // Store this!
             });
+            setConfig(prev => ({ ...prev, selectedAccessories: newAccessories }));
         }
-        setConfig(prev => ({ ...prev, selectedAccessories: newAccessories }));
     };
 
     const invalidWidth = config.width > limits.maxWidth || config.width < limits.minWidth;
@@ -474,6 +562,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         let nextWidth = config.width;
         let nextDepth = config.projection;
 
+        // ... Skystyle logic same as before ...
         if (nextWidth < limits.minWidth) nextWidth = limits.minWidth;
         if (nextWidth > limits.maxWidth) nextWidth = limits.maxWidth;
         if (nextDepth < limits.minDepth) nextDepth = limits.minDepth;
@@ -583,7 +672,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                 key={product.id || product.code}
                                                 onClick={() => {
                                                     handleBasicConfigChange('modelId', product.code);
-                                                    if (product.code === 'skystyle') {
+                                                    if (product.code === 'skystyle' || product.code === 'ultrastyle') {
                                                         handleBasicConfigChange('roofType', 'glass');
                                                         handleBasicConfigChange('glassType', 'standard');
                                                     }
@@ -870,7 +959,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                 <div className="space-y-4">
                                     <label className="block text-sm font-medium text-slate-700">Rodzaj pokrycia</label>
                                     <div className="grid grid-cols-2 gap-4">
-                                        {config.modelId !== 'skystyle' && (
+                                        {config.modelId !== 'skystyle' && config.modelId !== 'ultrastyle' && (
                                             <div
                                                 onClick={() => handleBasicConfigChange('roofType', 'polycarbonate')}
                                                 className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${config.roofType === 'polycarbonate' ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}
@@ -887,8 +976,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                             <div className="text-2xl mb-2">💎</div>
                                             <div className="font-bold text-slate-900">Szkło VSG</div>
                                             <div className="text-xs text-slate-500">
-                                                {config.modelId === 'skystyle'
-                                                    ? 'Jedyny wariant dachu dla Skystyle'
+                                                {(config.modelId === 'skystyle' || config.modelId === 'ultrastyle')
+                                                    ? 'Jedyny wariant dachu dla tego modelu'
                                                     : 'Premium wygląd'}
                                             </div>
                                         </div>
@@ -907,7 +996,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                     )}
 
                                     {/* Sub-options for Polycarbonate */}
-                                    {config.modelId !== 'skystyle' && config.roofType === 'polycarbonate' && (
+                                    {config.modelId !== 'skystyle' && config.modelId !== 'ultrastyle' && config.roofType === 'polycarbonate' && (
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
                                             <div className="text-sm font-medium text-slate-700 mb-3">Warianty Poliwęglanu</div>
                                             <div className="space-y-2">
@@ -1318,7 +1407,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    availableItems={addonGroups.awnings}
+                                                    availableItems={[...addonGroups.awnings, ...addonGroups.zip_screens]}
                                                     maxRoofWidth={config.width}
                                                     maxRoofDepth={config.projection}
                                                 />
@@ -1379,9 +1468,14 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                                 const itemName = entry.addon_name;
                                                                 const itemPrice = entry.price_upe_net_eur;
                                                                 const uniqueName = `[Akcesoria] ${itemName}`;
+                                                                const isMatrix = entry.pricing_basis === 'MATRIX';
 
                                                                 const selected = config.selectedAccessories?.find(a => a.name === uniqueName);
                                                                 const qty = selected?.quantity || 0;
+
+                                                                const displayPrice = isMatrix && itemPrice === 0
+                                                                    ? 'Wg wymiarów'
+                                                                    : formatCurrency(itemPrice);
 
                                                                 return (
                                                                     <div key={idx} className={`border rounded-xl p-4 transition-all ${qty > 0 ? 'border-accent bg-accent/5' : 'border-slate-100 hover:border-accent/30'}`}>
@@ -1389,16 +1483,16 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                                             <div className="font-medium text-slate-900 text-sm line-clamp-2 h-10 pr-2" title={uniqueName}>
                                                                                 {itemName}
                                                                             </div>
-                                                                            <div className="font-bold text-accent text-sm whitespace-nowrap">{formatCurrency(itemPrice)}</div>
+                                                                            <div className="font-bold text-accent text-sm whitespace-nowrap">{displayPrice}</div>
                                                                         </div>
                                                                         <div className="flex items-center justify-between mt-2 bg-white rounded-lg border border-slate-200 p-1">
                                                                             <button
-                                                                                onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, false)}
+                                                                                onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties, pricing_basis: entry.pricing_basis }, false)}
                                                                                 className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
                                                                             >-</button>
                                                                             <span className="font-bold text-sm text-slate-900 w-8 text-center">{qty}</span>
                                                                             <button
-                                                                                onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties }, true)}
+                                                                                onClick={() => toggleAccessory({ description: uniqueName, price_net: itemPrice, properties: entry.properties, pricing_basis: entry.pricing_basis }, true)}
                                                                                 className="w-8 h-8 flex items-center justify-center text-white bg-accent rounded hover:bg-accent/90"
                                                                             >+</button>
                                                                         </div>

@@ -5,13 +5,17 @@ import { TaskService } from './task.service';
 
 export const LeadService = {
     async createLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
+        // Debug: Log supabase instance status
+        console.log('LeadService.createLead: Checking auth', { supabaseDefined: !!supabase, authDefined: !!supabase?.auth });
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
         // Ensure customer exists
         let customerId = lead.customerId;
-        try {
-            if (lead.customerData) {
+
+        if (lead.customerData) {
+            try {
                 // Map Lead Data to Customer
                 const fullAddress = lead.customerData.address || '';
                 let street = fullAddress;
@@ -22,14 +26,21 @@ export const LeadService = {
                     houseNumber = match[2];
                 }
 
+                // [Fair Module] - Fallback address for Trade Fair leads
+                const isFair = lead.source === 'targi';
+                const defaultCity = isFair ? 'Targi (Do Uzupełnienia)' : '';
+                const defaultZip = isFair ? '00-000' : '';
+                const defaultStreet = isFair ? '-' : '';
+                const defaultHouse = isFair ? '0' : '';
+
                 const customerInput: Customer = {
                     salutation: (lead.customerData.companyName ? 'Firma' : 'Herr') as 'Herr' | 'Frau' | 'Firma',
                     firstName: lead.customerData.firstName || '',
                     lastName: lead.customerData.lastName || '',
-                    street: street,
-                    houseNumber: houseNumber,
-                    postalCode: lead.customerData.postalCode || '',
-                    city: lead.customerData.city || '',
+                    street: street || defaultStreet,
+                    houseNumber: houseNumber || defaultHouse,
+                    postalCode: lead.customerData.postalCode || defaultZip,
+                    city: lead.customerData.city || defaultCity,
                     phone: lead.customerData.phone || '',
                     email: lead.customerData.email || '',
                     country: 'Deutschland'
@@ -37,9 +48,15 @@ export const LeadService = {
 
                 const customer = await CustomerService.ensureCustomer(customerInput);
                 customerId = customer.id;
+            } catch (e) {
+                console.error('Failed to ensure customer for lead:', e);
+                throw new Error('Could not create/link customer for this lead. ' + (e instanceof Error ? e.message : 'Unknown error'));
             }
-        } catch (e) {
-            console.warn('Failed to ensure customer for lead:', e);
+        }
+
+        // Fail if we still don't have a customerId and logic requires it (usually a lead implies a potential customer)
+        if (!customerId && lead.customerData) {
+            console.warn('Proceeding to create lead without linked customer_id, rely on customer_data json.');
         }
 
         const { data, error } = await supabase
@@ -49,14 +66,18 @@ export const LeadService = {
                 source: lead.source,
                 customer_data: lead.customerData,
                 customer_id: customerId,
-                assigned_to: lead.assignedTo || user.id, // Default to current user if not set
+                // [Fix 2026-01-12] New leads should be unassigned by default. 
+                // Only assign if explicit or status is NOT 'new'.
+                assigned_to: lead.assignedTo || (lead.status === 'new' ? null : user.id),
                 email_message_id: lead.emailMessageId,
                 notes: lead.notes,
                 last_contact_date: lead.lastContactDate ? lead.lastContactDate.toISOString() : null,
                 // Fair Module
                 fair_id: lead.fairId,
                 fair_photos: lead.fairPhotos,
-                fair_prize: lead.fairPrize
+                fair_prize: lead.fairPrize,
+                fair_products: lead.fairProducts,
+                attachments: lead.attachments
             })
             .select()
             .single();
@@ -152,6 +173,26 @@ export const LeadService = {
     },
 
     async deleteLead(id: string): Promise<void> {
+        // 1. Check for existing offers
+        const { count, error: countError } = await supabase
+            .from('offers')
+            .select('*', { count: 'exact', head: true })
+            .eq('lead_id', id);
+
+        if (countError) throw countError;
+        if (count && count > 0) {
+            throw new Error('Nie można usunąć leada, który posiada utworzone oferty. Najpierw usuń oferty.');
+        }
+
+        // 2. Cascade delete messages (if foreign key cascade isn't set, better safe than sorry)
+        const { error: msgError } = await supabase
+            .from('lead_messages')
+            .delete()
+            .eq('lead_id', id);
+
+        if (msgError) console.warn('Error cleaning up lead messages:', msgError);
+
+        // 3. Delete the Lead
         const { error } = await supabase
             .from('leads')
             .delete()
@@ -288,6 +329,11 @@ export const LeadService = {
             lastContactDate: data.last_contact_date ? new Date(data.last_contact_date) : undefined,
             clientWillContactAt: data.client_will_contact_at ? new Date(data.client_will_contact_at) : undefined,
             customerData: data.customer_data,
+            // Fair Module Data Mapping
+            fairId: data.fair_id,
+            fairPhotos: data.fair_photos || [],
+            fairPrize: data.fair_prize,
+            fairProducts: data.fair_products || [],
             salesRep: undefined,
             assignee: data.assignee ? {
                 firstName: (data.assignee.full_name || '').split(' ')[0] || '',

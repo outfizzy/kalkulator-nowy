@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { NotificationsDropdown } from './notifications/NotificationsDropdown';
 import { GlobalSearch } from './GlobalSearch';
 import { AIAssistantSidebar } from './AIAssistantSidebar';
+import { TaskSidebar } from './tasks/TaskSidebar';
 
 export const Layout: React.FC = () => {
     const { currentUser, logout, isAdmin, hasPermission } = useAuth();
@@ -11,6 +12,7 @@ export const Layout: React.FC = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
     const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+    const [isTasksOpen, setIsTasksOpen] = useState(false);
 
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -94,6 +96,9 @@ export const Layout: React.FC = () => {
                             {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
                             {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
                             {hasPermission('system_notifications') && <NavLink to="/admin/notifications" label="Uprawnienia" icon="settings" />}
+                            {hasPermission('system_notifications') && <NavLink to="/admin/notifications" label="Uprawnienia" icon="settings" />}
+                            <NavLink to="/admin/error-reports" label="Raporty Błędów" icon="bell" />
+                            <NavLink to="/admin/email-templates" label="Szablony Wiadomości" icon="mail" />
                             {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" />}
                         </div>
                     )}

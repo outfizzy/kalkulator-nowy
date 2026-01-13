@@ -27,6 +27,11 @@ interface ParsedRow {
     area?: number;
     variantNote?: string;
     originalLine: string;
+
+    // Loose Parts
+    description?: string;
+    unit?: string;
+
 }
 
 type ParsingMode = 'standard' | 'aluxe_poly' | 'aluxe_glass';
@@ -42,27 +47,45 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
     const [constructionType, setConstructionType] = useState<'wall' | 'free'>('wall');
     const [snowZone, setSnowZone] = useState<string>('1');
 
-    // 2. Paste & Parse
+    // State for Custom Config
     const [rawText, setRawText] = useState('');
     const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
     const [columnsCount, setColumnsCount] = useState(0);
-
-    // Mode State: 'auto' (default) or explicit override
-    const [forcedMode, setForcedMode] = useState<'auto' | 'aluxe_poly' | 'aluxe_glass' | 'standard'>('auto');
     const [activeMode, setActiveMode] = useState<ParsingMode>('standard');
+    const [forcedMode, setForcedMode] = useState<ParsingMode | 'auto'>('auto');
 
-    // Tabs
-    const [activeTab, setActiveTab] = useState<'base' | 'surcharges'>('base');
-    const [surchargeType, setSurchargeType] = useState<string>('freestanding');
+    // Column Mapping State
+    const [columnMapping, setColumnMapping] = useState<Record<number, string>>({});
+
+    // Surcharge Mapping State
+    const [surchargeType, setSurchargeType] = useState<string>('poly_surcharge'); // Default
+
+    // Loose Parts State
+    const [activeTab, setActiveTab] = useState<'base' | 'surcharges' | 'loose_parts'>('base');
+    const [addonGroup, setAddonGroup] = useState<string>('accessories'); // Default group
+    const [addonImportMode, setAddonImportMode] = useState<'list' | 'matrix'>('list'); // NEW: Toggle between List and Matrix
+    const [awningType, setAwningType] = useState<'over_glass' | 'under_glass'>('over_glass');
+    const [motorCount, setMotorCount] = useState<number>(1); // 1 or 2
+    const [isGlobalImport, setIsGlobalImport] = useState(false); // New Subtype
+
+    const addonGroups = [
+        { id: 'awnings', label: 'Markizy (Dachowe/Pod)' },
+        { id: 'zip_screens', label: 'Rolety ZIP (Pionowe)' },
+        { id: 'sliding_doors', label: 'Szklane Ściany (Przesuwne)' },
+        { id: 'walls_aluminum', label: 'Zabudowa Stała (Alu/Ściany)' },
+        { id: 'panorama', label: 'Szyby Panoramiczne (Panorama)' },
+        { id: 'keilfenster', label: 'Zaplecze / Kliny (Keilfenster)' },
+        { id: 'wpc_floor', label: 'Podłoga WPC' },
+        { id: 'lighting', label: 'Oświetlenie' },
+        { id: 'heating', label: 'Ogrzewanie' },
+        { id: 'accessories', label: 'Pozostałe akcesoria (Inne)' }
+    ];
+
 
     // Config for Aluxe Poly
     const [polySurchargeIndex, setPolySurchargeIndex] = useState(4); // Default Index 4 (Column 5)
 
     // 3. Column Mapping (Standard Mode)
-    // 3. Column Mapping (Standard Mode)
-    const [columnMapping, setColumnMapping] = useState<Record<number, string>>({});
-
-
 
     // Custom Model State
     const [isCustomMode, setIsCustomMode] = useState(false);
@@ -150,6 +173,9 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
         let polyScore = 0;
         let glassScore = 0;
 
+        // Loose Parts Context
+        let currentContextName = '';
+
         lines.forEach(line => {
             const cells = line.trim().split(/\t| {2,}/).map(c => c.trim());
             maxCols = Math.max(maxCols, cells.length);
@@ -193,7 +219,7 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                     variantNote: currentVariantNote
                 };
                 rows.push(rowData);
-            } else {
+            } else if (activeTab === 'surcharges') {
                 // Surcharge Mode: Width | Price
                 // Expect simple 2 columns: Width (mm) and Price (EUR)
                 // or just "3000 500"
@@ -224,18 +250,201 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                         });
                     }
                 }
+            } else if (activeTab === 'loose_parts') {
+                if (addonImportMode === 'matrix') {
+                    // MATRIX MODE (Like Base)
+                    // Format: Width x Height/Projection | Price
+                    let width = 0;
+                    let height = 0; // mapped to depth in ParsedRow
+
+                    // 1. Identify Dimensions (Same as Base)
+                    for (const c of cells) {
+                        const m = c.match(/(\d{3,5})\s*[xX*]\s*(\d{3,5})/);
+                        if (m) { width = parseInt(m[1]); height = parseInt(m[2]); break; }
+                    }
+
+                    if (width > 0 && height > 0) {
+                        // Find Price - assume first valid number
+                        const numValues = cells.map(c => parsePrice(c));
+                        const price = numValues.find(v => v !== null && v > 0);
+
+                        if (price) {
+                            rows.push({
+                                width,
+                                depth: height, // Map height to depth
+                                prices: [price],
+                                entries: [{ coverType: 'matrix_price', price }],
+                                originalLine: line,
+                                description: modelFamily // Use model name as desc
+                            });
+                        }
+                    }
+                } else {
+                    // LIST MODE (Existing Custom Logic)
+                    // Loose Parts Mode
+                    // Expected format: Description | Dimensions? | Unit | Price
+
+                    const cleanCells = cells.filter(c => c && c.length > 0);
+
+                    if (cleanCells.length > 0) {
+                        // Try to identify Price
+                        let priceIndex = -1;
+                        for (let i = cleanCells.length - 1; i >= 0; i--) {
+                            if (parsePrice(cleanCells[i]) !== null) {
+                                priceIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (priceIndex > -1) {
+                            // CASE A: Row HAS Price -> It's an ITEM
+                            const price = parsePrice(cleanCells[priceIndex]);
+                            if (price !== null) {
+                                // Extract Unit (often just before price)
+                                let unit = 'szt';
+                                let descEndIndex = priceIndex - 1;
+
+                                if (descEndIndex >= 0) {
+                                    const unitCandidate = cleanCells[descEndIndex];
+                                    const commonUnits = ['stk', 'stk.', 'm', 'lfm', 'set', 'kpl', 'szt', 'szt.', 'pauschal'];
+                                    if (commonUnits.some(u => unitCandidate.toLowerCase().includes(u))) {
+                                        unit = unitCandidate;
+                                        descEndIndex--;
+                                    }
+                                }
+
+                                // Full Name Construction
+                                // 1. Current Row Text
+                                const rowName = cleanCells.slice(0, descEndIndex + 1).join(' ');
+
+                                // 2. Combine with Header Context if exists
+                                let finalName = rowName;
+                                // Only prepend context if the row seems meaningless purely numerical/short
+                                if (currentContextName) {
+                                    const normalizedRow = rowName.toLowerCase();
+                                    const normalizedContext = currentContextName.toLowerCase();
+
+                                    // Check if rowName ALREADY contains contextName to avoid duplication (e.g. "LED" -> "LED Strip")
+                                    if (!normalizedRow.includes(normalizedContext)) {
+                                        finalName = `${currentContextName} ${rowName}`;
+                                    } else {
+                                        finalName = rowName;
+                                    }
+                                }
+
+                                rows.push({
+                                    width: 0,
+                                    depth: 0,
+                                    prices: [price],
+                                    entries: [{ coverType: 'accessory', price: price }],
+                                    originalLine: line,
+                                    description: finalName,
+                                    unit: unit
+                                });
+                            }
+                        } else {
+                            // CASE B: Row has NO Price -> Treat as HEADER / CONTEXT
+                            // Only if it has text
+                            const potentialHeader = cleanCells.join(' ').trim();
+                            if (potentialHeader.length > 2) {
+                                currentContextName = potentialHeader;
+                            }
+                        }
+                    }
+                }
             }
         });
 
         // Determine Final Mode
         let finalMode: ParsingMode = 'standard';
 
+        // 0. ADDON MATRIX SPECIAL LOGIC
+        // If we are in Addon Matrix mode, we need to handle the 2D structure (Width x Projection)
+        if (activeTab === 'loose_parts' && addonImportMode === 'matrix' && lines.length > 1) {
+            // Reset rows because the loop above might have processed them as simple items
+            // Actually, we should prevent the loop above from strictly processing if we are in this mode, 
+            // OR just clear and overwrite here. Overwriting is safer.
+            rows.length = 0;
+            currentContextName = ''; // Reset context
+
+            // 1. Identify Header Row (Projections / Depths)
+            // Assumption: First valid row contains projections
+            let headerCells: string[] = [];
+            let bodyStartIndex = 0;
+
+            // Find first row with at least 2 numbers (heuristic)
+            for (let i = 0; i < lines.length; i++) {
+                const l = lines[i].trim().split(/\t|\s{2,}/).map(c => c.trim());
+                const nums = l.filter(c => parsePrice(c) !== null);
+                if (nums.length >= 2) {
+                    headerCells = l;
+                    bodyStartIndex = i + 1;
+                    break;
+                }
+            }
+
+            if (headerCells.length > 0) {
+                // Map Column Index -> Projection/Depth
+                const projectionMap: Record<number, number> = {};
+
+                // Heuristic: Check if first cell of header is a number > 500
+                // If yes, it means the header row is "Compact" (starts directly with projection values)
+                // So we need to shift the mapping by +1 because Body rows have Width at index 0.
+                const firstHeaderValue = parsePrice(headerCells[0]);
+                const isCompactHeader = firstHeaderValue !== null && firstHeaderValue > 500;
+                const indexOffset = isCompactHeader ? 1 : 0;
+
+                headerCells.forEach((cell, idx) => {
+                    const val = parsePrice(cell);
+                    // Heuristic: Projections are usually > 500. 
+                    if (val && val > 500) {
+                        projectionMap[idx + indexOffset] = val;
+                    }
+                });
+
+                // 2. Process Body Rows
+                for (let i = bodyStartIndex; i < lines.length; i++) {
+                    const line = lines[i];
+                    const cells = line.trim().split(/\t|\s{2,}/).map(c => c.trim());
+
+                    // First cell is usually Width
+                    const widthVal = parsePrice(cells[0]);
+
+                    if (widthVal && widthVal > 500) {
+                        // Iterate columns
+                        cells.forEach((cell, colIdx) => {
+                            // Skip col 0 (Width)
+                            if (colIdx === 0) return;
+
+                            const projection = projectionMap[colIdx];
+                            if (projection) {
+                                const price = parsePrice(cell);
+                                if (price !== null) {
+                                    rows.push({
+                                        width: widthVal,
+                                        depth: projection, // Mapped from Header
+                                        prices: [price],
+                                        entries: [{ coverType: 'matrix_entry', price }], // Dummy entry for later
+                                        originalLine: line,
+                                        description: `${modelFamily} ${widthVal}x${projection}`, // Helper desc
+                                        variantNote: 'matrix'
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+
         if (activeTab === 'base') {
             if (forcedMode !== 'auto') {
                 finalMode = forcedMode;
             } else {
                 // Auto-detect logic
-                if (glassScore > rows.length * 0.4) finalMode = 'aluxe_glass';
+                if (modelFamily.toLowerCase().includes('ultrastyle')) finalMode = 'aluxe_glass';
+                else if (glassScore > rows.length * 0.4) finalMode = 'aluxe_glass';
                 else if (polyScore > rows.length * 0.4) finalMode = 'aluxe_poly';
             }
         }
@@ -253,6 +462,9 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 if (row.entries.length > 0) {
                     entries.push(...row.entries);
                 }
+            } else if (activeTab === 'loose_parts') {
+                // Pass through
+                if (row.entries.length > 0) entries.push(...row.entries);
             } else if (finalMode === 'aluxe_poly') {
                 // Poly Layout
                 const basePoly = nums[3];
@@ -332,13 +544,11 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
 
         setParsedRows(processedRows);
         setColumnsCount(maxCols);
-        setParsedRows(processedRows);
-        setColumnsCount(maxCols);
     }, [rawText, forcedMode, activeTab, polySurchargeIndex]);
 
 
     const handleSave = async () => {
-        if (!modelFamily) return toast.error('Wybierz model!');
+        if (!modelFamily && !isGlobalImport) return toast.error('Wybierz model!');
         if (parsedRows.length === 0) return toast.error('Brak danych do zapisania');
 
         const toastId = toast.loading(`Przetwarzanie...`);
@@ -493,7 +703,14 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                             area_m2: row.area,
                             variant_note: row.variantNote, // Detected * or ** note
                             source_import_id: assignedTableId, // Link to tracker
-                            properties: (entry as any).properties || {} // *** NEW: Save properties ***
+                            properties: {
+                                ...((entry as any).properties || {}),
+                                // Inject Global Addon Context if applicable
+                                ...(activeTab === 'loose_parts' && addonGroup === 'awnings' ? {
+                                    motor_count: motorCount,
+                                    awning_type: awningType
+                                } : {})
+                            }
                         });
                     });
                 } else {
@@ -641,51 +858,186 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 // source_import_id: assignedTableId // Does pricing_surcharges have this? Probably not yet.
             }));
 
-            // 1. Save to Legacy Table (Backup)
-            const { error: err } = await supabase
-                .from('pricing_surcharges')
-                .upsert(surchargesToInsert, {
-                    onConflict: 'model_family, surcharge_type, width_mm',
-                    ignoreDuplicates: false
-                });
-            error = err;
+            // 0. LOOSE PARTS MODE
+            if (activeTab === 'loose_parts') {
+                if (addonImportMode === 'list') {
+                    // LIST MODE (Previous Logic)
+                    // 1. Create a Price Table container for these addons
+                    const tableName = `${modelFamily} - ${addonGroups.find(g => g.id === addonGroup)?.label || 'Części'} (${new Date().toLocaleDateString()})`;
 
-            // 2. NEW: Save Freestanding Rules to Product Configuration (Primary for Calculator)
-            if (!err && surchargeType === 'freestanding' && productId) {
-                console.log('⚡ Saving Freestanding Rules to Product Config:', productId);
+                    const { data: tableData, error: tableErr } = await supabase.from('price_tables').insert({
+                        name: tableName,
+                        type: 'addons', // List type
+                        is_active: true,
+                        currency: 'EUR',
+                        variant_config: {
+                            manualModel: modelFamily,
+                            addonGroup: addonGroup
+                        },
+                        product_definition_id: products?.find(p => p.name === modelFamily)?.id
+                    }).select().single();
 
-                // Convert parsed rows to cleaner rule format
-                const rules = parsedRows.map(row => ({
-                    max_width: row.width,
-                    price: row.entries[0]?.price || 0
-                }));
+                    if (tableErr) {
+                        error = tableErr;
+                    } else {
+                        // 2. Insert Parts linked to this Table
+                        const partsToInsert = parsedRows.map(row => {
+                            const cleanName = (row.description || 'Unknown').trim();
+                            const slug = cleanName
+                                .toLowerCase()
+                                .replace(/[^\w\s-]/g, '')
+                                .replace(/\s+/g, '-');
 
-                // Fetch current config first to merge (avoid overwriting other config)
-                const { data: currentProd } = await supabase
-                    .from('product_definitions')
-                    .select('configuration')
-                    .eq('id', productId)
-                    .single();
+                            const finalCode = `${modelFamily.toLowerCase()}-${slug}-${crypto.randomUUID().slice(0, 4)}`;
 
-                const currentConfig = currentProd?.configuration || {};
+                            // Prefix only if model family isn't already part of the name to avoid "Renson Renson ZIP"
+                            // Actually user said: "exactly create attributes to be linked".
+                            const prefix = (!cleanName.toLowerCase().includes(modelFamily.toLowerCase()) && modelFamily !== '__CUSTOM__') ? `[${modelFamily}] ` : '';
 
-                // Update configuration
-                const { error: configError } = await supabase
-                    .from('product_definitions')
-                    .update({
-                        configuration: {
-                            ...currentConfig,
-                            freestanding_surcharge_rules: rules,
-                            freestanding_is_additive: true // EXPLICITLY MARK AS ADDITIVE
-                        }
-                    })
-                    .eq('id', productId);
+                            return {
+                                price_table_id: tableData.id,
+                                addon_code: finalCode,
+                                addon_name: `${prefix}${cleanName}`,
+                                pricing_basis: 'FIXED',
+                                price_upe_net_eur: row.entries[0]?.price || 0,
+                                unit: row.unit || 'szt',
+                                addon_group: addonGroup,
+                                properties: {
+                                    imported_from: isGlobalImport ? undefined : modelFamily,
+                                    original_line: row.originalLine
+                                }
+                            };
+                        });
 
-                if (configError) {
-                    console.error('Failed to update product config:', configError);
-                    toast.error('Zapisano w tabeli, ale nie udało się zaktualizować konfiguracji produktu (Kalkulator może tego nie widzieć).', { id: toastId });
+                        const { error: err } = await supabase
+                            .from('pricing_addons')
+                            .insert(partsToInsert);
+
+                        error = err;
+                    }
                 } else {
-                    toast.success('Zaktualizowano reguły wolnostojące w produkcie!', { id: toastId });
+                    // MATRIX MODE (Price Table + Single Addon Pointer)
+                    console.log('💎 Saving Addon Matrix...');
+
+                    // 1. Create Price Table (Type: addon_matrix)
+                    const tableName = `Matrix - ${modelFamily} - ${addonGroups.find(g => g.id === addonGroup)?.label || 'Addon'} (${new Date().toLocaleDateString()})`;
+
+                    const { data: tableData, error: tableErr } = await supabase.from('price_tables').insert({
+                        name: tableName,
+                        type: 'addon_matrix', // NEW TYPE
+                        is_active: true,
+                        currency: 'EUR',
+                        variant_config: {
+                            manualModel: modelFamily,
+                            addonGroup: addonGroup
+                        },
+                        product_definition_id: products?.find(p => p.name === modelFamily)?.id
+                    }).select().single();
+
+                    if (tableErr) {
+                        error = tableErr;
+                    } else {
+                        // 2. Insert Matrix Entries into `pricing_base` (Reuse existing table? Or NEW `pricing_matrix`?)
+                        // We decided to reuse `pricing_base`? Or `price_tables.entries`?
+                        // `pricing_base` schema: model_family, construction_type, cover_type...
+                        // If we use `pricing_base`, we need unique `model_family`.
+                        // Using `source_import_id` is cleaner.
+                        // We will check `PricingService` logic. It uses `source_import_id`.
+
+                        // We will insert into `pricing_base` but with `cover_type` = 'matrix_entry'?
+                        // Or just use the dimensions.
+
+                        const entriesToInsert = parsedRows.map(row => ({
+                            model_family: modelFamily, // Virtual Model Name
+                            // Let's use 'wall' as default.
+                            construction_type: 'wall',
+                            cover_type: 'matrix_entry',
+                            zone: 1, // Default
+                            width_mm: row.width,
+                            depth_mm: row.depth, // Uses depth column for Height/Projection
+                            price_upe_net_eur: row.entries[0]?.price || 0,
+                            currency: 'EUR',
+                            source_import_id: tableData.id // CRITICAL
+                        }));
+
+                        const { error: errBase } = await supabase
+                            .from('pricing_base')
+                            .insert(entriesToInsert);
+
+                        if (errBase) {
+                            error = errBase;
+                        } else {
+                            // 3. Create SINGLE Addon Entry linked to this table
+                            // This is the "Product" the user selects in the dropdown.
+                            const finalCode = `${modelFamily.toLowerCase().replace(/\s+/g, '_')}_matrix`;
+
+                            const { error: errAddon } = await supabase.from('pricing_addons').insert({
+                                addon_code: finalCode,
+                                addon_name: modelFamily, // The name of the Product/Matrix (e.g. "Fixscreen 100")
+                                addon_group: addonGroup,
+                                pricing_basis: 'MATRIX', // Triggers Matrix Logic
+                                properties: {
+                                    price_table_id: tableData.id,
+                                    dimension_type: addonGroup === 'awnings' ? 'width_projection' : 'field_height', // Heuristic
+                                    awning_type: addonGroup === 'awnings' ? awningType : undefined, // Save Subtype
+                                    motor_count: addonGroup === 'awnings' ? motorCount : undefined, // Save Motor Count
+                                    imported_from: isGlobalImport ? undefined : modelFamily // Scope logic
+                                }
+                            });
+                            error = errAddon;
+                        }
+                    }
+                }
+            } else {
+                // SURCHARGE MODE (Previous Logic)
+
+                // 1. Save to Legacy Table (Backup)
+                const { error: err } = await supabase
+
+                    .from('pricing_surcharges')
+                    .upsert(surchargesToInsert, {
+                        onConflict: 'model_family, surcharge_type, width_mm',
+                        ignoreDuplicates: false
+                    });
+                error = err;
+
+                // 2. NEW: Save Freestanding Rules to Product Configuration (Primary for Calculator)
+                if (!err && surchargeType === 'freestanding' && productId) {
+                    console.log('⚡ Saving Freestanding Rules to Product Config:', productId);
+
+                    // Convert parsed rows to cleaner rule format
+                    const rules = parsedRows.map(row => ({
+                        max_width: row.width,
+                        price: row.entries[0]?.price || 0
+                    }));
+
+                    // Fetch current config first to merge (avoid overwriting other config)
+                    const { data: currentProd } = await supabase
+                        .from('product_definitions')
+                        .select('configuration')
+                        .eq('id', productId)
+                        .single();
+
+                    const currentConfig = currentProd?.configuration || {};
+
+                    // Update configuration
+                    const { error: configError } = await supabase
+                        .from('product_definitions')
+                        .update({
+                            configuration: {
+                                ...currentConfig,
+                                freestanding_surcharge_rules: rules,
+                                freestanding_is_additive: true // EXPLICITLY MARK AS ADDITIVE
+                            }
+                        })
+                        .eq('id', productId);
+
+                    if (configError) {
+                        console.error('Failed to update product config:', configError);
+                        toast.error('Zapisano w tabeli, ale nie udało się zaktualizować konfiguracji produktu (Kalkulator może tego nie widzieć).', { id: toastId });
+                    } else {
+                        toast.success('Zaktualizowano reguły wolnostojące w produkcie!', { id: toastId });
+                    }
                 }
             }
         }
@@ -693,7 +1045,7 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
         if (error) {
             toast.error(error.message, { id: toastId });
         } else {
-            toast.success(`Zapisano pomyślnie!`, { id: toastId });
+            toast.success(`Zapisano pomyślnie! ${activeTab === 'loose_parts' ? 'Dodano części.' : ''}`, { id: toastId });
             if (onSuccess) onSuccess();
             onClose();
         }
@@ -744,6 +1096,14 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                             </div>
                         )}
 
+                        {/* Mode Selector (Loose Parts) */}
+                        {activeTab === 'loose_parts' && (
+                            <span className="text-xs px-2 py-1 rounded font-mono bg-orange-100 text-orange-800">
+                                Aktywny: Części Luźne (Accessories)
+                            </span>
+                        )}
+
+
                         {/* Active Badge */}
                         {activeTab === 'base' && (
                             <span className={`text-xs px-2 py-1 rounded font-mono ${activeMode === 'standard' ? 'bg-slate-100 text-slate-500' :
@@ -758,7 +1118,33 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                                 Aktywny: Dopłaty ({surchargeType})
                             </span>
                         )}
+
+                        {/* Tab Switcher */}
+                        <div className="flex bg-slate-100 rounded-lg p-1 ml-4 border border-slate-200">
+                            <button
+                                onClick={() => setActiveTab('base')}
+                                className={`px-3 py-1 text-xs font-bold rounded transition-all ${activeTab === 'base' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                Baza
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('surcharges')}
+                                className={`px-3 py-1 text-xs font-bold rounded transition-all ${activeTab === 'surcharges' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                Dopłaty
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('loose_parts')}
+                                className={`px-3 py-1 text-xs font-bold rounded transition-all ${activeTab === 'loose_parts' ? 'bg-white shadow text-orange-600' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                Części
+                            </button>
+                        </div>
                     </div>
+
 
                     <div className="flex items-center gap-4">
                         <button onClick={onClose} className="px-4 py-2 text-slate-500 hover:text-slate-800 font-medium">Anuluj</button>
@@ -839,10 +1225,10 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                                 Cenniki Bazowe
                             </button>
                             <button
-                                onClick={() => setActiveTab('surcharges')}
-                                className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'surcharges' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                                onClick={() => setActiveTab('loose_parts')}
+                                className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'loose_parts' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
                             >
-                                Dopłaty (Opcje)
+                                Systemy i Dodatki (Akcesoria)
                             </button>
                         </div>
 
@@ -924,6 +1310,90 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                                 </div>
                             )}
 
+                            {activeTab === 'loose_parts' && (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs font-bold">Kategoria Dodatków</label>
+                                        <select
+                                            value={addonGroup}
+                                            onChange={e => setAddonGroup(e.target.value)}
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-accent focus:ring-accent"
+                                        >
+                                            {addonGroups.map(g => (
+                                                <option key={g.id} value={g.id}>{g.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {addonGroup === 'awnings' && (
+                                        <div className="flex gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-xl mb-3">
+                                            <div className="flex-1">
+                                                <label className="text-xs font-bold">Typ Markizy</label>
+                                                <select
+                                                    value={awningType}
+                                                    onChange={e => setAwningType(e.target.value as any)}
+                                                    className="w-full px-3 py-1.5 rounded-lg border text-sm mt-1 bg-white"
+                                                >
+                                                    <option value="over_glass">Nad szkłem (Aufdach)</option>
+                                                    <option value="under_glass">Pod szkłem (Unterdach)</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-xs font-bold">Liczba Silników</label>
+                                                <div className="flex bg-slate-100 p-1 rounded-lg mt-1 h-[34px] items-center">
+                                                    <button
+                                                        onClick={() => setMotorCount(1)}
+                                                        className={`flex-1 h-full rounded-md text-xs font-bold transition-all ${motorCount === 1 ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                                                    >
+                                                        1 Silnik
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setMotorCount(2)}
+                                                        className={`flex-1 h-full rounded-md text-xs font-bold transition-all ${motorCount === 2 ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                                                    >
+                                                        2 Siln.
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                                        <input
+                                            type="checkbox"
+                                            checked={isGlobalImport}
+                                            onChange={e => setIsGlobalImport(e.target.checked)}
+                                            className="w-4 h-4 text-accent rounded focus:ring-accent"
+                                        />
+                                        <label className="text-sm font-medium text-slate-700">Dostępne dla wszystkich modeli</label>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold">Tryb Importu</label>
+                                        <div className="flex bg-slate-100 p-1 rounded-lg mt-1">
+                                            <button
+                                                onClick={() => setAddonImportMode('list')}
+                                                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all ${addonImportMode === 'list' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                                            >
+                                                Lista (Prosta)
+                                            </button>
+                                            <button
+                                                onClick={() => setAddonImportMode('matrix')}
+                                                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all ${addonImportMode === 'matrix' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                                            >
+                                                Macierz (Wymiary)
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                                        {addonImportMode === 'list'
+                                            ? 'Prosta lista: Nazwa | Cena. Użyj dla pojedynczych komponentów.'
+                                            : 'Tabela wymiarowa: Szerokość (Kolumny) x Wysięg (Wiersze). Tworzy macierz.'
+                                        }
+                                    </p>
+                                </div>
+                            )}
+
                             {activeTab === 'base' && (
                                 <div className="flex gap-2">
                                     <div className="flex-1">
@@ -1000,108 +1470,152 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                             <table className="w-full text-xs border-collapse">
                                 <thead className="sticky top-0 bg-slate-100 shadow-sm z-10">
                                     <tr>
-                                        {/* Split Dimensions */}
-                                        <th className="p-2 border bg-slate-200 w-24">Szer. (mm)</th>
-                                        <th className="p-2 border bg-slate-200 w-24">Głęb. (mm)</th>
-
-                                        {activeTab === 'base' && activeMode === 'standard' ? (
-                                            Array.from({ length: columnsCount }).map((_, i) => (
-                                                <th key={i} className="p-2 border min-w-[100px]">
-                                                    <select
-                                                        className="w-full p-1 border rounded"
-                                                        value={columnMapping[i] || ''}
-                                                        onChange={e => setColumnMapping(prev => ({ ...prev, [i]: e.target.value }))}
-                                                    >
-                                                        <option value="">-- Ignoruj --</option>
-                                                        {availableCoverTypes.map(ct => (
-                                                            <option key={ct.id} value={ct.id}>{ct.label}</option>
-                                                        ))}
-                                                    </select>
-                                                </th>
-                                            ))
-                                        ) : activeTab === 'base' ? (
+                                        {activeTab === 'loose_parts' ? (
+                                            addonImportMode === 'matrix' ? (
+                                                <>
+                                                    <th className="p-2 border bg-slate-200 w-12">#</th>
+                                                    <th className="p-2 border bg-slate-200 w-24">Szer. (mm)</th>
+                                                    <th className="p-2 border bg-slate-200 w-24">Głęb. (mm)</th>
+                                                    <th className="p-2 border bg-slate-200 text-right">Cena (EUR)</th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <th className="p-2 border bg-slate-200 w-12">#</th>
+                                                    <th className="p-2 border bg-slate-200">Opis / Nazwa</th>
+                                                    <th className="p-2 border bg-slate-200 w-24">J.m.</th>
+                                                    <th className="p-2 border bg-slate-200 w-32 text-right">Cena (EUR)</th>
+                                                </>
+                                            )
+                                        ) : (
                                             <>
-                                                {/* Auto-Mode Headers Preview */}
-                                                {activeMode === 'aluxe_poly' ? (
+                                                {/* Split Dimensions */}
+                                                <th className="p-2 border bg-slate-200 w-24">Szer. (mm)</th>
+                                                <th className="p-2 border bg-slate-200 w-24">Głęb. (mm)</th>
+
+                                                {activeTab === 'base' && activeMode === 'standard' ? (
+                                                    Array.from({ length: columnsCount }).map((_, i) => (
+                                                        <th key={i} className="p-2 border min-w-[100px]">
+                                                            <select
+                                                                className="w-full p-1 border rounded"
+                                                                value={columnMapping[i] || ''}
+                                                                onChange={e => setColumnMapping(prev => ({ ...prev, [i]: e.target.value }))}
+                                                            >
+                                                                <option value="">-- Ignoruj --</option>
+                                                                {availableCoverTypes.map(ct => (
+                                                                    <option key={ct.id} value={ct.id}>{ct.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        </th>
+                                                    ))
+                                                ) : activeTab === 'base' ? (
                                                     <>
-                                                        <th className="p-2 border bg-green-50">Poly Clear/Opal</th>
-                                                        <th className="p-2 border bg-green-50">+ IQ Relax (Dopłata)</th>
+                                                        {/* Auto-Mode Headers Preview */}
+                                                        {activeMode === 'aluxe_poly' ? (
+                                                            <>
+                                                                <th className="p-2 border bg-green-50">Poly Clear/Opal</th>
+                                                                <th className="p-2 border bg-green-50">+ IQ Relax (Dopłata)</th>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <th className="p-2 border bg-cyan-50">Szkło Clear</th>
+                                                                <th className="p-2 border bg-cyan-50">+ Opal (Dopłata)</th>
+                                                                <th className="p-2 border bg-cyan-50">+ Tinted (Dopłata)</th>
+                                                            </>
+                                                        )}
+                                                        <th className="p-2 border bg-yellow-50">Felder</th>
+                                                        <th className="p-2 border bg-yellow-50">Pfosten</th>
+                                                        <th className="p-2 border bg-yellow-50">m2</th>
                                                     </>
                                                 ) : (
-                                                    <>
-                                                        <th className="p-2 border bg-cyan-50">Szkło Clear</th>
-                                                        <th className="p-2 border bg-cyan-50">+ Opal (Dopłata)</th>
-                                                        <th className="p-2 border bg-cyan-50">+ Tinted (Dopłata)</th>
-                                                    </>
+                                                    <th className="p-2 border bg-purple-50 text-purple-800">Cena Dopłaty</th>
                                                 )}
-                                                <th className="p-2 border bg-yellow-50">Felder</th>
-                                                <th className="p-2 border bg-yellow-50">Pfosten</th>
-                                                <th className="p-2 border bg-yellow-50">m2</th>
                                             </>
-                                        ) : (
-                                            <th className="p-2 border bg-purple-50 text-purple-800">Cena Dopłaty</th>
                                         )}
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-slate-100">
                                     {parsedRows.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50 border-b">
-                                            {/* Split Dimensions */}
-                                            <td className="p-2 border text-center font-mono text-slate-600">{row.width}</td>
-                                            <td className="p-2 border text-center font-mono text-slate-600">{row.depth || '-'}</td>
-
-                                            {activeTab === 'base' && activeMode === 'standard' ? (
-                                                row.prices.map((p, i) => (
-                                                    <td key={i} className={`p-2 border text-right ${columnMapping[i] ? 'bg-blue-50 font-bold' : 'text-slate-300'}`}>
-                                                        {p?.toFixed(2) || '-'}
-                                                    </td>
-                                                ))
-                                            ) : activeTab === 'base' ? (
+                                        <tr key={idx} className="hover:bg-slate-50 font-mono text-xs">
+                                            {activeTab === 'loose_parts' ? (
+                                                addonImportMode === 'matrix' ? (
+                                                    <>
+                                                        <td className="p-2 text-center text-slate-500">{idx + 1}</td>
+                                                        <td className="p-2 text-center font-bold text-slate-700">{row.width}</td>
+                                                        <td className="p-2 text-center font-bold text-slate-700">{row.depth}</td>
+                                                        <td className="p-2 text-right font-bold text-green-600">
+                                                            {row.entries[0]?.price?.toFixed(2)} EUR
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="p-2 text-center text-slate-500">{idx + 1}</td>
+                                                        <td className="p-2 font-bold text-slate-800">{row.description}</td>
+                                                        <td className="p-2 text-center text-slate-600">{row.unit}</td>
+                                                        <td className="p-2 text-right font-bold text-green-600">
+                                                            {row.entries[0]?.price?.toFixed(2)} EUR
+                                                        </td>
+                                                    </>
+                                                )
+                                            ) : (
                                                 <>
-                                                    {/* Auto-Mode: Explicit Mapping to Headers to ensure alignment */}
-                                                    {activeMode === 'aluxe_poly' ? (
-                                                        <>
-                                                            <td className="p-2 border text-right font-medium">
-                                                                {row.entries.find(e => e.coverType === 'poly_clear')?.price.toFixed(2) || '-'}
-                                                                <div className="text-[9px] text-slate-400">Clear/Opal</div>
-                                                            </td>
-                                                            <td className="p-2 border text-right font-medium">
-                                                                {row.entries.find(e => e.coverType === 'poly_iq_relax')?.price.toFixed(2) || '-'}
-                                                                <div className="text-[9px] text-slate-400">IQ Relax</div>
-                                                            </td>
-                                                        </>
-                                                    ) : activeMode === 'aluxe_glass' ? (
-                                                        <>
-                                                            <td className="p-2 border text-right font-medium">
-                                                                {row.entries.find(e => e.coverType === 'glass_clear')?.price.toFixed(2) || '-'}
-                                                                <div className="text-[9px] text-slate-400">Clear</div>
-                                                            </td>
-                                                            <td className="p-2 border text-right font-medium">
-                                                                {row.entries.find(e => e.coverType === 'glass_opal')?.price.toFixed(2) || '-'}
-                                                                <div className="text-[9px] text-slate-400">Opal</div>
-                                                            </td>
-                                                            <td className="p-2 border text-right font-medium">
-                                                                {row.entries.find(e => e.coverType === 'glass_tinted')?.price.toFixed(2) || '-'}
-                                                                <div className="text-[9px] text-slate-400">Tinted</div>
-                                                            </td>
-                                                        </>
-                                                    ) : (
-                                                        // Fallback for unexpected mode (shouldn't happen with current logic)
-                                                        row.entries.map((e, i) => (
-                                                            <td key={i} className="p-2 border text-right font-medium">
-                                                                {e.price.toFixed(2)}
+                                                    {/* Split Dimensions */}
+                                                    <td className="p-2 border text-center font-mono text-slate-600">{row.width}</td>
+                                                    <td className="p-2 border text-center font-mono text-slate-600">{row.depth || '-'}</td>
+
+                                                    {activeTab === 'base' && activeMode === 'standard' ? (
+                                                        row.prices.map((p, i) => (
+                                                            <td key={i} className={`p-2 border text-right ${columnMapping[i] ? 'bg-blue-50 font-bold' : 'text-slate-300'}`}>
+                                                                {p?.toFixed(2) || '-'}
                                                             </td>
                                                         ))
-                                                    )}
+                                                    ) : activeTab === 'base' ? (
+                                                        <>
+                                                            {/* Auto-Mode: Explicit Mapping to Headers to ensure alignment */}
+                                                            {activeMode === 'aluxe_poly' ? (
+                                                                <>
+                                                                    <td className="p-2 border text-right font-medium">
+                                                                        {row.entries.find(e => e.coverType === 'poly_clear')?.price.toFixed(2) || '-'}
+                                                                        <div className="text-[9px] text-slate-400">Clear/Opal</div>
+                                                                    </td>
+                                                                    <td className="p-2 border text-right font-medium">
+                                                                        {row.entries.find(e => e.coverType === 'poly_iq_relax')?.price.toFixed(2) || '-'}
+                                                                        <div className="text-[9px] text-slate-400">IQ Relax</div>
+                                                                    </td>
+                                                                </>
+                                                            ) : activeMode === 'aluxe_glass' ? (
+                                                                <>
+                                                                    <td className="p-2 border text-right font-medium">
+                                                                        {row.entries.find(e => e.coverType === 'glass_clear')?.price.toFixed(2) || '-'}
+                                                                        <div className="text-[9px] text-slate-400">Clear</div>
+                                                                    </td>
+                                                                    <td className="p-2 border text-right font-medium">
+                                                                        {row.entries.find(e => e.coverType === 'glass_opal')?.price.toFixed(2) || '-'}
+                                                                        <div className="text-[9px] text-slate-400">Opal</div>
+                                                                    </td>
+                                                                    <td className="p-2 border text-right font-medium">
+                                                                        {row.entries.find(e => e.coverType === 'glass_tinted')?.price.toFixed(2) || '-'}
+                                                                        <div className="text-[9px] text-slate-400">Tinted</div>
+                                                                    </td>
+                                                                </>
+                                                            ) : (
+                                                                // Fallback
+                                                                row.entries.map((e, i) => (
+                                                                    <td key={i} className="p-2 border text-right font-medium">
+                                                                        {e.price.toFixed(2)}
+                                                                    </td>
+                                                                ))
+                                                            )}
 
-                                                    <td className="p-2 border text-center text-slate-400">{row.fields || '-'}</td>
-                                                    <td className="p-2 border text-center text-slate-400">{row.posts || '-'}</td>
-                                                    <td className="p-2 border text-center text-slate-400">{row.area || '-'}</td>
+                                                            <td className="p-2 border text-center text-slate-400">{row.fields || '-'}</td>
+                                                            <td className="p-2 border text-center text-slate-400">{row.posts || '-'}</td>
+                                                            <td className="p-2 border text-center text-slate-400">{row.area || '-'}</td>
+                                                        </>
+                                                    ) : (
+                                                        <td className="p-2 border text-right font-bold text-purple-700 bg-purple-50">
+                                                            {row.entries[0]?.price.toFixed(2)} EUR
+                                                        </td>
+                                                    )}
                                                 </>
-                                            ) : (
-                                                <td className="p-2 border text-right font-bold text-purple-700 bg-purple-50">
-                                                    {row.entries[0]?.price.toFixed(2)} EUR
-                                                </td>
                                             )}
                                         </tr>
                                     ))}
@@ -1119,6 +1633,6 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                     // Refresh not strictly needed as we just edited metadata
                 }}
             />
-        </div>
+        </div >
     );
 };

@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
 import type { Lead } from '../../types';
+import type { Fair } from '../../services/database/fair.service';
 
 interface LeadsStatsProps {
     leads: Lead[];
+    fairs?: Fair[];
 }
 
-export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads }) => {
+export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => {
 
     const stats = useMemo(() => {
         const total = leads.length;
@@ -14,6 +16,56 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads }) => {
         const active = total - won - lost;
 
         const conversionRate = total > 0 ? ((won / total) * 100).toFixed(1) : '0.0';
+
+        // --- Source / Fair Stats ---
+        interface SourceStatItem {
+            id: string; // fairId or 'website' etc.
+            name: string;
+            count: number;
+            won: number;
+            conversion: string;
+            isFair: boolean;
+        }
+
+        const sourceMap: Record<string, SourceStatItem> = {};
+
+        leads.forEach(lead => {
+            let key: string = lead.source;
+            let name = lead.source === 'targi' ? 'Targi (Nieznane)' : (lead.source || 'Inne');
+            let isFair = false;
+
+            if (lead.source === 'targi') {
+                isFair = true;
+                if (lead.fairId) {
+                    key = lead.fairId;
+                    const fair = fairs.find(f => f.id === lead.fairId);
+                    name = fair ? `🎡 ${fair.name}` : `🎡 ${lead.fairId}`;
+                } else {
+                    key = 'targi_unknown';
+                }
+            } else if (lead.source === 'website' || lead.source === 'manual') {
+                name = lead.source === 'website' ? '🌐 Strona WWW' : '👤 Ręczne';
+            }
+
+            if (!sourceMap[key]) {
+                sourceMap[key] = {
+                    id: key,
+                    name,
+                    count: 0,
+                    won: 0,
+                    conversion: '0.0',
+                    isFair
+                };
+            }
+
+            sourceMap[key].count++;
+            if (lead.status === 'won') sourceMap[key].won++;
+        });
+
+        const sourceStats = Object.values(sourceMap).map(item => ({
+            ...item,
+            conversion: item.count > 0 ? ((item.won / item.count) * 100).toFixed(1) : '0.0'
+        })).sort((a, b) => b.count - a.count);
 
         // Full Detailed Calculation (Group by assignee)
         interface RepStats {
@@ -75,9 +127,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads }) => {
             conversionRate,
             topPerformer, // Best by WON count
             uniqueAssignees: Object.keys(assigneeStats).length,
-            detailedStats: tableData
+            detailedStats: tableData,
+            sourceStats // New
         };
-    }, [leads]);
+    }, [leads, fairs]);
 
     if (leads.length === 0) return null;
 
@@ -161,49 +214,98 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads }) => {
                 </div>
             </div>
 
-            {/* Detailed Team Performance Table */}
-            {stats.detailedStats.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Detailed Team Performance Table */}
+                {stats.detailedStats.length > 0 && (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="font-bold text-slate-800">Efektywność Zespołu</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Analiza wyników handlowców</p>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-slate-500 font-medium bg-slate-50 border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-6 py-3">Przedstawiciel</th>
+                                        <th className="px-6 py-3 text-right">Razem</th>
+                                        <th className="px-6 py-3 text-right text-green-600">Wygrane</th>
+                                        <th className="px-6 py-3 text-right">Skuteczność</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {stats.detailedStats.map((rep, index) => (
+                                        <tr key={rep.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-3 font-medium text-slate-900">
+                                                <div className="flex items-center gap-2">
+                                                    {index === 0 && rep.won > 0 && (
+                                                        <span className="text-yellow-400" title="Najlepszy wynik (Wygrane)">★</span>
+                                                    )}
+                                                    {rep.name}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-right font-semibold">{rep.total}</td>
+                                            <td className="px-6 py-3 text-right text-green-600 font-bold">{rep.won}</td>
+                                            <td className="px-6 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <span>{rep.conversion}%</span>
+                                                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-green-500 rounded-full"
+                                                            style={{ width: `${Math.min(parseFloat(rep.conversion), 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Sources Breakdown Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <div>
-                            <h3 className="font-bold text-slate-800">Efektywność Zespołu</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">Szczegółowa analiza wyników dla każdego handlowca</p>
+                            <h3 className="font-bold text-slate-800">Źródła Leadów</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Analiza źródeł i targów</p>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="text-slate-500 font-medium bg-slate-50 border-b border-slate-100">
                                 <tr>
-                                    <th className="px-6 py-3">Przedstawiciel</th>
-                                    <th className="px-6 py-3 text-right">Przypisane (Razem)</th>
-                                    <th className="px-6 py-3 text-right text-blue-600">W Toku</th>
+                                    <th className="px-6 py-3">Źródło / Targi</th>
+                                    <th className="px-6 py-3 text-right">Ilość</th>
                                     <th className="px-6 py-3 text-right text-green-600">Wygrane</th>
-                                    <th className="px-6 py-3 text-right text-red-500">Utracone</th>
                                     <th className="px-6 py-3 text-right">Skuteczność</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {stats.detailedStats.map((rep, index) => (
-                                    <tr key={rep.id} className="hover:bg-slate-50">
+                                {stats.sourceStats.map((source) => (
+                                    <tr key={source.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-3 font-medium text-slate-900">
-                                            <div className="flex items-center gap-2">
-                                                {index === 0 && rep.won > 0 && (
-                                                    <span className="text-yellow-400" title="Najlepszy wynik (Wygrane)">★</span>
-                                                )}
-                                                {rep.name}
-                                            </div>
+                                            {source.isFair ? (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <span className="text-purple-500">🎡</span> {source.name.replace('🎡 ', '')}
+                                                </span>
+                                            ) : (
+                                                source.name
+                                            )}
+
                                         </td>
-                                        <td className="px-6 py-3 text-right font-semibold">{rep.total}</td>
-                                        <td className="px-6 py-3 text-right text-blue-600">{rep.active}</td>
-                                        <td className="px-6 py-3 text-right text-green-600 font-bold">{rep.won}</td>
-                                        <td className="px-6 py-3 text-right text-red-400">{rep.lost}</td>
+                                        <td className="px-6 py-3 text-right font-semibold">{source.count}</td>
+                                        <td className="px-6 py-3 text-right text-green-600 font-bold">{source.won}</td>
                                         <td className="px-6 py-3 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <span>{rep.conversion}%</span>
+                                                <span>{source.conversion}%</span>
                                                 <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                     <div
-                                                        className="h-full bg-green-500 rounded-full"
-                                                        style={{ width: `${Math.min(parseFloat(rep.conversion), 100)}%` }}
+                                                        className="h-full bg-blue-500 rounded-full" // Blue for sources
+                                                        style={{ width: `${Math.min(parseFloat(source.conversion), 100)}%` }}
                                                     ></div>
                                                 </div>
                                             </div>
@@ -214,7 +316,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads }) => {
                         </table>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
+

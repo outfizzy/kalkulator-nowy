@@ -44,6 +44,20 @@ export function extractOrderedItemsFromOffer(offer: Offer): OrderedItem[] {
         });
     }
 
+    // 4. Process custom manual items
+    if (offer.product.customItems) {
+        for (const item of offer.product.customItems) {
+            items.push({
+                id: item.id || crypto.randomUUID(),
+                category: 'Other', // Or map from attributes if available
+                name: item.name,
+                details: item.description,
+                status: 'pending',
+                purchaseCost: 0 // Manual items might not have known purchase cost in this context
+            });
+        }
+    }
+
     return items;
 }
 

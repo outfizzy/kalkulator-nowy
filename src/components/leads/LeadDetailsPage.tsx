@@ -10,6 +10,7 @@ import { SendEmailModal } from './SendEmailModal';
 import { TasksList } from '../tasks/TasksList';
 import { TaskModal } from '../tasks/TaskModal';
 import { NotesList } from '../common/NotesList';
+import { AssigneeSelector } from '../common/AssigneeSelector';
 
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -27,7 +28,9 @@ export const LeadDetailsPage: React.FC = () => {
     const [communications, setCommunications] = useState<Communication[]>([]);
     const [offers, setOffers] = useState<Offer[]>([]);
     const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
+
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [isAssigning, setIsAssigning] = useState(false);
 
     useEffect(() => {
         const fetchLead = async () => {
@@ -260,6 +263,93 @@ export const LeadDetailsPage: React.FC = () => {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Left Column: Info & AI Insights */}
                                 <div className="space-y-6">
+                                    {/* TRADE FAIR CARD - Special Module View */}
+                                    {(lead.source === 'targi' || lead.fairId) && (
+                                        <div className="bg-white rounded-xl border-2 border-purple-100 shadow-sm overflow-hidden animate-in slide-in-from-left duration-500">
+                                            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl">🎡</span>
+                                                    <div>
+                                                        <h3 className="font-bold text-lg">Lead Targowy</h3>
+                                                        {lead.fairId && <p className="text-xs opacity-70 font-mono">ID: {lead.fairId}</p>}
+                                                    </div>
+                                                </div>
+                                                {lead.fairPrize && (
+                                                    <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">
+                                                        <span className="font-bold text-sm">🏆 {lead.fairPrize.label}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="p-6 space-y-6">
+                                                {/* PRODUCTS LIST */}
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                                        Skonfigurowane Produkty ({lead.fairProducts?.length || 0})
+                                                    </h4>
+
+                                                    {!lead.fairProducts || lead.fairProducts.length === 0 ? (
+                                                        <p className="text-sm text-slate-400 italic">Brak skonfigurowanych produktów w systemie.</p>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {lead.fairProducts.map((p, idx) => (
+                                                                <div key={idx} className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex gap-3 text-sm">
+                                                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-slate-400 shadow-sm shrink-0">
+                                                                        {idx + 1}
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <div className="flex justify-between">
+                                                                            <span className="font-bold text-slate-700 capitalize">
+                                                                                {p.type === 'roof' ? 'Zadaszenie' : p.type === 'pergola' ? 'Pergola' : p.type === 'carport' ? 'Carport' : p.type}
+                                                                            </span>
+                                                                            <span className="font-mono font-bold text-slate-600 bg-white px-2 rounded border border-slate-200">
+                                                                                {p.width} x {p.projection} mm
+                                                                            </span>
+                                                                        </div>
+                                                                        {/* Details Tags */}
+                                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                                            {p.wallTypes && p.wallTypes.length > 0 && !p.wallTypes.includes('none') && (
+                                                                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">Ściany</span>
+                                                                            )}
+                                                                            {p.zipEnabled && (
+                                                                                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">ZIP</span>
+                                                                            )}
+                                                                            {p.ledType && p.ledType !== 'none' && (
+                                                                                <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold">LED</span>
+                                                                            )}
+                                                                            {p.notes && (
+                                                                                <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[10px] font-bold">Uwagi</span>
+                                                                            )}
+                                                                        </div>
+                                                                        {p.notes && <p className="text-xs text-slate-500 mt-1 italic">"{p.notes}"</p>}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* PHOTOS */}
+                                                {lead.fairPhotos && lead.fairPhotos.length > 0 && (
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                            Zdjęcia / Szkice ({lead.fairPhotos.length})
+                                                        </h4>
+                                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                                            {lead.fairPhotos.map((ph, i) => (
+                                                                <a key={i} href={ph.url} target="_blank" rel="noreferrer" className="block w-20 h-20 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 hover:opacity-80 transition-opacity">
+                                                                    <img src={ph.url} alt="miniatura" className="w-full h-full object-cover" />
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* AI Insights Widget */}
                                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 shadow-sm p-5 relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-3 opacity-10">
@@ -403,8 +493,44 @@ export const LeadDetailsPage: React.FC = () => {
                                                 <div className="text-slate-900 capitalize">{lead.source}</div>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-medium text-slate-500 uppercase">Opiekun</label>
-                                                <div className="text-slate-900">{lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '-'}</div>
+                                                <label className="text-xs font-medium text-slate-500 uppercase flex items-center gap-2">
+                                                    Opiekun
+                                                    {!isAssigning && (currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                                                        <button
+                                                            onClick={() => setIsAssigning(true)}
+                                                            className="text-slate-400 hover:text-accent transition-colors"
+                                                            title="Zmień opiekuna"
+                                                        >
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+                                                </label>
+                                                <div className="text-slate-900 mt-1 min-h-[24px]">
+                                                    {isAssigning ? (
+                                                        <AssigneeSelector
+                                                            currentAssigneeId={lead.assignedTo}
+                                                            onCancel={() => setIsAssigning(false)}
+                                                            onAssign={async (newId) => {
+                                                                try {
+                                                                    await DatabaseService.updateLead(lead.id, { assignedTo: newId });
+
+                                                                    // Update local state
+                                                                    const updatedLead = await DatabaseService.getLead(lead.id);
+                                                                    setLead(updatedLead);
+                                                                    setIsAssigning(false);
+                                                                    toast.success('Zmieniono opiekuna');
+                                                                } catch (e) {
+                                                                    console.error('Failed to assign', e);
+                                                                    toast.error('Błąd przypisywania');
+                                                                }
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '-'
+                                                    )}
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="text-xs font-medium text-slate-500 uppercase">Klient skontaktuje się</label>
@@ -451,6 +577,42 @@ export const LeadDetailsPage: React.FC = () => {
                                             <div>
                                                 <h4 className="text-blue-900 font-semibold text-sm">Lead z wiadomości e-mail</h4>
                                                 <p className="text-blue-700 text-sm mt-1">Utworzony z wiadomości ID: {lead.emailMessageId}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Attachments Section */}
+                                    {lead.attachments && lead.attachments.length > 0 && (
+                                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                                            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                                <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                </svg>
+                                                Załączniki ({lead.attachments.length})
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {lead.attachments.map((att, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={att.url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors"
+                                                    >
+                                                        <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs uppercase shrink-0">
+                                                            {att.name.split('.').pop()}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium text-slate-900 truncate" title={att.name}>{att.name}</div>
+                                                            <div className="text-xs text-slate-500">{(att.size / 1024).toFixed(1)} KB</div>
+                                                        </div>
+                                                        <div className="text-slate-400">
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                            </svg>
+                                                        </div>
+                                                    </a>
+                                                ))}
                                             </div>
                                         </div>
                                     )}

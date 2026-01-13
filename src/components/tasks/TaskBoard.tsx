@@ -23,6 +23,7 @@ export const TaskBoard: React.FC = () => {
     const fetchTasks = async () => {
         setLoading(true);
         try {
+            // Service now auto-detects admin role to return all tasks
             const data = await DatabaseService.getTasks();
             setTasks(data);
         } catch (error) {
@@ -74,13 +75,7 @@ export const TaskBoard: React.FC = () => {
 
     const filteredTasks = tasks.filter(task => {
         if (filterAssignee === 'all') {
-            // If not admin, user sees their own or created by them (handled by RLS/fetch usually, but let's be safe visually)
-            // But getTasks returns all allowed.
-            // Admin usually wants to see "mine" or "all".
-            // Let's assume 'all' means "Everyone" (Admins view) or just "My tasks" (User view).
-            // Actually, let's make it simpler:
-            if (!isAdmin) return task.userId === currentUser?.id; // Standard user sees assigned
-            return true; // Admin sees all
+            return true;
         }
         if (filterAssignee === 'mine') return task.userId === currentUser?.id;
         return task.userId === filterAssignee;

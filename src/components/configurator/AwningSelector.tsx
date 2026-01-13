@@ -4,7 +4,7 @@ import { awningsData } from '../../data/awnings';
 import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
 import type { AddonPriceEntry } from '../../services/pricing.service';
-// import { PricingService } from '../../services/pricing.service';
+import { PricingService } from '../../services/pricing.service';
 
 interface AwningSelectorProps {
     onAdd: (addon: SelectedAddon) => void;
@@ -22,6 +22,7 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
     const [type, setType] = useState<'aufdachmarkise_zip' | 'unterdachmarkise_zip' | 'zip_screen'>(
         (existing?.id.replace('awning-', '') as 'aufdachmarkise_zip' | 'unterdachmarkise_zip' | 'zip_screen') || 'aufdachmarkise_zip'
     );
+    const [motorCount, setMotorCount] = useState<1 | 2>(1); // Default to 1 motor
 
     const [width, setWidth] = useState<number>(existing?.width || maxRoofWidth);
     const [projection, setProjection] = useState<number>((existing as any)?.depth || maxRoofDepth);
@@ -50,74 +51,77 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
 
     const isZipScreen = type === 'zip_screen';
 
-    // Calculate Price using Manual/CSV Items
+    const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
+    const [matchedItemName, setMatchedItemName] = useState<string>('');
+
+    // Async Price Calculation
+    useEffect(() => {
+        const calculateAsync = async () => {
+            if (!data) {
+                setCalculatedPrice(0);
+                setMatchedItemName('');
+                return;
+            }
+
+            // Filter for type
+            const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach']
+                : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
+                    : ['zip', 'screen', 'pion'];
+
+            // 1. Find the best matching Bundle/Product
+            let bestMatch = availableItems.find(i => {
+                // Priority: Check Metadata (awning_type)
+                if (i.properties?.awning_type) {
+                    if (type === 'aufdachmarkise_zip' && i.properties.awning_type === 'over_glass') return true;
+                    if (type === 'unterdachmarkise_zip' && i.properties.awning_type === 'under_glass') return true;
+                    // If metadata exists but doesn't match, exclude it (strict mode for tagged items)
+                    if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && ['over_glass', 'under_glass'].includes(i.properties.awning_type)) {
+                        return false;
+                    }
+                }
+
+                // Priority: Check Motor Count
+                if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && i.properties?.motor_count) {
+                    if (motorCount === 2 && i.properties.motor_count !== 2) return false;
+                    if (motorCount === 1 && i.properties.motor_count === 2) return false;
+                }
+
+                // Fallback: Name Matching
+                const n = i.addon_name.toLowerCase();
+                return typeKeywords.some(k => n.includes(k));
+            });
+
+            if (bestMatch) {
+                setMatchedItemName(bestMatch.addon_name);
+                // Calculate Price via Service (Handles Matrix & Fixed)
+                // Use 'width' and 'projection' (or depth for ZIPS)
+                // For ZIP Screen: Projection is usually 0 or irrelevant? No, it's Height.
+                // AwningSelector maps 'projection' state to Height for ZIPs (via dimensionLabel)
+                const price = await PricingService.calculateAddonPrice(bestMatch, width, projection);
+                setCalculatedPrice(price);
+            } else {
+                setMatchedItemName('Brak w cenniku');
+                setCalculatedPrice(0);
+            }
+        };
+
+        calculateAsync();
+    }, [data, type, width, projection, motorCount, availableItems]);
+
     const { totalPrice, breakdown } = useMemo(() => {
         if (!data) return { totalPrice: 0, breakdown: [] };
 
         const items: { name: string, price: number }[] = [];
         let total = 0;
 
-        // Find Base Item Logic
-        // Strategy: 
-        // 1. Look for Exact Item matching "Type" (e.g. "Aufdachmarkise") and dimensions?
-        //    Likely users upload "Aufdachmarkise 4000x3000".
-        // 2. Or "Aufdachmarkise" with BY_WIDTH basis.
-
-        // Filter for type
-        const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach']
-            : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
-                : ['zip', 'screen', 'pion'];
-
-        let candidates = availableItems.filter(i => {
-            const n = i.addon_name.toLowerCase();
-            return typeKeywords.some(k => n.includes(k));
-        });
-
-        // Find best match
-        let match = candidates.find(i => {
-            // Strict dimension check if properties exist
-            if (i.properties?.width && Number(i.properties.width) !== width) return false;
-            if (i.properties?.projection && Number(i.properties.projection) !== projection) return false;
-            return true;
-        });
-
-        // Fallback: Closest larger size?
-        if (!match) {
-            // naive find first that fits
-            match = candidates.find(i => {
-                const w = i.properties?.max_width || i.properties?.width;
-                const p = i.properties?.max_projection || i.properties?.projection || i.properties?.drop;
-                return (!w || Number(w) >= width) && (!p || Number(p) >= projection);
-            });
-        }
-
-        // Fallback: Generic BY_WIDTH match
-        if (!match) {
-            match = candidates.find(i => i.pricing_basis === 'BY_WIDTH');
-        }
-
-        if (match) {
-            let basePrice = match.price_upe_net_eur;
-
-            // Apply Basis Calc
-            // Note: Manual Pricing CSV logic for Awnings might be intricate.
-            // Assuming simpler rules for now as requested.
-            if (match.pricing_basis === 'BY_WIDTH') {
-                basePrice = match.price_upe_net_eur * (width / 1000);
-            } else if (match.pricing_basis === 'PER_M2') {
-                basePrice = match.price_upe_net_eur * (width / 1000) * (projection / 1000);
-            }
-
-            total += basePrice;
+        // Base Item Price
+        if (calculatedPrice > 0) {
+            total += calculatedPrice;
             items.push({
-                name: match.addon_name,
-                price: basePrice
+                name: matchedItemName || 'Markiza / ZIP',
+                price: calculatedPrice
             });
-        } else {
-            // Fail safe
-            // items.push({ name: 'Cena nie znana (brak w cenniku)', price: 0 });
         }
-
 
         // Special Color
         if (data.colors && !data.colors.standard.includes(color)) {
@@ -125,19 +129,16 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
             items.push({ name: `Kolor niestandardowy: ${color} `, price: data.colors.special_color_surcharge_eur });
         }
 
-        // Extras (Wind Sensor) - Look for item in availableItems?
-        // Or keep hardcoded if not in DB.
-        // Let's look for known extra items. (Global lookup?)
-        // Assuming currentAddons might handle extras, or just additive price here.
+        // Extras (Wind Sensor)
         if (!isZipScreen && extras.includes('wind_sensor')) {
             const sensorItem = availableItems.find(i => i.addon_name.toLowerCase().includes('sensor') || i.addon_name.toLowerCase().includes('czujnik'));
-            const sensorPrice = sensorItem ? sensorItem.price_upe_net_eur : 150; // Fallback 150
+            const sensorPrice = sensorItem ? (Number(sensorItem.price_upe_net_eur) || 150) : 150;
             total += sensorPrice;
             items.push({ name: 'Czujnik wiatru/deszczu', price: sensorPrice });
         }
 
         return { totalPrice: total, breakdown: items };
-    }, [data, type, width, projection, color, extras, isZipScreen, availableItems]);
+    }, [data, calculateAsync, calculatedPrice, matchedItemName, color, extras, isZipScreen, availableItems]);
 
     const handleAdd = () => {
         const typeName = type === 'aufdachmarkise_zip'
@@ -207,6 +208,33 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
                             </button>
                         </div>
                     </div>
+
+                    {/* Motor Count Selection (Not for ZIP screens) */}
+                    {!isZipScreen && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Liczba Silników</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setMotorCount(1)}
+                                    className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${motorCount === 1
+                                        ? 'border-accent bg-accent/5 text-accent'
+                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                        }`}
+                                >
+                                    1 Silnik (Standard)
+                                </button>
+                                <button
+                                    onClick={() => setMotorCount(2)}
+                                    className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${motorCount === 2
+                                        ? 'border-accent bg-accent/5 text-accent'
+                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                        }`}
+                                >
+                                    2 Silniki (Duże Gabaryty)
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Dimensions */}
                     <div className="grid grid-cols-2 gap-4">

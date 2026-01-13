@@ -7,6 +7,7 @@ import type { Customer, Contract, Installation, Communication, InstallationTeam,
 import { NotesList } from '../common/NotesList';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 import { ProfitabilityDashboard } from './ProfitabilityDashboard';
+import { ManualContractModal } from '../contracts/ManualContractModal';
 
 interface RingostatCall {
     id: string;
@@ -39,6 +40,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
     const [loading, setLoading] = useState(true);
     const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
     const [isInstallationModalOpen, setIsInstallationModalOpen] = useState(false);
+    const [isManualContractModalOpen, setIsManualContractModalOpen] = useState(false);
     const [stats, setStats] = useState({
         totalOffers: 0,
         acceptedOffers: 0,
@@ -461,9 +463,15 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                         <div className="space-y-6">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-slate-800">Umowy i Płatności</h3>
-                                <Link to={`/new-offer?customerId=${customer.id}`} className="text-sm bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700">
+                                <Link to={`/new-offer?customerId=${customer.id}`} className="text-sm bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1">
                                     + Nowa Oferta
                                 </Link>
+                                <button
+                                    onClick={() => setIsManualContractModalOpen(true)}
+                                    className="ml-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700 flex items-center gap-1"
+                                >
+                                    + Dodaj Umowę
+                                </button>
                             </div>
 
                             {/* Offers Table */}
@@ -902,6 +910,14 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                     )}
                 </div>
             </div>
+            <ManualContractModal
+                isOpen={isManualContractModalOpen}
+                onClose={() => setIsManualContractModalOpen(false)}
+                onSuccess={() => {
+                    DatabaseService.getCustomerContracts(customer.id!).then(setContracts);
+                }}
+                preselectedCustomer={customer as Customer}
+            />
         </div >
     );
 };

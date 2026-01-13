@@ -156,23 +156,29 @@ export const CustomerService = {
     },
 
     async ensureCustomer(customer: Omit<Customer, 'id'>): Promise<Customer> {
+        const email = customer.email?.trim()?.toLowerCase();
+        const phone = customer.phone?.replace(/\s/g, ''); // strip spaces from phone for check
+
         // 1. Try to find by email
-        if (customer.email && customer.email.trim()) {
+        if (email) {
             const { data: existing } = await supabase
                 .from('customers')
                 .select('*')
-                .eq('email', customer.email.trim())
+                .ilike('email', email) // Case insensitive
                 .maybeSingle();
 
             if (existing) return existing;
         }
 
         // 2. Try to find by Phone
-        if (customer.phone && customer.phone.trim()) {
+        if (phone && phone.length > 5) { // Basic length check to avoid matching empty/short trash
+            // Note: phone numbers are hard to match exactly due to formatting (+48, 0048, spaces).
+            // Ideally we should normalize phone in DB. For now, we try exact or simple match.
             const { data: existing } = await supabase
                 .from('customers')
                 .select('*')
-                .eq('phone', customer.phone.trim())
+                .or(`phone.eq.${phone},phone.eq.${customer.phone?.trim()}`)
+                .limit(1)
                 .maybeSingle();
 
             if (existing) return existing;

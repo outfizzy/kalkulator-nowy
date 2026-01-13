@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { UserService } from '../../services/database/user.service';
-import type { Task, TaskPriority, TaskStatus, TaskType, User } from '../../types';
+import type { Task, TaskPriority, TaskStatus, TaskType, User, Customer } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { CustomerSelector } from '../customers/CustomerSelector'; // Re-using existing selector
 
 interface TaskModalProps {
     isOpen: boolean;
@@ -31,16 +32,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
     const [status, setStatus] = useState<TaskStatus>('pending');
     const [assigneeId, setAssigneeId] = useState('');
 
-    const canAssign = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    // Customer Selection State
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
+    const [isSelectingCustomer, setIsSelectingCustomer] = useState(false);
+
+    const canAssign = true; // Anyone can assign now
 
     useEffect(() => {
-        if (isOpen && canAssign) {
+        if (isOpen) {
             UserService.getAllUsers().then(users => {
                 const activeUsers = users.filter(u => u.status !== 'blocked');
                 setAssignableUsers(activeUsers);
             }).catch(err => console.error('Error fetching users:', err));
         }
-    }, [isOpen, canAssign]);
+    }, [isOpen]);
 
     useEffect(() => {
         if (isOpen) {
@@ -60,6 +65,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                 setType(task.type);
                 setStatus(task.status);
                 setAssigneeId(task.userId);
+                // Ideally load customer data if task.customerId is present but we usually don't fetch relation here
+                // For now, if initialData.customerId is passed, we use that context
             } else {
                 // Create Mode - Reset
                 setTitle('');
@@ -70,16 +77,52 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                 setType('task');
                 setStatus('pending');
                 setAssigneeId(currentUser?.id || '');
+                setSelectedCustomer(undefined);
             }
         }
     }, [isOpen, task, currentUser]);
 
+    // Handle initial customer context
+    useEffect(() => {
+        if (initialData?.customerId && isOpen && !task) {
+            // If checking in simple context, we assume customer is known/passed or handled by ID
+            // We can fetch customer details if needed for display, but for now ID is enough for submit
+        }
+    }, [initialData, isOpen, task]);
+
     if (!isOpen) return null;
+
+    if (isSelectingCustomer) {
+        return (
+            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl h-[600px] flex flex-col">
+                    <div className="p-4 border-b flex justify-between items-center">
+                        <h3 className="font-bold">Wybierz Klienta</h3>
+                        <button onClick={() => setIsSelectingCustomer(false)}>✕</button>
+                    </div>
+                    <div className="flex-1 overflow-hidden p-4">
+                        <CustomerSelector
+                            onSelect={(c) => {
+                                setSelectedCustomer(c);
+                                setIsSelectingCustomer(false);
+                            }}
+                            onCancel={() => setIsSelectingCustomer(false)}
+                        />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) {
             toast.error('Tytuł jest wymagany');
+            return;
+        }
+
+        if (!assigneeId) {
+            toast.error('Musisz przypisać zadanie do użytkownika');
             return;
         }
 
@@ -89,7 +132,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
             let dueDateTime: string | undefined = undefined;
             if (dueDate) {
                 const dateTimeStr = dueTime ? `${dueDate}T${dueTime}:00` : `${dueDate}T12:00:00`;
-                // Simple ISO conversion, ignoring timezone complexities for now or assuming local
                 dueDateTime = new Date(dateTimeStr).toISOString();
             }
 
@@ -102,7 +144,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                 status,
                 userId: assigneeId || currentUser?.id || '',
                 leadId: task?.leadId || initialData?.leadId,
-                customerId: task?.customerId || initialData?.customerId
+                customerId: task?.customerId || initialData?.customerId || selectedCustomer?.id
             };
 
             if (task) {
@@ -117,7 +159,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
             onClose();
         } catch (error) {
             console.error('Error saving task:', error);
-            toast.error('Błąd zapisywania zadania');
+            const msg = error instanceof Error ? error.message : 'Nieznany błąd';
+            toast.error('Błąd zapisywania zadania: ' + msg);
         } finally {
             setLoading(false);
         }
@@ -149,24 +192,51 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, ini
                         />
                     </div>
 
-                    {/* Assignee (Admin/Manager only) */}
-                    {canAssign && (
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Przypisz do</label>
-                            <select
-                                value={assigneeId}
-                                onChange={(e) => setAssigneeId(e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:border-accent outline-none bg-white"
-                            >
-                                <option value={currentUser?.id}>Ja ({currentUser?.firstName} {currentUser?.lastName})</option>
-                                {assignableUsers.filter(u => u.id !== currentUser?.id).map(user => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.firstName} {user.lastName} ({user.role === 'sales_rep' ? 'Handlowiec' : user.role})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                    {/* Customer Link (Optional) */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Klient</label>
+                        {initialData?.customerId ? (
+                            <div className="text-sm text-slate-500 italic bg-slate-50 p-2 rounded border">
+                                (Przypisane do kontekstu klienta)
+                            </div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <div className="flex-1 p-2 bg-slate-50 border rounded text-sm text-slate-700 truncate">
+                                    {selectedCustomer
+                                        ? `${selectedCustomer.firstName} ${selectedCustomer.lastName} (${selectedCustomer.city})`
+                                        : task?.customerId ? '(Klient przypisany)' : 'Brak przypisanego klienta'}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSelectingCustomer(true)}
+                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-sm font-medium hover:bg-slate-50"
+                                >
+                                    {selectedCustomer ? 'Zmień' : 'Wybierz'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Assignee Selection - Unrestricted */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Przypisz do <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            value={assigneeId}
+                            onChange={(e) => setAssigneeId(e.target.value)}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:border-accent outline-none bg-white"
+                            required
+                        >
+                            <option value="" disabled>Wybierz użytkownika...</option>
+                            <option value={currentUser?.id}>Ja ({currentUser?.firstName} {currentUser?.lastName})</option>
+                            {assignableUsers.filter(u => u.id !== currentUser?.id).map(user => (
+                                <option key={user.id} value={user.id}>
+                                    {user.firstName} {user.lastName} ({user.role === 'sales_rep' ? 'Handlowiec' : user.role})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     {/* Type & Priority Row */}
                     <div className="grid grid-cols-2 gap-4">

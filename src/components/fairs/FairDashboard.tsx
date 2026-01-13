@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FairService, type Fair, type Prize } from '../../services/database/fair.service';
 import { FairLeadForm } from './FairLeadForm';
-import { WheelOfFortune } from './WheelOfFortune';
 import confetti from 'canvas-confetti';
 
-type ViewState = 'select_fair' | 'dashboard' | 'new_lead' | 'game' | 'result';
+type ViewState = 'select_fair' | 'dashboard' | 'new_lead' | 'result';
 
 export const FairDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -14,7 +13,7 @@ export const FairDashboard: React.FC = () => {
     const [selectedFair, setSelectedFair] = useState<Fair | null>(null);
     const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
     const [currentLeadName, setCurrentLeadName] = useState('');
-    const [wonPrize, setWonPrize] = useState<Prize | null>(null);
+    const [wonPrizeLabel, setWonPrizeLabel] = useState<string>('');
 
     useEffect(() => {
         FairService.getActiveFairs().then(data => {
@@ -26,18 +25,17 @@ export const FairDashboard: React.FC = () => {
         });
     }, []);
 
-    const handleSpinEnd = async (prize: Prize) => {
-        setWonPrize(prize);
+    const handleLeadSaved = (leadId: string, leadName: string, prizeLabel?: string) => {
+        setCurrentLeadId(leadId);
+        setCurrentLeadName(leadName);
+        setWonPrizeLabel(prizeLabel || 'Brak Nagrody');
+
         setView('result');
         confetti({
             particleCount: 150,
             spread: 70,
             origin: { y: 0.6 }
         });
-
-        if (currentLeadId) {
-            await FairService.updateLeadPrize(currentLeadId, prize);
-        }
     };
 
     if (view === 'select_fair') {
@@ -99,7 +97,7 @@ export const FairDashboard: React.FC = () => {
                     <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col">
                         <h3 className="text-2xl font-bold text-slate-800 mb-4">Statystyki Sesji</h3>
                         <div className="flex-1 flex items-center justify-center text-slate-400 italic">
-                            (Wkrótce: Liczba leadów, rozdane nagrody)
+                            (Statystyki wkrótce...)
                         </div>
                     </div>
                 </div>
@@ -110,41 +108,18 @@ export const FairDashboard: React.FC = () => {
     if (view === 'new_lead') {
         return (
             <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
-                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8">
-                    <div className="flex justify-between items-center mb-8">
+                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 h-[90vh] flex flex-col">
+                    <div className="flex justify-between items-center mb-8 shrink-0">
                         <h2 className="text-3xl font-bold text-slate-900">Dane Klienta</h2>
                         <button onClick={() => setView('dashboard')} className="text-slate-400 hover:text-slate-600 p-2 text-xl">✕</button>
                     </div>
-                    <FairLeadForm
-                        fairId={selectedFair!.id}
-                        onSaved={(id, name) => {
-                            setCurrentLeadId(id);
-                            setCurrentLeadName(name);
-                            setView('game');
-                        }}
-                    />
-                </div>
-            </div>
-        );
-    }
-
-    if (view === 'game') {
-        return (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 overflow-hidden relative">
-                {/* Background Decorations */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
-                    <div className="absolute top-10 left-10 w-64 h-64 bg-purple-500 rounded-full filter blur-[100px]" />
-                    <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-500 rounded-full filter blur-[100px]" />
-                </div>
-
-                <div className="relative z-10 bg-white/10 backdrop-blur-lg border border-white/20 p-12 rounded-3xl shadow-2xl flex flex-col items-center max-w-4xl w-full">
-                    <h2 className="text-4xl font-bold text-white mb-2">Zakręć po Nagrodę!</h2>
-                    <p className="text-xl text-purple-200 mb-8">Dla: <span className="font-bold text-white">{currentLeadName}</span></p>
-
-                    <WheelOfFortune
-                        prizes={selectedFair!.prizes_config}
-                        onSpinEnd={handleSpinEnd}
-                    />
+                    <div className="flex-1 overflow-hidden">
+                        <FairLeadForm
+                            fairId={selectedFair!.id}
+                            fairName={selectedFair!.name}
+                            onSaved={handleLeadSaved}
+                        />
+                    </div>
                 </div>
             </div>
         );
@@ -153,20 +128,29 @@ export const FairDashboard: React.FC = () => {
     if (view === 'result') {
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
-                <div className="bg-white p-12 rounded-3xl shadow-2xl animate-bounce-in">
+                <div className="bg-white p-12 rounded-3xl shadow-2xl animate-bounce-in max-w-2xl w-full">
                     <h2 className="text-3xl font-bold text-slate-800 mb-4">GRATULACJE!</h2>
-                    <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 mb-6">
-                        {wonPrize?.label}
+                    <p className="text-xl text-slate-500 mb-4">{currentLeadName}</p>
+
+                    <div className="py-8 border-y border-slate-100 my-6">
+                        <div className="text-sm uppercase font-bold text-slate-400 mb-2">WYLOSOWANA NAGRODA</div>
+                        <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
+                            {wonPrizeLabel}
+                        </div>
                     </div>
-                    <p className="text-slate-500 text-lg mb-8">Nagroda została przypisana do Twojego profilu w systemie.</p>
+
+                    <p className="text-slate-500 text-lg mb-8">
+                        Nagroda została przypisana do klienta.<br />
+                        Wysłano potwierdzenie PDF.
+                    </p>
 
                     <button
                         onClick={() => {
-                            setWonPrize(null);
+                            setWonPrizeLabel('');
                             setCurrentLeadId(null);
                             setView('dashboard');
                         }}
-                        className="px-12 py-4 bg-slate-900 text-white rounded-xl text-xl font-bold hover:bg-slate-800 transition-colors"
+                        className="px-12 py-4 bg-slate-900 text-white rounded-xl text-xl font-bold hover:bg-slate-800 transition-colors shadow-lg hover:shadow-xl w-full"
                     >
                         Wróć do Pulpitu
                     </button>

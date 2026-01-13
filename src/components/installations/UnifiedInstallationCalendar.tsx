@@ -3,6 +3,7 @@ import { UnifiedBacklogSidebar } from './UnifiedBacklogSidebar';
 import { InstallationCalendar } from './InstallationCalendar';
 import { InstallationTimeline } from './InstallationTimeline';
 import { InstallationService } from '../../services/database/installation.service';
+import { InstallationTeamService } from '../../services/database/installation-team.service';
 import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -44,7 +45,7 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
                     toast.error('Błąd ładowania montaży: ' + (e.message || 'Nieznany błąd'));
                     return [];
                 }),
-                InstallationService.getInstallationTeams().catch(e => {
+                InstallationTeamService.getTeams().catch(e => {
                     console.error('Teams load error:', e);
                     toast.error('Błąd ładowania ekip: ' + (e.message || 'Nieznany błąd'));
                     return [];

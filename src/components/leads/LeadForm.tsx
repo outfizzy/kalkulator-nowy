@@ -73,6 +73,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
                     emailMessageId: initialData?.emailMessageId,
                     lastContactDate: new Date(),
                     clientWillContactAt: formData.clientWillContactAt ? new Date(formData.clientWillContactAt) : undefined,
+                    attachments: initialData?.attachments || []
                 });
                 toast.success('Lead dodany pomyślnie!');
             }

@@ -127,42 +127,76 @@ export type RoofType = 'polycarbonate' | 'glass' | 'tin';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
 // --- Leads Types ---
-export type LeadStatus = 'new' | 'contacted' | 'offer_sent' | 'negotiation' | 'won' | 'lost';
+export type LeadStatus = 'new' | 'contacted' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair';
 export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'targi' | 'other';
 
 export interface Lead {
     id: string;
-    customerData: {
-        firstName: string;
-        lastName: string;
-        companyName?: string;
-        phone?: string;
-        email?: string;
-        address?: string; // Legacy field, prefer street
-        street?: string; // New field from AI
-        postalCode?: string;
-        city?: string;
-    };
-    customerId?: string;
     status: LeadStatus;
     source: LeadSource;
+    customerData?: {
+        firstName: string;
+        lastName: string;
+        phone: string;
+        email?: string;
+        city?: string;
+        postalCode?: string;
+        address?: string; // Street + House Number
+        companyName?: string;
+    };
+    customerId?: string; // Link to Customers
     assignedTo?: string; // User ID
     assignee?: {
         firstName: string;
         lastName: string;
     };
+    emailMessageId?: string; // If from email
+    notes?: string;
     createdAt: Date;
     updatedAt: Date;
     lastContactDate?: Date;
-    clientWillContactAt?: Date;
-    notes: string;
-    emailMessageId?: string; // If created from email
+    clientWillContactAt?: Date; // When they said they'd get back
+    // [Pattern 130] Fair Module - Full Integration
+    fairId?: string; // Reference to fairs table
+    fairPrize?: {
+        id: string;
+        label: string;
+        type: string;
+        value: number;
+    };
+    fairPhotos?: Array<{
+        url: string;
+        name: string;
+    }>;
+    fairProducts?: FairProductConfig[];
+    fairMessage?: string; // Optional contextual message (e.g. "Targi: BAU 2026")
     aiScore?: number;
     aiSummary?: string;
-    // Fair Module
-    fairId?: string;
-    fairPhotos?: { url: string; name: string }[];
-    fairPrize?: { label: string; type: string; value: any };
+    attachments?: { name: string; url: string; type: string; size: number }[];
+}
+
+// --- Fair Module Types ---
+export interface FairProductConfig {
+    id: string;
+    type: 'roof' | 'pergola' | 'carport' | 'zip_screen' | 'sliding_glass' | 'accessory' | 'other';
+    width: string;
+    projection: string;
+
+    // Roof / Pergola Logic
+    roofFill?: 'polycarbonate' | 'glass';
+    wallTypes?: string[]; // 'framed' | 'frameless' | 'fixed' | 'aluminum' | 'none'
+    wallSidesCount?: number;
+
+    ledType?: 'spot' | 'strip' | 'none';
+    roofAwning?: 'under' | 'over' | 'none';
+
+    // ZIP Logic
+    zipEnabled?: boolean;
+    zipWidth?: string;
+    zipHeight?: string;
+    zipSidesCount?: number;
+
+    notes?: string;
 }
 
 // --- New Catalog Types ---
@@ -249,6 +283,7 @@ export interface ProductConfig {
         price: number;
         quantity: number;
         attributes?: Record<string, unknown>; // For multilingual names
+        pricing_basis?: string;
     }[];
     customItems?: {
         id: string;

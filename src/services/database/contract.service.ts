@@ -70,6 +70,12 @@ export const ContractService = {
         });
     },
 
+    async getNextContractNumber(): Promise<string> {
+        const { data, error } = await supabase.rpc('get_next_contract_number');
+        if (error) throw error;
+        return data as string;
+    },
+
     async createContract(contract: Omit<Contract, 'id' | 'createdAt' | 'contractNumber'>): Promise<Contract> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
@@ -510,8 +516,179 @@ export const ContractService = {
         }));
     },
 
-    async deleteContract(id: string) {
-        const { error } = await supabase.from('contracts').delete().eq('id', id);
-        if (error) throw error;
+    async deleteContract(id: string): Promise<void> {
+        // 1. Fetch Contract to check type (Manual vs Regular) and linked items
+        const { data: contract, error: fetchError } = await supabase
+            .from('contracts')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw fetchError;
+        if (!contract) return; // Already gone
+
+        // 2. Check for Installations linked to the SAME Offer
+        const { data: installations } = await supabase
+            .from('installations')
+            .select('id')
+            .eq('offer_id', contract.offer_id);
+
+        if (installations && installations.length > 0) {
+            // Hard decision: Do we delete installations?
+            // User request: "nie mogę usunąć umowy" -> likely implies they WANT to delete it all.
+            // We will cascade delete installations.
+            const installIds = installations.map(i => i.id);
+            await supabase.from('installations').delete().in('id', installIds);
+        }
+
+        // 3. Delete Contract
+        const { error: deleteError } = await supabase
+            .from('contracts')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) throw deleteError;
+
+        // 4. If Manual Contract (Offer Product Model is 'MANUAL' or similar marker), delete the dummy Offer
+        // We can check the Offer
+        const { data: offer } = await supabase.from('offers').select('id, product_config').eq('id', contract.offer_id).single();
+        if (offer) {
+            const product = offer.product_config as any;
+            const isManual = product?.isManual || product?.modelId === 'MANUAL';
+            if (isManual) {
+                // Delete the dummy offer
+                await supabase.from('offers').delete().eq('id', offer.id);
+            } else {
+                // If regular offer, maybe revert status to 'new' or 'sent'?
+                // If we delete the contract, the offer is no longer 'sold'.
+                await supabase.from('offers').update({ status: 'new' }).eq('id', offer.id);
+            }
+        }
+    },
+
+    async createManualContract(params: {
+        customer: Customer;
+        items: Array<{
+            id: string;
+            modelId: string;
+            description: string;
+            quantity: number;
+            price: number;
+        }>;
+        contractDetails: {
+            contractNumber?: string;
+            createdAt?: Date;
+            signedAt?: Date;
+            advance?: number;
+            comments?: string;
+        }
+    }): Promise<void> {
+        const { customer, items, contractDetails } = params;
+        const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+        const { data: userData } = await supabase.auth.getUser();
+
+        // 1. Create Placeholder Offer
+        // Try to find existing lead for this customer to link logic
+        const { data: existingLead } = await supabase
+            .from('leads')
+            .select('id')
+            .eq('customer_id', customer.id) // Correct FK syntax
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        const productSummary = items.map(i => `${i.quantity}x ${i.description}`).join(', ');
+
+        const { data: offerData, error: offerError } = await supabase
+            .from('offers')
+            .insert({
+                customer_id: customer.id!,
+                lead_id: existingLead?.id || null, // Link to lead if exists
+                user_id: userData.user?.id,
+                status: 'sold',
+                offer_number: `MANUAL/${contractDetails.contractNumber || Date.now()}`,
+                margin_percentage: 0,
+                customer_data: customer,
+                product_config: {
+                    modelId: 'MANUAL',
+                    width: 0,
+                    projection: 0,
+                    color: 'N/A',
+                    roofType: 'other',
+                    installationType: 'wall',
+                    addons: [],
+                    isManual: true,
+                    manualDescription: productSummary,
+                    customItems: items.map(i => ({
+                        id: i.id,
+                        name: i.description,
+                        price: i.price,
+                        quantity: i.quantity,
+                        description: i.modelId,
+                        attributes: { modelId: i.modelId }
+                    }))
+                },
+                pricing: {
+                    finalPriceNet: totalPrice,
+                    sellingPriceNet: totalPrice,
+                    totalCost: 0,
+                    marginPercentage: 0,
+                    marginValue: 0,
+                    basePrice: totalPrice,
+                    addonsPrice: 0
+                },
+                snow_zone: { id: '1', value: 0, description: 'Default' }
+            })
+            .select()
+            .single();
+
+        if (offerError) throw offerError;
+
+        // 2. Create Contract
+        await this.createContract({
+            offerId: offerData.id,
+            status: 'signed',
+            signedAt: contractDetails.signedAt || new Date(),
+            client: customer,
+            product: {
+                modelId: 'MANUAL',
+                width: 0,
+                projection: 0,
+                color: 'N/A',
+                roofType: 'other',
+                installationType: 'wall',
+                addons: [],
+                customItems: items.map(i => ({
+                    id: i.id,
+                    name: i.description,
+                    price: i.price,
+                    quantity: i.quantity,
+                    attributes: { modelId: i.modelId }
+                }))
+            } as any, // Cast to avoid strict type checks on partial manual matches
+            pricing: {
+                basePrice: totalPrice,
+                finalPriceNet: totalPrice,
+                sellingPriceNet: totalPrice,
+                vatRate: 0.19, // DE VAT default
+                advancePayment: contractDetails.advance || 0,
+                paymentMethod: 'transfer'
+            },
+            commission: 0,
+            requirements: {
+                constructionProject: false,
+                powerSupply: false,
+                foundation: false
+            },
+            comments: contractDetails.comments ? [{
+                id: crypto.randomUUID(),
+                text: contractDetails.comments,
+                author: 'System',
+                createdAt: new Date()
+            }] : [],
+            attachments: [],
+            contractNumber: contractDetails.contractNumber?.trim() || undefined
+        });
     }
 };
