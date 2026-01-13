@@ -788,38 +788,46 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                         placeholder="Jan" />
                                 </div>
 
-                                <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><UserIcon size={14} /> Nazwisko *</label>
-                                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Kowalski" />
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-slate-700">Nazwisko *</label>
+                                    <input value={lastName} onChange={e => setLastName(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400"
+                                        placeholder="Kowalski" />
                                 </div>
-                                <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><Phone size={14} /> Telefon *</label>
-                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-green-500 focus:bg-green-50/20 focus:ring-4 focus:ring-green-100 transition-all outline-none font-mono font-bold text-slate-800 shadow-sm placeholder:text-slate-300 placeholder:font-sans group-hover:border-slate-300" placeholder="+48 500 600 700" />
-                                    <div className="text-xs text-slate-400 mt-2 ml-1">Min. 9 cyfr</div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-slate-700">Telefon *</label>
+                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400 font-mono"
+                                        placeholder="+48 500 600 700" />
                                 </div>
-                                <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><Mail size={14} /> E-mail <span className="text-slate-300">(opcjonalnie)</span></label>
-                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-purple-500 focus:bg-purple-50/20 focus:ring-4 focus:ring-purple-100 transition-all outline-none font-medium text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="jan@example.com" />
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-slate-700">E-mail <span className="text-slate-400 font-normal">(opcjonalnie)</span></label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400"
+                                        placeholder="jan@example.com" />
                                 </div>
                             </div>
 
                             {/* Optional Address Section */}
-                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
-                                        <MapPin className="w-5 h-5 text-slate-400" /> Adres Klienta
+                                    <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-slate-500" /> Adres Klienta
                                     </h4>
-                                    <span className="text-xs bg-slate-200 px-2.5 py-1 rounded-full font-semibold text-slate-500">Opcjonalne</span>
+                                    <span className="text-xs bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500">Opcjonalne</span>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                                     <div className="md:col-span-5">
-                                        <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Ulica i numer (np. Hauptstraße 15)" className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:bg-slate-50 transition-all outline-none text-slate-700" />
+                                        <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Ulica i numer (np. Hauptstraße 15)"
+                                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 text-sm placeholder:text-slate-400" />
                                     </div>
                                     <div className="md:col-span-2">
-                                        <input value={zip} onChange={e => setZip(e.target.value)} placeholder="PLZ (00-000)" className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:bg-slate-50 transition-all outline-none text-slate-700 font-mono" />
+                                        <input value={zip} onChange={e => setZip(e.target.value)} placeholder="Kod pocztowy"
+                                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 text-sm placeholder:text-slate-400" />
                                     </div>
                                     <div className="md:col-span-3">
-                                        <input value={city} onChange={e => setCity(e.target.value)} placeholder="Stadt (Berlin, Hamburg...)" className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:bg-slate-50 transition-all outline-none text-slate-700" />
+                                        <input value={city} onChange={e => setCity(e.target.value)} placeholder="Miasto"
+                                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 text-sm placeholder:text-slate-400" />
                                     </div>
                                 </div>
                             </div>
@@ -853,30 +861,31 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
 
                             {/* CONVERSATION SUMMARY - NEW FIELD */}
-                            <div className="bg-white p-6 rounded-2xl border-2 border-blue-100 shadow-md">
-                                <label className="text-sm font-bold text-blue-700 uppercase tracking-wide mb-3 block flex items-center gap-2">
-                                    <MessageSquare className="w-4 h-4" /> Podsumowanie Rozmowy
-                                    <span className="text-xs text-blue-400 font-normal normal-case">(Co ustalono z klientem?)</span>
+                            {/* CONVERSATION SUMMARY - NEW FIELD */}
+                            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                                <label className="text-sm font-semibold text-blue-900 mb-2 block flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4 text-blue-600" /> Podsumowanie Rozmowy
                                 </label>
                                 <textarea
                                     value={conversationSummary}
                                     onChange={e => setConversationSummary(e.target.value)}
-                                    className="w-full px-4 py-3.5 bg-blue-50/30 border border-blue-200 rounded-xl min-h-[120px] 
-                                               focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 
-                                               transition-all outline-none text-slate-700 resize-none
+                                    className="w-full px-3 py-2.5 bg-white border border-blue-200 rounded-lg min-h-[100px] 
+                                               focus:border-blue-400 focus:ring-2 focus:ring-blue-200 
+                                               transition-all outline-none text-slate-700 resize-none text-sm
                                                placeholder:text-blue-300"
-                                    placeholder="Klient zainteresowany dużym zadaszeniem z zabudową boczną. Preferuje montaż w kwietniu. Czeka na wycenę..."
+                                    placeholder="Klient zainteresowany..."
                                 />
-                                <div className="text-xs text-blue-500 mt-2 ml-1">💡 To pole pojawi się w notatkach leada</div>
                             </div>
 
                             {/* Extra Notes */}
-                            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block flex items-center gap-1.5">
-                                    <ClipboardList className="w-4 h-4" />
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                    <ClipboardList className="w-4 h-4 text-slate-400" />
                                     Notatki Dodatkowe
                                 </label>
-                                <textarea value={mainNotes} onChange={e => setMainNotes(e.target.value)} className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl min-h-[90px] focus:border-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-slate-700 resize-none placeholder:text-slate-400" placeholder="Specjalne wymagania, uwagi techniczne..." />
+                                <textarea value={mainNotes} onChange={e => setMainNotes(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 resize-none placeholder:text-slate-400 text-sm"
+                                    placeholder="Specjalne wymagania..." />
                             </div>
 
                             {/* Photos */}
