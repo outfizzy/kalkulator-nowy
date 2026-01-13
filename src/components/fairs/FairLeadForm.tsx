@@ -693,25 +693,34 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                     <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right duration-500">
                         {/* CONTACT FORM - Polished UI */}
                         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
-                            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                👤 Wizytówka Klienta
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase ml-1">Imię</label>
-                                    <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/10 transition-all outline-none font-medium" placeholder="Jan" />
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-slate-100">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                                    <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase ml-1">Nazwisko</label>
-                                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/10 transition-all outline-none font-medium" placeholder="Kowalski" />
+                                <div>
+                                    <h3 className="text-2xl font-bold text-slate-800">Dane Kontaktowe</h3>
+                                    <p className="text-sm text-slate-500">Wypełnij podstawowe informacje</p>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase ml-1">Telefon</label>
-                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/10 transition-all outline-none font-medium font-mono text-lg" placeholder="500 600 700" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-6">
+                                <div className="group">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Imię *</label>
+                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Jan" />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase ml-1">E-mail (opcjonalnie)</label>
-                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/10 transition-all outline-none font-medium" placeholder="jan@example.com" />
+                                <div className="group">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Nazwisko *</label>
+                                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Kowalski" />
+                                </div>
+                                <div className="group">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">📞 Telefon *</label>
+                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-green-500 focus:bg-green-50/20 focus:ring-4 focus:ring-green-100 transition-all outline-none font-mono font-bold text-slate-800 shadow-sm placeholder:text-slate-300 placeholder:font-sans group-hover:border-slate-300" placeholder="+48 500 600 700" />
+                                    <div className="text-xs text-slate-400 mt-2 ml-1">Min. 9 cyfr</div>
+                                </div>
+                                <div className="group">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">✉️ E-mail <span className="text-slate-300">(opcjonalnie)</span></label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-purple-500 focus:bg-purple-50/20 focus:ring-4 focus:ring-purple-100 transition-all outline-none font-medium text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="jan@example.com" />
                                 </div>
                             </div>
 
