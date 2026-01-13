@@ -6,6 +6,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { generateFairPDF } from '../../utils/fairPdfGenerator';
 import { WheelOfFortune } from './WheelOfFortune';
+import {
+    Home, Sun, Car, Wrench, Blinds, PanelLeft, Plug,
+    MessageSquare, User as UserIcon, MapPin,
+    Tent, CheckCircle2, ChevronRight, X, Phone, Mail, Image as ImageIcon,
+    ClipboardList, HelpCircle
+} from 'lucide-react';
 import type { FairProductConfig, User } from '../../types';
 
 interface FairLeadFormProps {
@@ -336,8 +342,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                     {/* Top Row: Fair Info + Close */}
                     <div className="flex items-center justify-between gap-4 mb-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
-                                <span className="text-3xl">🎪</span>
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200 text-slate-700">
+                                <Tent className="w-6 h-6" />
                             </div>
                             <div className="min-w-0 flex flex-col justify-center">
                                 <h1 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 leading-tight">{fairName}</h1>
@@ -416,16 +422,26 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                 <button
                                     key={type}
                                     onClick={() => { setCurrentConfig(c => ({ ...c, type })); setViewMode('config'); }}
-                                    className="p-6 lg:p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-slate-800 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col justify-between min-h-[160px] lg:min-h-[200px]"
+                                    className="relative p-6 lg:p-10 bg-white border-2 border-slate-200 rounded-3xl hover:border-slate-800 hover:shadow-2xl transition-all group text-left flex flex-col justify-between min-h-[180px] lg:min-h-[220px] overflow-hidden"
                                 >
-                                    <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity text-6xl lg:text-7xl">
-                                        {type === 'roof' ? '🏠' : type === 'pergola' ? '☀️' : type === 'carport' ? '🚗' : '🔧'}
+                                    <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity transform rotate-12">
+                                        {type === 'roof' && <Home size={160} />}
+                                        {type === 'pergola' && <Sun size={160} />}
+                                        {type === 'carport' && <Car size={160} />}
+                                        {type === 'other' && <Wrench size={160} />}
                                     </div>
+
                                     <div className="relative z-10">
-                                        <div className="text-5xl lg:text-6xl mb-4 transition-transform origin-left">
-                                            {type === 'roof' ? '🏠' : type === 'pergola' ? '☀️' : type === 'carport' ? '🚗' : '🔧'}
+                                        <div className="mb-6 text-slate-700 group-hover:text-slate-900 transition-colors">
+                                            {type === 'roof' && <Home size={56} strokeWidth={1.5} />}
+                                            {type === 'pergola' && <Sun size={56} strokeWidth={1.5} />}
+                                            {type === 'carport' && <Car size={56} strokeWidth={1.5} />}
+                                            {type === 'other' && <Wrench size={56} strokeWidth={1.5} />}
                                         </div>
-                                        <div className="font-extrabold text-xl lg:text-2xl text-slate-800 leading-tight">{getProductLabel(type)}</div>
+                                        <div>
+                                            <h4 className="font-extrabold text-2xl lg:text-3xl text-slate-800 leading-none mb-2">{getProductLabel(type)}</h4>
+                                            <p className="text-sm font-medium text-slate-400 group-hover:text-slate-500">Kliknij aby skonfigurować →</p>
+                                        </div>
                                     </div>
                                 </button>
                             ))}
@@ -436,28 +452,34 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             <div className="col-span-full text-base font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Tylko dodatki / Solo</div>
 
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
-                                className="flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left">
-                                <div className="text-2xl">🤐</div>
+                                className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
+                                <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-white border border-slate-100 group-hover:border-blue-100 transition-colors">
+                                    <Blinds className="w-8 h-8 text-slate-600 group-hover:text-blue-600" />
+                                </div>
                                 <div>
-                                    <div className="font-bold text-slate-700">Tylko ZIP Screen</div>
-                                    <div className="text-xs text-slate-400">Do istniejących okien/konstrukcji</div>
+                                    <div className="font-bold text-lg text-slate-800 mb-0.5">Tylko ZIP Screen</div>
+                                    <div className="text-sm text-slate-500">Do istniejących okien</div>
                                 </div>
                             </button>
 
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'sliding_glass' })); setViewMode('config'); }}
-                                className="flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left">
-                                <div className="text-2xl">🪟</div>
+                                className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
+                                <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-white border border-slate-100 group-hover:border-blue-100 transition-colors">
+                                    <PanelLeft className="w-8 h-8 text-slate-600 group-hover:text-blue-600" />
+                                </div>
                                 <div>
-                                    <div className="font-bold text-slate-700">Tylko Zabudowa</div>
-                                    <div className="text-xs text-slate-400">Szyby przesuwne / Ramowe</div>
+                                    <div className="font-bold text-lg text-slate-800 mb-0.5">Tylko Zabudowa</div>
+                                    <div className="text-sm text-slate-500">Szyby przesuwne</div>
                                 </div>
                             </button>
 
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'accessory' })); setViewMode('config'); }}
-                                className="flex items-center gap-4 p-5 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left shadow-sm hover:shadow-md">
-                                <div className="text-3xl">🔌</div>
+                                className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
+                                <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-white border border-slate-100 group-hover:border-blue-100 transition-colors">
+                                    <Plug className="w-8 h-8 text-slate-600 group-hover:text-blue-600" />
+                                </div>
                                 <div>
-                                    <div className="font-bold text-lg text-slate-800">Akcesoria / Serwis</div>
+                                    <div className="font-bold text-lg text-slate-800 mb-0.5">Akcesoria / Serwis</div>
                                     <div className="text-sm text-slate-500">Promienniki, LED, Części</div>
                                 </div>
                             </button>
@@ -476,7 +498,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                     className="px-8 py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg lg:text-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
                                 >
                                     Dalej: Wywiad
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                    <ChevronRight className="w-6 h-6" />
                                 </button>
                             </div>
 
@@ -657,7 +679,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             {/* Left: Client Questions */}
                             <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col">
                                 <h4 className="font-bold text-slate-700 mb-6 flex items-center gap-3 text-xl">
-                                    ❓ Pytania / Kwestie Techniczne
+                                    <HelpCircle className="w-6 h-6 text-slate-400" />
+                                    Pytania / Kwestie Techniczne
                                 </h4>
                                 <div className="space-y-3">
                                     <div className="flex gap-2">
@@ -706,7 +729,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             {/* Right: Next Actions */}
                             <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200 shadow-xl">
                                 <h4 className="font-bold text-slate-700 mb-6 flex items-center gap-3 text-xl">
-                                    👉 Next Steps
+                                    <ClipboardList className="w-6 h-6 text-slate-400" />
+                                    Next Steps
                                 </h4>
                                 <div className="flex flex-col gap-2">
                                     {[
@@ -756,7 +780,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                         <div className="bg-white p-6 lg:p-10 rounded-3xl border border-slate-200 shadow-xl">
                             <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-slate-100">
                                 <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
-                                    <span className="text-2xl">👤</span>
+                                    <UserIcon className="w-6 h-6 text-slate-600" />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold text-slate-800">Dane Kontaktowe</h3>
@@ -765,20 +789,20 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-8 mb-6">
                                 <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Imię *</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><UserIcon size={14} /> Imię *</label>
                                     <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Jan" />
                                 </div>
                                 <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">👤 Nazwisko *</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><UserIcon size={14} /> Nazwisko *</label>
                                     <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:bg-blue-50/20 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-semibold text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="Kowalski" />
                                 </div>
                                 <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">📞 Telefon *</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><Phone size={14} /> Telefon *</label>
                                     <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-4 py-3 md:px-5 md:py-4 text-base md:text-lg lg:text-xl bg-white border-2 border-slate-200 rounded-2xl focus:border-green-500 focus:bg-green-50/20 focus:ring-4 focus:ring-green-100 transition-all outline-none font-mono font-bold text-slate-800 shadow-sm placeholder:text-slate-300 placeholder:font-sans group-hover:border-slate-300" placeholder="+48 500 600 700" />
                                     <div className="text-xs text-slate-400 mt-2 ml-1">Min. 9 cyfr</div>
                                 </div>
                                 <div className="group">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block">✉️ E-mail <span className="text-slate-300">(opcjonalnie)</span></label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 flex items-center gap-1.5"><Mail size={14} /> E-mail <span className="text-slate-300">(opcjonalnie)</span></label>
                                     <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-5 py-4 text-base md:text-lg bg-white border-2 border-slate-200 rounded-2xl focus:border-purple-500 focus:bg-purple-50/20 focus:ring-4 focus:ring-purple-100 transition-all outline-none font-medium text-slate-800 shadow-sm placeholder:text-slate-300 group-hover:border-slate-300" placeholder="jan@example.com" />
                                 </div>
                             </div>
@@ -787,7 +811,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <h4 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
-                                        <span className="text-xl">📍</span> Adres Klienta
+                                        <MapPin className="w-5 h-5 text-slate-400" /> Adres Klienta
                                     </h4>
                                     <span className="text-xs bg-slate-200 px-2.5 py-1 rounded-full font-semibold text-slate-500">Opcjonalne</span>
                                 </div>
@@ -835,7 +859,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             {/* CONVERSATION SUMMARY - NEW FIELD */}
                             <div className="bg-white p-6 rounded-2xl border-2 border-blue-100 shadow-md">
                                 <label className="text-sm font-bold text-blue-700 uppercase tracking-wide mb-3 block flex items-center gap-2">
-                                    💬 Podsumowanie Rozmowy
+                                    <MessageSquare className="w-4 h-4" /> Podsumowanie Rozmowy
                                     <span className="text-xs text-blue-400 font-normal normal-case">(Co ustalono z klientem?)</span>
                                 </label>
                                 <textarea
@@ -853,7 +877,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             {/* Extra Notes */}
                             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block flex items-center gap-1.5">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    <ClipboardList className="w-4 h-4" />
                                     Notatki Dodatkowe
                                 </label>
                                 <textarea value={mainNotes} onChange={e => setMainNotes(e.target.value)} className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl min-h-[90px] focus:border-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-slate-700 resize-none placeholder:text-slate-400" placeholder="Specjalne wymagania, uwagi techniczne..." />
@@ -865,7 +889,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                 <div className="flex flex-wrap gap-3">
                                     <label className={`w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-all ${uploading ? 'opacity-50' : ''}`}>
                                         <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
-                                        <span className="text-2xl text-slate-400">📷</span>
+                                        <ImageIcon className="w-8 h-8 text-slate-300" />
                                     </label>
                                     {photos.map((photo, i) => (
                                         <div key={i} className="w-24 h-24 rounded-xl bg-slate-100 relative overflow-hidden group border border-slate-200">
