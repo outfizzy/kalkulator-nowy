@@ -329,18 +329,18 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
     // --- RENDERERS ---
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-purple50/10">
-            {/* MODERN STICKY HEADER WITH PROGRESS */}
-            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/60 shadow-lg">
+        <div className="min-h-screen bg-slate-50/50">
+            {/* CLEAN STICKY HEADER */}
+            <div className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
                     {/* Top Row: Fair Info + Close */}
                     <div className="flex items-center justify-between gap-4 mb-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 flex items-center justify-center shadow-xl flex-shrink-0 animate-in zoom-in duration-500">
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
                                 <span className="text-3xl">🎪</span>
                             </div>
                             <div className="min-w-0">
-                                <h1 className="text-xl font-bold text-slate-800 truncate">{fairName}</h1>
+                                <h1 className="text-lg font-bold text-slate-800 truncate">{fairName}</h1>
                                 <p className="text-sm text-slate-500">Formularz Leada</p>
                             </div>
                         </div>
@@ -360,9 +360,9 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                 return (
                                     <React.Fragment key={i}>
                                         <div className="flex flex-col items-center gap-1.5">
-                                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${completed ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg' :
-                                                active ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-2xl ring-4 ring-blue-200/50 scale-110' :
-                                                    'bg-slate-100 text-slate-400 border-2 border-slate-200'
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${completed ? 'bg-emerald-500 text-white shadow-sm' :
+                                                active ? 'bg-slate-800 text-white shadow-md ring-4 ring-slate-100' :
+                                                    'bg-white text-slate-300 border border-slate-200'
                                                 }`}>
                                                 {completed ? '✓' : step}
                                             </div>
@@ -372,7 +372,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                             </span>
                                         </div>
                                         {i < 3 && (
-                                            <div className={`w-16 h-1.5 rounded-full mb-6 transition-all duration-500 ${step < currentStep ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : 'bg-slate-200'
+                                            <div className={`w-16 h-0.5 rounded-full mb-5 transition-all duration-500 ${step < currentStep ? 'bg-emerald-500' : 'bg-slate-100'
                                                 }`} />
                                         )}
                                     </React.Fragment>
@@ -390,7 +390,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
                             <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                                 <div
-                                    className="h-full bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 transition-all duration-700 ease-out"
+                                    className="h-full bg-slate-800 transition-all duration-500 ease-out"
                                     style={{ width: `${((viewMode === 'hub' || viewMode === 'config' ? 1 : viewMode === 'interview' ? 2 : viewMode === 'finalize' ? 3 : 4) / 4) * 100}%` }}
                                 />
                             </div>
@@ -755,10 +755,8 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                         {/* CONTACT FORM - Polished UI */}
                         <div className="bg-white p-6 lg:p-10 rounded-3xl border border-slate-200 shadow-xl">
                             <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-slate-100">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
-                                    <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
+                                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
+                                    <span className="text-2xl">👤</span>
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold text-slate-800">Dane Kontaktowe</h3>
@@ -786,7 +784,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
 
                             {/* Optional Address Section */}
-                            <div className="bg-gradient-to-br from-slate-50 to-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <h4 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
                                         <span className="text-xl">📍</span> Adres Klienta
@@ -807,9 +805,9 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
 
                             {/* GERMAN HELPER PHRASES - NEW SECTION */}
-                            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-6 rounded-2xl border-2 border-amber-200 shadow-md">
+                            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-xl shadow">
+                                    <div className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center text-xl shadow-sm">
                                         🇩🇪
                                     </div>
                                     <div>
