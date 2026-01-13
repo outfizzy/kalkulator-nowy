@@ -33,6 +33,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
     const [zip, setZip] = useState('');
     const [address, setAddress] = useState('');
     const [mainNotes, setMainNotes] = useState('');
+    const [conversationSummary, setConversationSummary] = useState(''); // New: Conversation summary
 
     // Products
     const [products, setProducts] = useState<FairProductConfig[]>([]);
@@ -179,6 +180,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
         }
 
         if (photos.length) parts.push(`\n## Załączniki\n- Ilość zdjęć: ${photos.length}`);
+        if (conversationSummary) parts.push(`\n## 💬 Podsumowanie Rozmowy\n${conversationSummary}`);
         if (mainNotes) parts.push(`\n## Notatka Główna\n${mainNotes}`);
 
         return parts.join('\n');
@@ -725,27 +727,79 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                             </div>
 
                             {/* Optional Address Section */}
-                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                                <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                                    <span className="text-xl">📍</span> Adres (Opcjonalnie)
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-gradient-to-br from-slate-50 to-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
+                                        <span className="text-xl">📍</span> Adres Klienta
+                                    </h4>
+                                    <span className="text-xs bg-slate-200 px-2.5 py-1 rounded-full font-semibold text-slate-500">Opcjonalne</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                                    <div className="md:col-span-5">
+                                        <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Ulica i numer (np. Hauptstraße 15)" className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:bg-slate-50 transition-all outline-none text-slate-700" />
+                                    </div>
                                     <div className="md:col-span-2">
-                                        <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Ulica i numer" className="w-full p-3 border rounded-xl" />
+                                        <input value={zip} onChange={e => setZip(e.target.value)} placeholder="PLZ (00-000)" className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:bg-slate-50 transition-all outline-none text-slate-700 font-mono" />
                                     </div>
-                                    <div>
-                                        <input value={zip} onChange={e => setZip(e.target.value)} placeholder="Kod Pocztowy (00-000)" className="w-full p-3 border rounded-xl" />
-                                    </div>
-                                    <div>
-                                        <input value={city} onChange={e => setCity(e.target.value)} placeholder="Miasto" className="w-full p-3 border rounded-xl" />
+                                    <div className="md:col-span-3">
+                                        <input value={city} onChange={e => setCity(e.target.value)} placeholder="Stadt (Berlin, Hamburg...)" className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:bg-slate-50 transition-all outline-none text-slate-700" />
                                     </div>
                                 </div>
                             </div>
 
+                            {/* GERMAN HELPER PHRASES - NEW SECTION */}
+                            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-6 rounded-2xl border-2 border-amber-200 shadow-md">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-xl shadow">
+                                        🇩🇪
+                                    </div>
+                                    <div>
+                                        <h4 className="text-base font-bold text-amber-900">Hilfreiche Fragen (Deutsch)</h4>
+                                        <p className="text-xs text-amber-600">Pytania pomocnicze po niemiecku</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                    {[
+                                        { de: 'Wie groß soll die Überdachung sein?', pl: 'Jak duże ma być zadaszenie?' },
+                                        { de: 'Wünschen Sie Seitenwände?', pl: 'Czy chcą Państwo ściany boczne?' },
+                                        { de: 'Mit oder ohne Beleuchtung?', pl: 'Z oświetleniem czy bez?' },
+                                        { de: 'Haben Sie eine Baugenehmigung?', pl: 'Czy mają Państwo pozwolenie na budowę?' },
+                                        { de: 'Wo soll es installiert werden?', pl: 'Gdzie ma być zainstalowane?' },
+                                        { de: 'Bis wann brauchen Sie das?', pl: 'Do kiedy Państwo tego potrzebują?' }
+                                    ].map((phrase, i) => (
+                                        <div key={i} className="bg-white p-3 rounded-xl border border-amber-100 hover:border-amber-300 transition-all group cursor-default">
+                                            <div className="font-semibold text-slate-700 mb-1">{phrase.de}</div>
+                                            <div className="text-xs text-slate-400 italic">{phrase.pl}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* CONVERSATION SUMMARY - NEW FIELD */}
+                            <div className="bg-white p-6 rounded-2xl border-2 border-blue-100 shadow-md">
+                                <label className="text-sm font-bold text-blue-700 uppercase tracking-wide mb-3 block flex items-center gap-2">
+                                    💬 Podsumowanie Rozmowy
+                                    <span className="text-xs text-blue-400 font-normal normal-case">(Co ustalono z klientem?)</span>
+                                </label>
+                                <textarea
+                                    value={conversationSummary}
+                                    onChange={e => setConversationSummary(e.target.value)}
+                                    className="w-full px-4 py-3.5 bg-blue-50/30 border border-blue-200 rounded-xl min-h-[120px] 
+                                               focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 
+                                               transition-all outline-none text-slate-700 resize-none
+                                               placeholder:text-blue-300"
+                                    placeholder="Klient zainteresowany dużym zadaszeniem z zabudową boczną. Preferuje montaż w kwietniu. Czeka na wycenę..."
+                                />
+                                <div className="text-xs text-blue-500 mt-2 ml-1">💡 To pole pojawi się w notatkach leada</div>
+                            </div>
+
                             {/* Extra Notes */}
-                            <div className="mt-6 space-y-1">
-                                <label className="text-xs font-bold text-slate-400 uppercase ml-1">Notatka Główna (Opcjonalne)</label>
-                                <textarea value={mainNotes} onChange={e => setMainNotes(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl min-h-[100px] focus:border-accent focus:bg-white transition-all outline-none" placeholder="Dodatkowe uwagi do zamówienia..." />
+                            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1 mb-2.5 block flex items-center gap-1.5">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    Notatki Dodatkowe
+                                </label>
+                                <textarea value={mainNotes} onChange={e => setMainNotes(e.target.value)} className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl min-h-[90px] focus:border-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-slate-700 resize-none placeholder:text-slate-400" placeholder="Specjalne wymagania, uwagi techniczne..." />
                             </div>
 
                             {/* Photos */}
