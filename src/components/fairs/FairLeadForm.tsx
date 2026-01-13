@@ -405,118 +405,108 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                 </div>
             </div>
 
-            {/* MAIN CONTENT AREA - WIDER FOR DESKTOP */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+            {/* MAIN CONTENT - COMPACT PROFESSIONAL WIDTH */}
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
                 {/* VIEW: HUB (Product Selection) */}
                 {viewMode === 'hub' && (
-                    <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8">
-                        <div className="text-center mb-8">
-                            <h3 className="text-3xl font-bold text-slate-800 mb-2">Czego szukamy?</h3>
-                            <p className="text-slate-500">Wybierz produkt aby dodać go do listy zainteresowań klienta.</p>
+                    <div className="space-y-8">
+                        <div>
+                            <h3 className="text-2xl font-semibold text-slate-900">Biblioteka Produktów</h3>
+                            <p className="text-slate-500 mt-1">Wybierz kategorię aby skonfigurować produkt.</p>
                         </div>
 
-                        {/* Main Categories - Responsive Grid (2 cols mobile/tablet, 4 cols large desktop) */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-2 sm:px-0">
-                            {(['roof', 'pergola', 'carport', 'other'] as const).map(type => (
-                                <button
-                                    key={type}
-                                    onClick={() => { setCurrentConfig(c => ({ ...c, type })); setViewMode('config'); }}
-                                    className="relative p-5 lg:p-8 bg-white border border-slate-200 rounded-3xl hover:border-slate-800 hover:shadow-xl transition-all group text-left flex flex-col justify-between min-h-[180px] lg:min-h-[240px] overflow-hidden"
-                                >
-                                    <div className="absolute -right-6 -top-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity transform rotate-12 bg-transparent pointer-events-none">
-                                        {type === 'roof' && <Home size={180} />}
-                                        {type === 'pergola' && <Sun size={180} />}
-                                        {type === 'carport' && <Car size={180} />}
-                                        {type === 'other' && <Wrench size={180} />}
-                                    </div>
-
-                                    <div className="relative z-10 h-full flex flex-col justify-between">
-                                        <div className="mb-4 text-slate-700 group-hover:text-slate-900 transition-colors">
-                                            {// Responsive Icon Size
-                                                type === 'roof' && <Home className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
-                                            {type === 'pergola' && <Sun className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
-                                            {type === 'carport' && <Car className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
-                                            {type === 'other' && <Wrench className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-lg sm:text-xl lg:text-2xl text-slate-800 leading-tight mb-2">{getProductLabel(type)}</h4>
-                                            <div className="flex items-center text-xs lg:text-sm font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
-                                                Konfiguruj <ChevronRight size={14} className="ml-1" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Standalone Accessories */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-slate-200 pt-8 mt-8">
-                            <div className="col-span-full text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center gap-2">
-                                <PlusCircle size={16} /> Opcje Dodatkowe
-                            </div>
-
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
-                                className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
-                                <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-white border border-slate-100 group-hover:border-blue-100 transition-colors">
-                                    <Blinds className="w-8 h-8 text-slate-600 group-hover:text-blue-600" />
+                        {/* UNIFIED PRO GRID */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* ROOF */}
+                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'roof' })); setViewMode('config'); }}
+                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    <Home className="w-6 h-6" />
                                 </div>
-                                <div>
-                                    <div className="font-bold text-lg text-slate-800 mb-0.5">Tylko ZIP Screen</div>
-                                    <div className="text-sm text-slate-500">Do istniejących okien</div>
-                                </div>
+                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Zadaszenie</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed">Systemy aluminiowe z wypełnieniem szklanym lub poliwęglanowym.</p>
                             </button>
 
+                            {/* PERGOLA */}
+                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'pergola' })); setViewMode('config'); }}
+                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    <Sun className="w-6 h-6" />
+                                </div>
+                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Pergola</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed">Bioklimatyczne pergole lamelowe oraz systemy materiałowe.</p>
+                            </button>
+
+                            {/* CARPORT */}
+                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'carport' })); setViewMode('config'); }}
+                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    <Car className="w-6 h-6" />
+                                </div>
+                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Carport</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed">Wiaty garażowe wolnostojące oraz przyścienne.</p>
+                            </button>
+
+                            {/* GLASS (SOLO) */}
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'sliding_glass' })); setViewMode('config'); }}
-                                className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
-                                <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-white border border-slate-100 group-hover:border-blue-100 transition-colors">
-                                    <PanelLeft className="w-8 h-8 text-slate-600 group-hover:text-blue-600" />
+                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    <PanelLeft className="w-6 h-6" />
                                 </div>
-                                <div>
-                                    <div className="font-bold text-lg text-slate-800 mb-0.5">Tylko Zabudowa</div>
-                                    <div className="text-sm text-slate-500">Szyby przesuwne</div>
-                                </div>
+                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Zabudowa</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed">Systemy przesuwne (ramowe/bezramowe) do gotowych konstrukcji.</p>
                             </button>
 
+                            {/* ZIP (SOLO) */}
+                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
+                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    <Blinds className="w-6 h-6" />
+                                </div>
+                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Rolety ZIP</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed">Osłony przeciwsłoneczne typu screen do okien i tarasów.</p>
+                            </button>
+
+                            {/* ACCESSORIES */}
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'accessory' })); setViewMode('config'); }}
-                                className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
-                                <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-white border border-slate-100 group-hover:border-blue-100 transition-colors">
-                                    <Plug className="w-8 h-8 text-slate-600 group-hover:text-blue-600" />
+                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    <Plug className="w-6 h-6" />
                                 </div>
-                                <div>
-                                    <div className="font-bold text-lg text-slate-800 mb-0.5">Akcesoria / Serwis</div>
-                                    <div className="text-sm text-slate-500">Promienniki, LED, Części</div>
-                                </div>
+                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Akcesoria</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed">Promienniki ciepła, oświetlenie LED, czujniki pogodowe.</p>
                             </button>
                         </div>
 
-                        {/* Summary / Action Bar */}
-                        <div className="pt-8 mt-8 border-t border-slate-200 sticky bottom-0 bg-slate-50 pb-4">
-                            <div className="flex justify-between items-center shadow-sm bg-white p-4 rounded-2xl border border-slate-100">
+
+                        {/* ACTION BAR */}
+                        <div className="pt-6 border-t border-slate-200 sticky bottom-0 bg-slate-50 pb-4">
+                            <div className="flex justify-between items-center shadow-lg bg-white p-4 rounded-xl border border-slate-200">
                                 <div>
-                                    <h4 className="font-bold text-slate-700">Twoja lista ({products.length})</h4>
-                                    <div className="text-sm text-slate-500">{products.length === 0 ? 'Brak produktów' : 'Przejdź dalej gdy gotowe'}</div>
+                                    <h4 className="font-semibold text-slate-900 text-sm">Lista wyboru ({products.length})</h4>
+                                    <div className="text-xs text-slate-500">{products.length === 0 ? 'Dodaj produkt' : 'Gotowe do wyceny'}</div>
                                 </div>
                                 <button
                                     onClick={() => setViewMode('interview')}
                                     disabled={products.length === 0}
-                                    className="px-8 py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg lg:text-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
+                                    className="px-6 py-2.5 bg-slate-900 hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm shadow-sm transition-all flex items-center gap-2"
                                 >
-                                    Dalej: Wywiad
-                                    <ChevronRight className="w-6 h-6" />
+                                    Dalej
+                                    <ChevronRight className="w-4 h-4" />
                                 </button>
                             </div>
 
-                            {/* Mini List Preview */}
+                            {/* MINI PREVIEW */}
                             {products.length > 0 && (
-                                <div className="mt-4 flex flex-wrap gap-3">
+                                <div className="mt-3 flex flex-wrap gap-2">
                                     {products.map((p, i) => (
-                                        <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-sm">
-                                            <span className="text-xs font-bold text-slate-400">#{i + 1}</span>
-                                            <span className="font-medium text-slate-700">{getProductLabel(p.type)}</span>
-                                            {p.width && <span className="text-xs bg-slate-100 px-1 rounded">{p.width}mm</span>}
-                                            <button onClick={() => setProducts(curr => curr.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 p-2">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-md shadow-sm">
+                                            <span className="text-xs font-mono text-slate-400">#{i + 1}</span>
+                                            <span className="text-xs font-medium text-slate-700">{getProductLabel(p.type)}</span>
+                                            {p.width && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 ml-1">{p.width}mm</span>}
+                                            <button onClick={() => setProducts(curr => curr.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-600 ml-1">
+                                                <X className="w-3 h-3" />
                                             </button>
                                         </div>
                                     ))}
