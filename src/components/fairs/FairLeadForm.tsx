@@ -10,7 +10,7 @@ import {
     Home, Sun, Car, Wrench, Blinds, PanelLeft, Plug,
     MessageSquare, User as UserIcon, MapPin,
     Tent, CheckCircle2, ChevronRight, X, Phone, Mail, Image as ImageIcon,
-    ClipboardList, HelpCircle
+    ClipboardList, HelpCircle, PlusCircle
 } from 'lucide-react';
 import type { FairProductConfig, User } from '../../types';
 
@@ -422,25 +422,28 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                 <button
                                     key={type}
                                     onClick={() => { setCurrentConfig(c => ({ ...c, type })); setViewMode('config'); }}
-                                    className="relative p-6 lg:p-10 bg-white border-2 border-slate-200 rounded-3xl hover:border-slate-800 hover:shadow-2xl transition-all group text-left flex flex-col justify-between min-h-[180px] lg:min-h-[220px] overflow-hidden"
+                                    className="relative p-5 lg:p-8 bg-white border border-slate-200 rounded-3xl hover:border-slate-800 hover:shadow-xl transition-all group text-left flex flex-col justify-between min-h-[180px] lg:min-h-[240px] overflow-hidden"
                                 >
-                                    <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity transform rotate-12">
-                                        {type === 'roof' && <Home size={160} />}
-                                        {type === 'pergola' && <Sun size={160} />}
-                                        {type === 'carport' && <Car size={160} />}
-                                        {type === 'other' && <Wrench size={160} />}
+                                    <div className="absolute -right-6 -top-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity transform rotate-12 bg-transparent pointer-events-none">
+                                        {type === 'roof' && <Home size={180} />}
+                                        {type === 'pergola' && <Sun size={180} />}
+                                        {type === 'carport' && <Car size={180} />}
+                                        {type === 'other' && <Wrench size={180} />}
                                     </div>
 
-                                    <div className="relative z-10">
-                                        <div className="mb-6 text-slate-700 group-hover:text-slate-900 transition-colors">
-                                            {type === 'roof' && <Home size={56} strokeWidth={1.5} />}
-                                            {type === 'pergola' && <Sun size={56} strokeWidth={1.5} />}
-                                            {type === 'carport' && <Car size={56} strokeWidth={1.5} />}
-                                            {type === 'other' && <Wrench size={56} strokeWidth={1.5} />}
+                                    <div className="relative z-10 h-full flex flex-col justify-between">
+                                        <div className="mb-4 text-slate-700 group-hover:text-slate-900 transition-colors">
+                                            {// Responsive Icon Size
+                                                type === 'roof' && <Home className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
+                                            {type === 'pergola' && <Sun className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
+                                            {type === 'carport' && <Car className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
+                                            {type === 'other' && <Wrench className="w-10 h-10 lg:w-14 lg:h-14" strokeWidth={1.5} />}
                                         </div>
                                         <div>
-                                            <h4 className="font-extrabold text-2xl lg:text-3xl text-slate-800 leading-none mb-2">{getProductLabel(type)}</h4>
-                                            <p className="text-sm font-medium text-slate-400 group-hover:text-slate-500">Kliknij aby skonfigurować →</p>
+                                            <h4 className="font-bold text-lg sm:text-xl lg:text-2xl text-slate-800 leading-tight mb-2">{getProductLabel(type)}</h4>
+                                            <div className="flex items-center text-xs lg:text-sm font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
+                                                Konfiguruj <ChevronRight size={14} className="ml-1" />
+                                            </div>
                                         </div>
                                     </div>
                                 </button>
@@ -449,7 +452,9 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
 
                         {/* Standalone Accessories */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-slate-200 pt-8 mt-8">
-                            <div className="col-span-full text-base font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Tylko dodatki / Solo</div>
+                            <div className="col-span-full text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center gap-2">
+                                <PlusCircle size={16} /> Opcje Dodatkowe
+                            </div>
 
                             <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
                                 className="flex items-center gap-5 p-6 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
