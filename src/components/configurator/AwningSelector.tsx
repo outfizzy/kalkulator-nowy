@@ -55,58 +55,58 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
     const [matchedItemName, setMatchedItemName] = useState<string>('');
 
     // Async Price Calculation
-    useEffect(() => {
-        const calculateAsync = async () => {
-            if (!data) {
-                setCalculatedPrice(0);
-                setMatchedItemName('');
-                return;
+    const calculatePrice = React.useCallback(async () => {
+        if (!data) {
+            setCalculatedPrice(0);
+            setMatchedItemName('');
+            return;
+        }
+
+        // Filter for type
+        const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach']
+            : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
+                : ['zip', 'screen', 'pion'];
+
+        // 1. Find the best matching Bundle/Product
+        let bestMatch = availableItems.find(i => {
+            // Priority: Check Metadata (awning_type)
+            if (i.properties?.awning_type) {
+                if (type === 'aufdachmarkise_zip' && i.properties.awning_type === 'over_glass') return true;
+                if (type === 'unterdachmarkise_zip' && i.properties.awning_type === 'under_glass') return true;
+                // If metadata exists but doesn't match, exclude it (strict mode for tagged items)
+                if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && ['over_glass', 'under_glass'].includes(i.properties.awning_type)) {
+                    return false;
+                }
             }
 
-            // Filter for type
-            const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach']
-                : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
-                    : ['zip', 'screen', 'pion'];
-
-            // 1. Find the best matching Bundle/Product
-            let bestMatch = availableItems.find(i => {
-                // Priority: Check Metadata (awning_type)
-                if (i.properties?.awning_type) {
-                    if (type === 'aufdachmarkise_zip' && i.properties.awning_type === 'over_glass') return true;
-                    if (type === 'unterdachmarkise_zip' && i.properties.awning_type === 'under_glass') return true;
-                    // If metadata exists but doesn't match, exclude it (strict mode for tagged items)
-                    if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && ['over_glass', 'under_glass'].includes(i.properties.awning_type)) {
-                        return false;
-                    }
-                }
-
-                // Priority: Check Motor Count
-                if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && i.properties?.motor_count) {
-                    if (motorCount === 2 && i.properties.motor_count !== 2) return false;
-                    if (motorCount === 1 && i.properties.motor_count === 2) return false;
-                }
-
-                // Fallback: Name Matching
-                const n = i.addon_name.toLowerCase();
-                return typeKeywords.some(k => n.includes(k));
-            });
-
-            if (bestMatch) {
-                setMatchedItemName(bestMatch.addon_name);
-                // Calculate Price via Service (Handles Matrix & Fixed)
-                // Use 'width' and 'projection' (or depth for ZIPS)
-                // For ZIP Screen: Projection is usually 0 or irrelevant? No, it's Height.
-                // AwningSelector maps 'projection' state to Height for ZIPs (via dimensionLabel)
-                const price = await PricingService.calculateAddonPrice(bestMatch, width, projection);
-                setCalculatedPrice(price);
-            } else {
-                setMatchedItemName('Brak w cenniku');
-                setCalculatedPrice(0);
+            // Priority: Check Motor Count
+            if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && i.properties?.motor_count) {
+                if (motorCount === 2 && i.properties.motor_count !== 2) return false;
+                if (motorCount === 1 && i.properties.motor_count === 2) return false;
             }
-        };
 
-        calculateAsync();
+            // Fallback: Name Matching
+            const n = i.addon_name.toLowerCase();
+            return typeKeywords.some(k => n.includes(k));
+        });
+
+        if (bestMatch) {
+            setMatchedItemName(bestMatch.addon_name);
+            // Calculate Price via Service (Handles Matrix & Fixed)
+            // Use 'width' and 'projection' (or depth for ZIPS)
+            // For ZIP Screen: Projection is usually 0 or irrelevant? No, it's Height.
+            // AwningSelector maps 'projection' state to Height for ZIPs (via dimensionLabel)
+            const price = await PricingService.calculateAddonPrice(bestMatch, width, projection);
+            setCalculatedPrice(price);
+        } else {
+            setMatchedItemName('Brak w cenniku');
+            setCalculatedPrice(0);
+        }
     }, [data, type, width, projection, motorCount, availableItems]);
+
+    useEffect(() => {
+        calculatePrice();
+    }, [calculatePrice]);
 
     const { totalPrice, breakdown } = useMemo(() => {
         if (!data) return { totalPrice: 0, breakdown: [] };
@@ -138,7 +138,7 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
         }
 
         return { totalPrice: total, breakdown: items };
-    }, [data, calculateAsync, calculatedPrice, matchedItemName, color, extras, isZipScreen, availableItems]);
+    }, [data, calculatedPrice, matchedItemName, color, extras, isZipScreen, availableItems]);
 
     const handleAdd = () => {
         const typeName = type === 'aufdachmarkise_zip'
