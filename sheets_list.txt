@@ -1,0 +1,97 @@
+[dotenv@17.2.3] injecting env (1) from .env.local -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+Reading /Users/tomaszfijolek/Desktop/Program do ofert /offer-app/AluxePreisliste.xlsx...
+Available Sheets:
+1. Titelblatt
+2. Vorwort
+3. Einteilung (fertig)
+4. Orangeline  Polycarbonat Zone1R
+5. Orangeline Polycarbonat 1a&2R
+6. Orangeline Polycarbonat 2a&3R
+7. Orangeline Glas zone 1R
+8. Orangeline Glas zone 1a&2R
+9. Orangeline Glas zone 2a&3R
+10. Orangeline+ Polycarbonat Zone1R
+11. Orangeline+ Polycarbonat 1a&2R
+12. Orangeline+ Polycarbonat 2a&3R
+13. Orangeline+ Glas zone 1R
+14. Orangeline+ Glas zone 1a&2R
+15. Orangeline+ Glas zone 2a&3R
+16. Materialien Orangeline
+17. Trendline Polycarbonat Zone1R
+18. Trendline Polycarbonat 1a&2R
+19. Trendline Polycarbonat 2a&3R 
+20. Trendline Glas zone 1R
+21. Trendline Glas 1a & 2R
+22. Trendline Glas 2a & 3R
+23. Trendline+ Polycarbonat Zone1R
+24. Trendline+ Polycarbonat 1a&2R
+25. Trendline+ Polycarbonat 2a&3R 
+26. Trendline+ Glas zone 1R
+27. Trendline+ Glas 1a & 2R
+28. Trendline+ Glas 2a & 3R
+29. Materialien Trendline R
+30. Topline Polycarbonat Z 1R
+31. Topline Polycarbonat Z 1a +2R
+32. Topline Polycarbonat Z 2a + 3R
+33. Topline Glas zone 1R 
+34. Topline Glas zone 1a+2R
+35. Topline Glas zone 2a+3R
+36. Materialien Topline R
+37. Topline XL Polycarbonat Z 1R
+38. Topline XL Polycarbona Z1a + 2R
+39. Topline XL Poly Z 2a + 3R
+40. Topline XL Glas zone 1R
+41. Topline XL Glas zone 1a+2R
+42. Topline XL Glas zone 2a+3R
+43. Materialien Topline XL
+44. Designline Zone 1R
+45. Designline Zone 1a+2R
+46. Designline Zone 2a+3R
+47. Designline materialen
+48. Ultraline Zone 1R
+49. Ultraline Zone 1a +2R
+50. Ultraline Zone 2a +3R
+51. Ultraline MaterialienR
+52. Skyline Zone 1R
+53. Skyline Freistand Zone 1R
+54. Skyline Zone 1a +2R
+55. Skyline Freistand Zone 1a +2R
+56. Skyline Zone 2a +3R
+57. Skyline Freistand Zone 2a +3R
+58. Carport Zone 1R
+59. Carport Freistand Zone 1R
+60. Carport Zone 1a +2R
+61. Carport Freistand Zone 1a +2R
+62. Carport Zone 2a +3R
+63. Carport Freistand Zone 2a +3R
+64. Skyline MaterialienR
+65. Freistehende TerrassendächerR
+66. Markisen - Aufdach ZIP
+67. Markisen - Unterdach ZIP 
+68. Markisen - Senkrecht
+69. KeilfensterR
+70. SeitenwandR
+71. FrontwandR
+72. SchiebetürR
+73. Panorama AL22R
+74. Panorama AL 23R
+75. Panorama AL24R
+76. Panorama AL 25R
+77. Panorama AL26R
+78. Zonweringspaneel
+79. Planken,ZäuneR
+80. Loses Material allgemein 
+81. Algemene voorwaarden
+82. Sprache
+
+✅ --- SHEET: Markisen - Aufdach ZIP (Lines 0-10) ---
+[0] ["Aufdachmarkise ZIP ",null,null,null,null,null,null,null,null,0.44999999999999996]
+[1] ["max. 6.000 x 5.000 mm | Kupplung max. 2 x 5.000 mm",null,null,null,null,null,null,null,null,null]
+[2] ["1 Feld (bis 5000 mm Breite) = 1 Motor",null,null,null,null,null,null,null,null,null]
+[3] ["Preis inkl. Somfy IO Motor, Kabel und 5-Kanal Fernbedienung, exkl. Montagematerial",null,null,null,null,null,null,null,null,null]
+[4] [null,null,null,null,null,null,null,null,null,null]
+[5] ["Breite in mm","Ausfall in mm",null,null,null,null,null,null,null,null]
+[6] [null,2500,3000,3500,4000,4500,5000,null,null,null]
+[7] [3000,1465.13772,1532.6999999999998,1600.1999999999998,1703.6999999999998,1772.1,1838.6999999999998,null,null,null]
+[8] [3500,1565.9999999999998,1641.6,1718.1,1830.6,1907.1,1983.6,null,null,null]
+[9] [4000,1659.6,1744.1999999999998,1829.6999999999998,1951.1999999999998,2035.7999999999997,2121.2999999999997,null,null,null]

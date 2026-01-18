@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { FairService, type Fair } from '../../services/database/fair.service';
-import type { Lead, LeadStatus } from '../../types';
+import type { Lead, LeadStatus, User } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { LeadsKanban } from './LeadsKanban';
 import { LeadsFunnelChart } from './LeadsFunnelChart';
@@ -12,6 +12,8 @@ import { LeadsStats } from './LeadsStats';
 export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [fairs, setFairs] = useState<Fair[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [filterAssignee, setFilterAssignee] = useState<string>('all');
     const { isAdmin } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -26,12 +28,14 @@ export const LeadsList: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [leadsData, fairsData] = await Promise.all([
+            const [leadsData, fairsData, usersData] = await Promise.all([
                 DatabaseService.getLeads(),
-                FairService.getAllFairs()
+                FairService.getAllFairs(),
+                DatabaseService.getAllUsers()
             ]);
             setLeads(leadsData);
             setFairs(fairsData);
+            setUsers(usersData);
         } catch (error) {
             console.error('Error loading data:', error);
             toast.error('Nie udało się załadować danych');
@@ -61,6 +65,15 @@ export const LeadsList: React.FC = () => {
             } else {
                 // Specific fair ID
                 if (lead.fairId !== filterFair) return false;
+            }
+        }
+
+        // Assignee Filter
+        if (filterAssignee !== 'all') {
+            if (filterAssignee === 'unassigned') {
+                if (lead.assignedTo) return false;
+            } else {
+                if (lead.assignedTo !== filterAssignee) return false;
             }
         }
 
@@ -334,6 +347,23 @@ export const LeadsList: React.FC = () => {
                             {fairs.map(fair => (
                                 <option key={fair.id} value={fair.id}>
                                     🎡 {fair.name} {fair.is_active ? '(Aktywne)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-600">Opiekun:</span>
+                        <select
+                            value={filterAssignee}
+                            onChange={(e) => setFilterAssignee(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none min-w-[150px]"
+                        >
+                            <option value="all">Wszyscy</option>
+                            <option value="unassigned">Nieprzypisany</option>
+                            {users.filter(u => u.role === 'sales_rep' || u.role === 'admin' || u.role === 'manager').map(user => (
+                                <option key={user.id} value={user.id}>
+                                    {user.firstName} {user.lastName}
                                 </option>
                             ))}
                         </select>

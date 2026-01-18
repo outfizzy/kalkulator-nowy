@@ -3,6 +3,7 @@ import { SettingsService } from '../../services/database/settings.service';
 
 export const GlobalSettingsPanel: React.FC = () => {
     const [eurRate, setEurRate] = useState<number | null>(null);
+    const [defaultMargin, setDefaultMargin] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -16,6 +17,11 @@ export const GlobalSettingsPanel: React.FC = () => {
             setLoading(true);
             const rate = await SettingsService.getEurRate();
             setEurRate(rate);
+
+            const policy = await SettingsService.getGlobalPricingPolicy();
+            if (policy) {
+                setDefaultMargin(policy.defaultMargin);
+            }
         } catch (err) {
             console.error('Error loading settings:', err);
             setError('Failed to load settings');
@@ -31,6 +37,13 @@ export const GlobalSettingsPanel: React.FC = () => {
             setSaving(true);
             setError(null);
             await SettingsService.updateEurRate(eurRate);
+
+            if (defaultMargin !== null) {
+                await SettingsService.updateGlobalPricingPolicy({
+                    defaultMargin: defaultMargin
+                });
+            }
+
             alert('Settings saved successfully');
         } catch (err) {
             console.error('Error saving settings:', err);
@@ -70,6 +83,27 @@ export const GlobalSettingsPanel: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                         Used for converting EUR costs to PLN in profitability calculations.
+                    </p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Default Margin (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="100"
+                            value={defaultMargin ?? ''}
+                            onChange={(e) => setDefaultMargin(parseFloat(e.target.value) || 0)}
+                            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border"
+                        />
+                        <span className="text-gray-500">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Global default margin applied to new offers.
                     </p>
                 </div>
             </div>

@@ -299,31 +299,42 @@ export const AdminDashboard: React.FC = () => {
                 <div className="lg:col-span-1 h-full min-h-[400px] space-y-6">
                     <WalletWidget />
 
-                    {/* Tasks Widget */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[400px]">
-                        <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                                </svg>
-                                Moje Zadania
-                            </h3>
-                            <button
-                                onClick={() => setIsTaskModalOpen(true)}
-                                className="text-xs font-semibold text-accent hover:text-accent-dark bg-accent/10 hover:bg-accent/20 px-2 py-1 rounded transition-colors"
-                            >
-                                + Dodaj
-                            </button>
-                        </div>
-                        <div className="p-4 flex-1 overflow-y-auto">
-                            <TasksList refreshTrigger={tasksRefreshTrigger} />
-                        </div>
-                    </div>
+
                 </div>
                 <div className="lg:col-span-2 h-full">
                     <RingostatWidget />
                 </div>
             </div>
+
+            {/* Tasks Section - Full Width */}
+            <section>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800">Moje Zadania</h3>
+                        </div>
+                        <button
+                            onClick={() => setIsTaskModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Dodaj Zadanie
+                        </button>
+                    </div>
+                    <div className="p-0 flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto p-6">
+                            <TasksList refreshTrigger={tasksRefreshTrigger} />
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <TaskModal
                 isOpen={isTaskModalOpen}

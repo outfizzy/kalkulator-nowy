@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../../services/database';
+import { supabase } from '../../lib/supabase';
 import { FairService, type Prize } from '../../services/database/fair.service';
 import { UserService } from '../../services/database/user.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { generateFairPDF } from '../../utils/fairPdfGenerator';
+import { CATALOG_EMAIL_TEMPLATE } from './fairEmailTemplate';
 import { WheelOfFortune } from './WheelOfFortune';
 import {
     Home, Sun, Car, Wrench, Blinds, PanelLeft, Plug,
@@ -40,6 +42,7 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
     const [address, setAddress] = useState('');
     const [mainNotes, setMainNotes] = useState('');
     const [conversationSummary, setConversationSummary] = useState(''); // New: Conversation summary
+    const [sendCatalog, setSendCatalog] = useState(false);
 
     // Products
     const [products, setProducts] = useState<FairProductConfig[]>([]);
@@ -231,25 +234,55 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                     address: address || '', // Street / House Number
                     companyName: ''
                 },
-                source: 'targi',
+                // Dynamic Source: targi + sanitized fair name (e.g., 'targi_budma_2025')
+                // Dynamic Source: targi + sanitized fair name
+                // [Fix 2026-01-15] Check if source is valid enum or use default 'targi'
+                source: 'targi', // Safer to use standard 'targi' then put specific fair in notes/fairId
                 status: 'fair',
                 assignedTo: selectedAssigneeId || currentUser?.id, // Logic: Use selected (if admin) or self
                 notes: notes,
                 fairId: fairId,
-                fairMessage: `Targi: ${fairName}`, // Store source info here if needed by backend, or relies on fairId
+                fairMessage: `Targi: ${fairName}`,
                 fairPhotos: photos,
-                fairPrize: prize,
-                fairProducts: products
+                fairPrize: prize, // Storing full prize object
+                fairProducts: products,
+                attachments: [] // Initialize empty if needed
             });
 
             if (lead) {
+                // 3. Send Catalog Email if requested
+                if (sendCatalog && email) {
+                    try {
+                        const { data, error } = await supabase.functions.invoke('send-email', {
+                            body: {
+                                to: email,
+                                subject: 'Polendach24 - Terrassenüberdachung',
+                                html: CATALOG_EMAIL_TEMPLATE
+                            }
+                        });
+
+                        // [Fix 2026-01-15] Handle 200 OK with error (Edge Function Pattern)
+                        if (error) throw error;
+                        if (data && data.success === false) throw new Error(data.error || 'Email function returned error');
+
+                        toast.success('Katalog został wysłany! 📧');
+                    } catch (emailError: any) {
+                        console.error('Failed to send catalog (Details):', JSON.stringify(emailError, null, 2));
+                        const errMsg = emailError?.message || emailError?.error_description || JSON.stringify(emailError);
+                        toast.error(`Nie udało się wysłać katalogu: ${errMsg.substring(0, 50)}...`);
+                        // Don't block flow, lead is saved
+                    }
+                }
+
                 // Generate PDF Backup
                 try {
                     generateFairPDF({
-                        firstName,
-                        lastName,
                         phone,
                         email,
+                        companyName: '', // Future proofing
+                        city: city || '',
+                        zip: zip || '',
+                        street: address || '',
                         notes: mainNotes,
                         wonPrize: prize,
                         photos
@@ -266,10 +299,18 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                 }, 1500);
             }
         } catch (error) {
-            console.error('Fair Lead Save Error:', error);
+            console.error('Fair Lead Save Error:', JSON.stringify(error, null, 2));
 
             // User-friendly error messages
-            const message = error instanceof Error ? error.message : 'Nieznany błąd';
+            const getMessage = (e: any) => {
+                if (e instanceof Error) return e.message;
+                if (typeof e === 'object' && e !== null) {
+                    return e.message || e.error_description || JSON.stringify(e);
+                }
+                return String(e);
+            }
+
+            const message = getMessage(error); // error instanceof Error ? error.message : 'Nieznany błąd';
 
             if (message.includes('constraint') || message.includes('violates')) {
                 toast.error('❌ Błąd walidacji danych. Sprawdź czy wszystkie pola są poprawnie wypełnione.');
@@ -335,9 +376,9 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
     // --- RENDERERS ---
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900">
-            {/* CLEAN STICKY HEADER */}
-            <div className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+        <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+            {/* CLEAN HEADER - NON-STICKY (Flex Item) */}
+            <div className="flex-none z-50 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
                     {/* Top Row: Fair Info + Close */}
                     <div className="flex items-center justify-between gap-4 mb-4">
@@ -405,533 +446,538 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                 </div>
             </div>
 
-            {/* MAIN CONTENT - COMPACT PROFESSIONAL WIDTH */}
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+            {/* MAIN CONTENT - SCROLLABLE AREA (Flex Grow) */}
+            <div className="flex-1 overflow-hidden flex flex-col w-full relative">
+                <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-4 w-full flex flex-col overflow-y-auto scroll-smooth">
 
-                {/* VIEW: HUB (Product Selection) */}
-                {viewMode === 'hub' && (
-                    <div className="space-y-8">
-                        <div>
-                            <h3 className="text-2xl font-semibold text-slate-900">Biblioteka Produktów</h3>
-                            <p className="text-slate-500 mt-1">Wybierz kategorię aby skonfigurować produkt.</p>
-                        </div>
+                    {/* VIEW: HUB (Product Selection) */}
+                    {viewMode === 'hub' && (
+                        <div className="space-y-8">
+                            <div>
+                                <h3 className="text-2xl font-semibold text-slate-900">Biblioteka Produktów</h3>
+                                <p className="text-slate-500 mt-1">Wybierz kategorię aby skonfigurować produkt.</p>
+                            </div>
 
-                        {/* UNIFIED PRO GRID */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {/* ROOF */}
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'roof' })); setViewMode('config'); }}
-                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
-                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                    <Home className="w-6 h-6" />
-                                </div>
-                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Zadaszenie</h4>
-                                <p className="text-sm text-slate-500 leading-relaxed">Systemy aluminiowe z wypełnieniem szklanym lub poliwęglanowym.</p>
-                            </button>
+                            {/* UNIFIED PRO GRID */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* ROOF */}
+                                <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'roof' })); setViewMode('config'); }}
+                                    className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                        <Home className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-semibold text-slate-900 text-lg mb-1">Zadaszenie</h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed">Systemy aluminiowe z wypełnieniem szklanym lub poliwęglanowym.</p>
+                                </button>
 
-                            {/* PERGOLA */}
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'pergola' })); setViewMode('config'); }}
-                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
-                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                    <Sun className="w-6 h-6" />
-                                </div>
-                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Pergola</h4>
-                                <p className="text-sm text-slate-500 leading-relaxed">Bioklimatyczne pergole lamelowe oraz systemy materiałowe.</p>
-                            </button>
+                                {/* PERGOLA */}
+                                <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'pergola' })); setViewMode('config'); }}
+                                    className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                        <Sun className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-semibold text-slate-900 text-lg mb-1">Pergola</h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed">Bioklimatyczne pergole lamelowe oraz systemy materiałowe.</p>
+                                </button>
 
-                            {/* CARPORT */}
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'carport' })); setViewMode('config'); }}
-                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
-                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                    <Car className="w-6 h-6" />
-                                </div>
-                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Carport</h4>
-                                <p className="text-sm text-slate-500 leading-relaxed">Wiaty garażowe wolnostojące oraz przyścienne.</p>
-                            </button>
+                                {/* CARPORT */}
+                                <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'carport' })); setViewMode('config'); }}
+                                    className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                        <Car className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-semibold text-slate-900 text-lg mb-1">Carport</h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed">Wiaty garażowe wolnostojące oraz przyścienne.</p>
+                                </button>
 
-                            {/* GLASS (SOLO) */}
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'sliding_glass' })); setViewMode('config'); }}
-                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
-                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                    <PanelLeft className="w-6 h-6" />
-                                </div>
-                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Zabudowa</h4>
-                                <p className="text-sm text-slate-500 leading-relaxed">Systemy przesuwne (ramowe/bezramowe) do gotowych konstrukcji.</p>
-                            </button>
+                                {/* GLASS (SOLO) */}
+                                <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'sliding_glass' })); setViewMode('config'); }}
+                                    className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                        <PanelLeft className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-semibold text-slate-900 text-lg mb-1">Zabudowa</h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed">Systemy przesuwne (ramowe/bezramowe) do gotowych konstrukcji.</p>
+                                </button>
 
-                            {/* ZIP (SOLO) */}
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
-                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
-                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                    <Blinds className="w-6 h-6" />
-                                </div>
-                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Rolety ZIP</h4>
-                                <p className="text-sm text-slate-500 leading-relaxed">Osłony przeciwsłoneczne typu screen do okien i tarasów.</p>
-                            </button>
+                                {/* ZIP (SOLO) */}
+                                <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'zip_screen' })); setViewMode('config'); }}
+                                    className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                        <Blinds className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-semibold text-slate-900 text-lg mb-1">Rolety ZIP</h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed">Osłony przeciwsłoneczne typu screen do okien i tarasów.</p>
+                                </button>
 
-                            {/* ACCESSORIES */}
-                            <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'accessory' })); setViewMode('config'); }}
-                                className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
-                                <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                    <Plug className="w-6 h-6" />
-                                </div>
-                                <h4 className="font-semibold text-slate-900 text-lg mb-1">Akcesoria</h4>
-                                <p className="text-sm text-slate-500 leading-relaxed">Promienniki ciepła, oświetlenie LED, czujniki pogodowe.</p>
-                            </button>
-                        </div>
-
-
-                        {/* ACTION BAR */}
-                        <div className="pt-6 border-t border-slate-200 sticky bottom-0 bg-slate-50 pb-4">
-                            <div className="flex justify-between items-center shadow-lg bg-white p-4 rounded-xl border border-slate-200">
-                                <div>
-                                    <h4 className="font-semibold text-slate-900 text-sm">Lista wyboru ({products.length})</h4>
-                                    <div className="text-xs text-slate-500">{products.length === 0 ? 'Dodaj produkt' : 'Gotowe do wyceny'}</div>
-                                </div>
-                                <button
-                                    onClick={() => setViewMode('interview')}
-                                    disabled={products.length === 0}
-                                    className="px-6 py-2.5 bg-slate-900 hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm shadow-sm transition-all flex items-center gap-2"
-                                >
-                                    Dalej
-                                    <ChevronRight className="w-4 h-4" />
+                                {/* ACCESSORIES */}
+                                <button onClick={() => { setCurrentConfig(c => ({ ...c, type: 'accessory' })); setViewMode('config'); }}
+                                    className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all text-left flex flex-col items-start">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                        <Plug className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-semibold text-slate-900 text-lg mb-1">Akcesoria</h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed">Promienniki ciepła, oświetlenie LED, czujniki pogodowe.</p>
                                 </button>
                             </div>
-
-                            {/* MINI PREVIEW */}
-                            {products.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {products.map((p, i) => (
-                                        <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-md shadow-sm">
-                                            <span className="text-xs font-mono text-slate-400">#{i + 1}</span>
-                                            <span className="text-xs font-medium text-slate-700">{getProductLabel(p.type)}</span>
-                                            {p.width && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 ml-1">{p.width}mm</span>}
-                                            <button onClick={() => setProducts(curr => curr.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-600 ml-1">
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* VIEW: CONFIG (Product Details) */}
-                {viewMode === 'config' && (
-                    <div className="max-w-2xl mx-auto">
-                        <button
-                            onClick={() => { setViewMode('hub'); setCurrentConfig({}); }}
-                            className="mb-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 px-3 py-2 hover:bg-white rounded-lg transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                            Wróć do wyboru
-                        </button>
+                    {/* VIEW: CONFIG (Product Details) */}
+                    {viewMode === 'config' && (
+                        <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col min-h-0">
+                            <button
+                                onClick={() => { setViewMode('hub'); setCurrentConfig({}); }}
+                                className="mb-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 px-3 py-2 hover:bg-white rounded-lg transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                Wróć do wyboru
+                            </button>
 
-                        <div className="bg-white w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-                            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                <h3 className="text-lg font-bold text-slate-800">
-                                    Konfiguracja: {getProductLabel(currentConfig.type || 'Produkt')}
-                                </h3>
-                                <button onClick={() => setViewMode('hub')} className="text-slate-400 hover:text-slate-600 p-2">✕</button>
-                            </div>
+                            <div className="bg-white w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col flex-1 border border-slate-200">
+                                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                    <h3 className="text-lg font-bold text-slate-800">
+                                        Konfiguracja: {getProductLabel(currentConfig.type || 'Produkt')}
+                                    </h3>
+                                    <button onClick={() => setViewMode('hub')} className="text-slate-400 hover:text-slate-600 p-2">✕</button>
+                                </div>
 
-                            <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
-                                {/* DYNAMIC SECTIONS BASED ON TYPE */}
+                                <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+                                    {/* DYNAMIC SECTIONS BASED ON TYPE */}
 
-                                {/* 1. Dimensions (For Roof, Pergola, Carport, Zip, Glass) */}
-                                {['roof', 'pergola', 'carport', 'zip_screen', 'sliding_glass'].includes(currentConfig.type!) && (
-                                    <div className="space-y-6 mb-8">
-                                        <h4 className="text-xl font-bold text-slate-800">Wymiary (mm)</h4>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-400 uppercase">Szerokość</label>
-                                                <input type="number"
-                                                    value={currentConfig.width || ''}
-                                                    onChange={e => setCurrentConfig(c => ({ ...c, width: e.target.value }))}
-                                                    className="w-full p-4 border rounded-xl text-center text-2xl font-bold font-mono" />
-                                                <div className="flex gap-2 justify-center">{[3000, 4000, 5000].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, width: v.toString() }))} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">{v}</button>)}</div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                                                    {currentConfig.type === 'zip_screen' || currentConfig.type === 'sliding_glass' ? 'Wysokość' : 'Wysięg'}
-                                                </label>
-                                                <input type="number"
-                                                    value={currentConfig.projection || ''}
-                                                    onChange={e => setCurrentConfig(c => ({ ...c, projection: e.target.value }))}
-                                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-lg font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-                                                <div className="flex gap-2 justify-center">{[2500, 3000, 3500].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, projection: v.toString() }))} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">{v}</button>)}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 2. Roof Fill (Roof Only) */}
-                                {currentConfig.type === 'roof' && (
-                                    <div className="space-y-3 mb-8">
-                                        <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Wypełnienie Dachu</label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <OptionCard active={currentConfig.roofFill === 'polycarbonate'} onClick={() => setCurrentConfig(c => ({ ...c, roofFill: 'polycarbonate' }))} label="Poliwęglan" />
-                                            <OptionCard active={currentConfig.roofFill === 'glass'} onClick={() => setCurrentConfig(c => ({ ...c, roofFill: 'glass' }))} label="Szkło" />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 3. Walls (Roof, Pergola, Sliding Glass) */}
-                                {['roof', 'pergola'].includes(currentConfig.type!) && (
-                                    <div className="space-y-3 mb-8">
-                                        <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Ściany / Zabudowa</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                            {['none', 'framed', 'frameless', 'fixed', 'aluminum'].map((wType) => {
-                                                const isActive = currentConfig.wallTypes?.includes(wType);
-                                                return (
-                                                    <button key={wType} onClick={() => {
-                                                        const current = currentConfig.wallTypes || [];
-                                                        const newTypes = isActive ? current.filter(t => t !== wType) : [...current, wType];
-                                                        setCurrentConfig(c => ({ ...c, wallTypes: newTypes }));
-                                                    }} className={`p-2.5 rounded-lg border text-sm font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
-                                                        {wType === 'none' ? 'Brak' : wType === 'framed' ? 'Ramowe' : wType === 'frameless' ? 'Bezramowe' : wType === 'fixed' ? 'Stałe' : 'Aluminium'}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 3b. Sliding Glass Specific */}
-                                {currentConfig.type === 'sliding_glass' && (
-                                    <div className="space-y-3 mb-8">
-                                        <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Typ Systemu</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                            {['framed', 'frameless', 'fixed'].map((wType) => {
-                                                const isActive = currentConfig.wallTypes?.includes(wType);
-                                                return (
-                                                    <button key={wType} onClick={() => {
-                                                        const current = currentConfig.wallTypes || [];
-                                                        const newTypes = isActive ? current.filter(t => t !== wType) : [...current, wType];
-                                                        setCurrentConfig(c => ({ ...c, wallTypes: newTypes }));
-                                                    }} className={`p-2.5 rounded-lg border text-sm font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
-                                                        {wType === 'framed' ? 'Ramowe' : wType === 'frameless' ? 'Bezramowe' : 'Stałe'}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                        <div className="mt-4 flex items-center gap-3">
-                                            <label className="text-sm font-medium text-slate-600">Ilość stron / odcinków:</label>
-                                            <input type="number" value={currentConfig.wallSidesCount || 1} onChange={e => setCurrentConfig(c => ({ ...c, wallSidesCount: parseInt(e.target.value) }))} className="w-20 p-2 border border-slate-300 rounded-md text-center font-semibold" />
-                                        </div>
-                                    </div>
-                                )}
-
-
-                                {/* 4. ZIP Screens (Roof, Pergola - toggle; Zip Standalone - implied) */}
-                                {['roof', 'pergola'].includes(currentConfig.type!) && (
-                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-8">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <span className="font-semibold text-slate-900">Rolety ZIP Screen</span>
-                                            <button onClick={() => setCurrentConfig(c => ({ ...c, zipEnabled: !c.zipEnabled }))} className={`w-12 h-6 rounded-full transition-colors relative ${currentConfig.zipEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                                                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${currentConfig.zipEnabled ? 'translate-x-6' : ''}`} />
-                                            </button>
-                                        </div>
-                                        {currentConfig.zipEnabled && (
-                                            <div className="flex items-center gap-3">
-                                                <label className="text-sm text-slate-600">Ilość rolet:</label>
-                                                <div className="flex gap-2">
-                                                    {[1, 2, 3, 4].map(n =>
-                                                        <button key={n} onClick={() => setCurrentConfig(c => ({ ...c, zipSidesCount: n }))}
-                                                            className={`w-8 h-8 flex items-center justify-center rounded border ${currentConfig.zipSidesCount === n ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-slate-200 text-slate-600'}`}>{n}</button>
-                                                    )}
+                                    {/* 1. Dimensions (For Roof, Pergola, Carport, Zip, Glass) */}
+                                    {['roof', 'pergola', 'carport', 'zip_screen', 'sliding_glass'].includes(currentConfig.type!) && (
+                                        <div className="space-y-6 mb-8">
+                                            <h4 className="text-xl font-bold text-slate-800">Wymiary (mm)</h4>
+                                            <div className="grid grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase">Szerokość</label>
+                                                    <input type="number"
+                                                        value={currentConfig.width || ''}
+                                                        onChange={e => setCurrentConfig(c => ({ ...c, width: e.target.value }))}
+                                                        className="w-full p-4 border rounded-xl text-center text-2xl font-bold font-mono" />
+                                                    <div className="flex gap-2 justify-center">{[3000, 4000, 5000].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, width: v.toString() }))} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">{v}</button>)}</div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                                        {currentConfig.type === 'zip_screen' || currentConfig.type === 'sliding_glass' ? 'Wysokość' : 'Wysięg'}
+                                                    </label>
+                                                    <input type="number"
+                                                        value={currentConfig.projection || ''}
+                                                        onChange={e => setCurrentConfig(c => ({ ...c, projection: e.target.value }))}
+                                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-lg font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                                                    <div className="flex gap-2 justify-center">{[2500, 3000, 3500].map(v => <button key={v} onClick={() => setCurrentConfig(c => ({ ...c, projection: v.toString() }))} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">{v}</button>)}</div>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                )}
+                                        </div>
+                                    )}
 
-                                {/* 5. Common Notes */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-slate-900">Uwagi do produktu</label>
-                                    <textarea value={currentConfig.notes || ''} onChange={e => setCurrentConfig(c => ({ ...c, notes: e.target.value }))} placeholder="Dodatkowe informacje..." className="w-full p-3 border border-slate-300 rounded-lg min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
-                                </div>
-                            </div>
+                                    {/* 2. Roof Fill (Roof Only) */}
+                                    {currentConfig.type === 'roof' && (
+                                        <div className="space-y-3 mb-8">
+                                            <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Wypełnienie Dachu</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <OptionCard active={currentConfig.roofFill === 'polycarbonate'} onClick={() => setCurrentConfig(c => ({ ...c, roofFill: 'polycarbonate' }))} label="Poliwęglan" />
+                                                <OptionCard active={currentConfig.roofFill === 'glass'} onClick={() => setCurrentConfig(c => ({ ...c, roofFill: 'glass' }))} label="Szkło" />
+                                            </div>
+                                        </div>
+                                    )}
 
-                            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
-                                <button onClick={saveConfig} className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-black shadow-lg">
-                                    Gotowe - Dodaj Produkt
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                                    {/* 3. Walls (Roof, Pergola, Sliding Glass) */}
+                                    {['roof', 'pergola'].includes(currentConfig.type!) && (
+                                        <div className="space-y-3 mb-8">
+                                            <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Ściany / Zabudowa</label>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                {['none', 'framed', 'frameless', 'fixed', 'aluminum'].map((wType) => {
+                                                    const isActive = currentConfig.wallTypes?.includes(wType);
+                                                    return (
+                                                        <button key={wType} onClick={() => {
+                                                            const current = currentConfig.wallTypes || [];
+                                                            const newTypes = isActive ? current.filter(t => t !== wType) : [...current, wType];
+                                                            setCurrentConfig(c => ({ ...c, wallTypes: newTypes }));
+                                                        }} className={`p-2.5 rounded-lg border text-sm font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                                                            {wType === 'none' ? 'Brak' : wType === 'framed' ? 'Ramowe' : wType === 'frameless' ? 'Bezramowe' : wType === 'fixed' ? 'Stałe' : 'Aluminium'}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
 
-                {/* VIEW: INTERVIEW (Questions & Next Actions) */}
-                {viewMode === 'interview' && (
-                    <div className="max-w-4xl mx-auto space-y-8">
-                        <div>
-                            <h3 className="text-2xl font-semibold text-slate-900">Wywiad</h3>
-                            <p className="text-slate-500 mt-1">Szybka weryfikacja potrzeb i ustalenie kolejnych kroków.</p>
-                        </div>
+                                    {/* 3b. Sliding Glass Specific */}
+                                    {currentConfig.type === 'sliding_glass' && (
+                                        <div className="space-y-3 mb-8">
+                                            <label className="text-sm font-semibold text-slate-900 block border-b border-slate-100 pb-2">Typ Systemu</label>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                {['framed', 'frameless', 'fixed'].map((wType) => {
+                                                    const isActive = currentConfig.wallTypes?.includes(wType);
+                                                    return (
+                                                        <button key={wType} onClick={() => {
+                                                            const current = currentConfig.wallTypes || [];
+                                                            const newTypes = isActive ? current.filter(t => t !== wType) : [...current, wType];
+                                                            setCurrentConfig(c => ({ ...c, wallTypes: newTypes }));
+                                                        }} className={`p-2.5 rounded-lg border text-sm font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                                                            {wType === 'framed' ? 'Ramowe' : wType === 'frameless' ? 'Bezramowe' : 'Stałe'}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="mt-4 flex items-center gap-3">
+                                                <label className="text-sm font-medium text-slate-600">Ilość stron / odcinków:</label>
+                                                <input type="number" value={currentConfig.wallSidesCount || 1} onChange={e => setCurrentConfig(c => ({ ...c, wallSidesCount: parseInt(e.target.value) }))} className="w-20 p-2 border border-slate-300 rounded-md text-center font-semibold" />
+                                            </div>
+                                        </div>
+                                    )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Left: Client Questions */}
-                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                                    <HelpCircle className="w-5 h-5 text-slate-400" />
-                                    Pytania Kluczowe
-                                </h4>
-                                <div className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <input
-                                            value={newQuestion}
-                                            onChange={e => setNewQuestion(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' && newQuestion.trim()) {
-                                                    setClientQuestions(prev => [...prev, newQuestion.trim()]);
-                                                    setNewQuestion('');
-                                                }
-                                            }}
-                                            placeholder="Dodaj pytanie/uwagę..."
-                                            className="flex-1 p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                if (newQuestion.trim()) {
-                                                    setClientQuestions(prev => [...prev, newQuestion.trim()]);
-                                                    setNewQuestion('');
-                                                }
-                                            }}
-                                            className="bg-slate-100 text-slate-600 px-3.5 rounded-lg font-medium hover:bg-slate-200"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                    {/* List */}
-                                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
-                                        {clientQuestions.map((q, i) => (
-                                            <div key={i} className="flex items-start gap-3 p-3 bg-white hover:bg-slate-50 group">
-                                                <span className="text-slate-400 font-mono text-xs mt-0.5">{i + 1}.</span>
-                                                <span className="flex-1 text-sm text-slate-700 leading-snug">{q}</span>
-                                                <button onClick={() => setClientQuestions(curr => curr.filter((_, idx) => idx !== i))} className="text-slate-300 group-hover:text-red-500 transition-colors">
-                                                    <X className="w-4 h-4" />
+
+                                    {/* 4. ZIP Screens (Roof, Pergola - toggle; Zip Standalone - implied) */}
+                                    {['roof', 'pergola'].includes(currentConfig.type!) && (
+                                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-8">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="font-semibold text-slate-900">Rolety ZIP Screen</span>
+                                                <button onClick={() => setCurrentConfig(c => ({ ...c, zipEnabled: !c.zipEnabled }))} className={`w-12 h-6 rounded-full transition-colors relative ${currentConfig.zipEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                                    <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${currentConfig.zipEnabled ? 'translate-x-6' : ''}`} />
                                                 </button>
                                             </div>
-                                        ))}
-                                        {clientQuestions.length === 0 && (
-                                            <div className="p-4 text-center text-xs text-slate-400 italic">
-                                                Brak dodanych pytań
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right: Next Actions */}
-                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                                    <ClipboardList className="w-5 h-5 text-slate-400" />
-                                    Działania
-                                </h4>
-                                <div className="space-y-2">
-                                    {[
-                                        'Wysłać Katalog PDF',
-                                        'Wycena Wstępna',
-                                        'Umówić Pomiar',
-                                        'Kontakt Telefoniczny',
-                                        'Pilny Lead 🔥'
-                                    ].map(action => {
-                                        const active = nextActions.includes(action);
-                                        return (
-                                            <button
-                                                key={action}
-                                                onClick={() => {
-                                                    setNextActions(prev =>
-                                                        active ? prev.filter(a => a !== action) : [...prev, action]
-                                                    );
-                                                }}
-                                                className={`w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center gap-3 ${active ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                                            >
-                                                <div className={`w-5 h-5 rounded border flex items-center justify-center bg-white ${active ? 'border-blue-500 text-blue-600' : 'border-slate-300 text-transparent'}`}>
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                            {currentConfig.zipEnabled && (
+                                                <div className="flex items-center gap-3">
+                                                    <label className="text-sm text-slate-600">Ilość rolet:</label>
+                                                    <div className="flex gap-2">
+                                                        {[1, 2, 3, 4].map(n =>
+                                                            <button key={n} onClick={() => setCurrentConfig(c => ({ ...c, zipSidesCount: n }))}
+                                                                className={`w-8 h-8 flex items-center justify-center rounded border ${currentConfig.zipSidesCount === n ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-slate-200 text-slate-600'}`}>{n}</button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {action}
-                                            </button>
-                                        );
-                                    })}
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* 5. Common Notes */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold text-slate-900">Uwagi do produktu</label>
+                                        <textarea value={currentConfig.notes || ''} onChange={e => setCurrentConfig(c => ({ ...c, notes: e.target.value }))} placeholder="Dodatkowe informacje..." className="w-full p-3 border border-slate-300 rounded-lg min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                                    </div>
+                                </div>
+
+                                <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
+                                    <button onClick={saveConfig} className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-black shadow-lg">
+                                        Gotowe - Dodaj Produkt
+                                    </button>
                                 </div>
                             </div>
                         </div>
+                    )}
 
-                        <div className="flex justify-between pt-6 border-t border-slate-200">
-                            <button onClick={() => setViewMode('hub')} className="text-slate-500 hover:text-slate-800 text-sm font-medium">
-                                ← Wróć
-                            </button>
-                            <button onClick={() => setViewMode('finalize')} className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-medium shadow-sm hover:bg-black transition-all">
-                                Dane Klienta →
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* VIEW: FINALIZE (Data & Photos) */}
-                {viewMode === 'finalize' && (
-                    <div className="max-w-4xl mx-auto space-y-6">
-                        {/* CONTACT FORM - Pro Clean */}
-                        <div className="bg-white p-6 lg:p-8 rounded-xl border border-slate-200 shadow-sm">
-                            <div className="mb-6 border-b border-slate-100 pb-4">
-                                <h3 className="text-xl font-semibold text-slate-800">Dane Klienta</h3>
-                                <p className="text-sm text-slate-500">Uzupełnij wymagane informacje kontaktowe.</p>
+                    {/* VIEW: INTERVIEW (Questions & Next Actions) */}
+                    {viewMode === 'interview' && (
+                        <div className="max-w-4xl mx-auto space-y-8">
+                            <div>
+                                <h3 className="text-2xl font-semibold text-slate-900">Wywiad</h3>
+                                <p className="text-slate-500 mt-1">Szybka weryfikacja potrzeb i ustalenie kolejnych kroków.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-slate-700">Imię *</label>
-                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)}
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400"
-                                        placeholder="Jan" />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-slate-700">Nazwisko *</label>
-                                    <input value={lastName} onChange={e => setLastName(e.target.value)}
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400"
-                                        placeholder="Kowalski" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-slate-700">Telefon *</label>
-                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400 font-mono"
-                                        placeholder="+48 500 600 700" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-slate-700">E-mail <span className="text-slate-400 font-normal">(opcjonalnie)</span></label>
-                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 shadow-sm placeholder:text-slate-400"
-                                        placeholder="jan@example.com" />
-                                </div>
-                            </div>
-
-                            {/* Optional Address Section */}
-                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                                        <MapPin className="w-4 h-4 text-slate-500" /> Adres Klienta
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Left: Client Questions */}
+                                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                    <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                        <HelpCircle className="w-5 h-5 text-slate-400" />
+                                        Pytania Kluczowe
                                     </h4>
-                                    <span className="text-xs bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500">Opcjonalne</span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                                    <div className="md:col-span-5">
-                                        <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Ulica i numer (np. Hauptstraße 15)"
-                                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 text-sm placeholder:text-slate-400" />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <input value={zip} onChange={e => setZip(e.target.value)} placeholder="Kod pocztowy"
-                                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 text-sm placeholder:text-slate-400" />
-                                    </div>
-                                    <div className="md:col-span-3">
-                                        <input value={city} onChange={e => setCity(e.target.value)} placeholder="Miasto"
-                                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 text-sm placeholder:text-slate-400" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* GERMAN HELPER PHRASES - NEW SECTION */}
-                            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center text-xl shadow-sm">
-                                        🇩🇪
-                                    </div>
-                                    <div>
-                                        <h4 className="text-base font-bold text-amber-900">Hilfreiche Fragen (Deutsch)</h4>
-                                        <p className="text-xs text-amber-600">Pytania pomocnicze po niemiecku</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                    {[
-                                        { de: 'Wie groß soll die Überdachung sein?', pl: 'Jak duże ma być zadaszenie?' },
-                                        { de: 'Wünschen Sie Seitenwände?', pl: 'Czy chcą Państwo ściany boczne?' },
-                                        { de: 'Mit oder ohne Beleuchtung?', pl: 'Z oświetleniem czy bez?' },
-                                        { de: 'Haben Sie eine Baugenehmigung?', pl: 'Czy mają Państwo pozwolenie na budowę?' },
-                                        { de: 'Wo soll es installiert werden?', pl: 'Gdzie ma być zainstalowane?' },
-                                        { de: 'Bis wann brauchen Sie das?', pl: 'Do kiedy Państwo tego potrzebują?' }
-                                    ].map((phrase, i) => (
-                                        <div key={i} className="bg-white p-3 rounded-xl border border-amber-100 hover:border-amber-300 transition-all group cursor-default">
-                                            <div className="font-semibold text-slate-700 mb-1">{phrase.de}</div>
-                                            <div className="text-xs text-slate-400 italic">{phrase.pl}</div>
+                                    <div className="space-y-4">
+                                        <div className="flex gap-2">
+                                            <input
+                                                value={newQuestion}
+                                                onChange={e => setNewQuestion(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && newQuestion.trim()) {
+                                                        setClientQuestions(prev => [...prev, newQuestion.trim()]);
+                                                        setNewQuestion('');
+                                                    }
+                                                }}
+                                                placeholder="Dodaj pytanie/uwagę..."
+                                                className="flex-1 p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    if (newQuestion.trim()) {
+                                                        setClientQuestions(prev => [...prev, newQuestion.trim()]);
+                                                        setNewQuestion('');
+                                                    }
+                                                }}
+                                                className="bg-slate-100 text-slate-600 px-3.5 rounded-lg font-medium hover:bg-slate-200"
+                                            >
+                                                +
+                                            </button>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* CONVERSATION SUMMARY - NEW FIELD */}
-                            {/* CONVERSATION SUMMARY - NEW FIELD */}
-                            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                                <label className="text-sm font-semibold text-blue-900 mb-2 block flex items-center gap-2">
-                                    <MessageSquare className="w-4 h-4 text-blue-600" /> Podsumowanie Rozmowy
-                                </label>
-                                <textarea
-                                    value={conversationSummary}
-                                    onChange={e => setConversationSummary(e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-white border border-blue-200 rounded-lg min-h-[100px] 
-                                               focus:border-blue-400 focus:ring-2 focus:ring-blue-200 
-                                               transition-all outline-none text-slate-700 resize-none text-sm
-                                               placeholder:text-blue-300"
-                                    placeholder="Klient zainteresowany..."
-                                />
-                            </div>
-
-                            {/* Extra Notes */}
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                                    <ClipboardList className="w-4 h-4 text-slate-400" />
-                                    Notatki Dodatkowe
-                                </label>
-                                <textarea value={mainNotes} onChange={e => setMainNotes(e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 resize-none placeholder:text-slate-400 text-sm"
-                                    placeholder="Specjalne wymagania..." />
-                            </div>
-
-                            {/* Photos */}
-                            <div className="mt-6">
-                                <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-2 block">Zdjęcia / Szkice</label>
-                                <div className="flex flex-wrap gap-3">
-                                    <label className={`w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-all ${uploading ? 'opacity-50' : ''}`}>
-                                        <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
-                                        <ImageIcon className="w-8 h-8 text-slate-300" />
-                                    </label>
-                                    {photos.map((photo, i) => (
-                                        <div key={i} className="w-24 h-24 rounded-xl bg-slate-100 relative overflow-hidden group border border-slate-200">
-                                            <img src={photo.url} alt="preview" className="w-full h-full object-cover" />
-                                            <button onClick={() => setPhotos(p => p.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 shadow-sm">✕</button>
+                                        {/* List */}
+                                        <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
+                                            {clientQuestions.map((q, i) => (
+                                                <div key={i} className="flex items-start gap-3 p-3 bg-white hover:bg-slate-50 group">
+                                                    <span className="text-slate-400 font-mono text-xs mt-0.5">{i + 1}.</span>
+                                                    <span className="flex-1 text-sm text-slate-700 leading-snug">{q}</span>
+                                                    <button onClick={() => setClientQuestions(curr => curr.filter((_, idx) => idx !== i))} className="text-slate-300 group-hover:text-red-500 transition-colors">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {clientQuestions.length === 0 && (
+                                                <div className="p-4 text-center text-xs text-slate-400 italic">
+                                                    Brak dodanych pytań
+                                                </div>
+                                            )}
                                         </div>
-                                    ))}
+                                    </div>
+                                </div>
+
+                                {/* Right: Next Actions */}
+                                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                    <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                        <ClipboardList className="w-5 h-5 text-slate-400" />
+                                        Działania
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {[
+                                            'Wysłać Katalog PDF',
+                                            'Wycena Wstępna',
+                                            'Umówić Pomiar',
+                                            'Kontakt Telefoniczny',
+                                            'Pilny Lead 🔥'
+                                        ].map(action => {
+                                            const active = nextActions.includes(action);
+                                            return (
+                                                <button
+                                                    key={action}
+                                                    onClick={() => {
+                                                        setNextActions(prev =>
+                                                            active ? prev.filter(a => a !== action) : [...prev, action]
+                                                        );
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center gap-3 ${active ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                                                >
+                                                    <div className={`w-5 h-5 rounded border flex items-center justify-center bg-white ${active ? 'border-blue-500 text-blue-600' : 'border-slate-300 text-transparent'}`}>
+                                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    {action}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
 
-
-                            {/* ASSIGNMENT DROPDOWN (Admin/Manager Only) */}
-                            {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && assignees.length > 0 && (
-                                <div className="mt-8 bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
-                                        🛡️ Panel Managera: Przypisz Opiekuna
-                                    </label>
-                                    <select
-                                        value={selectedAssigneeId}
-                                        onChange={e => setSelectedAssigneeId(e.target.value)}
-                                        className="w-full p-3 rounded-lg border border-slate-300 bg-white font-medium"
-                                    >
-                                        <option value={currentUser?.id}>Ja ({currentUser?.firstName} {currentUser?.lastName})</option>
-                                        {assignees.filter(a => a.id !== currentUser?.id).map(u => (
-                                            <option key={u.id} value={u.id}>
-                                                {u.firstName} {u.lastName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-slate-400 mt-1">Lead trafi bezpośrednio do lejka wybranego handlowca.</p>
-                                </div>
-                            )}
-
-                            {/* NAV BUTTONS */}
-                            <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-100">
-                                <button onClick={() => setViewMode('interview')} className="text-slate-500 hover:text-slate-800 px-4 py-2">
+                            <div className="flex justify-between pt-6 border-t border-slate-200">
+                                <button onClick={() => setViewMode('hub')} className="text-slate-500 hover:text-slate-800 text-sm font-medium">
                                     ← Wróć
+                                </button>
+                                <button onClick={() => setViewMode('finalize')} className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-medium shadow-sm hover:bg-black transition-all">
+                                    Dane Klienta →
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW: FINALIZE (Data & Photos) */}
+                    {viewMode === 'finalize' && (
+                        <div className="max-w-6xl mx-auto w-full">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+
+                                {/* LEFT COLUMN: IDENTITY & ADDRESS */}
+                                <div className="space-y-6">
+
+                                    {/* 1. CONTACT CARD */}
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                                        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
+                                        <div className="mb-6 flex items-center justify-between">
+                                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                                <UserIcon className="w-5 h-5 text-blue-500" />
+                                                Dane Klienta
+                                            </h3>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Imię *</label>
+                                                    <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)}
+                                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 font-medium transition-all"
+                                                        placeholder="Jan" />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nazwisko *</label>
+                                                    <input value={lastName} onChange={e => setLastName(e.target.value)}
+                                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 font-medium transition-all"
+                                                        placeholder="Kowalski" />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Telefon *</label>
+                                                <div className="relative">
+                                                    <Phone className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
+                                                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 font-mono font-medium transition-all"
+                                                        placeholder="123 456 789" />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">E-mail</label>
+                                                <div className="relative">
+                                                    <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
+                                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 transition-all"
+                                                        placeholder="jan@example.com" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. ADDRESS CARD */}
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-300" />
+                                        <div className="mb-4 flex items-center justify-between">
+                                            <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                                                <MapPin className="w-5 h-5 text-slate-400" />
+                                                Adres (Opcjonalnie)
+                                            </h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Ulica i numer"
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-400 outline-none text-slate-900 text-sm transition-all" />
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <input value={zip} onChange={e => setZip(e.target.value)} placeholder="Kod"
+                                                    className="col-span-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-400 outline-none text-slate-900 text-sm transition-all" />
+                                                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Miasto"
+                                                    className="col-span-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-400 outline-none text-slate-900 text-sm transition-all" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* ASSIGNMENT DROPDOWN (Admin/Manager Only) - MOVED TO LEFT COLUMN BOTTOM */}
+                                    {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && assignees.length > 0 && (
+                                        <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
+                                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
+                                                🛡️ Panel Managera
+                                            </label>
+                                            <select
+                                                value={selectedAssigneeId}
+                                                onChange={e => setSelectedAssigneeId(e.target.value)}
+                                                className="w-full p-2.5 rounded-lg border border-slate-300 bg-white font-medium text-sm"
+                                            >
+                                                <option value={currentUser?.id}>Ja ({currentUser?.firstName} {currentUser?.lastName})</option>
+                                                {assignees.filter(a => a.id !== currentUser?.id).map(u => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.firstName} {u.lastName}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                </div>
+
+                                {/* RIGHT COLUMN: CONTEXT, MEDIA, HELPERS */}
+                                <div className="space-y-6">
+
+                                    {/* 3. CONTEXT & SUMMARY */}
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
+
+                                        {/* Conversation Summary */}
+                                        <div className="mb-6">
+                                            <label className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                                <MessageSquare className="w-4 h-4 text-emerald-500" />
+                                                Podsumowanie Rozmowy
+                                            </label>
+                                            <textarea
+                                                value={conversationSummary}
+                                                onChange={e => setConversationSummary(e.target.value)}
+                                                className="w-full px-4 py-3 bg-emerald-50/30 border border-emerald-100 rounded-xl min-h-[100px] 
+                                                       focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 
+                                                       transition-all outline-none text-slate-700 resize-none text-sm leading-relaxed"
+                                                placeholder="O czym rozmawialiśmy? Co klienta najbardziej interesuje?"
+                                            />
+                                        </div>
+
+                                        {/* Technical Notes */}
+                                        <div>
+                                            <label className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                                <ClipboardList className="w-4 h-4 text-slate-400" />
+                                                Notatki Techniczne
+                                            </label>
+                                            <textarea
+                                                value={mainNotes}
+                                                onChange={e => setMainNotes(e.target.value)}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl min-h-[80px] focus:bg-white focus:ring-2 focus:ring-slate-200 outline-none text-slate-700 resize-none text-sm"
+                                                placeholder="Wymiary, kolory, specyficzne wymagania..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* SEND CATALOG OPTION */}
+                                    <div className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${sendCatalog ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-200'}`}
+                                        onClick={() => setSendCatalog(!sendCatalog)}>
+                                        <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${sendCatalog ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300'}`}>
+                                            {sendCatalog && <CheckCircle2 className="w-4 h-4 text-white" />}
+                                        </div>
+                                        <div>
+                                            <span className={`font-bold block text-sm ${sendCatalog ? 'text-blue-900' : 'text-slate-700'}`}>Wyślij Katalog PDF</span>
+                                            <span className="text-xs text-slate-500">Klient otrzyma maila z ofertą i katalogiem.</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 4. MEDIA UPLOAD */}
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                            <ImageIcon className="w-5 h-5 text-purple-500" />
+                                            Zdjęcia / Szkice
+                                        </h4>
+                                        <div className="flex flex-wrap gap-3">
+                                            <label className={`w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all ${uploading ? 'opacity-50' : ''}`}>
+                                                <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
+                                                <PlusCircle className="w-6 h-6 text-slate-300" />
+                                            </label>
+                                            {photos.map((photo, i) => (
+                                                <div key={i} className="w-20 h-20 rounded-xl bg-slate-100 relative overflow-hidden group border border-slate-200 shadow-sm">
+                                                    <img src={photo.url} alt="preview" className="w-full h-full object-cover" />
+                                                    <button onClick={() => setPhotos(p => p.filter((_, idx) => idx !== i))} className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs backdrop-blur-sm transition-colors">✕</button>
+                                                </div>
+                                            ))}
+                                            {photos.length === 0 && (
+                                                <div className="flex-1 flex items-center text-xs text-slate-400 italic pl-2">
+                                                    Dodaj zdjęcia wizytówki lub szkicu
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 5. GERMAN HELPERS (Collapsible-ish style) */}
+                                    <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="text-lg">🇩🇪</span>
+                                            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Pytania pomocnicze</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {[
+                                                { de: 'Wie groß soll es sein?', pl: 'Jak duże to ma być?' },
+                                                { de: 'Wann möchten Sie montieren?', pl: 'Kiedy montaż?' }
+                                            ].map((phrase, i) => (
+                                                <div key={i} className="flex justify-between items-baseline text-sm border-b border-amber-100/50 last:border-0 pb-1.5 last:pb-0">
+                                                    <span className="font-medium text-amber-900">{phrase.de}</span>
+                                                    <span className="text-xs text-amber-600/70">{phrase.pl}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            {/* BOTTOM NAV - STICKY / FLOATING */}
+                            <div className="mt-8 flex items-center justify-between pt-6 border-t border-slate-100">
+                                <button onClick={() => setViewMode('interview')} className="text-slate-500 hover:text-slate-800 font-medium px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors">
+                                    ← Wróć do Wywiadu
                                 </button>
                                 <button
                                     onClick={() => {
@@ -939,38 +985,75 @@ export const FairLeadForm: React.FC<FairLeadFormProps> = ({ fairId, fairName, on
                                             setViewMode('wheel');
                                         }
                                     }}
-                                    className="flex-1 md:flex-none ml-4 px-6 md:px-8 py-4 bg-green-600 text-white text-lg md:text-xl font-bold rounded-2xl shadow-xl hover:bg-green-700 transform transition-transform active:scale-[0.99] flex items-center justify-center gap-3"
+                                    className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-2xl shadow-xl hover:bg-black hover:scale-[1.02] active:scale-[0.98] transition-all"
                                 >
-                                    Dalej: Koło Fortuny 🎁
+                                    <span>Gotowe - Losuj Nagrodę</span>
+                                    <span className="text-2xl">🎁</span>
                                 </button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* VIEW: WHEEL (Final) */}
-                {viewMode === 'wheel' && (
-                    <div className="h-full flex flex-col items-center justify-center">
-                        {loading ? (
-                            <div className="text-center">
-                                <div className="text-6xl mb-4 animate-bounce">💾</div>
-                                <h2 className="text-2xl font-bold text-slate-800">Zapisywanie Leada...</h2>
-                                <p className="text-slate-500">Chwilka, generuję PDF i wysyłam do bazy.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <h2 className="text-3xl font-bold text-slate-800 mb-2">Zakręć aby zapisać!</h2>
-                                <p className="text-slate-500 mb-8">Wylosowana nagroda zostanie przypisana do klienta.</p>
-                                <WheelOfFortune prizes={prizes} onSpinEnd={handleWheelSpin} />
-                                <button onClick={() => handleWheelSpin({ id: 'none', label: 'Brak', type: 'none', value: 0 })} className="mt-8 text-slate-300 hover:text-slate-500 text-sm underline">
-                                    Pomiń losowanie (Zapisz bez nagrody)
-                                </button>
-                            </>
-                        )}
-                    </div>
-                )}
+                    {/* VIEW: WHEEL (Final) */}
+                    {viewMode === 'wheel' && (
+                        <div className="h-full flex flex-col items-center justify-center">
+                            {loading ? (
+                                <div className="text-center">
+                                    <div className="text-6xl mb-4 animate-bounce">💾</div>
+                                    <h2 className="text-2xl font-bold text-slate-800">Zapisywanie Leada...</h2>
+                                    <p className="text-slate-500">Chwilka, generuję PDF i wysyłam do bazy.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <h2 className="text-3xl font-bold text-slate-800 mb-2">Zakręć aby zapisać!</h2>
+                                    <p className="text-slate-500 mb-8">Wylosowana nagroda zostanie przypisana do klienta.</p>
+                                    <WheelOfFortune prizes={prizes} onSpinEnd={handleWheelSpin} />
+                                    <button onClick={() => handleWheelSpin({ id: 'none', label: 'Brak', type: 'none', value: 0 })} className="mt-8 text-slate-300 hover:text-slate-500 text-sm underline">
+                                        Pomiń losowanie (Zapisz bez nagrody)
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
 
+                </div>
             </div>
+
+            {/* FIXED FOOTER - Outside Scrollable Area */}
+            {viewMode === 'hub' && (
+                <div className="flex-none bg-white border-t border-slate-200 p-4 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] pb-safe">
+                    <div className="max-w-5xl mx-auto flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div>
+                            <h4 className="font-semibold text-slate-900 text-sm">Lista wyboru ({products.length})</h4>
+                            <div className="text-xs text-slate-500">{products.length === 0 ? 'Dodaj produkt' : 'Gotowe do wyceny'}</div>
+                        </div>
+                        <button
+                            onClick={() => setViewMode('interview')}
+                            disabled={products.length === 0}
+                            className="px-6 py-2.5 bg-slate-900 hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm shadow-sm transition-all flex items-center gap-2"
+                        >
+                            Dalej
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                    {/* MINI PREVIEW */}
+                    {products.length > 0 && (
+                        <div className="max-w-5xl mx-auto mt-3 flex flex-wrap gap-2">
+                            {products.map((p, i) => (
+                                <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-md shadow-sm">
+                                    <span className="text-xs font-mono text-slate-400">#{i + 1}</span>
+                                    <span className="text-xs font-medium text-slate-700">{getProductLabel(p.type)}</span>
+                                    {p.width && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 ml-1">{p.width}mm</span>}
+                                    <button onClick={() => setProducts(curr => curr.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-600 ml-1">
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )
+            }
         </div >
     );
 };

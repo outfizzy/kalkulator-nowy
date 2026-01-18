@@ -1,0 +1,31 @@
+
+> offer-app@0.0.0 build
+> vite build
+
+vite v7.2.4 building client environment for production...
+transforming...
+✓ 467 modules transformed.
+✗ Build failed in 1.73s
+error during build:
+[vite:esbuild] Transform failed with 1 error:
+/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/src/components/leads/LeadDetailsPage.tsx:681:29: ERROR: Expected identifier but found "/"
+file: /Users/tomaszfijolek/Desktop/Program do ofert /offer-app/src/components/leads/LeadDetailsPage.tsx:681:29
+
+Expected identifier but found "/"
+679 |  
+680 |                          {activeTab === 'communications' && (
+681 |                              </div>
+    |                               ^
+682 |                          )}
+683 |  
+
+    at failureErrorWithLog (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:1467:15)
+    at /Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:736:50
+    at responseCallbacks.<computed> (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

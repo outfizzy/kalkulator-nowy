@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { SmartPastePreviewModal } from './SmartPastePreviewModal';
+import { ImportManual } from './ManualPriceImporter';
 
 interface MatrixEditorProps {
     tableId: string;
@@ -37,6 +38,11 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
     const [bulkValue, setBulkValue] = useState<string>('');
     const [bulkOperation, setBulkOperation] = useState<'add' | 'multiply' | 'set'>('set');
     const [selectedProductId, setSelectedProductId] = useState<string>('');
+    const [showImporter, setShowImporter] = useState(false);
+
+    // Dimension Modal State
+    const [addDimType, setAddDimType] = useState<'width' | 'projection' | null>(null);
+    const [addDimValue, setAddDimValue] = useState('');
 
     // Smart Paste State
     const [isSmartPasteOpen, setIsSmartPasteOpen] = useState(false);
@@ -272,10 +278,19 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         }));
     };
 
-    const handleAddDimension = (type: 'width' | 'projection') => {
-        const valStr = prompt(`Podaj nową ${type === 'width' ? 'szerokość' : 'wysięg'} (mm):`);
-        if (!valStr) return;
-        const val = parseInt(valStr);
+    const confirmAddDimension = () => {
+        if (!addDimType || !addDimValue) return;
+        const val = parseInt(addDimValue);
+        const type = addDimType;
+
+        // Reset Modal
+        setAddDimType(null);
+        setAddDimValue('');
+
+        if (isNaN(val) || val <= 0) {
+            toast.error('Nieprawidłowa wartość');
+            return;
+        }
         if (isNaN(val) || val <= 0) return;
 
         if (type === 'width' && widths.includes(val)) {
@@ -584,6 +599,67 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
 
     return (
         <div className="fixed inset-0 bg-white z-40 flex flex-col">
+            {showImporter && (
+                <ImportManual
+                    isOpen={showImporter}
+                    onClose={() => setShowImporter(false)}
+                    products={products}
+                    targetTableId={tableId}
+                    targetTableName={tableName}
+                    onSuccess={() => {
+                        setShowImporter(false);
+                        loadMatrix(); // Reload data
+                        toast.success('Dane zaimportowane pomyślnie');
+                    }}
+                />
+            )}
+
+            {/* Add Dimension Modal */}
+            {addDimType && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm scale-100 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 bg-blue-50/50 p-2 rounded -mx-2">
+                            ➕ Dodaj {addDimType === 'width' ? 'Szerokość' : 'Wysięg'}
+                        </h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                    Wartość (mm)
+                                </label>
+                                <input
+                                    autoFocus
+                                    type="number"
+                                    className="w-full text-2xl font-bold p-3 border border-slate-300 rounded-lg focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-slate-700"
+                                    placeholder="np. 3500"
+                                    value={addDimValue}
+                                    onChange={e => setAddDimValue(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') confirmAddDimension();
+                                        if (e.key === 'Escape') setAddDimType(null);
+                                    }}
+                                />
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    onClick={() => setAddDimType(null)}
+                                    className="flex-1 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors"
+                                >
+                                    Anuluj
+                                </button>
+                                <button
+                                    onClick={confirmAddDimension}
+                                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all active:scale-95"
+                                >
+                                    Dodaj
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <SmartPastePreviewModal
                 isOpen={isSmartPasteOpen}
                 onClose={() => setIsSmartPasteOpen(false)}
@@ -631,10 +707,26 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
                     <div className="flex gap-2">
                         {viewMode !== 'groups' && (
                             <>
-                                <button onClick={() => handleAddDimension('width')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium">+ Szer</button>
-                                <button onClick={() => handleAddDimension('projection')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium">+ Wys</button>
+                                <button
+                                    onClick={() => { setAddDimType('width'); setAddDimValue(''); }}
+                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium border border-slate-700 hover:border-slate-500 transition-all active:scale-95"
+                                >
+                                    + Szerokość
+                                </button>
+                                <button
+                                    onClick={() => { setAddDimType('projection'); setAddDimValue(''); }}
+                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium border border-slate-700 hover:border-slate-500 transition-all active:scale-95"
+                                >
+                                    + Wysięg
+                                </button>
                             </>
                         )}
+                        <button
+                            onClick={() => setShowImporter(true)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium flex items-center gap-1"
+                        >
+                            📤 Import CSV
+                        </button>
                         <button onClick={onClose} className="px-4 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded font-medium text-sm">Anuluj</button>
                         <button onClick={saveChanges} disabled={saving} className="px-5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-sm disabled:opacity-50">
                             {saving ? 'Zapisuję...' : 'Zapisz'}

@@ -17,7 +17,7 @@ export interface FooterAssignment {
     is_default: boolean;
 }
 
-export interface CreateFooterDTO {
+export interface CreateFooterInput {
     name: string;
     content: string;
     is_active?: boolean;
@@ -39,7 +39,7 @@ export const EmailFooterService = {
         return data || [];
     },
 
-    async createFooter(footer: CreateFooterDTO): Promise<EmailFooter> {
+    async createFooter(footer: CreateFooterInput): Promise<EmailFooter> {
         const { data, error } = await supabase
             .from('email_footers')
             .insert(footer)
@@ -50,7 +50,7 @@ export const EmailFooterService = {
         return data;
     },
 
-    async updateFooter(id: string, updates: Partial<CreateFooterDTO>): Promise<EmailFooter> {
+    async updateFooter(id: string, updates: Partial<CreateFooterInput>): Promise<EmailFooter> {
         const { data, error } = await supabase
             .from('email_footers')
             .update(updates)

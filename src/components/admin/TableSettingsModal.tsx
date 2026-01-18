@@ -8,6 +8,12 @@ interface TableSettingsModalProps {
     tableId: string;
     tableName: string;
     initialAttributes: Record<string, any>;
+    // New Schema Fields
+    initialModelFamily?: string;
+    initialZone?: number;
+    initialCoverType?: string;
+    initialConstructionType?: string;
+
     isOpen: boolean;
     onClose: () => void;
     onSave: () => void;
@@ -17,11 +23,22 @@ export const TableSettingsModal: React.FC<TableSettingsModalProps> = ({
     tableId,
     tableName,
     initialAttributes,
+    initialModelFamily = '',
+    initialZone = 1,
+    initialCoverType = 'polycarbonate',
+    initialConstructionType = 'wall',
     isOpen,
     onClose,
     onSave
 }) => {
     const [attributes, setAttributes] = useState<Record<string, any>>(initialAttributes || {});
+    const [configuration, setConfiguration] = useState<Record<string, any>>({});
+    // State for new schema fields
+    const [modelFamily, setModelFamily] = useState(initialModelFamily);
+    const [zone, setZone] = useState(initialZone);
+    const [coverType, setCoverType] = useState(initialCoverType);
+    const [constructionType, setConstructionType] = useState(initialConstructionType);
+
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -33,8 +50,20 @@ export const TableSettingsModal: React.FC<TableSettingsModalProps> = ({
     useEffect(() => {
         if (isOpen && tableId) {
             fetchEntries();
+            fetchConfiguration();
         }
     }, [isOpen, tableId]);
+
+    const fetchConfiguration = async () => {
+        const { data, error } = await supabase
+            .from('price_tables')
+            .select('configuration')
+            .eq('id', tableId)
+            .single();
+        if (data?.configuration) {
+            setConfiguration(data.configuration);
+        }
+    };
 
     const fetchEntries = async () => {
         setLoadingEntries(true);
@@ -152,9 +181,22 @@ export const TableSettingsModal: React.FC<TableSettingsModalProps> = ({
     const handleSave = async () => {
         setSaving(true);
         try {
+            // Update explicit schema fields + attributes
+            const updates = {
+                model_family: modelFamily,
+                zone: zone,
+                cover_type: coverType,
+                construction_type: constructionType,
+                attributes: attributes,
+                configuration: {
+                    ...configuration,
+                    freestanding_is_additive: constructionType === 'freestanding' || configuration.freestanding_is_additive // auto-flag
+                }
+            };
+
             const { error } = await supabase
                 .from('price_tables')
-                .update({ attributes: attributes })
+                .update(updates)
                 .eq('id', tableId);
 
             if (error) throw error;
@@ -195,6 +237,75 @@ export const TableSettingsModal: React.FC<TableSettingsModalProps> = ({
                     </div>
 
                     <div className="p-6 overflow-y-auto space-y-8 flex-1">
+
+                        {/* 0. Explicit Schema Fields (Critical for PricingService) */}
+                        <div className="space-y-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                            <h4 className="font-bold text-yellow-800 text-sm flex items-center gap-2">
+                                ⚡ Konfiguracja Mapowania (Wymagane)
+                            </h4>
+                            <p className="text-xs text-yellow-700">
+                                Te pola są kluczowe dla automatycznego dobierania cenników w kalkulatorze.
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-yellow-800 mb-1">Rodzina Modeli</label>
+                                    <input
+                                        type="text"
+                                        value={modelFamily || ''}
+                                        onChange={e => setModelFamily(e.target.value)}
+                                        placeholder="np. Trendstyle"
+                                        className="w-full p-2 border border-yellow-300 rounded text-sm bg-white focus:ring-2 focus:ring-yellow-400 outline-none"
+                                    />
+                                    <p className="text-[10px] text-yellow-600 mt-1">Musi pasować do nazwy modelu (bez 'Aluxe').</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-yellow-800 mb-1">Strefa Śniegowa</label>
+                                    <select
+                                        value={zone}
+                                        onChange={e => setZone(parseInt(e.target.value))}
+                                        className="w-full p-2 border border-yellow-300 rounded text-sm bg-white"
+                                    >
+                                        <option value={1}>Strefa 1 (85kg)</option>
+                                        <option value={2}>Strefa 2 (110kg)</option>
+                                        <option value={3}>Strefa 3 (135kg+)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-yellow-800 mb-1">Typ Pokrycia</label>
+                                    <input
+                                        type="text"
+                                        value={coverType || ''}
+                                        onChange={e => setCoverType(e.target.value)}
+                                        placeholder="np. glass_clear"
+                                        className="w-full p-2 border border-yellow-300 rounded text-sm bg-white"
+                                        list="cover-types"
+                                    />
+                                    <datalist id="cover-types">
+                                        <option value="polycarbonate">Poliwęglan (Ogólny)</option>
+                                        <option value="glass">Szkło (Ogólne)</option>
+                                        <option value="glass_clear">Szkło Przeźroczyste</option>
+                                        <option value="glass_opal">Szkło Mleczne (Opal)</option>
+                                        <option value="poly_clear">Poliwęglan Clear</option>
+                                        <option value="poly_opal">Poliwęglan Opal</option>
+                                        <option value="poly_iq_relax">Poliwęglan IQ Relax</option>
+                                        <option value="poly_ir_clear">Poliwęglan IR Clear</option>
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-yellow-800 mb-1">Konstrukcja</label>
+                                    <select
+                                        value={constructionType}
+                                        onChange={e => setConstructionType(e.target.value)}
+                                        className="w-full p-2 border border-yellow-300 rounded text-sm bg-white"
+                                    >
+                                        <option value="wall">Przyścienna</option>
+                                        <option value="freestanding">Wolnostojąca</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* 1. Main Table Image */}
                         <div className="space-y-3">
                             <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2 border-b pb-2">
@@ -261,6 +372,72 @@ export const TableSettingsModal: React.FC<TableSettingsModalProps> = ({
                                 </p>
                             </div>
                         </div>
+
+                        {/* 1.6 Freestanding Surcharges (New Editor) */}
+                        {constructionType === 'freestanding' && (
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-slate-700 text-sm border-b pb-2 flex items-center justify-between">
+                                    <span>💰 Zasady Dopłat (Wolnostojące)</span>
+                                </h4>
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                                    <p className="text-xs text-blue-800">
+                                        Zdefiniuj dopłaty do wersji przyściennej dla różnych szerokości.
+                                        System użyje ceny bazowej (przyściennej) + tej dopłaty.
+                                    </p>
+
+                                    <div className="space-y-2">
+                                        {(configuration.freestanding_surcharge_rules || []).map((rule: any, idx: number) => (
+                                            <div key={idx} className="flex gap-2 items-center">
+                                                <span className="text-xs text-slate-500 w-16">Do szer.:</span>
+                                                <input
+                                                    type="number"
+                                                    value={rule.max_width}
+                                                    onChange={(e) => {
+                                                        const newRules = [...(configuration.freestanding_surcharge_rules || [])];
+                                                        newRules[idx].max_width = parseInt(e.target.value);
+                                                        setConfiguration({ ...configuration, freestanding_surcharge_rules: newRules });
+                                                    }}
+                                                    className="w-24 p-1 text-sm border rounded"
+                                                    placeholder="mm"
+                                                />
+                                                <span className="text-xs text-slate-500 w-12">Cena:</span>
+                                                <input
+                                                    type="number"
+                                                    value={rule.price}
+                                                    onChange={(e) => {
+                                                        const newRules = [...(configuration.freestanding_surcharge_rules || [])];
+                                                        newRules[idx].price = parseFloat(e.target.value);
+                                                        setConfiguration({ ...configuration, freestanding_surcharge_rules: newRules });
+                                                    }}
+                                                    className="w-24 p-1 text-sm border rounded"
+                                                    placeholder="EUR"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const newRules = (configuration.freestanding_surcharge_rules || []).filter((_: any, i: number) => i !== idx);
+                                                        setConfiguration({ ...configuration, freestanding_surcharge_rules: newRules });
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 px-2"
+                                                >✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            const rules = configuration.freestanding_surcharge_rules || [];
+                                            setConfiguration({
+                                                ...configuration,
+                                                freestanding_surcharge_rules: [...rules, { max_width: 0, price: 0 }]
+                                            });
+                                        }}
+                                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 font-medium"
+                                    >
+                                        + Dodaj Próg Dopłaty
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* 2. Component Images (New Section) */}
                         <div className="space-y-3">

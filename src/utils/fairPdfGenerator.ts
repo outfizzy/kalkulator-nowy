@@ -14,6 +14,13 @@ interface PDFLeadData {
         value: any;
     } | null;
     photos?: { url: string; name: string }[];
+    // New Fields
+    companyName?: string;
+    city?: string;
+    zip?: string;
+    street?: string;
+    country?: string;
+
 }
 
 export const generateFairPDF = (data: PDFLeadData, products: FairProductConfig[], salesRepName: string) => {
@@ -32,15 +39,36 @@ export const generateFairPDF = (data: PDFLeadData, products: FairProductConfig[]
     doc.text(`Opiekun: ${salesRepName}`, 15, 33);
 
     // 3. Client Info Table
+    // 3. Client Info Table
+    // Construct Address String
+    const addressLine = [data.street, data.zip, data.city].filter(Boolean).join(', ');
+
+    // Construct Contact Array
+    const contactInfo = [
+        data.phone ? `Tel: ${data.phone}` : null,
+        data.email || null // Show email if exists
+    ].filter(Boolean).join('\n');
+
+    const clientData = [
+        [`${data.firstName} ${data.lastName}`, contactInfo],
+        [data.companyName ? `Firma: ${data.companyName}` : '', addressLine]
+    ];
+
     autoTable(doc, {
         startY: 40,
-        head: [['Dane Klienta', 'Kontakt']],
-        body: [
-            [`${data.firstName} ${data.lastName}`, `Tel: ${data.phone}`],
-            [data.email || '-', ``]
-        ],
+        head: [['Dane Klienta', 'Kontakt / Adres']],
+        body: clientData,
         theme: 'grid',
-        headStyles: { fillColor: [51, 65, 85] }
+        headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+        styles: {
+            font: 'helvetica', // Standard PDF font
+            cellPadding: 4,
+            overflow: 'linebreak'
+        },
+        columnStyles: {
+            0: { cellWidth: 'auto' },
+            1: { cellWidth: 'auto' }
+        }
     });
 
     let currentY = (doc as any).lastAutoTable.finalY + 15;
@@ -114,9 +142,12 @@ export const generateFairPDF = (data: PDFLeadData, products: FairProductConfig[]
 
 const getProductLabel = (type: string) => {
     switch (type) {
-        case 'roof': return 'Zadaszenie';
-        case 'pergola': return 'Pergola';
+        case 'roof': return 'Zadaszenie Aluminiowe';
+        case 'pergola': return 'Pergola / Deluxe';
         case 'carport': return 'Carport';
+        case 'zip_screen': return 'ZIP Screen (Solo)';
+        case 'sliding_glass': return 'Szyby Przesuwne (Solo)';
+        case 'accessory': return 'Akcesoria';
         case 'other': return 'Inne';
         default: return type;
     }

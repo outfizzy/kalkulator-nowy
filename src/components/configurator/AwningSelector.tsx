@@ -54,6 +54,47 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
     const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
     const [matchedItemName, setMatchedItemName] = useState<string>('');
 
+    // 1. Filter Available Items by Type
+    // Heuristic: Filter availableItems based on current 'type' tab
+    const availableModels = useMemo(() => {
+        const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach', 'ancona']
+            : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
+                : ['zip', 'screen', 'pion', 'solid'];
+
+        return availableItems.filter(i => {
+            // Explicit Metadata Check (if imported with new logic)
+            if (i.properties?.awning_type) {
+                if (type === 'aufdachmarkise_zip' && i.properties.awning_type === 'over_glass') return true;
+                if (type === 'unterdachmarkise_zip' && i.properties.awning_type === 'under_glass') return true;
+                if (type === 'zip_screen' && i.properties.addon_group === 'zip_screens') return true;
+            }
+
+            // Motor Count Check (New)
+            if (type !== 'zip_screen' && i.properties?.motor_count) {
+                // Ensure we compare numbers (Importer saves as number)
+                if (Number(i.properties.motor_count) !== motorCount) return false;
+            }
+
+            // Keyword Fallback
+            const n = i.addon_name.toLowerCase();
+            return typeKeywords.some(k => n.includes(k));
+        });
+    }, [availableItems, type, motorCount]);
+
+    // 2. State for Selected Model
+    const [selectedModelId, setSelectedModelId] = useState<string>('');
+
+    // Reset or Default selection when Type changes
+    useEffect(() => {
+        if (availableModels.length > 0) {
+            // Try to keep selection if valid, else first
+            const exists = availableModels.find(m => m.id === selectedModelId);
+            if (!exists) setSelectedModelId(availableModels[0].id);
+        } else {
+            setSelectedModelId('');
+        }
+    }, [availableModels, type]);
+
     // Async Price Calculation
     const calculatePrice = React.useCallback(async () => {
         if (!data) {
@@ -62,47 +103,19 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
             return;
         }
 
-        // Filter for type
-        const typeKeywords = type === 'aufdachmarkise_zip' ? ['aufdach', 'dach']
-            : type === 'unterdachmarkise_zip' ? ['unterdach', 'poddach']
-                : ['zip', 'screen', 'pion'];
-
-        // 1. Find the best matching Bundle/Product
-        let bestMatch = availableItems.find(i => {
-            // Priority: Check Metadata (awning_type)
-            if (i.properties?.awning_type) {
-                if (type === 'aufdachmarkise_zip' && i.properties.awning_type === 'over_glass') return true;
-                if (type === 'unterdachmarkise_zip' && i.properties.awning_type === 'under_glass') return true;
-                // If metadata exists but doesn't match, exclude it (strict mode for tagged items)
-                if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && ['over_glass', 'under_glass'].includes(i.properties.awning_type)) {
-                    return false;
-                }
-            }
-
-            // Priority: Check Motor Count
-            if (['aufdachmarkise_zip', 'unterdachmarkise_zip'].includes(type) && i.properties?.motor_count) {
-                if (motorCount === 2 && i.properties.motor_count !== 2) return false;
-                if (motorCount === 1 && i.properties.motor_count === 2) return false;
-            }
-
-            // Fallback: Name Matching
-            const n = i.addon_name.toLowerCase();
-            return typeKeywords.some(k => n.includes(k));
-        });
+        // 1. Find explicit selected model
+        let bestMatch = availableModels.find(m => m.id === selectedModelId);
 
         if (bestMatch) {
             setMatchedItemName(bestMatch.addon_name);
-            // Calculate Price via Service (Handles Matrix & Fixed)
-            // Use 'width' and 'projection' (or depth for ZIPS)
-            // For ZIP Screen: Projection is usually 0 or irrelevant? No, it's Height.
-            // AwningSelector maps 'projection' state to Height for ZIPs (via dimensionLabel)
+            // Height logic: For ZIP, projection is the 'Drop' (Height).
             const price = await PricingService.calculateAddonPrice(bestMatch, width, projection);
             setCalculatedPrice(price);
         } else {
-            setMatchedItemName('Brak w cenniku');
+            setMatchedItemName('Brak cennika dla tego typu');
             setCalculatedPrice(0);
         }
-    }, [data, type, width, projection, motorCount, availableItems]);
+    }, [data, width, projection, selectedModelId, availableModels]);
 
     useEffect(() => {
         calculatePrice();
@@ -175,34 +188,57 @@ export const AwningSelector: React.FC<AwningSelectorProps> = ({ onAdd, onRemove,
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
+
+
+                    {/* Model Selector (New) */}
+                    {availableModels.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Model Systemu</label>
+                            <select
+                                value={selectedModelId}
+                                onChange={(e) => setSelectedModelId(e.target.value)}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                            >
+                                {availableModels.map(m => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.addon_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Wybierz konkretny cennik z bazy.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Type Selection */}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Rodzaj Systemu</label>
                         <div className="grid grid-cols-3 gap-2">
                             <button
                                 onClick={() => setType('aufdachmarkise_zip')}
-                                className={`py - 3 px - 2 rounded - xl border - 2 font - bold text - xs transition - all ${type === 'aufdachmarkise_zip'
+                                className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${type === 'aufdachmarkise_zip'
                                     ? 'border-accent bg-accent/5 text-accent'
                                     : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                    } `}
+                                    }`}
                             >
                                 Aufdach
                             </button>
                             <button
                                 onClick={() => setType('unterdachmarkise_zip')}
-                                className={`py - 3 px - 2 rounded - xl border - 2 font - bold text - xs transition - all ${type === 'unterdachmarkise_zip'
+                                className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${type === 'unterdachmarkise_zip'
                                     ? 'border-accent bg-accent/5 text-accent'
                                     : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                    } `}
+                                    }`}
                             >
                                 Unterdach
                             </button>
                             <button
                                 onClick={() => setType('zip_screen')}
-                                className={`py - 3 px - 2 rounded - xl border - 2 font - bold text - xs transition - all ${type === 'zip_screen'
+                                className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all ${type === 'zip_screen'
                                     ? 'border-accent bg-accent/5 text-accent'
                                     : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                    } `}
+                                    }`}
                             >
                                 ZIP Screen
                             </button>

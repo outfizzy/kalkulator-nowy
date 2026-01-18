@@ -4,6 +4,7 @@ import { formatCurrency } from '../../utils/translations';
 import type { SelectedAddon } from '../../types';
 
 import type { AddonPriceEntry } from '../../services/pricing.service';
+import { PricingService } from '../../services/pricing.service';
 
 
 interface KeilfensterSelectorProps {
@@ -38,56 +39,50 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
     const [leftQty, setLeftQty] = useState(0);
     const [rightQty, setRightQty] = useState(0);
 
-    // Simplified Price Lookup
-    const baseUnitPrice = useMemo(() => {
-        // Strategy:
-        // 1. Try to find a Fixed Price item for this specific Width (if items are pre-generated per width)
-        // 2. Or find a generic item with BY_WIDTH basis.
+    // 1. Group Available Models
+    const availableModels = useMemo(() => {
+        return availableItems.filter((item, index, self) =>
+            index === self.findIndex((t) => (
+                t.id === item.id
+            ))
+        );
+    }, [availableItems]);
 
-        let match = availableItems.find(i => {
-            const w = i.properties?.width || i.properties?.max_width;
-            return w && Number(w) >= width;
-        });
+    // 2. Select Model
+    const [selectedModelId, setSelectedModelId] = useState<string>('');
 
-        // Fallback: Generic item
-        if (!match) {
-            match = availableItems.find(i => i.pricing_basis === 'BY_WIDTH' || i.pricing_basis === 'PER_M2');
+    useEffect(() => {
+        if (!selectedModelId && availableModels.length > 0) {
+            setSelectedModelId(availableModels[0].id);
         }
+    }, [availableModels, selectedModelId]);
 
-        // Fallback 2: Any matching name?
-        if (!match) {
-            match = availableItems.find(i => i.addon_name.toLowerCase().includes('keil') || i.addon_name.toLowerCase().includes('klin'));
-        }
+    // Pricing Logic
+    const [basePrice, setBasePrice] = useState<number>(0);
+    const [matchedName, setMatchedName] = useState<string>('');
 
-        if (!match) return 0;
+    useEffect(() => {
+        const calculate = async () => {
+            const model = availableModels.find(m => m.id === selectedModelId);
+            if (!model) {
+                setBasePrice(0);
+                setMatchedName('');
+                return;
+            }
+            setMatchedName(model.addon_name);
 
-        let price = match.price_upe_net_eur;
+            // Keilfenster usually priced by Width? Or Width x Height? 
+            // Often just Width for standard slopes, or Matrix.
+            // Pass max height?
+            const h = Math.max(height1, height2);
 
-        // Apply Basis
-        if (match.pricing_basis === 'BY_WIDTH') {
-            price = price * (width / 1000); // Assume price per meter
-        } else if (match.pricing_basis === 'PER_M2') {
-            // Keilfenster area ~ width * height / 2 ? Or bounding box.
-            // Assume bounding box for simplicity or simplified triangle area
-            const h = Math.max(height1, height2) / 1000;
-            const w = width / 1000;
-            price = price * w * h;
-        }
+            // Use Service
+            const p = await PricingService.calculateAddonPrice(model, width, h);
+            setBasePrice(p);
+        };
+        calculate();
+    }, [selectedModelId, width, height1, height2, availableModels]);
 
-        // Modifiers (Glass, RAL) - Assuming these are percentages or fixed additions
-        // Ideally these should be separate addons or factors.
-        // For MVP manual, we might just have different items for "Keilfenster Mat" vs "Clear".
-
-        // Apply Glass Surcharge if regex match in name?
-        // Or if we have separate "Surcharge" items in availableItems.
-        // Let's assume the base price covers standard.
-        // Surcharges:
-        if (glass === 'mat') price += 50; // Hardcoded heuristic for now OR look for "Mat Surcharge" item
-        if (glass === 'ig') price += 100;
-        if (specialRal) price *= 1.30;
-
-        return price;
-    }, [availableItems, width, height1, height2, glass, specialRal]);
 
     const optionsPrice = useMemo(() => {
         let sum = 0;
@@ -98,7 +93,30 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
         return sum;
     }, [selectedDbOptions, availableItems]);
 
-    const totalUnitPrice = baseUnitPrice + optionsPrice;
+    // Apply Surcharges on top of Base Price (if not handled by separate items)
+    // Legacy hardcoded logic:
+    // if (glass === 'mat') price += 50; 
+    // if (glass === 'ig') price += 100;
+    // if (specialRal) price *= 1.30;
+
+    // Ideally these should be DB items! 
+    // BUT for now, let's KEEP local modifiers if they are "built-in" features 
+    // that don't have separate items in availableItems.
+    // If user says "Analyze all", they want manual import to drive price.
+    // So if manual import doesn't have "Mat Surcharge", we might lose it.
+    // Let's Keep them as "Legacy Modifiers" added to Base Price.
+
+    const modifierPrice = useMemo(() => {
+        let surcharge = 0;
+        if (glass === 'mat') surcharge += 50;
+        if (glass === 'ig') surcharge += 100;
+        if (specialRal) return (basePrice + surcharge) * 0.30; // Delta? No, 30% of total?
+        // Let's simplify: 
+        return surcharge;
+    }, [glass, specialRal, basePrice]);
+
+    // Total Unit Price
+    const totalUnitPrice = basePrice + modifierPrice + (specialRal ? (basePrice + modifierPrice) * 0.30 : 0) + optionsPrice;
 
     const toggleOption = (id: string) => {
         const next = new Set(selectedDbOptions);
@@ -169,6 +187,23 @@ export const KeilfensterSelector: React.FC<KeilfensterSelectorProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Controls */}
                 <div className="space-y-5">
+                    {/* Model Selector */}
+                    {availableModels.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Model Systemu</label>
+                            <select
+                                value={selectedModelId}
+                                onChange={(e) => setSelectedModelId(e.target.value)}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                            >
+                                {availableModels.map(m => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.addon_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Szerokość (mm)</label>
                         <input type="number" value={width} onChange={e => setWidth(Number(e.target.value))} className="w-full border p-2 rounded" />

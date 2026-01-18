@@ -19,102 +19,96 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
 }) => {
     const existing = currentAddons.find(a => a.id.startsWith('panorama-'));
 
-    const [systemType, setSystemType] = useState<'AL22' | 'AL23'>(existing?.id.includes('AL23') ? 'AL23' : 'AL22');
-    const [width, setWidth] = useState<number>(existing?.width || 3000);
-    const [height, setHeight] = useState<number>(existing?.height || 2500);
-    const [numTracks, setNumTracks] = useState<number>(existing?.variant ? parseInt(existing.variant) : 3);
-
-
-    // Derive available track counts from DB items
-    const availableTracks = useMemo(() => {
-        // In Manual Pricing, we assume availableItems contains "Panorama Base" items which might specify tracks in name
-        // OR we just allow standard 3,4,5,6 and look for price match later.
-        // Let's scrape availableItems for distinct track numbers if possible.
-        const tracks = new Set<number>();
-        availableItems.forEach(item => {
-            const name = item.addon_name || '';
-            const match = name.match(/(\d+)[- ](tor|rail|spur|gleis|lauf)/i);
-            if (match) {
-                tracks.add(parseInt(match[1]));
-            }
-        });
-
-        if (tracks.size === 0) return [3, 4, 5, 6]; // Default if no specific items found
-        return Array.from(tracks).sort((a, b) => a - b);
+    // 1. Group Available Models
+    // Filter items that are 'panorama' type. 
+    // Usually 'availableItems' prop already filtered by ProductConfigurator to only include 'panorama' group.
+    const availableModels = useMemo(() => {
+        // De-duplicate by ID
+        const unique = availableItems.filter((item, index, self) =>
+            index === self.findIndex((t) => (
+                t.id === item.id
+            ))
+        );
+        return unique;
     }, [availableItems]);
 
-    // Ensure numTracks is valid when switching systems
-    // Ensure valid track selection
-    useEffect(() => {
-        if (availableTracks.length > 0 && !availableTracks.includes(numTracks)) {
-            // Defer update to avoid strict mode double invocation issues or warning
-            const t = setTimeout(() => setNumTracks(availableTracks[0]), 0);
-            return () => clearTimeout(t);
-        }
-    }, [availableTracks, numTracks]);
+    // 2. Select Model
+    const [selectedModelId, setSelectedModelId] = useState<string>('');
 
-    // Calculate limit of panels based on width (approximate logic matching commercial rules)
-    // AL22/23 usually max 1100mm per panel or so.
-    // If DB doesn't have rules, we'll use a generic safe rule: Min 600mm, Max 1300mm per panel.
-    // Panel width = Width / numTracks.
+    // Auto-select loop
+    useEffect(() => {
+        if (availableModels.length > 0) {
+            // Try to find one matching existing? 
+            if (existing && !selectedModelId) {
+                const match = availableModels.find(m => existing.name.includes(m.addon_name));
+                if (match) {
+                    setSelectedModelId(match.id);
+                    return;
+                }
+            }
+
+            if (!selectedModelId) {
+                setSelectedModelId(availableModels[0].id);
+            }
+        }
+    }, [availableModels, existing, selectedModelId]);
+
+    // Track Count Logic
+    // If selected model is specific (e.g. 'Panorama AL22 3-Tor'), it might imply track count.
+    // If selected model is generic 'Panorama AL22', we might need to select tracks.
+    // However, usually Panorama pricing is Specific Item per Track Count OR Matrix.
+    // Let's assume user selects the "Model Family" (e.g. AL23) and we find the specific item variant?
+    // OR: usage of 'systemType' logic in original code suggests AL22/AL23 are toggleable.
+    // We should allow selecting the *specific price list item* directly via dropdown.
+
+    // Actually, for Panorama, usually we have different items for 3-rail, 4-rail etc.
+    // If the imported items are separate (e.g. "AL22 3-gleisig", "AL22 4-gleisig"), 
+    // then the Model Selector might become a list of "AL22 3-gleisig", "AL22 4-gleisig"...
+    // That's okay, user picks exact system config.
+    // OR we can try to group them. 
+    // Let's keep it simple: Select the "Price List Item" (Model).
+
+    const selectedModel = availableModels.find(m => m.id === selectedModelId);
+
+    // Parse Tracks from Selected Model Name if possible, else default
+    useEffect(() => {
+        if (selectedModel) {
+            const match = selectedModel.addon_name.match(/(\d+)[- ](tor|rail|spur|gleis|lauf)/i);
+            if (match) setNumTracks(parseInt(match[1]));
+        }
+    }, [selectedModel]);
+
+    // Panel Width Check
     const panelWidth = width / numTracks;
     const isDimensionValid = panelWidth >= 500 && panelWidth <= 1500;
 
-    // Pricing Logic
-    const { totalPrice, breakdown } = useMemo(() => {
-        if (availableItems.length === 0) return { totalPrice: 0, breakdown: [] };
+    // Pricing Logic via Service
+    const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
+    const [itemLabel, setItemLabel] = useState<string>('');
 
-        let total = 0;
-        const items: { name: string, price: number }[] = [];
-
-        // Find Base Price for System + Tracks + Width
-        // Look for items with pricing_basis = 'BY_OPENING_WIDTH' (or similar)
-        // Name should match System (AL22/23) (or just generic 'Panorama' if system not in name)
-        // AND Track count.
-
-        // Filter candidates
-        const candidates = availableItems.filter(i => {
-            const n = i.addon_name.toLowerCase();
-            return n.includes(systemType.toLowerCase()) && n.includes(`${numTracks}-`);
-        });
-
-        // Find best match by Width (if multiple items for different widths exist)
-        // OR find one item with BY_OPENING_WIDTH basis.
-
-        let match = candidates.find(i => i.pricing_basis === 'BY_OPENING_WIDTH');
-
-        // Fallback: Exact match on width property?
-        if (!match) {
-            match = candidates.find(i => {
-                const w = i.properties?.width || i.properties?.max_width;
-                return w && Number(w) >= width;
-            });
-        }
-
-        // Fallback 2: Any item matching system & tracks
-        if (!match && candidates.length > 0) match = candidates[0];
-
-        if (match) {
-            let price = match.price_upe_net_eur;
-
-            // Calculate Logic
-            if (match.pricing_basis === 'BY_OPENING_WIDTH') {
-                // Price per Meter of Opening Width
-                price = price * (width / 1000);
-            } else if (match.pricing_basis === 'PER_M2') {
-                price = price * (width / 1000) * (height / 1000);
+    useEffect(() => {
+        const calculate = async () => {
+            if (!selectedModel) {
+                setCalculatedPrice(0);
+                setItemLabel('');
+                return;
             }
 
-            total += price;
-            items.push({ name: match.addon_name, price });
-        } else {
-            // Cannot find price
-            // Maybe manual component logic?
-            // For now return 0 or maybe warn.
-        }
+            setItemLabel(selectedModel.addon_name);
+            const price = await PricingService.calculateAddonPrice(selectedModel, width, height);
+            setCalculatedPrice(price);
+        };
+        calculate();
+    }, [selectedModel, width, height]);
 
-        return { totalPrice: total, breakdown: items };
-    }, [availableItems, width, height, numTracks, systemType]);
+    const { totalPrice, breakdown } = useMemo(() => {
+        if (calculatedPrice <= 0) return { totalPrice: 0, breakdown: [] };
+
+        return {
+            totalPrice: calculatedPrice,
+            breakdown: [{ name: itemLabel, price: calculatedPrice }]
+        };
+    }, [calculatedPrice, itemLabel]);
 
     const handleAdd = () => {
         onAdd({
@@ -146,21 +140,31 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
-                    {/* System Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Model Systemu</label>
-                        <div className="flex gap-2">
-                            {['AL22', 'AL23'].map(s => (
-                                <button
-                                    key={s}
-                                    onClick={() => setSystemType(s as 'AL22' | 'AL23')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${systemType === s ? 'border-accent bg-accent text-white' : 'border-slate-200 hover:bg-slate-50'}`}
-                                >
-                                    {s}
-                                </button>
-                            ))}
+                    {/* Model Selector (New) */}
+                    {availableModels.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Model Systemu</label>
+                            <select
+                                value={selectedModelId}
+                                onChange={(e) => setSelectedModelId(e.target.value)}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                            >
+                                {availableModels.map(m => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.addon_name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                    </div>
+                    )}
+
+                    {/* System Selection (Legacy/Fallback - Optional, might remove if Model Selector covers found variant) */}
+                    {/* Only show legacy buttons if NO model selected or if we want to filter generic types */}
+                    {/* For now, keep it but maybe strictly rely on Model Selector? */}
+                    {/* Actually, if user picks a specific model, we don't need AL22/AL23 toggle if the model name implies it. */}
+                    {/* But let's keep it compatible for now. */}
+
+                    {/* Dimensions */}
 
                     {/* Dimensions */}
                     <div className="grid grid-cols-2 gap-4">

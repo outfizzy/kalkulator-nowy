@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import type { Installation, User, InstallationTeam, TeamUnavailability, OrderItem, OrderItemStatus, ProductConfig, SelectedAddon, InstallationWorkLog, Contract, ServiceTicket } from '../../types';
 import { UserService } from './user.service';
+import { InstallationTeamService } from './installation-team.service';
 
 interface InstallationData {
     client?: Installation['client'];
@@ -727,47 +728,10 @@ export const InstallationService = {
         if (error) throw error;
     },
     async getInstallationTeams(): Promise<InstallationTeam[]> {
-        const { data, error } = await supabase
-            .from('installation_teams')
-            .select('*')
-            .eq('is_active', true);
-
-        if (error) throw error;
-
-        return data.map((t) => {
-            // Handle members being JSONB array of strings or objects
-            let membersList: { id: string; firstName: string; lastName: string }[] = [];
-
-            if (Array.isArray(t.members)) {
-                membersList = t.members.map((m: unknown, idx: number) => {
-                    if (typeof m === 'string') {
-                        return {
-                            id: `mem-${t.id}-${idx}`,
-                            firstName: m,
-                            lastName: ''
-                        };
-                    } else if (typeof m === 'object' && m !== null) {
-                        const memberObj = m as Record<string, any>;
-                        return {
-                            id: memberObj.id || `mem-${t.id}-${idx}`,
-                            firstName: memberObj.firstName || memberObj.name || '',
-                            lastName: memberObj.lastName || ''
-                        };
-                    }
-                    return { id: `unknown-${idx}`, firstName: 'Nieznany', lastName: '' };
-                });
-            }
-
-            return {
-                id: t.id,
-                name: t.name,
-                color: t.color,
-                isActive: t.is_active,
-                members: membersList,
-                vehicle: t.vehicle,
-                workingDays: t.working_days || [1, 2, 3, 4, 5] // Default Mon-Fri if missing
-            };
-        });
+        return InstallationTeamService.getTeams();
+    },
+    async getTeams(): Promise<InstallationTeam[]> {
+        return InstallationTeamService.getTeams();
     },
 
     async autoReschedule(installationId: string): Promise<string | null> {
@@ -1014,79 +978,7 @@ export const InstallationService = {
 
         return stats;
     },
-    async getTeams(): Promise<InstallationTeam[]> {
-        // Fetch teams
-        const { data: teams, error: teamsError } = await supabase
-            .from('teams')
-            .select('*')
-            .order('created_at', { ascending: false });
 
-        if (teamsError) throw teamsError;
-
-        // Fetch members for all teams
-        const { data: members, error: membersError } = await supabase
-            .from('team_members')
-            .select('team_id, user_id');
-
-        if (membersError) throw membersError;
-
-        // Fetch profiles for these members
-        const userIds = Array.from(new Set((members || []).map(m => m.user_id)));
-        const profileMap = new Map<string, { id: string; full_name?: string }>();
-
-        if (userIds.length > 0) {
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, full_name')
-                .in('id', userIds);
-
-            if (profiles) {
-                profiles.forEach(p => profileMap.set(p.id, p));
-            }
-        }
-
-        // Map members to teams
-        return teams.map((team: {
-            id: string;
-            name: string;
-            color: string;
-            is_active: boolean;
-            working_days?: number[];
-            tags?: string[];
-            notes?: string;
-            fuel_consumption?: number;
-            vehicle_maintenance_rate?: number;
-        }) => {
-            const teamMembers = (members || [])
-                .filter((m: { team_id: string; user_id: string }) => m.team_id === team.id)
-                .map((m: { team_id: string; user_id: string }) => {
-                    const profile = profileMap.get(m.user_id);
-                    const fullName = profile?.full_name || 'Unknown User';
-                    const parts = fullName.split(' ');
-                    const firstName = parts[0] || '';
-                    const lastName = parts.slice(1).join(' ') || '';
-
-                    return {
-                        id: m.user_id,
-                        firstName,
-                        lastName
-                    };
-                });
-
-            return {
-                id: team.id,
-                name: team.name,
-                color: team.color,
-                isActive: team.is_active,
-                workingDays: team.working_days || [1, 2, 3, 4, 5], // Default Mon-Fri
-                tags: team.tags || [],
-                notes: team.notes || '',
-                members: teamMembers,
-                fuelConsumption: team.fuel_consumption !== undefined ? team.fuel_consumption : 12,
-                vehicleMaintenanceRate: team.vehicle_maintenance_rate !== undefined ? team.vehicle_maintenance_rate : 0
-            };
-        });
-    },
 
     async getTeamUnavailability(teamId: string): Promise<TeamUnavailability[]> {
         const { data, error } = await supabase

@@ -30,12 +30,17 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
     const [activeTab, setActiveTab] = useState<Tab>('structure');
     const [showOfferModal, setShowOfferModal] = useState(false);
     const [componentLists, setComponentLists] = useState<any[]>([]);
+    const [dbProducts, setDbProducts] = useState<any[]>([]);
 
     React.useEffect(() => {
         const load = async () => {
             try {
-                const lists = await PricingService.getComponentLists();
+                const [lists, products] = await Promise.all([
+                    PricingService.getComponentLists(),
+                    PricingService.getMainProducts()
+                ]);
                 setComponentLists(lists || []);
+                setDbProducts(products || []);
             } catch (e) {
                 console.error('Failed to load components', e);
             }
@@ -147,6 +152,22 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                             key={m.id}
                                             onClick={() => {
                                                 updateConfig('modelId', m.id);
+
+                                                // Link Pricing Data / Specs
+                                                const product = dbProducts?.find(p =>
+                                                    (p.code?.toLowerCase() === m.id.toLowerCase()) ||
+                                                    (p.model_family?.toLowerCase() === m.id.toLowerCase()) ||
+                                                    (p.name?.toLowerCase().includes(m.name.toLowerCase()))
+                                                );
+
+                                                if (product?.configuration?.visualizer) {
+                                                    // console.log('Applying Specs:', product.configuration.visualizer);
+                                                    updateConfig('productSpecs', product.configuration.visualizer);
+                                                } else {
+                                                    // Reset if no specific specs found (or handle defaults)
+                                                    updateConfig('productSpecs', undefined);
+                                                }
+
                                                 if (m.id === 'pergola_bio' || m.id === 'pergola_deluxe') {
                                                     // Default depth 4000mm
                                                     updateConfig('projection', 4000);
@@ -970,23 +991,7 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                     <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-32 h-20 bg-slate-900/50 blur-xl z-10" />
 
                     <div className="flex flex-col gap-4 relative z-20">
-                        {/* Price Row */}
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <div className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">Cena Netto</div>
-                                <div className="text-xl font-medium text-slate-300">
-                                    {priceLoading ? <span className="animate-pulse">...</span> : formatCurrency(price.net)}
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-xs text-accent font-bold uppercase tracking-widest mb-1">CENA BRUTTO</div>
-                                <div className="text-3xl font-bold tracking-tight text-white drop-shadow-lg">
-                                    {priceLoading ? <span className="animate-pulse">...</span> : formatCurrency(price.gross)}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Save Button */}
+                        {/* Save Button - Prices Hidden for Visualizer Mode */}
                         <button
                             onClick={() => setShowOfferModal(true)}
                             className="w-full bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-accent/20 flex items-center justify-center gap-2 transform transition-all hover:-translate-y-1 active:scale-95"

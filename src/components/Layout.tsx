@@ -61,6 +61,7 @@ export const Layout: React.FC = () => {
                             {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" />}
                             {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" />}
                             {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" />}
+                            <NavLink to="/admin/fairs" label="Targi / Hub" icon="calendar" />
                             {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" />}
                             {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />}
                             {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" />}
@@ -91,7 +92,6 @@ export const Layout: React.FC = () => {
                             {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />}
                             {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" />}
                             {hasPermission('partner_management') && <NavLink to="/admin/partner-offers" label="Partnerzy B2B" icon="clipboard" />}
-                            {isAdmin() && <NavLink to="/admin/fairs" label="Targi (Zarządzanie)" icon="calendar" />}
                             {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
                             {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
                             {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}

@@ -478,6 +478,24 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                                     </td>
                                 </tr>
                             ))}
+                            {/* Discount Row */}
+                            {offer.product.discount && offer.product.discount > 0 && (
+                                <tr className="bg-red-50/50">
+                                    <td className="py-4 text-red-700 pl-2 border-l-2 border-red-500 font-bold">
+                                        Rabat Handlowy
+                                        {offer.product.discountMode === 'percentage' && ` (${offer.product.discount}%)`}
+                                    </td>
+                                    <td className="py-4 text-red-600 text-right font-bold">
+                                        -{formatCurrency(
+                                            offer.product.discountMode === 'percentage'
+                                                ? (offer.pricing.sellingPriceNet / (1 - (offer.product.discount / 100))) - offer.pricing.sellingPriceNet
+                                                // Wait, sellingPriceNet is already Final.
+                                                // If Discount was 10%, Final = 90. Original = 100. Diff = 10.
+                                                : offer.product.discount
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
 
@@ -582,6 +600,18 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                     <p className="text-xl font-semibold text-slate-700 mb-2">
                         {formatCurrency(offer.pricing.sellingPriceNet)}
                     </p>
+                    {offer.product.discount && offer.product.discount > 0 && (
+                        <div className="text-sm font-bold text-red-500 mb-2">
+                            Rabat: -{formatCurrency(
+                                offer.product.discountMode === 'percentage'
+                                    ? offer.pricing.sellingPriceNet * (offer.product.discount / (100 - offer.product.discount)) // Reverse Logic approximation or simple diff?
+                                    // Actually, if we want to show how much was taken OFF, and sellingPriceNet is ALREADY discounted:
+                                    // Original = Selling / (1 - discount%)
+                                    // DiscountVal = Original - Selling
+                                    : offer.product.discount
+                            )}
+                        </div>
+                    )}
 
                     <div className="border-t border-slate-200 my-2"></div>
 
@@ -652,6 +682,6 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

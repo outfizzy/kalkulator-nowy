@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { ErrorReportService, ErrorReport } from '../../services/database/error-report.service';
+import { ErrorReportService, type ErrorReport } from '../../services/database/error-report.service';
 
 const ErrorDetailModal: React.FC<{ report: ErrorReport; onClose: () => void }> = ({ report, onClose }) => {
 
@@ -177,9 +177,9 @@ export const ErrorReportsPage: React.FC = () => {
                                 >
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${report.status === 'new' ? 'bg-red-100 text-red-700' :
-                                                report.status === 'resolved' ? 'bg-green-100 text-green-700' :
-                                                    report.status === 'analyzed' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-slate-100 text-slate-600'
+                                            report.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                                                report.status === 'analyzed' ? 'bg-blue-100 text-blue-700' :
+                                                    'bg-slate-100 text-slate-600'
                                             }`}>
                                             {report.status}
                                         </span>

@@ -12,7 +12,7 @@ interface AluminumWallSelectorProps {
     currentAddons: SelectedAddon[];
     maxRoofWidth?: number;
     maxRoofDepth?: number;
-    availableItems: any[];
+
     availableItems: AddonPriceEntry[];
 }
 
@@ -42,6 +42,19 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     const [frontSprosse, setFrontSprosse] = useState<boolean>(false);
     const [frontQty, setFrontQty] = useState<number>(0);
     const [frontExtras, setFrontExtras] = useState<Set<string>>(new Set());
+
+    const currentType = activeTab;
+    const currentQty = currentType === 'side' ? sideQty : frontQty;
+    const currentExtras = currentType === 'side' ? sideExtras : frontExtras;
+
+    const toggleExtra = (id: string, type: WallType) => {
+        const setFn = type === 'side' ? setSideExtras : setFrontExtras;
+        const current = type === 'side' ? sideExtras : frontExtras;
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setFn(next);
+    };
 
 
     // Auto-default side width to roof depth
@@ -99,68 +112,78 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
     // For Manual Mode: We probably need a "Find Price" button or auto-calc based on new Service.
     // Let's assume `availableItems` contains everything.
 
-    const sideBasePrice = useMemo(() => 0, [sideWidth]); // Placeholder
-    const sideExtrasPrice = useMemo(() => calculateExtrasPrice(sideExtras), [sideExtras, availableItems]);
-    const totalSidePrice = sideBasePrice + sideExtrasPrice;
+    // 1. Group Available Models (Base Walls)
+    const availableModels = useMemo(() => {
+        // Filter items that look like "Base Models" (not small extras like Sprosse/Glass upgrade if separate)
+        // Heuristic: Price > 100 EUR or explicit property?
+        // Or just show EVERYTHING in the dropdown and let user pick "Wall Base"?
+        // Better: Expect "Wall System" items.
+        // For now, show unique items.
+        return availableItems.filter((item, index, self) =>
+            index === self.findIndex((t) => (
+                t.id === item.id
+            ))
+        );
+    }, [availableItems]);
 
-    const frontBasePrice = useMemo(() => 0, [frontWidth]); // Placeholder
-    const frontExtrasPrice = useMemo(() => calculateExtrasPrice(frontExtras), [frontExtras, availableItems]);
-    const totalFrontPrice = frontBasePrice + frontExtrasPrice;
+    // 2. Select Model
+    const [selectedModelId, setSelectedModelId] = useState<string>('');
 
-    const toggleExtra = (id: string, type: WallType) => {
-        if (type === 'side') {
-            const next = new Set(sideExtras);
-            if (next.has(id)) next.delete(id); else next.add(id);
-            setSideExtras(next);
-        } else {
-            const next = new Set(frontExtras);
-            if (next.has(id)) next.delete(id); else next.add(id);
-            setFrontExtras(next);
+    useEffect(() => {
+        if (!selectedModelId && availableModels.length > 0) {
+            setSelectedModelId(availableModels[0].id);
         }
-    };
+    }, [availableModels, selectedModelId]);
 
-    const handleSaveSide = () => {
-        const extraNames = Array.from(sideExtras).map(id => availableItems.find(i => i.id === id)?.addon_name).join(', ');
-        if (sideQty > 0) {
+    // Pricing Logic
+    const [basePrice, setBasePrice] = useState<number>(0);
+    const [matchedName, setMatchedName] = useState<string>('');
+
+    // Calculate Base Price
+    useEffect(() => {
+        const calculate = async () => {
+            const model = availableModels.find(m => m.id === selectedModelId);
+            if (!model) {
+                setBasePrice(0);
+                setMatchedName('');
+                return;
+            }
+            setMatchedName(model.addon_name);
+            const w = activeTab === 'side' ? sideWidth : frontWidth;
+            const h = activeTab === 'side' ? sideHeight : frontHeight;
+            // Use Service (Matrix/Area/Linear)
+            const p = await PricingService.calculateAddonPrice(model, w, h);
+            setBasePrice(p);
+        };
+        calculate();
+    }, [selectedModelId, activeTab, sideWidth, sideHeight, frontWidth, frontHeight, availableModels]);
+
+
+    const currentExtrasPrice = useMemo(() => calculateExtrasPrice(currentType === 'side' ? sideExtras : frontExtras),
+        [sideExtras, frontExtras, currentType, availableItems]);
+
+    const totalUnitPrice = basePrice + currentExtrasPrice;
+
+    const handleSave = () => {
+        const qty = currentQty;
+        if (qty > 0) {
+            const extraNames = Array.from(currentExtras).map(id => availableItems.find(i => i.id === id)?.addon_name).join(', ');
+
             onAdd({
-                id: 'alu-side',
+                id: `alu-${currentType}`,
                 type: 'fixedWall',
-                name: 'Ściana Alu Boczna',
-                variant: `${sideGlass} ${sideSprosse ? '+ Sprosse' : ''}`,
-                width: sideWidth,
-                depth: 0,
-                quantity: sideQty,
-                price: totalSidePrice * sideQty,
-                description: `Szkło: ${sideGlass}. ${extraNames}`
+                name: matchedName || `Ściana Alu ${currentType === 'side' ? 'Boczna' : 'Frontowa'}`,
+                variant: activeTab === 'side' ? 'Boczna' : 'Frontowa',
+                width: currentType === 'side' ? sideWidth : frontWidth,
+                height: currentType === 'side' ? sideHeight : frontHeight,
+                quantity: qty,
+                price: totalUnitPrice * qty,
+                description: `Wymiary: ${currentType === 'side' ? sideWidth : frontWidth}x${currentType === 'side' ? sideHeight : frontHeight}. ${extraNames}`
             });
         } else {
-            onRemove('alu-side');
+            onRemove(`alu-${currentType}`);
         }
     };
-
-    const handleSaveFront = () => {
-        const extraNames = Array.from(frontExtras).map(id => availableItems.find(i => i.id === id)?.addon_name).join(', ');
-        if (frontQty > 0) {
-            onAdd({
-                id: 'alu-front',
-                type: 'fixedWall',
-                name: 'Ściana Alu Frontowa',
-                variant: `${frontGlass} ${frontSprosse ? '+ Sprosse' : ''}`,
-                width: frontWidth,
-                depth: 0,
-                quantity: frontQty,
-                price: totalFrontPrice * frontQty,
-                description: `Szkło: ${frontGlass}. ${extraNames}`
-            });
-        } else {
-            onRemove('alu-front');
-        }
-    };
-
-    const currentType = activeTab;
-    const currentPrice = currentType === 'side' ? totalSidePrice : totalFrontPrice;
-    const currentQty = currentType === 'side' ? sideQty : frontQty;
-    const currentExtras = currentType === 'side' ? sideExtras : frontExtras;
 
     return (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
@@ -174,6 +197,24 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1 space-y-6">
+                    {/* Model Selector */}
+                    {availableModels.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Model Systemu</label>
+                            <select
+                                value={selectedModelId}
+                                onChange={(e) => setSelectedModelId(e.target.value)}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                            >
+                                {availableModels.map(m => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.addon_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {/* Controls */}
                     <div>
                         <label className="block text-sm font-medium mb-1">
@@ -186,7 +227,6 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                             onChange={e => {
                                 const val = Number(e.target.value);
                                 if (currentType === 'side') {
-                                    // Clamp to maxRoofDepth
                                     setSideWidth(maxRoofDepth ? Math.min(val, maxRoofDepth) : val);
                                 } else {
                                     setFrontWidth(val);
@@ -205,36 +245,12 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                             className="w-full border p-2 rounded"
                         />
                     </div>
-                    {/* Glass toggles */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Szkło</label>
-                        <div className="flex gap-1 text-xs">
-                            {['klar', 'matt', 'ig'].map(g => (
-                                <button
-                                    key={g}
-                                    onClick={() => currentType === 'side' ? setSideGlass(g as any) : setFrontGlass(g as any)}
-                                    className={`px-2 py-1 border rounded capitalize ${(currentType === 'side' ? sideGlass : frontGlass) === g ? 'bg-accent text-white' : ''}`}
-                                >
-                                    {g}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <label className="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            checked={currentType === 'side' ? sideSprosse : frontSprosse}
-                            onChange={(e) => currentType === 'side' ? setSideSprosse(e.target.checked) : setFrontSprosse(e.target.checked)}
-                        />
-                        Szprosy (Fenstersprosse)
-                    </label>
 
                     {/* DB Options - Key Logic */}
                     {availableItems.length > 0 && (
                         <div className="border-t pt-4">
-                            <label className="block text-sm font-bold mb-2">Opcje Dodatkowe</label>
-                            <div className="space-y-2">
+                            <label className="block text-sm font-bold mb-2">Opcje Dodatkowe (Wybierz jeśli nie są w cenie podstawowej)</label>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
                                 {availableItems.map(item => (
                                     <label key={item.id} className="flex items-center justify-between p-2 border rounded cursor-pointer hover:bg-slate-50">
                                         <div className="flex items-center gap-2">
@@ -269,10 +285,10 @@ export const AluminumWallSelector: React.FC<AluminumWallSelectorProps> = ({
                     <div className="bg-white p-4 border rounded-xl flex justify-between items-center">
                         <div>
                             <div className="text-sm text-slate-500">Cena jedn.</div>
-                            <div className="font-bold text-xl text-accent">{formatCurrency(currentPrice)}</div>
+                            <div className="font-bold text-xl text-accent">{formatCurrency(totalUnitPrice)}</div>
                         </div>
                         <button
-                            onClick={activeTab === 'side' ? handleSaveSide : handleSaveFront}
+                            onClick={handleSave}
                             className="px-8 py-3 bg-accent text-white font-bold rounded-xl hover:bg-accent-dark"
                         >
                             {currentQty > 0 ? 'Aktualizuj' : 'Dodaj'}

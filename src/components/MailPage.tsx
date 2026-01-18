@@ -679,22 +679,23 @@ export const MailPage: React.FC = () => {
             // Combine subject and body for analysis
             const fullText = `Temat: ${selectedEmail.subject}\nOd: ${selectedEmail.from}\n\n${selectedEmail.text || ''}`;
 
-            const res = await fetch('/api/extract-lead-info', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const { supabase } = await import('../lib/supabase');
+            const { data, error } = await supabase.functions.invoke('extract-lead-info', {
+                body: {
                     text: fullText,
                     apiKey: activeConfig?.openaiKey
-                })
+                }
             });
 
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'AI Error');
+            if (error) {
+                console.error("Supabase Invoke Error:", error);
+                throw new Error(error.message || 'Error invoking AI function');
             }
 
-            const data = await res.json();
+            // Edge function returns { leadData: ... } or just the object depending on implementation.
+            // My implementation returns { leadData }.
             const extracted = data.leadData;
+            console.log('AI Extracted Data:', extracted);
 
             if (extracted) {
                 setLeadInitialData({

@@ -14,7 +14,7 @@ export interface EmailTemplate {
     updated_at: string;
 }
 
-export interface CreateTemplateDTO {
+export interface CreateTemplateInput {
     name: string;
     subject: string;
     body: string;
@@ -39,7 +39,7 @@ export const EmailTemplateService = {
         return data || [];
     },
 
-    async createTemplate(template: CreateTemplateDTO): Promise<EmailTemplate> {
+    async createTemplate(template: CreateTemplateInput): Promise<EmailTemplate> {
         const { data: { user } } = await supabase.auth.getUser();
 
         const { data, error } = await supabase
@@ -55,7 +55,7 @@ export const EmailTemplateService = {
         return data;
     },
 
-    async updateTemplate(id: string, updates: Partial<CreateTemplateDTO>): Promise<EmailTemplate> {
+    async updateTemplate(id: string, updates: Partial<CreateTemplateInput>): Promise<EmailTemplate> {
         const { data, error } = await supabase
             .from('email_templates')
             .update(updates)

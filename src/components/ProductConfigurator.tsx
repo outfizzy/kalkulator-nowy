@@ -18,6 +18,7 @@ import { WPCFlooringSelector } from './configurator/WPCFlooringSelector';
 import { formatCurrency } from '../utils/translations';
 import { toast } from 'react-hot-toast';
 import { PricingService, type AdditionalCost } from '../services/pricing.service';
+import { SettingsService } from '../services/database/settings.service';
 
 // === OFFER BASKET TYPES ===
 interface ProductDefinition {
@@ -76,7 +77,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         addons: [],
         selectedAccessories: [],
         selectedSurcharges: [],
-        installationDays: 0
+        installationDays: 0,
+        discount: 0,
+        discountMode: 'percentage'
     });
 
     // Dynamic Pricing state
@@ -121,7 +124,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
     const [variantNote, setVariantNote] = useState<string | null>(null);
     const [detail, setDetail] = useState<any>({});
-    const [marginData, setMarginData] = useState<{ value: number, percentage: number } | null>(null);
+    // marginData moved to lower section
 
     // Dynamic Limits State
     const [limits, setLimits] = useState({ minWidth: 2000, maxWidth: 10000, minDepth: 2000, maxDepth: 5000 });
@@ -130,6 +133,62 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     useEffect(() => {
         if (!config.modelId) return;
         PricingService.getProductLimits(config.modelId).then(setLimits);
+
+        // NEW: Set default dimensions to smallest valid size in price list
+        // This ensures the calculator never starts with "0 EUR" due to invalid default dims
+        const setSmartDefaults = async () => {
+            try {
+                // Construct basic attributes for lookup
+                let calculatedSubtype = (config.roofType === 'glass' ? config.glassType : config.polycarbonateType) || 'standard';
+                const isAluxe = ['topstyle', 'trendstyle', 'orangestyle', 'ultrastyle', 'carport', 'topstyle_xl', 'grillo_rigid'].some(m => config.modelId.toLowerCase().includes(m));
+
+                if (isAluxe) {
+                    if (config.roofType === 'glass' && calculatedSubtype === 'standard') calculatedSubtype = 'glass_clear';
+                    if (config.roofType === 'polycarbonate' && calculatedSubtype === 'standard') calculatedSubtype = 'poly_clear';
+                }
+
+                // Handle Skystyle/Ultrastyle override (Force Glass context)
+                let roofType = config.roofType;
+                if (config.modelId === 'skystyle' || config.modelId === 'ultrastyle') {
+                    roofType = 'glass';
+                    calculatedSubtype = 'glass_clear';
+                }
+
+                const attributes: Record<string, string> = {
+                    snow_zone: config.snowZone ? String(config.snowZone) : '1',
+                    roof_type: roofType,
+                    mounting: config.installationType === 'wall-mounted' ? 'wall' : 'free',
+                    subtype: calculatedSubtype
+                };
+
+                const matrix = await PricingService.getPriceMatrix(config.modelId, attributes);
+
+                if (matrix && matrix.length > 0) {
+                    // Find Minimum Valid Dimension Pair
+                    // Sort by Width ASC, then Depth ASC
+                    const sorted = matrix.sort((a: any, b: any) => {
+                        if (a.width_mm !== b.width_mm) return a.width_mm - b.width_mm;
+                        return a.depth_mm - b.depth_mm;
+                    });
+
+                    const bestFit = sorted[0]; // The smallest width/depth combo
+
+                    if (bestFit) {
+                        console.log(`📏 Setting Default Dimensions for ${config.modelId}: ${bestFit.width_mm}x${bestFit.depth_mm}`);
+                        setConfig(prev => ({
+                            ...prev,
+                            width: bestFit.width_mm,
+                            projection: bestFit.depth_mm
+                        }));
+                    }
+                }
+            } catch (e) {
+                console.error('Error setting smart defaults:', e);
+            }
+        };
+
+        setSmartDefaults();
+
     }, [config.modelId]);
 
     // Fetch Price when attributes change
@@ -313,6 +372,31 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         }
     }, [products, config.modelId]);
 
+    // Margin State
+    const [marginData, setMarginData] = useState<{ percentage: number; value: number }>({ percentage: 40, value: 0 });
+
+    // Load Global Settings
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                // If initialData provided margin, respect it (logic to extract is handled in effect below or passed differently?
+                // Actually initialData doesn't strictly have margin in ProductConfig, it's in PricingResult. 
+                // But ProductConfigurator returns config. 
+                // The margin is usually handled in the "Offer" context or passed as props if we were editing an Offer.
+                // Here we are creating/editing a CONFIG.
+
+                // If it's a fresh config (no info), load global default.
+                const policy = await SettingsService.getGlobalPricingPolicy();
+                if (policy && policy.defaultMargin) {
+                    setMarginData(prev => ({ ...prev, percentage: policy.defaultMargin }));
+                }
+            } catch (e) {
+                console.error('Error loading global pricing policy', e);
+            }
+        };
+        loadSettings();
+    }, []);
+
     // Fetch Dynamic Products
     useEffect(() => {
         const loadProducts = async () => {
@@ -422,11 +506,24 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             productSelling = totalCost / (1 - (marginData.percentage / 100));
         }
 
+        // Apply Manual Discount
+        // Discount is applied to the PRODUCT part (productSelling), before services? 
+        // Or to the total? Usually discount is on the product.
+        // Let's apply to productSelling.
+        if (config.discount && config.discount > 0) {
+            if (config.discountMode === 'fixed') {
+                productSelling = Math.max(0, productSelling - config.discount);
+            } else {
+                // percentage
+                productSelling = productSelling * (1 - (config.discount / 100));
+            }
+        }
+
         // Add Services (Pass-through)
         const services = (installationData?.dailyTotal || 0) + (installationData?.travelCost || 0);
 
         return productSelling + services;
-    }, [totalCost, marginData, installationData]);
+    }, [totalCost, marginData, installationData, config.discount, config.discountMode]);
 
     // --- Logic & Calculations ---
 
@@ -1417,7 +1514,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                                     currentAddons={config.addons}
                                                     onAdd={handleAddonAdd}
                                                     onRemove={handleAddonRemove}
-                                                    availableItems={addonGroups.lighting}
+                                                    availableItems={[...(addonGroups.lighting || []), ...(addonGroups.heating || [])]}
                                                 />
                                             )}
                                         </div>
@@ -1748,6 +1845,45 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                 </div>
                             </div>
                         )}
+
+                        {/* Discount Section */}
+                        <div className="space-y-3 pb-6 border-b border-slate-100">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rabat</span>
+                                <div className="flex bg-slate-100 rounded p-0.5">
+                                    <button
+                                        onClick={() => handleBasicConfigChange('discountMode', 'percentage')}
+                                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${config.discountMode === 'percentage' ? 'bg-white shadow text-slate-800' : 'text-slate-400'}`}
+                                    >%</button>
+                                    <button
+                                        onClick={() => handleBasicConfigChange('discountMode', 'fixed')}
+                                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${config.discountMode === 'fixed' ? 'bg-white shadow text-slate-800' : 'text-slate-400'}`}
+                                    >EUR</button>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step={config.discountMode === 'percentage' ? "1" : "10"}
+                                    value={config.discount || ''}
+                                    onChange={(e) => handleBasicConfigChange('discount', parseFloat(e.target.value) || 0)}
+                                    placeholder={config.discountMode === 'percentage' ? "np. 5%" : "np. 500 EUR"}
+                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/50"
+                                />
+                                {config.discount && config.discount > 0 ? (
+                                    <div className="text-right whitespace-nowrap">
+                                        <span className="text-red-500 font-bold text-sm">
+                                            -{formatCurrency(
+                                                config.discountMode === 'percentage'
+                                                    ? (totalPrice - ((installationData?.dailyTotal || 0) + (installationData?.travelCost || 0))) * (config.discount / (100 - config.discount))
+                                                    : config.discount
+                                            )}
+                                        </span>
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
 
                         {/* Margin Display (Explicit) */}
                         {marginData && typeof marginData.value === 'number' && (

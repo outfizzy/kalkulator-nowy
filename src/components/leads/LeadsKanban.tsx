@@ -173,7 +173,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
                         <span className="truncate">{lead.customerData.address}</span>
                     </div>
                 )}
-                {lead.customerData.city && (
+                {(lead.customerData.city || lead.customerData.postalCode) && (
                     <div className="flex items-center gap-1.5 pl-5">
                         <span className="text-slate-500">{lead.customerData.postalCode}</span>
                         <span>{lead.customerData.city}</span>

@@ -179,24 +179,21 @@ export interface Lead {
 export interface FairProductConfig {
     id: string;
     type: 'roof' | 'pergola' | 'carport' | 'zip_screen' | 'sliding_glass' | 'accessory' | 'other';
-    width: string;
-    projection: string;
+    model: string; // "trendstyle", "aluxe_fixed", etc.
+    label: string; // Display name
+    width: string; // String to allow 'Auto' or raw input
+    projection: string; // String to allow 'Auto' or raw input
 
-    // Roof / Pergola Logic
-    roofFill?: 'polycarbonate' | 'glass';
-    wallTypes?: string[]; // 'framed' | 'frameless' | 'fixed' | 'aluminum' | 'none'
-    wallSidesCount?: number;
+    // V7 Logic - Side Counts
+    wallSidesCount?: number; // 0, 1, 2, 3
+    zipSidesCount?: number; // 0, 1, 2, 3
 
-    ledType?: 'spot' | 'strip' | 'none';
-    roofAwning?: 'under' | 'over' | 'none';
-
-    // ZIP Logic
-    zipEnabled?: boolean;
-    zipWidth?: string;
-    zipHeight?: string;
-    zipSidesCount?: number;
-
+    // Config Details
+    colors?: string; // e.g. "RAL 7016"
     notes?: string;
+
+    // Standalone logic
+    quantity?: number; // For standalone accessories
 }
 
 // --- New Catalog Types ---
@@ -241,7 +238,8 @@ export interface SelectedAddon {
     flooringType?: string;
     installationOption?: 'with-foundation' | 'without-foundation';
     attributes?: Record<string, unknown>; // For multilingual names (name_pl, name_de)
-}
+    pricing_basis?: 'FIXED' | 'MATRIX';
+    properties?: Record<string, any>; // For matrix calculation metadata
 
 export interface ProductConfig {
     modelId: string; // e.g., "trendstyle"
@@ -306,6 +304,14 @@ export interface ProductConfig {
         windowPosition?: number; // mm offset
         showDecor: boolean;
     };
+
+    // Dynamic Profile Specs (Linked to Pricing)
+    productSpecs?: {
+        postSize: number;      // meters, e.g. 0.11
+        beamHeight: number;    // meters, e.g. 0.15
+        rafterHeight?: number; // meters, e.g. 0.10
+        gutterProfile?: 'trend' | 'orange' | 'flat';
+    };
     // Pergola Specific
     lamellaAngle?: number; // 0-135 degrees
     numberOfPosts?: number; // Calculated number of posts
@@ -319,6 +325,10 @@ export interface ProductConfig {
 
     // Calculator V2 Surcharges
     selectedSurcharges?: string[];
+
+    // Discount System
+    discount?: number; // Value (e.g. 5 for 5% or 500 for 500 EUR)
+    discountMode?: 'percentage' | 'fixed'; // Mode
 }
 
 export interface InstallationCostResult {
@@ -981,4 +991,29 @@ export interface ServiceTicket {
     contract?: Contract;
     installation?: Installation;
     assignedTeam?: InstallationTeam;
+}
+
+// --- Pricing Types ---
+
+export interface PriceTable {
+    id: string;
+    product_definition_id?: string; // Link to Product Definitions
+    name: string;
+    valid_from?: string; // ISO Date
+    valid_to?: string; // ISO Date
+    currency: string;
+    is_active: boolean;
+    type: 'matrix' | 'linear' | 'fixed';
+
+    // Legacy/Flexible Configuration
+    attributes?: Record<string, unknown>;
+    configuration?: Record<string, unknown>;
+
+    // New Explicit Aluxe Schema (2026-01-19)
+    model_family?: string; // "Trendstyle", "Ultrastyle", etc.
+    zone?: number; // 1, 2, 3
+    cover_type?: string; // 'polycarbonate', 'glass'
+    construction_type?: string; // 'wall', 'freestanding'
+
+    created_at: string;
 }

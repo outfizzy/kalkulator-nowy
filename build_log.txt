@@ -1,0 +1,40 @@
+
+> offer-app@0.0.0 build
+> vite build
+
+vite v7.2.4 building client environment for production...
+transforming...
+✓ 3202 modules transformed.
+✗ Build failed in 1.84s
+error during build:
+[vite:esbuild] Transform failed with 2 errors:
+/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/src/components/leads/LeadDetailsPage.tsx:744:26: ERROR: Unexpected closing "div" tag does not match opening fragment tag
+/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/src/components/leads/LeadDetailsPage.tsx:885:29: ERROR: Unterminated regular expression
+file: /Users/tomaszfijolek/Desktop/Program do ofert /offer-app/src/components/leads/LeadDetailsPage.tsx:744:26
+
+Unexpected closing "div" tag does not match opening fragment tag
+742 |                              )}
+743 |                              
+744 |                          </div>
+    |                            ^
+745 |                          )}
+746 |  
+
+Unterminated regular expression
+883 |                                  </div>
+884 |                              </div>
+885 |                          </>)}
+    |                               ^
+886 |                      </div>
+887 |                  </div>
+
+    at failureErrorWithLog (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:1467:15)
+    at /Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:736:50
+    at responseCallbacks.<computed> (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/Users/tomaszfijolek/Desktop/Program do ofert /offer-app/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

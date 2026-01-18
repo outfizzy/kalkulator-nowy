@@ -159,11 +159,11 @@ export const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({ prizes, onSpinEn
             <button
                 onClick={spin}
                 disabled={isSpinning}
-                className={`mt-6 px-12 py-4 rounded-full text-2xl font-bold shadow-xl transition-transform ${isSpinning
+                className={`mt-6 px-12 py-4 rounded-xl text-xl font-bold shadow-lg transition-transform ${isSpinning
                     ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 active:scale-95'}`}
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 shadow-emerald-200'}`}
             >
-                {isSpinning ? 'KRĘCIMY...' : 'ZAKRĘĆ KOŁEM!'}
+                {isSpinning ? 'LOSOWANIE...' : 'ZAKRĘĆ I ODBIERZ NAGRODĘ'}
             </button>
         </div>
     );

@@ -194,16 +194,18 @@ export const CustomerService = {
      */
     async ensureCustomerSecure(customer: Partial<Customer>): Promise<Customer> {
         const { data, error } = await supabase.rpc('get_or_create_customer_v2', {
-            p_email: customer.email || null,
-            p_phone: customer.phone || null,
-            p_first_name: customer.firstName || null,
-            p_last_name: customer.lastName || null,
-            p_company_name: customer.companyName || null,
-            p_street: customer.street || null,
-            p_house_number: customer.houseNumber || null,
-            p_postal_code: customer.postalCode || null,
-            p_city: customer.city || null,
-            p_country: customer.country || 'Deutschland'
+            p_email: customer.email ?? null,
+            p_phone: customer.phone ?? null,
+            p_first_name: customer.firstName ?? null,
+            p_last_name: customer.lastName ?? null,
+            p_company_name: customer.companyName ?? null,
+            p_street: customer.street ?? null,
+            p_house_number: customer.houseNumber ?? null,
+            p_postal_code: customer.postalCode ?? null,
+            p_city: customer.city ?? null,
+            p_country: customer.country || 'Deutschland',
+            p_representative_id: customer.representative_id || null,
+            p_source: customer.source || 'manual'
         });
 
         if (error) throw error;

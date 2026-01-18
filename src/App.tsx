@@ -155,6 +155,9 @@ function App() {
             }>
               <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/offers" element={<OffersList />} />
+              <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+              {/* <Route path="/v2" element={<ProductConfiguratorV2 />} /> */} {/* New Route - DISABLED FOR DEBUGGING */}
+              <Route path="/offer/:id" element={<OfferPreview />} />
               <Route path="/new-offer" element={<NewOfferPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/migration" element={<MigrationPage />} />

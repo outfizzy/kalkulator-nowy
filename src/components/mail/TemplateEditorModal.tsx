@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { EmailTemplateService, CreateTemplateDTO, EmailTemplate } from '../../services/database/email-template.service';
+import { EmailTemplateService, type CreateTemplateInput, type EmailTemplate } from '../../services/database/email-template.service';
 
 interface TemplateEditorModalProps {
     isOpen: boolean;
@@ -50,7 +50,7 @@ export const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({ isOpen
 
         setLoading(true);
         try {
-            const templateData: CreateTemplateDTO = {
+            const templateData: CreateTemplateInput = {
                 name,
                 subject,
                 body,
@@ -81,7 +81,7 @@ export const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({ isOpen
             const start = textareaRef.current.selectionStart;
             const end = textareaRef.current.selectionEnd;
             const text = body;
-            const newText = text.substring(0, start) + `{{${variable}}}` + text.substring(end);
+            const newText = text.substring(0, start) + '{{' + variable + '}}' + text.substring(end);
 
             setBody(newText);
 
@@ -93,7 +93,7 @@ export const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({ isOpen
                 }
             }, 0);
         } else {
-            setBody(prev => prev + `{{${variable}}}`);
+            setBody(prev => prev + '{{' + variable + '}}');
         }
     };
 

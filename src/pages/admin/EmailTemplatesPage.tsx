@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { EmailTemplateService, EmailTemplate } from '../../services/database/email-template.service';
-import { EmailFooterService, EmailFooter } from '../../services/database/email-footer.service';
+import { EmailTemplateService } from '../../services/database/email-template.service';
+import type { EmailTemplate } from '../../services/database/email-template.service';
+import { EmailFooterService } from '../../services/database/email-footer.service';
+import type { EmailFooter } from '../../services/database/email-footer.service';
 import { TemplateEditorModal } from '../../components/mail/TemplateEditorModal';
 import { FooterEditorModal } from '../../components/mail/FooterEditorModal';
 import { toast } from 'react-hot-toast';

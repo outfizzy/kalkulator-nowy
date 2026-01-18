@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 export const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Security: Honeypot & Time-based protection
@@ -33,16 +31,10 @@ export const LoginPage: React.FC = () => {
             return;
         }
 
-        // 3. ReCAPTCHA Check
-        if (!captchaToken) {
-            toast.error('Potwierdź, że nie jesteś robotem (ReCAPTCHA).');
-            return;
-        }
-
         setLoading(true);
 
         try {
-            const { error } = await login(email, password, captchaToken);
+            const { error } = await login(email, password);
             if (error) throw error;
             navigate('/dashboard');
         } catch (error: unknown) {
@@ -200,15 +192,6 @@ export const LoginPage: React.FC = () => {
                                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                                     placeholder="••••••••"
                                     disabled={loading}
-                                />
-                            </div>
-
-                            {/* hCaptcha */}
-                            <div className="flex justify-center my-4">
-                                <HCaptcha
-                                    sitekey="d3c63506-a15a-4128-a62c-6d54ee5005c0"
-                                    onVerify={(token) => setCaptchaToken(token)}
-                                    theme="dark"
                                 />
                             </div>
 

@@ -17,7 +17,18 @@ const DEFAULT_TRANSPORT_SETTINGS: TransportSettings = {
         lat: 51.9494,
         lng: 14.7242
     }
+}
+
+
+export interface GlobalPricingPolicy {
+    defaultMargin: number; // e.g. 40 for 40%
+    // Future: globalMarkup, seasonalModifier, etc.
+}
+
+const DEFAULT_PRICING_POLICY: GlobalPricingPolicy = {
+    defaultMargin: 40
 };
+
 
 export const SettingsService = {
     async getTransportSettings(): Promise<TransportSettings> {
@@ -134,6 +145,62 @@ export const SettingsService = {
             .upsert({
                 key: 'contract_number_start',
                 value: { start },
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+    },
+
+    async getEurRate(): Promise<number | null> {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'eur_rate')
+                .single();
+
+            if (error || !data) return null;
+            return (data.value as any)?.rate || null;
+        } catch (e) {
+            console.error('Error fetching EUR rate:', e);
+            return null;
+        }
+    },
+
+    async updateEurRate(rate: number): Promise<void> {
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert({
+                key: 'eur_rate',
+                value: { rate },
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+    },
+
+    async getGlobalPricingPolicy(): Promise<GlobalPricingPolicy> {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'global_pricing_policy')
+                .single();
+
+            if (error || !data) return DEFAULT_PRICING_POLICY;
+            return data.value as GlobalPricingPolicy;
+        } catch (e) {
+            console.error('Error fetching pricing policy:', e);
+            return DEFAULT_PRICING_POLICY;
+        }
+    },
+
+    async updateGlobalPricingPolicy(policy: GlobalPricingPolicy): Promise<void> {
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert({
+                key: 'global_pricing_policy',
+                value: policy,
                 updated_at: new Date().toISOString()
             });
 

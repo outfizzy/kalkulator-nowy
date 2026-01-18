@@ -6,7 +6,14 @@ import { TaskService } from './task.service';
 export const LeadService = {
     async createLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
         // Debug: Log supabase instance status
-        console.log('LeadService.createLead: Checking auth', { supabaseDefined: !!supabase, authDefined: !!supabase?.auth });
+        console.log('LeadService.createLead: Checking auth', {
+            supabaseDefined: !!supabase,
+            authDefined: !!supabase?.auth,
+            url: import.meta.env.VITE_SUPABASE_URL ? 'DEFINED' : 'MISSING'
+        });
+
+        if (!supabase) throw new Error('Supabase Client is undefined in LeadService');
+        if (!supabase.auth) throw new Error('Supabase Auth is undefined in LeadService');
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
@@ -43,18 +50,26 @@ export const LeadService = {
                     city: lead.customerData.city || defaultCity,
                     phone: lead.customerData.phone || '',
                     email: lead.customerData.email || '',
-                    country: 'Deutschland'
+                    country: 'Deutschland',
+                    // [Fix 2026-01-13] Pass Representative ID to bypass RLS and ensure ownership
+                    representative_id: lead.assignedTo || user.id,
+                    source: lead.source || 'targi'
                 };
 
                 // Use SECURE version to bypass RLS (especially important for fair leads)
+                // Note: The RPC might fail if passed NULL for NOT NULL columns (lastName, city, postalCode).
+                // We ensure above they default to empty strings, but let's be explicit if customerInput was modified.
                 const customer = await CustomerService.ensureCustomerSecure(customerInput);
                 customerId = customer.id;
             } catch (e) {
                 console.error('Failed to ensure customer for lead:', e);
                 // Log detailed error for debugging
                 console.error('Customer data:', lead.customerData);
-                console.error('Error details:', e instanceof Error ? e.message : JSON.stringify(e));
-                throw new Error('Could not create/link customer for this lead. ' + (e instanceof Error ? e.message : 'Unknown error'));
+                const errString = e instanceof Error ? e.message : JSON.stringify(e);
+                console.error('Error details:', errString);
+
+                // If it's the "new row for relation" error, it's RLS or constraint
+                throw new Error(`Could not create/link customer: ${errString}`);
             }
         }
 

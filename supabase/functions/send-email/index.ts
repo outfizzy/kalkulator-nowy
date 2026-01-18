@@ -1,10 +1,7 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-//
-// @ts-ignore
+// Setup type definitions for built-in Supabase Runtime APIs
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-// @ts-ignore
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.13";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -15,6 +12,14 @@ interface EmailRequest {
     to: string;
     subject: string;
     html: string;
+    config?: {
+        smtpHost: string;
+        smtpPort: number;
+        smtpUser: string;
+        smtpPassword?: string;
+        smtpPass?: string; // Compatibility
+    };
+    page?: string; // For tracking source
 }
 
 serve(async (req) => {
@@ -24,36 +29,41 @@ serve(async (req) => {
     }
 
     try {
-        const { to, subject, html } = await req.json() as EmailRequest;
+        const { to, subject, html, config } = await req.json() as EmailRequest;
 
-        // Check for SMTP Credentials (User Preference: home.pl)
-        const smtpHost = Deno.env.get('SMTP_HOST');
-        const smtpUser = Deno.env.get('SMTP_USER');
-        const smtpPass = Deno.env.get('SMTP_PASS');
+        // Determine SMTP Credentials (Config > Env)
+        const smtpHost = config?.smtpHost || Deno.env.get('SMTP_HOST');
+        const smtpUser = config?.smtpUser || Deno.env.get('SMTP_USER');
+        const smtpPass = config?.smtpPassword || config?.smtpPass || Deno.env.get('SMTP_PASS');
+        const smtpPort = config?.smtpPort || parseInt(Deno.env.get('SMTP_PORT') || '465');
 
         if (smtpHost && smtpUser && smtpPass) {
             console.log(`Sending via SMTP (${smtpHost})...`);
 
-            const client = new SmtpClient();
-            await client.connectTLS({
-                hostname: smtpHost,
-                port: 465, // Standard Secure SMTP Port for home.pl
-                username: smtpUser,
-                password: smtpPass,
+            const transporter = nodemailer.createTransport({
+                host: smtpHost,
+                port: smtpPort,
+                secure: smtpPort === 465, // true for 465, false for 587/other
+                auth: {
+                    user: smtpUser,
+                    pass: smtpPass,
+                },
+                // Robustness settings
+                tls: {
+                    rejectUnauthorized: false, // Often needed for shared hosts
+                    ciphers: 'SSLv3' // Sometimes helps with old servers
+                }
             });
 
-            await client.send({
-                from: smtpUser, // Send from the authenticated user
+            await transporter.sendMail({
+                from: `System Polendach <${smtpUser}>`, // Use authenticated user
                 to: to,
                 subject: subject,
-                content: html,
                 html: html,
             });
 
-            await client.close();
-
             return new Response(
-                JSON.stringify({ success: true, message: 'Email sent via SMTP' }),
+                JSON.stringify({ success: true, message: 'Email sent via SMTP (Nodemailer)' }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
@@ -82,7 +92,7 @@ serve(async (req) => {
                 'Authorization': `Bearer ${resendApiKey}`,
             },
             body: JSON.stringify({
-                from: 'System Ofertowy <onboarding@resend.dev>', // Default Resend, user should change this
+                from: 'System Ofertowy <onboarding@resend.dev>',
                 to,
                 subject,
                 html,
@@ -99,11 +109,11 @@ serve(async (req) => {
             JSON.stringify(data),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         )
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error:', error);
         return new Response(
-            JSON.stringify({ error: error.message }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 },
+            JSON.stringify({ success: false, error: error.message || 'Unknown Error' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
         )
     }
 })

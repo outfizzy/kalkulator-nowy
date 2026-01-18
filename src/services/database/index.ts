@@ -65,3 +65,5 @@ export * from './storage.service';
 export * from './support.service';
 export * from './task.service';
 export * from './user.service';
+export * from './user.service';
+export * from './email-template.service';

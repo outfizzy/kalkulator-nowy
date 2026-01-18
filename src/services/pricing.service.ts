@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import type { ProductConfig, PricingResult, SnowZoneInfo, TransportSettings } from '../types';
+import type { ProductConfig, PricingResult, SnowZoneInfo, TransportSettings, PriceTable } from '../types';
+
 import { calculateInstallationCosts, calculateDistanceFromGubin, type InstallationDailyRates } from '../utils/distanceCalculator';
 import { DatabaseService } from './database';
 import catalogData from '../data/catalog.json';
@@ -242,6 +243,140 @@ export const PricingService = {
     },
 
     /**
+     * Find the best matching Price Table using Explicit Schema (Preferred) or Heuristics (Fallback)
+     */
+    async findMatchingPriceTable(criteria: {
+        modelFamily: string;
+        constructionType: 'wall' | 'free';
+        coverType: string;
+        zone: number;
+    }): Promise<PriceTable | null> {
+        // 1. Explicit Schema Lookup (The "Aluxe Way")
+        // We look for a table that explicitly matches the tags.
+        const normalizedConstruct = criteria.constructionType === 'free' ? 'freestanding' : 'wall';
+
+        console.log(`🔎 [Pricing] Explicit Table Lookup: ${criteria.modelFamily} / Zone ${criteria.zone} / ${normalizedConstruct} / ${criteria.coverType}`);
+
+        try {
+            const { data: explicitTables } = await supabase
+                .from('price_tables')
+                .select('*')
+                .ilike('model_family', criteria.modelFamily.replace(/_/g, ' ')) // 'trendstyle' matches 'Trendstyle'
+                .eq('zone', criteria.zone)
+                .eq('construction_type', normalizedConstruct)
+                .eq('is_active', true);
+
+            if (explicitTables && explicitTables.length > 0) {
+                // Refine by Cover Type
+                // A. Exact Match (e.g. 'glass_opal')
+                const exactCover = explicitTables.find(t => t.cover_type?.toLowerCase() === criteria.coverType.toLowerCase());
+                if (exactCover) {
+                    console.log(`✅ Explicit Match Found: ${exactCover.name}`);
+                    return exactCover as any as PriceTable;
+                }
+
+                // B. Generic Match (e.g. 'glass' covers 'glass_opal')
+                if (criteria.coverType.includes('glass')) {
+                    const genericGlass = explicitTables.find(t => t.cover_type?.toLowerCase() === 'glass');
+                    if (genericGlass) {
+                        console.log(`✅ Explicit Generic Match Found (Glass): ${genericGlass.name}`);
+                        return genericGlass as any as PriceTable;
+                    }
+                }
+                if (criteria.coverType.includes('poly')) {
+                    const genericPoly = explicitTables.find(t => t.cover_type?.toLowerCase() === 'polycarbonate');
+                    if (genericPoly) {
+                        console.log(`✅ Explicit Generic Match Found (Poly): ${genericPoly.name}`);
+                        return genericPoly as any as PriceTable;
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error in explicit lookup:', err);
+        }
+
+        // 2. Fallback: Heuristic Lookup (Legacy)
+        console.warn('⚠️ Explicit keys not found. Fallback to Heuristic Name Matching...');
+
+        const requestIsWall = criteria.constructionType === 'wall';
+        // Normalize Model Name
+        const normalizedFamily = criteria.modelFamily.toLowerCase().replace('aluxe', '').replace(/_/g, ' ').trim();
+        let searchName = normalizedFamily;
+
+        if (normalizedFamily.includes('ultrastyle')) searchName = 'ultrastyle';
+        if (normalizedFamily.includes('trendstyle')) searchName = 'trendstyle';
+        if (normalizedFamily.includes('orangestyle')) searchName = 'orangestyle';
+        if (normalizedFamily.includes('topstyle')) searchName = 'topstyle';
+
+        const { data: manualTables } = await supabase
+            .from('price_tables')
+            .select('*')
+            .ilike('name', `%${searchName}%`);
+
+        if (!manualTables || manualTables.length === 0) return null;
+
+        // Use Scoring System
+        const typeKey = criteria.coverType.includes('glass') ? 'Glass' : 'Poly';
+        const isRelax = criteria.coverType.includes('relax') || criteria.coverType.includes('gold') || criteria.coverType.includes('ir');
+        const isOpal = criteria.coverType.includes('opal');
+        const isClear = criteria.coverType.includes('clear') || (!isRelax && !isOpal);
+
+        let bestMatch: any = null;
+        let bestScore = -100;
+
+        manualTables.forEach(t => {
+            const name = t.name.toLowerCase();
+            let score = 0;
+
+            // A. Construction Type
+            const attrType = t.attributes?.installationType;
+            if (attrType) {
+                if (attrType === 'freestanding' && requestIsWall) return;
+                if (attrType === 'wall-mounted' && !requestIsWall) return;
+            } else {
+                const isExplicitFree = name.includes('freestanding') || name.includes('wolnostoj');
+                if (requestIsWall && isExplicitFree) return;
+                if (!requestIsWall && !isExplicitFree) return;
+            }
+            score += 10;
+
+            // B. Zone Check
+            const configZone = (t as any).variant_config?.snowZone;
+            if (configZone) {
+                if (String(configZone) === String(criteria.zone)) score += 100;
+                else return;
+            } else {
+                const zoneRegex = new RegExp(`([sS]|zone|strefa)[\\s-_]*${criteria.zone}\\b`, 'i');
+                if (!zoneRegex.test(name)) return;
+                score += 10;
+            }
+
+            // C. Subtype Nuances
+            if (isRelax) {
+                if (name.includes('relax') || name.includes('ir') || name.includes('gold')) score += 50;
+                else score -= 20;
+            } else if (isOpal) {
+                if (name.includes('opal') || name.includes('mlecz')) score += 50;
+                else score -= 10;
+            } else if (isClear) {
+                if (name.includes('relax') || name.includes('gold') || name.includes('opal')) score -= 50;
+                else score += 10;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = t;
+            }
+        });
+
+        if (bestMatch) {
+            console.log(`✅ Heuristic Match: ${bestMatch.name} (Score: ${bestScore})`);
+        }
+
+        return bestMatch as PriceTable | null;
+    },
+
+    /**
      * Exact Match Lookup for Base Price with Smart Fallback
      */
     async findBasePrice(criteria: {
@@ -251,10 +386,58 @@ export const PricingService = {
         zone: number;
         width: number;
         depth: number;
-    }): Promise<{ price: number, variant_note?: string, properties?: { matchedWidth: number; matchedProjection: number; posts_count?: number; fields_count?: number } } | null> {
+    }): Promise<{ price: number, variant_note?: string, properties?: { matchedWidth: number; matchedProjection: number; posts_count?: number; fields_count?: number, constructionType?: string } } | null> {
         console.log('🔍 Pricing Lookup:', criteria);
 
-        // 1. Try Exact Match
+        // 0. NEW STRATEGY: Explicit Price Table Lookup (Matrix)
+        // Try to find a specific Price Table matching these criteria first
+        const matchedTable = await this.findMatchingPriceTable({
+            modelFamily: criteria.modelFamily,
+            constructionType: criteria.constructionType, // 'wall' or 'free' mapping handles inside findMatchingPriceTable checks? No, findMatching expects db values usually.
+            // Wait, findMatchingPriceTable checks variant_config which stores strings.
+            // The Importer saves constructionType as 'wall' | 'freestanding' (expanded).
+            // Criteria.constructionType is 'wall' | 'free'.
+            // Let's normalize for lookup.
+            zone: criteria.zone,
+            coverType: criteria.coverType
+        });
+
+        if (matchedTable && matchedTable.type === 'matrix') {
+            console.log(`💎 Found Explicit Matrix Table: "${matchedTable.name}" (ID: ${matchedTable.id})`);
+
+            // Query Matrix Entries
+            const { data: matrixEntry } = await supabase
+                .from('price_matrix_entries')
+                .select('price, width_mm, projection_mm')
+                .eq('price_table_id', matchedTable.id)
+                .gte('width_mm', criteria.width)
+                .gte('projection_mm', criteria.depth)
+                .order('width_mm', { ascending: true })
+                .order('projection_mm', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            if (matrixEntry) {
+                console.log('✅ Matrix Price Found:', matrixEntry.price);
+                return {
+                    price: matrixEntry.price,
+                    variant_note: `Matrix: ${matchedTable.name}`,
+                    properties: {
+                        matchedWidth: matrixEntry.width_mm,
+                        matchedProjection: matrixEntry.projection_mm,
+                        // Matrix entries might not have posts/fields count yet if strictly price grid.
+                        // Can fetch from table attributes if needed or leave undefined (Calculator has defaults).
+                        constructionType: 'matrix_db'
+                    }
+                };
+            } else {
+                console.warn('⚠️ Table found but no matrix entry covers dimensions:', criteria.width, criteria.depth);
+                // Proceed to Legacy Fallback? Or Fail?
+                // Probably Fallback to allow old data to work if new table is incomplete.
+            }
+        }
+
+        // 1. LEGACY: Try Exact Match in pricing_base
         let exactQuery = supabase
             .from('pricing_base')
             .select('price_upe_net_eur, variant_note, posts_count, fields_count, width_mm, depth_mm')
@@ -276,7 +459,7 @@ export const PricingService = {
         const { data: exactData } = await exactQuery.maybeSingle();
 
         if (exactData) {
-            console.log('✅ Exact Price Found:', exactData.price_upe_net_eur);
+            console.log('✅ Exact Price Found (Legacy):', exactData.price_upe_net_eur);
             return {
                 price: exactData.price_upe_net_eur,
                 variant_note: exactData.variant_note,
@@ -284,7 +467,8 @@ export const PricingService = {
                     matchedWidth: exactData.width_mm,
                     matchedProjection: exactData.depth_mm,
                     posts_count: exactData.posts_count,
-                    fields_count: exactData.fields_count
+                    fields_count: exactData.fields_count,
+                    constructionType: 'exact_db'
                 }
             };
         }
@@ -319,192 +503,93 @@ export const PricingService = {
                     matchedWidth: smartData.width_mm,
                     matchedProjection: smartData.depth_mm,
                     posts_count: smartData.posts_count,
-                    fields_count: smartData.fields_count
+                    constructionType: 'smart_db'
                 }
             };
         }
 
-        console.warn('❌ Base Price Not Found. Attempting Manual Table Lookup...');
+        // 3. Fallback: Oversized Width Logic (Split & Sum)
+        // If we are here, it means we found NO single entry large enough.
+        // Cases:
+        // A. Depth is too large -> Fail (Return null)
+        // B. Width is too large -> Split (Max Width + Remainder)
 
-        // 3. Manual Table Lookup (Fallback for Raw Imports)
-        // Check construction type: Surcharges rely on Base (Wall) + Surcharge.
-        // If request is for 'free', we should return NULL here so the Service falls back to "Wall + Surcharge".
-        // UNLESS the table explicitly says "Freestanding".
-        const requestIsWall = criteria.constructionType === 'wall';
+        // Check if Depth is valid at all (is there ANY entry with this depth or larger?)
+        let depthCheckQuery = supabase
+            .from('pricing_base')
+            .select('width_mm')
+            .ilike('model_family', criteria.modelFamily)
+            .eq('construction_type', criteria.constructionType)
+            .eq('zone', criteria.zone)
+            .gte('depth_mm', criteria.depth)
+            .limit(1);
 
-        // Normalize Model Name for Lookup (e.g. 'topstyle_xl' -> 'topstyle xl')
-        // Strip 'aluxe' prefix to avoid "Aluxe Ultrastyle" vs "Ultrastyle" mismatches
-        const normalizedFamily = criteria.modelFamily.toLowerCase().replace('aluxe', '').replace(/_/g, ' ').trim();
-        let searchName = normalizedFamily;
-
-        // HEURISTIC: Simplify search for known Aluxe Families to ensure match even if Product Name has suffix (e.g. "Ultrastyle Premium")
-        if (normalizedFamily.includes('ultrastyle')) searchName = 'ultrastyle';
-        if (normalizedFamily.includes('trendstyle')) searchName = 'trendstyle';
-        if (normalizedFamily.includes('orangestyle')) searchName = 'orangestyle';
-        // For Topstyle, keep XL distinction if it exists, or just fallback if needed. `topstyle_xl` became `topstyle xl`.
-        // If table is "Topstyle", `%topstyle xl%` fails.
-        // If table is "Topstyle XL", `%topstyle%` matches.
-        // Let's try to match broader.
-        if (normalizedFamily.includes('topstyle')) {
-            // If we search for 'topstyle', we match 'Topstyle' and 'Topstyle XL'. 
-            // Logic later filters by zone, etc.
-            // But 'Topstyle' table might not cover 'Topstyle XL' prices correctly?
-            // Usually they are separate tables.
-            // If I search 'topstyle', I get BOTH tables. Then JS filtering logic picks the best one.
-            // THIS IS BETTER than missing it.
-            searchName = 'topstyle';
+        if (criteria.coverType) {
+            depthCheckQuery = depthCheckQuery.ilike('cover_type', criteria.coverType);
         }
 
-        console.log(`🔎 Searching Tables for normalized name: '${searchName}' (Derived from: '${criteria.modelFamily}')`);
+        const { data: depthValid } = await depthCheckQuery.maybeSingle();
 
-        const { data: manualTables } = await supabase
-            .from('price_tables')
-            .select('*')
-            .ilike('name', `%${searchName}%`) as {
-                data: {
-                    name: string;
-                    id: string;
-                    description?: string;
-                    attributes?: Record<string, any>;
-                    variant_config?: { snowZone?: string | number;[key: string]: any };
-                }[] | null
-            }; // Broad match on model name
+        if (!depthValid) {
+            console.warn(`❌ Depth ${criteria.depth} exceeds all limits for this model/type.`);
+            return null; // Depth is the hard limit
+        }
 
-        if (manualTables && manualTables.length > 0) {
-            // Filter in JS for best match using Scoring System
-            // We need to match criteria.zone and criteria.coverType
+        // If Depth is valid, then Width must be the problem.
+        // Find the LARGEST available width for this depth (or valid depth)
+        let maxPartQuery = supabase
+            .from('pricing_base')
+            .select('price_upe_net_eur, width_mm, depth_mm, variant_note, posts_count, fields_count')
+            .ilike('model_family', criteria.modelFamily)
+            .eq('construction_type', criteria.constructionType)
+            .eq('zone', criteria.zone)
+            .gte('depth_mm', criteria.depth); // Must handle the depth
 
-            // 1. Identify Target Keys
-            const typeKey = criteria.coverType.includes('glass') ? 'Glass' : 'Poly';
-            const zoneKey = `S${criteria.zone}`; // e.g. "S1"
+        if (criteria.coverType) {
+            maxPartQuery = maxPartQuery.ilike('cover_type', criteria.coverType);
+        }
 
-            // Subtype Nuances
-            const isRelax = criteria.coverType.includes('relax') || criteria.coverType.includes('gold') || criteria.coverType.includes('ir');
-            const isOpal = criteria.coverType.includes('opal');
-            const isClear = criteria.coverType.includes('clear') || (!isRelax && !isOpal);
+        // Sort by Width DESC to get the biggest piece
+        const { data: maxPartData } = await maxPartQuery
+            .order('width_mm', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-            // 2. Score Tables
-            let bestMatch: { name: string; id: string; description?: string } | null = null;
-            let bestScore = -100;
+        if (maxPartData) {
+            const maxW = maxPartData.width_mm;
+            const remainingW = criteria.width - maxW;
 
-            console.log(`🔎 Searching Manual Tables for: ${criteria.modelFamily} (${criteria.coverType}) Zone:${criteria.zone} Type:${criteria.constructionType}`);
+            if (remainingW > 0) {
+                console.log(`⚠️ Oversized Width ${criteria.width}mm. Splitting into ${maxW}mm + ${remainingW}mm.`);
 
-            manualTables.forEach(t => {
-                const name = t.name.toLowerCase();
-                let score = 0;
+                // Recurse for the remainder
+                // Note: We use the SAME depth requirements for the remainder
+                const remainderPrice = await this.findBasePrice({
+                    ...criteria,
+                    width: remainingW, // Only width changes
+                    // Depth, Zone, Type stay same
+                });
 
-                // A. Construction Type Check (Attribute Priority > Name Heuristic)
-                const attrType = t.attributes?.installationType;
+                if (remainderPrice) {
+                    const totalRefPrice = maxPartData.price_upe_net_eur + remainderPrice.price;
+                    const combinedPosts = (maxPartData.posts_count || 0) + (remainderPrice.properties?.posts_count || 0);
 
-                if (attrType) {
-                    // Strict Attribute Matching
-                    if (attrType === 'freestanding' && requestIsWall) return; // Requested Wall, Table is Free -> Skip
-                    if (attrType === 'wall-mounted' && !requestIsWall) return; // Requested Free, Table is Wall -> Skip
-                } else {
-                    // Legacy Name Matching (only if no attribute set)
-                    const isExplicitFree = name.includes('freestanding') || name.includes('wolnostoj');
-                    if (requestIsWall && isExplicitFree) return; // Disqualify
-                    if (!requestIsWall && !isExplicitFree) return; // Disqualify
-                }
-                score += 10; // Construction type matches
-
-                // B. Zone Check (Critical)
-                // New: Check variant_config first (Explicit Importer Logic)
-                const configZone = t.variant_config?.snowZone;
-                if (configZone) {
-                    if (String(configZone) === String(criteria.zone)) {
-                        score += 100; // Major Boost for explicit intent
-                    } else {
-                        // Explicit Mismatch -> Disqualify immediately
-                        return;
-                    }
-                } else {
-                    // Legacy Name Matching with Robust Regex
-                    // Matches: "S1", "S-1", "S 1", "Zone 1", "Zone-1", "Strefa 1"
-                    // \b boundary ensures we don't match "S12" for "S1"
-                    const zoneRegex = new RegExp(`([sS]|zone|strefa)[\\s-_]*${criteria.zone}\\b`, 'i');
-                    const hasZone = zoneRegex.test(name);
-
-                    if (!hasZone) return; // Disqualify (Zone mismatch is fatal usually)
-                    score += 10;
-                }
-
-                // C. Material Check (High Priority)
-                if (typeKey === 'Glass' && !name.includes('glass') && !name.includes('szkło')) {
-                    // If searching for Glass but table doesn't say Glass, it might be Poly by default? 
-                    // Or "Trendstyle - S1" is generic? Assuming generic is Poly usually.
-                    // Score penalty if mismatch type
-                }
-
-                // D. Subtype Specifics (The IR Gold Fix)
-                if (isRelax) {
-                    if (name.includes('relax') || name.includes('ir') || name.includes('gold')) {
-                        score += 50; // Huge boost for specific match
-                    } else {
-                        score -= 20; // Penalty for picking non-relax table when we want relax
-                    }
-                } else if (isOpal) {
-                    if (name.includes('opal') || name.includes('mlecz')) {
-                        score += 50;
-                    } else {
-                        score -= 10;
-                    }
-                } else if (isClear) {
-                    // If we want clear, we prefer NOT to see "Relax" or "Opal"
-                    if (name.includes('relax') || name.includes('gold') || name.includes('opal')) {
-                        score -= 50; // Strong penalty: Don't pick a specialized table for clear
-                    } else {
-                        score += 10; // Neutral/Correct
-                    }
-                }
-
-                // E. Tie Breaker for "Genric" vs "Specific" names?
-                // Shorter names might be more generic.
-
-                // console.log(`   ? Checking: ${t.name} -> Score: ${score}`);
-
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = t;
-                }
-            });
-
-            const match = bestMatch;
-
-            if (match && match.rows) {
-                console.log(`✅ Selected Manual Table: ${match.name} (Score: ${bestScore})`);
-                // Parse JSON Grid
-                // rows: { width: number, ...projections: { [depth]: price } }
-                const rows = match.rows as any[];
-
-                // Sort by width
-                const sortedRows = rows.sort((a, b) => a.width - b.width);
-
-                // Find Row >= Width
-                const row = sortedRows.find(r => r.width >= criteria.width);
-
-                // ... (rest is same)
-                if (row) {
-                    // Check Projections in this row
-                    // row = { width: 3000, "2000": 1500, "2500": 1600 ... }
-                    // Find key >= depth
-                    const depths = Object.keys(row).filter(k => k !== 'width' && !isNaN(Number(k))).map(Number).sort((a, b) => a - b);
-                    const matchedDepth = depths.find(d => d >= criteria.depth);
-
-                    if (matchedDepth) {
-                        const price = Number(row[matchedDepth]);
-                        if (price && !isNaN(price)) {
-                            console.log(`✅ Manual Table Match: ${match.name} (W:${row.width} x D:${matchedDepth}) = ${price}`);
-                            return {
-                                price,
-                                variant_note: 'Manual Table Price',
-                                tableAttributes: match.attributes
-                            };
+                    return {
+                        price: totalRefPrice,
+                        variant_note: `Combined: ${maxW}mm (${maxPartData.price_upe_net_eur}€) + ${remainingW}mm (${remainderPrice.price}€)`,
+                        properties: {
+                            matchedWidth: criteria.width, // We "matched" the total request virtually
+                            matchedProjection: maxPartData.depth_mm, // Bound to the valid depth
+                            posts_count: combinedPosts,
+                            constructionType: 'split_system'
                         }
-                    }
+                    };
+                } else {
+                    console.warn('❌ Could not price the remainder part.');
                 }
             }
         }
+
 
         return null; // Return null to indicate failure
     },
@@ -670,10 +755,13 @@ export const PricingService = {
 
         // A. Freestanding Surcharge
         let freestandingSurcharge = 0;
-
         // Check for Explicit Freestanding Table
         const foundTableType = (priceResult as any)?.tableAttributes?.installationType;
-        const isExplicitlyFreestanding = foundTableType === 'free' || foundTableType === 'freestanding';
+        // Also include results from DB that successfully matched 'freestanding' query
+        const resultType = (priceResult as any)?.properties?.constructionType;
+        const isDbFreestandingMatch = constructionType === 'free' && (resultType === 'exact_db' || resultType === 'smart_db');
+
+        const isExplicitlyFreestanding = foundTableType === 'free' || foundTableType === 'freestanding' || isDbFreestandingMatch;
         const isUniversalTable = foundTableType === 'all';
 
         // Apply Surcharge Logic (Corrected to avoid Double Counting)
@@ -1321,27 +1409,60 @@ export const PricingService = {
         }
 
         // 2. Matrix Price (New)
-        if (addon.pricing_basis === 'MATRIX') {
-            const tableId = addon.properties?.price_table_id;
+        if (addon.pricing_basis === 'MATRIX' || addon.price_table_id) {
+            // PRIORITY 1: Explicitly linked table (Manual Override)
+            let tableId = addon.price_table_id || addon.properties?.price_table_id;
+
+            // PRIORITY 2: Dynamic Lookup via linked_product_code (if no explicit table)
+            const linkedCode = addon.properties?.linked_product_code;
+
+            if (!tableId && linkedCode) {
+                try {
+                    // Find latest active price table for this product code
+                    const { data: latestTable } = await supabase
+                        .from('price_tables')
+                        // Use Supabase Relation Syntax with !inner for strict joining
+                        .select('id, name, created_at, product_definitions!inner(code)')
+                        .eq('product_definitions.code', linkedCode)
+                        .eq('is_active', true)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (latestTable) {
+                        console.log(`🔄 Dynamic Addon Pricing: "switched" table for ${addon.addon_name} -> ${latestTable.name} (${latestTable.id})`);
+                        tableId = latestTable.id;
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Dynamic Table Lookup failed for', linkedCode, err);
+                }
+            }
+
             if (!tableId) {
                 console.warn(`⚠️ Matrix Addon ${addon.addon_name} missing price_table_id`);
                 return 0;
             }
 
-            // Determine dimensions based on addon type
-            // Default: Match Roof Dimensions
-            // If "dimension_type" property exists, use it?
-            // For now assume Width x Height (where Height = Roof Projection usually for side screens, or Roof Depth for awnings)
-            // Let's rely on the arguments passed: width, depth.
+            // 3.1 Try `price_matrix_entries` (Standard/Bulk Import) FIRST
+            // This is the modern schema used by new inputs.
+            const { data: matrixEntry } = await supabase
+                .from('price_matrix_entries')
+                .select('price, width_mm, projection_mm')
+                .eq('price_table_id', tableId)
+                // Use a generous "cover check": Find entry that fits or exceeds requested
+                .gte('width_mm', width)
+                .gte('projection_mm', depth)
+                .order('width_mm', { ascending: true })
+                .order('projection_mm', { ascending: true })
+                .limit(1)
+                .maybeSingle();
 
-            // Fetch Matrix Row
-            // We need to query pricing_base by source_import_id (= tableId)
-            // and find the best match for width/depth.
+            if (matrixEntry) {
+                console.log(`✅ Addon Matrix Match (New Schema): ${addon.addon_name} -> ${matrixEntry.price} (Size: ${matrixEntry.width_mm}x${matrixEntry.projection_mm})`);
+                return matrixEntry.price;
+            }
 
-            // Reuse logic from findBasePrice but simpler?
-            // "getMatrixPrice" fetches ALL rows. We can use getDetailedPrice.
-
-            // Use internal cache or fetch fresh? Fetch fresh for safety.
+            // 3.2 FALLBACK: Try `pricing_base` (Legacy/Manual Import)
             const query = supabase
                 .from('pricing_base')
                 .select('price_upe_net_eur, width_mm, depth_mm')
@@ -1363,7 +1484,7 @@ export const PricingService = {
                     // Sort by size (area or width then depth)
                     applicable.sort((a: any, b: any) => (a.width_mm * a.depth_mm) - (b.width_mm * b.depth_mm));
                     const match = applicable[0];
-                    console.log(`✅ Addon Matrix Match: ${addon.addon_name} -> ${match.price_upe_net_eur} (Size: ${match.width_mm}x${match.depth_mm})`);
+                    console.log(`✅ Addon Matrix Match (Legacy): ${addon.addon_name} -> ${match.price_upe_net_eur} (Size: ${match.width_mm}x${match.depth_mm})`);
                     return Number(match.price_upe_net_eur);
                 } else {
                     console.warn(`⚠️ No Matrix match for ${addon.addon_name} (Req: ${width}x${depth}) - Largest available?`);
@@ -1374,6 +1495,19 @@ export const PricingService = {
             }
 
             return 0;
+        }
+
+        // 3. Linear Price (Per Meter of Width)
+        if (addon.pricing_basis === 'BY_OPENING_WIDTH' || addon.pricing_basis === 'BY_WIDTH') {
+            const basePrice = Number(addon.price_upe_net_eur) || 0;
+            // width is in mm, price is usually per meter
+            return basePrice * (width / 1000);
+        }
+
+        // 4. Area Price (Per M2)
+        if (addon.pricing_basis === 'PER_M2') {
+            const basePrice = Number(addon.price_upe_net_eur) || 0;
+            return basePrice * (width / 1000) * (depth / 1000);
         }
 
         return Number(addon.price_upe_net_eur) || 0;

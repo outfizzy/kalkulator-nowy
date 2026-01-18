@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { EmailFooterService, EmailFooter, CreateFooterDTO } from '../../services/database/email-footer.service';
+import { EmailFooterService, type EmailFooter, type CreateFooterInput } from '../../services/database/email-footer.service';
 import { supabase } from '../../lib/supabase';
 
 interface FooterEditorModalProps {
@@ -69,7 +69,7 @@ export const FooterEditorModal: React.FC<FooterEditorModalProps> = ({ isOpen, on
 
         setLoading(true);
         try {
-            const footerData: CreateFooterDTO = {
+            const footerData: CreateFooterInput = {
                 name,
                 content,
                 is_active: isActive

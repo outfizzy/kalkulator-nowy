@@ -5,13 +5,29 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+// Check for .env.local first, then .env
+const envLocalPath = path.resolve(process.cwd(), '.env.local');
+const envDefaultPath = path.resolve(process.cwd(), '.env');
+const envPath = fs.existsSync(envLocalPath) ? envLocalPath : envDefaultPath;
 
-const supabase = createClient(
-    process.env.VITE_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+console.log(`Loading env from: ${envPath}`);
+const envConfig = dotenv.parse(fs.readFileSync(envPath));
+
+// Manual merge into process.env so createClient can use it if needed, or pass directly
+for (const k in envConfig) {
+    process.env[k] = envConfig[k];
+}
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase credentials (VITE_SUPABASE_URL or keys)');
+    console.log('Available Keys:', Object.keys(process.env).filter(k => k.includes('SUPABASE')));
+    process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const filePath = process.argv[2];
 if (!filePath) {

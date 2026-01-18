@@ -26,60 +26,81 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
 }) => {
     const existing = currentAddons.find(a => a.id === 'alu-schiebetuer');
 
+    // 1. Derive Available Models
+    const availableModels = useMemo(() => {
+        return availableItems.filter(item => item.pricing_basis === 'MATRIX' || item.pricing_basis === 'FIXED');
+    }, [availableItems]);
+
+    // 2. State for Selected Model
+    // Default to existing name if matches, or first available
+    const [selectedModelId, setSelectedModelId] = useState<string>(() => {
+        if (existing) {
+            // Try to find model matching existing name
+            const match = availableModels.find(m => existing.name.includes(m.addon_name));
+            if (match) return match.id;
+        }
+        return availableModels.length > 0 ? availableModels[0].id : '';
+    });
+
+    // Validations & Defaults
+    useEffect(() => {
+        if (!selectedModelId && availableModels.length > 0) {
+            setSelectedModelId(availableModels[0].id);
+        }
+    }, [availableModels, selectedModelId]);
+
+
     const [width, setWidth] = useState<number>(existing?.width || 3000);
     const [height, setHeight] = useState<number>(2200); // Default height
     const [glass, setGlass] = useState<GlassVariant>(existing?.variant?.includes('Mat') ? 'matt' : existing?.variant?.includes('IG') ? 'ig' : 'klar');
     const [quantity, setQuantity] = useState<number>(existing?.quantity || 0);
 
-    const priceData = useMemo(() => {
-        // Find matching item in availableItems
-        // Heuristic: Look for name matching 'Schiebetür' + Glass
-        // OR rely on user to pick? No, this is a configurator.
-        // We iterate availableItems.
+    const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
+    const [matchedItemConfig, setMatchedItemConfig] = useState<string>('');
 
-        let foundItem = availableItems.find(item => {
-            const name = item.addon_name.toLowerCase();
-            // Simple logic:
-            if (glass === 'matt') return name.includes('matt') || name.includes('satyn');
-            if (glass === 'ig') return name.includes('ig') || name.includes('heat');
-            return name.includes('klar') || !name.match(/(matt|satyn|ig|heat)/);
-        });
+    // Async Price Calculation
+    useEffect(() => {
+        const calculate = async () => {
+            let foundItem = availableModels.find(item => item.id === selectedModelId);
 
-        if (!foundItem && availableItems.length > 0) foundItem = availableItems[0]; // Fallback
+            // Legacy Fallback (if no explicit model selected or list empty, try glass heuristic)
+            if (!foundItem) {
+                foundItem = availableItems.find(item => {
+                    const name = item.addon_name.toLowerCase();
+                    if (glass === 'matt') return name.includes('matt') || name.includes('satyn');
+                    if (glass === 'ig') return name.includes('ig') || name.includes('heat');
+                    return name.includes('klar') || !name.match(/(matt|satyn|ig|heat)/);
+                });
+            }
 
-        if (!foundItem) return { price: 0, config: 'Brak cennika' };
+            if (!foundItem && availableItems.length > 0) foundItem = availableItems[0];
 
-        // If pricing_basis is BY_WIDTH or similar, we calculate
-        // For Sliding Door, likely fixed Price per Set? Or Price per Meter?
-        // Let's assume Price in DB is for the whole set OR per meter.
-        // If simplistic: "1000 EUR".
-        // If "PER_METER": price * width/1000.
+            if (!foundItem) {
+                setCalculatedPrice(0);
+                setMatchedItemConfig('Brak cennika');
+                return;
+            }
 
-        let finalPrice = foundItem.price_upe_net_eur;
-        // Adjust for width if basis suggests it?
-        // PricingService.calculateAddonPrice logic:
-        if (foundItem.pricing_basis === 'BY_WIDTH' || foundItem.pricing_basis === 'PER_M2') {
-            // Sliding door per m2? width * height?
-            // Or just width.
-            const wM = width / 1000;
-            const hM = height / 1000;
-            if (foundItem.pricing_basis === 'PER_M2') finalPrice = foundItem.price_upe_net_eur * wM * hM;
-            else finalPrice = foundItem.price_upe_net_eur * wM;
-        }
+            setMatchedItemConfig(foundItem.addon_name);
 
-        return { price: finalPrice, config: foundItem.addon_name };
-    }, [width, height, glass, availableItems]);
+            // Use PricingService for centralized logic (Fixed, Matrix, Linear)
+            const price = await PricingService.calculateAddonPrice(foundItem, width, height);
+            setCalculatedPrice(price);
+        };
 
-    const { price, config } = priceData;
-    const totalPrice = price * quantity;
+        calculate();
+    }, [width, height, glass, availableItems, selectedModelId, availableModels]);
+
+    const totalPrice = calculatedPrice * quantity;
+    const config = matchedItemConfig;
 
     const handleSave = () => {
         if (quantity > 0) {
             onAdd({
                 id: 'alu-schiebetuer',
                 type: 'slidingWall',
-                name: 'Szyba przesuwna w ramie (Alu Schiebetür)',
-                variant: `${glass === 'klar' ? 'Klar' : glass === 'matt' ? 'Mat' : 'IG'} (${config})`,
+                name: config, // Use the specific model name
+                variant: `${glass === 'klar' ? 'Klar' : glass === 'matt' ? 'Mat' : 'IG'}`, // Keep glass as variant info
                 width,
                 quantity,
                 price: totalPrice,
@@ -109,6 +130,26 @@ export const SlidingDoorSelector: React.FC<SlidingDoorSelectorProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Controls */}
                 <div className="lg:col-span-1 space-y-6">
+
+                    {/* Model Selector */}
+                    {availableModels.length > 1 && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">System / Model</label>
+                            <select
+                                value={selectedModelId}
+                                onChange={(e) => setSelectedModelId(e.target.value)}
+                                className="w-full border-2 border-slate-200 rounded-xl p-3 font-bold text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                            >
+                                {availableModels.map(model => (
+                                    <option key={model.id} value={model.id}>
+                                        {model.addon_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">Szerokość (mm)</label>

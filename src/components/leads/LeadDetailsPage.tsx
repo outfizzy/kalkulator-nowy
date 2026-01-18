@@ -11,10 +11,12 @@ import { TasksList } from '../tasks/TasksList';
 import { TaskModal } from '../tasks/TaskModal';
 import { NotesList } from '../common/NotesList';
 import { AssigneeSelector } from '../common/AssigneeSelector';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import { useAuth } from '../../contexts/AuthContext';
 
-type Tab = 'overview' | 'communications' | 'offers';
+type Tab = 'overview' | 'communications' | 'offers' | 'fair';
 
 export const LeadDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -253,102 +255,28 @@ export const LeadDetailsPage: React.FC = () => {
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                             Komunikacja
                         </button>
+
+                        {(lead.source === 'targi' || lead.fairId) && (
+                            <button
+                                onClick={() => setActiveTab('fair')}
+                                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === 'fair' ? 'bg-purple-50 text-purple-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                            >
+                                <span className="text-xl">🎡</span>
+                                Targi
+                            </button>
+                        )}
                     </nav>
                 </div>
 
                 {/* Main Content */}
                 <div className="flex-1 overflow-auto bg-slate-50 p-8">
                     <div className="max-w-5xl mx-auto">
-                        {activeTab === 'overview' && (
+                        {activeTab === 'overview' && (<>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Left Column: Info & AI Insights */}
                                 <div className="space-y-6">
-                                    {/* TRADE FAIR CARD - Special Module View */}
-                                    {(lead.source === 'targi' || lead.fairId) && (
-                                        <div className="bg-white rounded-xl border-2 border-purple-100 shadow-sm overflow-hidden animate-in slide-in-from-left duration-500">
-                                            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4 flex justify-between items-center text-white">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-2xl">🎡</span>
-                                                    <div>
-                                                        <h3 className="font-bold text-lg">Lead Targowy</h3>
-                                                        {lead.fairId && <p className="text-xs opacity-70 font-mono">ID: {lead.fairId}</p>}
-                                                    </div>
-                                                </div>
-                                                {lead.fairPrize && (
-                                                    <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">
-                                                        <span className="font-bold text-sm">🏆 {lead.fairPrize.label}</span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                    {/* TRADE FAIR CARD - MOVED TO TAB */}
 
-                                            <div className="p-6 space-y-6">
-                                                {/* PRODUCTS LIST */}
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                                                        Skonfigurowane Produkty ({lead.fairProducts?.length || 0})
-                                                    </h4>
-
-                                                    {!lead.fairProducts || lead.fairProducts.length === 0 ? (
-                                                        <p className="text-sm text-slate-400 italic">Brak skonfigurowanych produktów w systemie.</p>
-                                                    ) : (
-                                                        <div className="space-y-3">
-                                                            {lead.fairProducts.map((p, idx) => (
-                                                                <div key={idx} className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex gap-3 text-sm">
-                                                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-slate-400 shadow-sm shrink-0">
-                                                                        {idx + 1}
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <div className="flex justify-between">
-                                                                            <span className="font-bold text-slate-700 capitalize">
-                                                                                {p.type === 'roof' ? 'Zadaszenie' : p.type === 'pergola' ? 'Pergola' : p.type === 'carport' ? 'Carport' : p.type}
-                                                                            </span>
-                                                                            <span className="font-mono font-bold text-slate-600 bg-white px-2 rounded border border-slate-200">
-                                                                                {p.width} x {p.projection} mm
-                                                                            </span>
-                                                                        </div>
-                                                                        {/* Details Tags */}
-                                                                        <div className="flex flex-wrap gap-1 mt-2">
-                                                                            {p.wallTypes && p.wallTypes.length > 0 && !p.wallTypes.includes('none') && (
-                                                                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">Ściany</span>
-                                                                            )}
-                                                                            {p.zipEnabled && (
-                                                                                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">ZIP</span>
-                                                                            )}
-                                                                            {p.ledType && p.ledType !== 'none' && (
-                                                                                <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold">LED</span>
-                                                                            )}
-                                                                            {p.notes && (
-                                                                                <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[10px] font-bold">Uwagi</span>
-                                                                            )}
-                                                                        </div>
-                                                                        {p.notes && <p className="text-xs text-slate-500 mt-1 italic">"{p.notes}"</p>}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* PHOTOS */}
-                                                {lead.fairPhotos && lead.fairPhotos.length > 0 && (
-                                                    <div>
-                                                        <h4 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                            Zdjęcia / Szkice ({lead.fairPhotos.length})
-                                                        </h4>
-                                                        <div className="flex gap-2 overflow-x-auto pb-2">
-                                                            {lead.fairPhotos.map((ph, i) => (
-                                                                <a key={i} href={ph.url} target="_blank" rel="noreferrer" className="block w-20 h-20 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 hover:opacity-80 transition-opacity">
-                                                                    <img src={ph.url} alt="miniatura" className="w-full h-full object-cover" />
-                                                                </a>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
 
                                     {/* AI Insights Widget */}
                                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 shadow-sm p-5 relative overflow-hidden">
@@ -474,11 +402,11 @@ export const LeadDetailsPage: React.FC = () => {
                                             <div>
                                                 <label className="text-xs font-medium text-slate-500 uppercase">Adres</label>
                                                 <div className="text-slate-900">
-                                                    {(lead.customerData.address || lead.customerData.street || (lead.customerData.postalCode && lead.customerData.city)) ? (
+                                                    {(lead.customerData.address || lead.customerData.street || lead.customerData.postalCode || lead.customerData.city) ? (
                                                         <div>
                                                             <div>{lead.customerData.address || lead.customerData.street}</div>
                                                             <div className="text-slate-500 text-sm">
-                                                                {lead.customerData.postalCode} {lead.customerData.city}
+                                                                {[lead.customerData.postalCode, lead.customerData.city].filter(Boolean).join(' ')}
                                                             </div>
                                                         </div>
                                                     ) : '-'}
@@ -684,9 +612,13 @@ export const LeadDetailsPage: React.FC = () => {
 
                                         {/* Main Lead Note (from Form) */}
                                         {lead.notes && (
-                                            <div className="bg-amber-50 border border-amber-100 p-4 rounded-lg mb-6 text-slate-700 whitespace-pre-wrap">
-                                                <div className="text-xs font-bold text-amber-700 uppercase mb-1">Opis / Główna Notatka</div>
-                                                {lead.notes}
+                                            <div className="bg-amber-50 border border-amber-100 p-4 rounded-lg mb-6 text-slate-700">
+                                                <div className="text-xs font-bold text-amber-700 uppercase mb-2">Opis / Główna Notatka</div>
+                                                <div className="prose prose-sm prose-amber max-w-none">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                        {lead.notes}
+                                                    </ReactMarkdown>
+                                                </div>
                                             </div>
                                         )}
 
@@ -704,7 +636,111 @@ export const LeadDetailsPage: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                        )}
+
+                            {/* FAIR DATA SECTION (INLINED) */}
+                            {(lead.source === 'targi' || lead.fairId) && (
+                                <div className="mt-8 animate-in slide-in-from-bottom duration-500">
+                                    <div className="bg-white rounded-xl border-2 border-purple-100 shadow-sm overflow-hidden">
+                                        <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-2xl">🎡</span>
+                                                <div>
+                                                    <h3 className="font-bold text-lg">Lead Targowy - Szczegóły Konfiguracji</h3>
+                                                    {lead.fairId && <p className="text-xs opacity-70 font-mono">ID: {lead.fairId}</p>}
+                                                </div>
+                                            </div>
+                                            {lead.fairPrize && (
+                                                <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">
+                                                    <span className="font-bold text-sm">🏆 {lead.fairPrize.label}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="p-6 space-y-8">
+                                            {/* PRODUCTS LIST */}
+                                            <div>
+                                                <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                                    Skonfigurowane Produkty ({lead.fairProducts?.length || 0})
+                                                </h4>
+
+                                                {!lead.fairProducts || lead.fairProducts.length === 0 ? (
+                                                    <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-100 border-dashed">
+                                                        <p className="text-slate-400 italic">Brak skonfigurowanych produktów w systemie.</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                                        {lead.fairProducts.map((p, idx) => (
+                                                            <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-purple-200 transition-colors shadow-sm">
+                                                                <div className="flex items-start gap-4">
+                                                                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center font-bold text-purple-600 shadow-sm shrink-0 text-lg border border-purple-100">
+                                                                        {idx + 1}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex justify-between items-start mb-2">
+                                                                            <span className="font-bold text-slate-800 capitalize text-lg">
+                                                                                {p.type === 'roof' ? 'Zadaszenie' : p.type === 'pergola' ? 'Pergola' : p.type === 'carport' ? 'Carport' : p.type}
+                                                                            </span>
+                                                                            <span className="font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 text-sm shadow-sm">
+                                                                                {p.width} x {p.projection} mm
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Details Tags */}
+                                                                        <div className="flex flex-wrap gap-2 mb-3">
+                                                                            {p.wallTypes && p.wallTypes.length > 0 && !p.wallTypes.includes('none') && (
+                                                                                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-bold border border-blue-200">Ściany</span>
+                                                                            )}
+                                                                            {p.zipEnabled && (
+                                                                                <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-bold border border-amber-200">ZIP ({p.zipSidesCount || 0})</span>
+                                                                            )}
+                                                                            {p.ledType && p.ledType !== 'none' && (
+                                                                                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-xs font-bold border border-yellow-200">LED</span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {p.notes ? (
+                                                                            <div className="bg-white p-3 rounded-lg border border-slate-100 text-sm text-slate-600 italic relative">
+                                                                                <span className="absolute top-2 left-2 text-slate-200 text-4xl leading-none -z-10">"</span>
+                                                                                {p.notes}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <p className="text-xs text-slate-400 italic">Brak uwag</p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* PHOTOS */}
+                                            {lead.fairPhotos && lead.fairPhotos.length > 0 && (
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                        Zdjęcia / Szkice ({lead.fairPhotos.length})
+                                                    </h4>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                                        {lead.fairPhotos.map((ph, i) => (
+                                                            <a key={i} href={ph.url} target="_blank" rel="noreferrer" className="group relative aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                                                <img src={ph.url} alt="miniatura" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                                    <div className="bg-white p-2 rounded-full shadow-lg">
+                                                                        <svg className="w-5 h-5 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+                                                                    </div>
+                                                                </div>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>)}
 
                         {activeTab === 'offers' && (
                             <div className="space-y-6">
@@ -734,17 +770,115 @@ export const LeadDetailsPage: React.FC = () => {
                         )}
 
                         {activeTab === 'communications' && (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-[calc(100vh-12rem)] flex flex-col">
+                            <div className="space-y-6">
                                 <CommunicationTimeline
-                                    communications={communications}
-                                    customerId={''} // No customer ID for pure leads yet
-                                    leadId={lead.id}
-                                    onAdd={() => {
-                                        if (lead?.id) {
-                                            DatabaseService.getLeadCommunications(lead.id).then(setCommunications);
-                                        }
-                                    }}
+                                    items={communications}
+                                    onItemClick={() => { }}
                                 />
+                            </div>
+                        )}
+
+                        {activeTab === 'fair' && (
+                            <div className="space-y-6 animate-in slide-in-from-right duration-500">
+                                {/* TRADE FAIR CARD - Special Module View */}
+                                <div className="bg-white rounded-xl border-2 border-purple-100 shadow-sm overflow-hidden">
+                                    <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">🎡</span>
+                                            <div>
+                                                <h3 className="font-bold text-lg">Lead Targowy</h3>
+                                                {lead.fairId && <p className="text-xs opacity-70 font-mono">ID: {lead.fairId}</p>}
+                                            </div>
+                                        </div>
+                                        {lead.fairPrize && (
+                                            <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">
+                                                <span className="font-bold text-sm">🏆 {lead.fairPrize.label}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="p-6 space-y-8">
+                                        {/* PRODUCTS LIST */}
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                                Skonfigurowane Produkty ({lead.fairProducts?.length || 0})
+                                            </h4>
+
+                                            {!lead.fairProducts || lead.fairProducts.length === 0 ? (
+                                                <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-100 border-dashed">
+                                                    <p className="text-slate-400 italic">Brak skonfigurowanych produktów w systemie.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {lead.fairProducts.map((p, idx) => (
+                                                        <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-purple-200 transition-colors shadow-sm">
+                                                            <div className="flex items-start gap-4">
+                                                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center font-bold text-purple-600 shadow-sm shrink-0 text-lg border border-purple-100">
+                                                                    {idx + 1}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <span className="font-bold text-slate-800 capitalize text-lg">
+                                                                            {p.type === 'roof' ? 'Zadaszenie' : p.type === 'pergola' ? 'Pergola' : p.type === 'carport' ? 'Carport' : p.type}
+                                                                        </span>
+                                                                        <span className="font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 text-sm shadow-sm">
+                                                                            {p.width} x {p.projection} mm
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* Details Tags */}
+                                                                    <div className="flex flex-wrap gap-2 mb-3">
+                                                                        {p.wallTypes && p.wallTypes.length > 0 && !p.wallTypes.includes('none') && (
+                                                                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-bold border border-blue-200">Ściany</span>
+                                                                        )}
+                                                                        {p.zipEnabled && (
+                                                                            <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-bold border border-amber-200">ZIP ({p.zipSidesCount || 0})</span>
+                                                                        )}
+                                                                        {p.ledType && p.ledType !== 'none' && (
+                                                                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-xs font-bold border border-yellow-200">LED</span>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {p.notes ? (
+                                                                        <div className="bg-white p-3 rounded-lg border border-slate-100 text-sm text-slate-600 italic relative">
+                                                                            <span className="absolute top-2 left-2 text-slate-200 text-4xl leading-none -z-10">"</span>
+                                                                            {p.notes}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-xs text-slate-400 italic">Brak uwag</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* PHOTOS */}
+                                        {lead.fairPhotos && lead.fairPhotos.length > 0 && (
+                                            <div>
+                                                <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                    Zdjęcia / Szkice ({lead.fairPhotos.length})
+                                                </h4>
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                                    {lead.fairPhotos.map((ph, i) => (
+                                                        <a key={i} href={ph.url} target="_blank" rel="noreferrer" className="group relative aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                                            <img src={ph.url} alt="miniatura" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                                <div className="bg-white p-2 rounded-full shadow-lg">
+                                                                    <svg className="w-5 h-5 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -769,6 +903,6 @@ export const LeadDetailsPage: React.FC = () => {
                 initialData={{ leadId: lead.id }}
                 onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
             />
-        </div>
+        </div >
     );
 };

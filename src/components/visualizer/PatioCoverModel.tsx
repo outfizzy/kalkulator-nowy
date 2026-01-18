@@ -35,10 +35,15 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
     const heightM = frontHeightBase; // Base height for posts/gutter
 
     // 2. Geometry Constants (Meters)
+    // 2. Geometry Constants (Meters)
     const isHeavy = config.modelId.includes('xl') || config.modelId === 'skystyle' || config.modelId === 'trendstyle_plus' || config.modelId === 'topstyle';
     const isSkystyle = config.modelId === 'skystyle';
-    const postScale = isHeavy ? 1.36 : 1.0;
-    const POST_SIZE = 0.11 * postScale;
+
+    // Dynamic Specs from DB or Fallback
+    const BASE_POST_SIZE = 0.11;
+    const targetPostSize = config.productSpecs?.postSize || (isHeavy ? 0.15 : 0.11);
+    const postScale = targetPostSize / BASE_POST_SIZE;
+    const POST_SIZE = targetPostSize;
 
     // Skystyle has massive beams/rafters visually, but let's stick to heavy profile for now.
     // Skystyle structure Pitch is 0. Roof Glass Pitch is calculated.
@@ -53,7 +58,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
 
     const glassPitch = isSkystyle ? skystyleFixedPitch : pitchAngle;
 
-    const BEAM_HEIGHT = isHeavy ? 0.20 : 0.15; // Nominal height for positioning
+    const BEAM_HEIGHT = config.productSpecs?.beamHeight || (isHeavy ? 0.20 : 0.15); // Nominal height for positioning
     const GUTTER_DEPTH = 0.15 * postScale;
 
     // Use Max Depth for alignment (Beam vs Post) in Freestanding mode
@@ -310,7 +315,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                         position={[0, 0, -r.length / 2]}
                         castShadow receiveShadow
                         material={structureMaterial}
-                        scale={[postScale, postScale, 1]}
+                        scale={[1, 1, 1]}
                     >
                         {/* Make rafters slightly more detailed? standard extrude for now */}
                         <extrudeGeometry args={[rafterShape, extrudeSettings(r.length)]} />
@@ -354,11 +359,22 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                 // Solve for PivotY: PivotY = heightM - (depthM/2 * sin(glassPitch)).
                 // We add small safety margin (-0.01) to be slightly under.
 
-                let midY = heightM + (depthM / 2) * Math.tan(glassPitch) - BEAM_HEIGHT / 2 + 0.01;
+                // Fix for Z-Fighting: Glass must sit ON TOP of Rafters.
+                // Rafter Height ~ 0.10m. Center is at [x, midY_rafter, z].
+                // Rafter Top Face is at midY_rafter + 0.05.
+                // We want Glass Bottom to be at midY_rafter + 0.05.
+                // Glass Center = Glass Bottom + Thickness/2 (0.008). 
+                // So Glass Center = midY_rafter + 0.058.
+
+                // Rafter MidY reference:
+                // heightM + (depthM / 2) * Math.tan(structurePitch) - BEAM_HEIGHT / 2;
+
+                const rafterMidY = heightM + (depthM / 2) * Math.tan(structurePitch) - BEAM_HEIGHT / 2;
+                let midY = rafterMidY + 0.034; // +3.4cm (Deeply seated, well inside profile)
 
                 if (isSkystyle) {
                     // Override midY to sink it
-                    midY = heightM - (effectiveDepthZ / 2 * Math.sin(glassPitch)) - 0.02; // 2cm below rim
+                    midY = heightM - (effectiveDepthZ / 2 * Math.sin(glassPitch)) - 0.06; // 6cm below rim (Guaranteed below top edge)
                 }
 
                 return (
@@ -369,7 +385,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                         material={activeRoofMat}
                         castShadow={config.roofType !== 'glass'} receiveShadow
                     >
-                        <boxGeometry args={[rafterSpacing - 0.04, 0.016, panelLength]} />
+                        <boxGeometry args={[rafterSpacing - 0.005, 0.016, panelLength]} />
                     </mesh>
                 );
             })}

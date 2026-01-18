@@ -17,6 +17,7 @@ interface AddonEntry {
     image_url?: string;
     properties?: any;
     addon_group: string;
+    price_table_id?: string | null;
     _changed?: boolean;
 }
 
@@ -24,11 +25,23 @@ export const AddonEditor: React.FC<AddonEditorProps> = ({ tableId, tableName, on
     const [entries, setEntries] = useState<AddonEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [availableMatrices, setAvailableMatrices] = useState<any[]>([]);
 
     useEffect(() => {
         loadEntries();
+        loadMatrices();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tableId]);
+
+    const loadMatrices = async () => {
+        const { data } = await supabase
+            .from('price_tables')
+            .select('id, name')
+            .eq('type', 'addon_matrix')
+            .eq('is_active', true)
+            .order('name');
+        setAvailableMatrices(data || []);
+    };
 
     const loadEntries = async () => {
         setLoading(true);
@@ -42,7 +55,10 @@ export const AddonEditor: React.FC<AddonEditorProps> = ({ tableId, tableName, on
             toast.error('Błąd pobierania elementów');
             console.error(error);
         } else {
-            setEntries(data || []);
+            setEntries((data || []).map(e => ({
+                ...e,
+                price_table_id: e.price_table_id || e.properties?.price_table_id || null
+            })));
         }
         setLoading(false);
     };
@@ -85,7 +101,8 @@ export const AddonEditor: React.FC<AddonEditorProps> = ({ tableId, tableName, on
             addon_name: e.addon_name,
             price_upe_net_eur: e.price_upe_net_eur,
             unit: e.unit,
-            properties: e.properties // Include properties in update
+            properties: e.properties, // Include properties in update
+            price_table_id: e.price_table_id
         }));
 
         const { error } = await supabase.from('pricing_addons').upsert(updates);
@@ -130,6 +147,7 @@ export const AddonEditor: React.FC<AddonEditorProps> = ({ tableId, tableName, on
                                 <th className="p-4">Nazwa Elementu</th>
                                 <th className="p-4 w-32">Cena (Netto)</th>
                                 <th className="p-4 w-24">Jedn.</th>
+                                <th className="p-4 w-48">Przypisana Matryca</th>
                                 <th className="p-4 w-64">Atrybuty (Dla Kalkulatora)</th>
                             </tr>
                         </thead>
@@ -185,6 +203,20 @@ export const AddonEditor: React.FC<AddonEditorProps> = ({ tableId, tableName, on
                                         />
                                     </td>
                                     <td className="p-4">
+                                        <select
+                                            value={entry.price_table_id || ''}
+                                            onChange={(e) => handleFieldChange(entry.id, 'price_table_id', e.target.value || null)}
+                                            className="w-full text-xs border-slate-200 rounded shadow-sm focus:border-accent focus:ring-accent"
+                                        >
+                                            <option value="">-- Brak / Kod --</option>
+                                            {availableMatrices.map(m => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </td>
+                                    <td className="p-4">
                                         {/* Attributes Editor */}
                                         <div className="space-y-2">
                                             {/* Awning Attributes */}
@@ -213,13 +245,48 @@ export const AddonEditor: React.FC<AddonEditorProps> = ({ tableId, tableName, on
                                             )}
                                             {/* Search Keywords */}
                                             {/* Not implemented yet as simple tags are cleaner */}
+
+                                            {/* Pricing Basis Editor */}
+                                            <div className="mt-2 text-xs border-t pt-2">
+                                                <div className="flex gap-2 mb-1">
+                                                    <select
+                                                        className="border rounded p-1 bg-slate-50 font-bold text-slate-700"
+                                                        value={entry.addon_group === 'zip_screens' ? 'MATRIX' : (entry.properties?.pricing_basis || 'FIXED')}
+                                                        onChange={(e) => handleFieldChange(entry.id, 'properties', { ...entry.properties, pricing_basis: e.target.value })}
+                                                    >
+                                                        <option value="FIXED">Stała Cena</option>
+                                                        <option value="MATRIX">Matryca (Tabela)</option>
+                                                        <option value="LINEAR">Liniowa (mb)</option>
+                                                    </select>
+                                                </div>
+
+                                                {entry.properties?.pricing_basis === 'MATRIX' && (
+                                                    <div className="space-y-1">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Kod Produktu (Link)"
+                                                            value={entry.properties?.linked_product_code || ''}
+                                                            onChange={(e) => handleFieldChange(entry.id, 'properties', { ...entry.properties, linked_product_code: e.target.value })}
+                                                            className="w-full border rounded p-1 text-slate-600 placeholder-slate-400"
+                                                            title="Wpisz kod modelu (np. 'ZipScreen_V1') aby automatycznie pobierać najnowszy cennik tego produktu"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="LUB ID Tabeli (Opcja)"
+                                                            value={entry.properties?.price_table_id || ''}
+                                                            onChange={(e) => handleFieldChange(entry.id, 'properties', { ...entry.properties, price_table_id: e.target.value })}
+                                                            className="w-full border rounded p-1 text-slate-600 placeholder-slate-400 text-[10px]"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                             {entries.length === 0 && !loading && (
-                                <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-400">
+                                <tr >
+                                    <td colSpan={6} className="p-8 text-center text-slate-400">
                                         Brak elementów w tym cenniku.
                                     </td>
                                 </tr>
