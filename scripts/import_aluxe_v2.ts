@@ -10,6 +10,28 @@ const OUTPUT_SQL = 'scripts/batch5_import.sql';
 // Width mappings for parsing standard Aluxe formatting
 // We will parse the string "3000x2500" from Column A
 
+// Helper function to find sheet with fuzzy matching (handles trailing spaces)
+function findSheet(workbook: XLSX.WorkBook, name: string): XLSX.WorkSheet | null {
+    // Try exact match first
+    if (workbook.Sheets[name]) return workbook.Sheets[name];
+
+    // Try with/without trailing space
+    if (workbook.Sheets[name + ' ']) return workbook.Sheets[name + ' '];
+    if (workbook.Sheets[name.trim()]) return workbook.Sheets[name.trim()];
+
+    // Fuzzy match - case insensitive and whitespace normalized
+    const normalizedName = name.trim().toLowerCase().replace(/\s+/g, ' ');
+    const match = workbook.SheetNames.find(s =>
+        s.trim().toLowerCase().replace(/\s+/g, ' ') === normalizedName
+    );
+    return match ? workbook.Sheets[match] : null;
+}
+
+// Helper to preserve price precision (2 decimals)
+function formatPrice(price: number): string {
+    return (Math.round(price * 100) / 100).toFixed(2);
+}
+
 function generateSQL() {
     console.log(`Reading ${FILE_PATH}...`);
     console.log(`CWD: ${process.cwd()}`);
@@ -38,44 +60,67 @@ BEGIN;
 
     // Mapping based on "AluxePreisliste.xlsx" sheet names
     const roofSheets: RoofSheetConfig[] = [
-        // TRENDLINE POLY
+        // === ORANGELINE ===
+        { sheetName: 'Orangeline  Polycarbonat Zone1R', modelFamily: 'Orangeline', coverType: 'poly_clear', zone: 1 },
+        { sheetName: 'Orangeline Polycarbonat 1a&2R', modelFamily: 'Orangeline', coverType: 'poly_clear', zone: 2 },
+        { sheetName: 'Orangeline Polycarbonat 2a&3R', modelFamily: 'Orangeline', coverType: 'poly_clear', zone: 3 },
+        { sheetName: 'Orangeline Glas zone 1R', modelFamily: 'Orangeline', coverType: 'glass_clear', zone: 1 },
+        { sheetName: 'Orangeline Glas zone 1a&2R', modelFamily: 'Orangeline', coverType: 'glass_clear', zone: 2 },
+        { sheetName: 'Orangeline Glas zone 2a&3R', modelFamily: 'Orangeline', coverType: 'glass_clear', zone: 3 },
+
+        // === ORANGELINE+ ===
+        { sheetName: 'Orangeline+ Polycarbonat Zone1R', modelFamily: 'Orangeline+', coverType: 'poly_clear', zone: 1 },
+        { sheetName: 'Orangeline+ Polycarbonat 1a&2R', modelFamily: 'Orangeline+', coverType: 'poly_clear', zone: 2 },
+        { sheetName: 'Orangeline+ Polycarbonat 2a&3R', modelFamily: 'Orangeline+', coverType: 'poly_clear', zone: 3 },
+        { sheetName: 'Orangeline+ Glas zone 1R', modelFamily: 'Orangeline+', coverType: 'glass_clear', zone: 1 },
+        { sheetName: 'Orangeline+ Glas zone 1a&2R', modelFamily: 'Orangeline+', coverType: 'glass_clear', zone: 2 },
+        { sheetName: 'Orangeline+ Glas zone 2a&3R', modelFamily: 'Orangeline+', coverType: 'glass_clear', zone: 3 },
+
+        // === TRENDLINE ===
         { sheetName: 'Trendline Polycarbonat Zone1R', modelFamily: 'Trendline', coverType: 'poly_clear', zone: 1 },
         { sheetName: 'Trendline Polycarbonat 1a&2R', modelFamily: 'Trendline', coverType: 'poly_clear', zone: 2 },
         { sheetName: 'Trendline Polycarbonat 2a&3R ', modelFamily: 'Trendline', coverType: 'poly_clear', zone: 3 },
-
-        // TRENDLINE GLASS
         { sheetName: 'Trendline Glas zone 1R', modelFamily: 'Trendline', coverType: 'glass_clear', zone: 1 },
         { sheetName: 'Trendline Glas 1a & 2R', modelFamily: 'Trendline', coverType: 'glass_clear', zone: 2 },
         { sheetName: 'Trendline Glas 2a & 3R', modelFamily: 'Trendline', coverType: 'glass_clear', zone: 3 },
 
-        // TOPLINE POLY
+        // === TRENDLINE+ ===
+        { sheetName: 'Trendline+ Polycarbonat Zone1R', modelFamily: 'Trendline+', coverType: 'poly_clear', zone: 1 },
+        { sheetName: 'Trendline+ Polycarbonat 1a&2R', modelFamily: 'Trendline+', coverType: 'poly_clear', zone: 2 },
+        { sheetName: 'Trendline+ Polycarbonat 2a&3R ', modelFamily: 'Trendline+', coverType: 'poly_clear', zone: 3 },
+        { sheetName: 'Trendline+ Glas zone 1R', modelFamily: 'Trendline+', coverType: 'glass_clear', zone: 1 },
+        { sheetName: 'Trendline+ Glas 1a & 2R', modelFamily: 'Trendline+', coverType: 'glass_clear', zone: 2 },
+        { sheetName: 'Trendline+ Glas 2a & 3R', modelFamily: 'Trendline+', coverType: 'glass_clear', zone: 3 },
+
+        // === TOPLINE ===
         { sheetName: 'Topline Polycarbonat Z 1R', modelFamily: 'Topline', coverType: 'poly_clear', zone: 1 },
         { sheetName: 'Topline Polycarbonat Z 1a +2R', modelFamily: 'Topline', coverType: 'poly_clear', zone: 2 },
         { sheetName: 'Topline Polycarbonat Z 2a + 3R', modelFamily: 'Topline', coverType: 'poly_clear', zone: 3 },
-
-        // TOPLINE GLASS
         { sheetName: 'Topline Glas zone 1R ', modelFamily: 'Topline', coverType: 'glass_clear', zone: 1 },
         { sheetName: 'Topline Glas zone 1a+2R', modelFamily: 'Topline', coverType: 'glass_clear', zone: 2 },
         { sheetName: 'Topline Glas zone 2a+3R', modelFamily: 'Topline', coverType: 'glass_clear', zone: 3 },
 
-        // TOPLINE XL POLY
+        // === TOPLINE XL ===
         { sheetName: 'Topline XL Polycarbonat Z 1R', modelFamily: 'Topline XL', coverType: 'poly_clear', zone: 1 },
         { sheetName: 'Topline XL Polycarbona Z1a + 2R', modelFamily: 'Topline XL', coverType: 'poly_clear', zone: 2 },
         { sheetName: 'Topline XL Poly Z 2a + 3R', modelFamily: 'Topline XL', coverType: 'poly_clear', zone: 3 },
-
-        // TOPLINE XL GLASS
         { sheetName: 'Topline XL Glas zone 1R', modelFamily: 'Topline XL', coverType: 'glass_clear', zone: 1 },
         { sheetName: 'Topline XL Glas zone 1a+2R', modelFamily: 'Topline XL', coverType: 'glass_clear', zone: 2 },
         { sheetName: 'Topline XL Glas zone 2a+3R', modelFamily: 'Topline XL', coverType: 'glass_clear', zone: 3 },
 
-        // ULTRALINE (Optional for Batch 1, but let's include if simple)
+        // === DESIGNLINE (Glass only) ===
+        { sheetName: 'Designline Zone 1R', modelFamily: 'Designline', coverType: 'glass_clear', zone: 1 },
+        { sheetName: 'Designline Zone 1a+2R', modelFamily: 'Designline', coverType: 'glass_clear', zone: 2 },
+        { sheetName: 'Designline Zone 2a+3R', modelFamily: 'Designline', coverType: 'glass_clear', zone: 3 },
+
+        // === ULTRALINE (Glass only) ===
         { sheetName: 'Ultraline Zone 1R', modelFamily: 'Ultraline', coverType: 'glass_clear', zone: 1 },
         { sheetName: 'Ultraline Zone 1a +2R', modelFamily: 'Ultraline', coverType: 'glass_clear', zone: 2 },
         { sheetName: 'Ultraline Zone 2a +3R', modelFamily: 'Ultraline', coverType: 'glass_clear', zone: 3 },
     ];
 
     roofSheets.forEach(config => {
-        const sheet = workbook.Sheets[config.sheetName];
+        const sheet = findSheet(workbook, config.sheetName);
         if (!sheet) {
             console.warn(`Skipping missing sheet: ${config.sheetName}`);
             return;
@@ -127,7 +172,7 @@ BEGIN
                 if (match) {
                     const width = parseInt(match[1]);
                     const projection = parseInt(match[2]);
-                    values.push(`(v_table_id, ${width}, ${projection}, ${Math.ceil(price)})`);
+                    values.push(`(v_table_id, ${width}, ${projection}, ${formatPrice(price)})`);
                 }
             }
         });
@@ -144,7 +189,7 @@ BEGIN
     // =================================================================================================
     // 2. PANORAMA IMPORT (Addon Matrix)
     // =================================================================================================
-    const panoramaSheet = workbook.Sheets['Panorama AL22R'];
+    const panoramaSheet = findSheet(workbook, 'Panorama AL22R');
     if (panoramaSheet) {
         console.log('Processing Panorama AL22...');
 
@@ -224,7 +269,7 @@ BEGIN
                         ((w / 1000) * trackMeterPrice) +
                         ((h / 1000) * sideMeterPrice);
 
-                    values.push(`(v_table_id, ${w}, ${h}, ${Math.ceil(cost)})`);
+                    values.push(`(v_table_id, ${w}, ${h}, ${formatPrice(cost)})`);
                 }
             }
             sqlStatements.push(values.join(',\n'));
@@ -302,7 +347,7 @@ BEGIN
     ];
 
     wallConfigs.forEach(config => {
-        const sheet = workbook.Sheets[config.sheetName];
+        const sheet = findSheet(workbook, config.sheetName);
         if (!sheet) {
             console.warn(`[Batch 2] Missing sheet: ${config.sheetName}`);
             return;
@@ -362,7 +407,7 @@ BEGIN
                     const width = config.dimType === 'width' ? dimension : 0;
                     const projection = config.dimType === 'projection' ? dimension : 0;
 
-                    values.push(`(v_table_id, ${width}, ${projection}, ${Math.ceil(price)})`);
+                    values.push(`(v_table_id, ${width}, ${projection}, ${formatPrice(price)})`);
                 }
             }
         });
@@ -419,7 +464,7 @@ BEGIN
     ];
 
     awningConfigs.forEach(config => {
-        const sheet = workbook.Sheets[config.sheetName];
+        const sheet = findSheet(workbook, config.sheetName);
         if (!sheet) {
             console.warn(`[Batch 3] Missing sheet: ${config.sheetName}`);
             return;
@@ -488,7 +533,7 @@ BEGIN
                     if (typeof price === 'number' && price > 0) {
                         // For Screens, the matrix is Width x Height (mapped to projection_mm column usually)
                         // For Awnings, the matrix is Width x Projection
-                        values.push(`(v_table_id, ${widthVal}, ${proj}, ${Math.ceil(price)})`);
+                        values.push(`(v_table_id, ${widthVal}, ${proj}, ${formatPrice(price)})`);
                     }
                 });
             }
@@ -538,7 +583,7 @@ BEGIN
     ];
 
     batch4Configs.forEach(config => {
-        const sheet = workbook.Sheets[config.sheetName];
+        const sheet = findSheet(workbook, config.sheetName);
         if (!sheet) {
             console.warn(`Skipping missing sheet: ${config.sheetName}`);
             return;
@@ -605,7 +650,7 @@ BEGIN
                         const colIndex = projIdx + 1;
                         const price = row[colIndex];
                         if (typeof price === 'number' && price > 0) {
-                            values.push(`(v_table_id, ${widthVal}, ${proj}, ${Math.ceil(price)})`);
+                            values.push(`(v_table_id, ${widthVal}, ${proj}, ${formatPrice(price)})`);
                         }
                     });
                 }
@@ -632,7 +677,7 @@ BEGIN
     // Table 1: Aluxe V2 - Freestanding Surcharge (No Foundation)
     // Table 2: Aluxe V2 - Freestanding Surcharge (With Foundation)
     const fsSheetName = 'Freistehende TerrassendächerR';
-    const fsSheet = workbook.Sheets[fsSheetName];
+    const fsSheet = findSheet(workbook, fsSheetName);
     if (fsSheet) {
         const rows = XLSX.utils.sheet_to_json(fsSheet, { header: 1, range: 0, defval: null }) as any[][];
         // Data starts at row 3 (index 3). Col 0=Width, Col 1=Price(NoFound), Col 2=Price(Found)
@@ -653,7 +698,7 @@ BEGIN
                     const widthVal = parseInt(wRaw.replace(/\D/g, ''));
                     if (widthVal > 0 && price > 0) {
                         // Width x 0
-                        values.push(`(v_table_id, ${widthVal}, 0, ${Math.ceil(price)})`);
+                        values.push(`(v_table_id, ${widthVal}, 0, ${formatPrice(price)})`);
                     }
                 }
             });
@@ -688,7 +733,7 @@ END $$;`);
     // 5.2 Zonweringspaneel (Sheet 78)
     // Height -> Price (Width 600-1100)
     const zpSheetName = 'Zonweringspaneel';
-    const zpSheet = workbook.Sheets[zpSheetName];
+    const zpSheet = findSheet(workbook, zpSheetName);
     if (zpSheet) {
         const rows = XLSX.utils.sheet_to_json(zpSheet, { header: 1, range: 0, defval: null }) as any[][];
         // Data starts at row 5 (index 5)
@@ -701,7 +746,7 @@ END $$;`);
                 const hVal = parseInt(hRaw.replace(/\D/g, ''));
                 if (hVal > 0 && price > 0) {
                     // 0 x Height
-                    values.push(`(v_table_id, 0, ${hVal}, ${Math.ceil(price)})`);
+                    values.push(`(v_table_id, 0, ${hVal}, ${formatPrice(price)})`);
                 }
             }
         });
@@ -732,7 +777,7 @@ END $$;`);
     // 5.3 Fences (Sheet 79: Planken,ZäuneR)
     // Width x Height
     const fenceSheetName = 'Planken,ZäuneR';
-    const fenceSheet = workbook.Sheets[fenceSheetName];
+    const fenceSheet = findSheet(workbook, fenceSheetName);
     if (fenceSheet) {
         const rows = XLSX.utils.sheet_to_json(fenceSheet, { header: 1, range: 0, defval: null }) as any[][];
         const startRow = 4; // Data rows
@@ -750,10 +795,10 @@ END $$;`);
 
                 if (wVal > 0) {
                     if (typeof priceAlu === 'number' && priceAlu > 0) {
-                        valuesAlu.push(`(v_table_id, ${wVal}, ${hRaw}, ${Math.ceil(priceAlu)})`);
+                        valuesAlu.push(`(v_table_id, ${wVal}, ${hRaw}, ${formatPrice(priceAlu)})`);
                     }
                     if (typeof priceDoor === 'number' && priceDoor > 0) {
-                        valuesDoor.push(`(v_table_id, ${wVal}, ${hRaw}, ${Math.ceil(priceDoor)})`);
+                        valuesDoor.push(`(v_table_id, ${wVal}, ${hRaw}, ${formatPrice(priceDoor)})`);
                     }
                 }
             }
@@ -790,7 +835,7 @@ END $$;`);
 
     // 5.4 Loose Materials (Sheet 80: 'Loses Material allgemein ')
     const accSheetName = 'Loses Material allgemein ';
-    const accSheet = workbook.Sheets[accSheetName];
+    const accSheet = findSheet(workbook, accSheetName);
     if (accSheet) {
         const rows = XLSX.utils.sheet_to_json(accSheet, { header: 1, range: 0, defval: null }) as any[][];
         const startRow = 3;
@@ -821,7 +866,7 @@ BEGIN
     VALUES ('${tableName}', 'fixed', true, 'EUR', '${jsonAttr}'::jsonb)
     RETURNING id INTO v_table_id;
     INSERT INTO price_matrix_entries (price_table_id, width_mm, projection_mm, price)
-    VALUES (v_table_id, 0, 0, ${Math.ceil(price)});
+    VALUES (v_table_id, 0, 0, ${formatPrice(price)});
 END $$;`);
             }
         });

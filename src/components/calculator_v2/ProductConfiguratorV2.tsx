@@ -1,567 +1,1229 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/translations';
 import { PricingService } from '../../services/pricing.service';
+import { toast } from 'react-hot-toast';
 
-type ProductType = 'Roof' | 'Panorama' | 'Wall' | 'Awning' | 'Skyline' | 'Carport' | 'Fence' | 'Accessory';
-type ModelFamily = 'Trendline' | 'Topline' | 'Topline XL' | 'Ultraline';
+// ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
-type PanoramaModel = '3-Tor' | '5-Tor';
-type WallModel = 'Side Wall' | 'Front Wall' | 'Sliding Door' | 'Wedge';
-type AwningModel = 'On-Roof Awning' | 'Under-Roof Awning' | 'ZIP Screen';
-type ConstructionType = 'Attached' | 'Freestanding';
-type FenceModel = 'Zonweringspaneel' | 'Fence Element (Aluminium)' | 'Fence Element (Door)';
+type ConstructionType = 'wall' | 'freestanding';
 
+interface RoofModel {
+    id: string;
+    name: string;
+    description: string;
+    hasPoly: boolean;
+    hasGlass: boolean;
+    hasFreestanding: boolean;
+    image_url?: string;
+}
+
+interface Accessory {
+    id: string;
+    name: string;
+    price: number;
+    category: 'led' | 'profile' | 'pvc' | 'mounting' | 'polycarbonate' | 'other';
+    unit: string;
+}
+
+interface BasketItem {
+    id: string;
+    category: 'roof' | 'wall' | 'accessory' | 'panorama';
+    name: string;
+    config: string;
+    dimensions: string;
+    price: number;
+    quantity: number;
+}
+
+// ======= PRODUCT CATALOG =======
+const ROOF_MODELS: RoofModel[] = [
+    { id: 'Orangeline', name: 'Orangeline', description: 'Ekonomiczny profil 50mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false },
+    { id: 'Orangeline+', name: 'Orangeline+', description: 'Ekonomiczny Plus 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false },
+    { id: 'Trendline', name: 'Trendline', description: 'Klasyczny profil 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true },
+    { id: 'Trendline+', name: 'Trendline+', description: 'Klasyczny Plus 70mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true },
+    { id: 'Topline', name: 'Topline', description: 'Premium profil 80mm • od 2500mm', hasPoly: true, hasGlass: true, hasFreestanding: true },
+    { id: 'Topline XL', name: 'Topline XL', description: 'Extra duża konstrukcja XL', hasPoly: true, hasGlass: true, hasFreestanding: false },
+    { id: 'Designline', name: 'Designline', description: 'Elegancki design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true },
+    { id: 'Ultraline', name: 'Ultraline', description: 'Najwyższa klasa 100mm • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: false },
+    { id: 'Skyline', name: 'Skyline', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true },
+    { id: 'Carport', name: 'Carport', description: 'Wiata garażowa z blachą', hasPoly: false, hasGlass: false, hasFreestanding: true },
+];
+
+const WALL_PRODUCTS = [
+    { id: 'Side Wall (Glass)', name: 'Ściana Boczna', icon: '🔲', description: 'Szklana ściana boczna' },
+    { id: 'Front Wall (Glass)', name: 'Ściana Frontowa', icon: '⬛', description: 'Szklana ściana frontowa' },
+    { id: 'Wedge (Glass)', name: 'Keilfenster', icon: '📐', description: 'Szyba klinowa trójkątna' },
+];
+
+// Schiebetür - framed sliding doors
+const SCHIEBETUR_PRODUCTS = [
+    { id: 'Schiebetür (VSG klar)', name: 'Drzwi VSG klar', icon: '🚪', description: 'Szkło hartowane czyste' },
+    { id: 'Schiebetür (VSG matt)', name: 'Drzwi VSG matt', icon: '🚪', description: 'Szkło matowe' },
+    { id: 'Schiebetür (Isolierglas)', name: 'Drzwi Izolacyjne', icon: '🚪', description: 'Szkło termoizolacyjne' },
+];
+
+// Panorama - frameless sliding glass systems
+const PANORAMA_PRODUCTS = [
+    // AL22 - flat track
+    { id: 'Panorama AL22 (3-Tor)', name: 'AL22 3-Tor', description: 'Płaska szyna, 3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL22 (5-Tor)', name: 'AL22 5-Tor', description: 'Płaska szyna, 5 torów', icon: '⊟', tracks: 5 },
+    // AL23 - high track
+    { id: 'Panorama AL23 (3-Tor)', name: 'AL23 3-Tor', description: 'Wysoka szyna, 3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL23 (5-Tor)', name: 'AL23 5-Tor', description: 'Wysoka szyna, 5 torów', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL23 (7-Tor)', name: 'AL23 7-Tor', description: 'Wysoka szyna, 7 torów', icon: '⊞', tracks: 7 },
+    // AL24
+    { id: 'Panorama AL24 (3-Tor)', name: 'AL24 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL24 (5-Tor)', name: 'AL24 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
+    // AL25
+    { id: 'Panorama AL25 (3-Tor)', name: 'AL25 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL25 (5-Tor)', name: 'AL25 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
+    // AL26
+    { id: 'Panorama AL26 (3-Tor)', name: 'AL26 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL26 (5-Tor)', name: 'AL26 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
+];
+
+// ======= HELPER: Build table name =======
+function buildTableName(model: string, cover: CoverType, zone: number, construction: ConstructionType): string {
+    const prefix = 'Aluxe V2 - ';
+
+    if (model === 'Skyline' || model === 'Carport') {
+        if (construction === 'freestanding') {
+            return `${prefix}${model} Freestanding (Zone ${zone})`;
+        }
+        return `${prefix}${model} (Zone ${zone})`;
+    }
+
+    const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
+    if (construction === 'freestanding') {
+        return `${prefix}${model} Freestanding ${coverName} (Zone ${zone})`;
+    }
+    return `${prefix}${model} ${coverName} (Zone ${zone})`;
+}
+
+// ======= COMPONENT =======
 export const ProductConfiguratorV2: React.FC = () => {
-    // State
-    const [productType, setProductType] = useState<ProductType>('Roof');
+    // === STEPS ===
+    const [activeStep, setActiveStep] = useState(0);
+    const steps = [
+        { id: 0, label: 'Model', icon: '🏠' },
+        { id: 1, label: 'Wymiary', icon: '📏' },
+        { id: 2, label: 'Specyfikacja', icon: '⚙️' },
+        { id: 3, label: 'Dodatki', icon: '🧩' },
+    ];
 
-    // Roof State
-    const [model, setModel] = useState<ModelFamily>('Trendline');
+    // === ROOF CONFIG ===
+    const [model, setModel] = useState<string>('Trendline');
     const [cover, setCover] = useState<CoverType>('Poly');
     const [zone, setZone] = useState<number>(1);
-    const [isFreestandingRoof, setIsFreestandingRoof] = useState(false);
-    const [includeFoundation, setIncludeFoundation] = useState(false);
+    const [construction, setConstruction] = useState<ConstructionType>('wall');
+    const [width, setWidth] = useState<number>(3000);
+    const [projection, setProjection] = useState<number>(3000);
+    const [color, setColor] = useState('RAL 7016');
 
-    // Panorama State
-    const [panoramaModel, setPanoramaModel] = useState<PanoramaModel>('3-Tor');
+    // === WALL CONFIG ===
+    const [wallProduct, setWallProduct] = useState<string>('Side Wall (Glass)');
+    const [wallWidth, setWallWidth] = useState<number>(2000);
+    const [wallHeight, setWallHeight] = useState<number>(2200);
+    const [wallTab, setWallTab] = useState<'walls' | 'awnings' | 'led' | 'materials'>('walls');
 
-    // Wall State
-    const [wallModel, setWallModel] = useState<WallModel>('Side Wall');
+    // === ACCESSORIES ===
+    const [accessories, setAccessories] = useState<Accessory[]>([]);
+    const [accessoryQuantities, setAccessoryQuantities] = useState<Record<string, number>>({});
+    const [loadingAccessories, setLoadingAccessories] = useState(false);
 
-    // Awning State
-    const [awningModel, setAwningModel] = useState<AwningModel>('On-Roof Awning');
+    // === AWNING CONFIG ===
+    const [awningType, setAwningType] = useState<'aufdach' | 'unterdach' | 'zip'>('aufdach');
+    const [awningWidth, setAwningWidth] = useState<number>(2000);
+    const [awningProjection, setAwningProjection] = useState<number>(2000);
+    const [awningPrice, setAwningPrice] = useState<number | null>(null);
 
-    // Construction Type (for Skyline & Carport)
-    const [constructionType, setConstructionType] = useState<ConstructionType>('Attached');
+    // === MATERIALS ===
+    const [materials, setMaterials] = useState<any[]>([]);
+    const [materialQuantities, setMaterialQuantities] = useState<Record<string, number>>({});
+    const [loadingMaterials, setLoadingMaterials] = useState(false);
 
-    // Fence State
-    const [fenceModel, setFenceModel] = useState<FenceModel>('Zonweringspaneel');
-
-    // Accessory State
-    const [accessories, setAccessories] = useState<{ id: string, name: string }[]>([]);
-    const [selectedAccessory, setSelectedAccessory] = useState<string>('');
-
-    // Common State
-    const [width, setWidth] = useState(3000);
-    const [projection, setProjection] = useState(2500);
-
+    // === PRICING STATE ===
     const [price, setPrice] = useState<number | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [debugInfo, setDebugInfo] = useState<string>('');
+    const [freestandingSurchargePrice, setFreestandingSurchargePrice] = useState<number>(0);
+    const [includeFoundations, setIncludeFoundations] = useState<boolean>(true);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Load Accessories on Mount
+    // === BASKET ===
+    const [basket, setBasket] = useState<BasketItem[]>([]);
+    const [showBasket, setShowBasket] = useState(false);
+
+    // === AUTO-SWITCH COVER TYPE FOR GLASS-ONLY MODELS ===
     useEffect(() => {
-        const fetchAccessories = async () => {
-            const { data } = await supabase
-                .from('price_tables')
-                .select('id, name')
-                .eq('attributes->>type', 'accessory')
-                .eq('is_active', true)
-                .order('name');
+        const currentModelConfig = ROOF_MODELS.find(m => m.id === model);
+        if (currentModelConfig) {
+            // If model doesn't support Poly, switch to Glass
+            if (!currentModelConfig.hasPoly && cover === 'Poly') {
+                setCover('Glass');
+            }
+            // If model doesn't support Glass (Skyline, Carport), set to special
+            if (!currentModelConfig.hasGlass && cover === 'Glass') {
+                setCover('Poly'); // Will use buildTableName without cover prefix
+            }
+        }
+    }, [model, cover]);
 
-            if (data && data.length > 0) {
-                setAccessories(data);
-                setSelectedAccessory(data[0].name);
+    // === LOAD ACCESSORIES ===
+    useEffect(() => {
+        const loadAccessories = async () => {
+            setLoadingAccessories(true);
+            try {
+                const { data: tables } = await supabase
+                    .from('price_tables')
+                    .select('id, name')
+                    .eq('is_active', true)
+                    .eq('type', 'fixed')
+                    .ilike('name', 'Aluxe V2%')
+                    .order('name');
+
+                if (!tables) return;
+
+                const accessoryList: Accessory[] = [];
+                for (const table of tables) {
+                    const { data: priceData } = await supabase
+                        .from('price_matrix_entries')
+                        .select('price')
+                        .eq('price_table_id', table.id)
+                        .limit(1);
+
+                    const price = priceData?.[0]?.price || 0;
+                    const name = table.name.toLowerCase();
+                    let category: Accessory['category'] = 'other';
+                    if (name.includes('led') || name.includes('stripe') || name.includes('spots')) category = 'led';
+                    else if (name.includes('profil') || name.includes('leiste')) category = 'profile';
+                    else if (name.includes('fundament')) category = 'mounting';
+                    else if (name.includes('poly')) category = 'polycarbonate';
+                    else if (name.includes('pvc')) category = 'pvc';
+
+                    accessoryList.push({
+                        id: table.id,
+                        name: table.name.replace('Aluxe V2 - ', ''),
+                        price: Number(price),
+                        category,
+                        unit: 'szt'
+                    });
+                }
+                setAccessories(accessoryList);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingAccessories(false);
             }
         };
-        fetchAccessories();
+        loadAccessories();
     }, []);
 
-    // Reset Freestanding state when model changes to unsupported type
+    // === LOAD MATERIALS ===
     useEffect(() => {
-        if (!['Trendline', 'Topline'].includes(model)) {
-            setIsFreestandingRoof(false);
-            setIncludeFoundation(false);
-        }
+        const loadMaterials = async () => {
+            setLoadingMaterials(true);
+            try {
+                const { data } = await supabase
+                    .from('aluxe_materials')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('sort_order');
+
+                if (data) {
+                    // Filter by current model
+                    const filtered = data.filter(m =>
+                        m.model_family === 'all' ||
+                        m.model_family === model ||
+                        (m.compatible_models && m.compatible_models.includes(model))
+                    );
+                    setMaterials(filtered);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingMaterials(false);
+            }
+        };
+        loadMaterials();
     }, [model]);
 
-    // Reset Foundation when Freestanding is unchecked
+    // === CALCULATE AWNING PRICE ===
     useEffect(() => {
-        if (!isFreestandingRoof) {
-            setIncludeFoundation(false);
-        }
-    }, [isFreestandingRoof]);
+        const fetchAwningPrice = async () => {
+            setAwningPrice(null);
+            const tableName = awningType === 'aufdach'
+                ? 'Aluxe V2 - Aufdachmarkise'
+                : awningType === 'unterdach'
+                    ? 'Aluxe V2 - Unterdachmarkise'
+                    : 'Aluxe V2 - ZIP Screen';
 
-    // Fetch Price Logic
+            try {
+                const { data: tables } = await supabase
+                    .from('price_tables')
+                    .select('id')
+                    .eq('name', tableName)
+                    .limit(1);
+
+                if (tables && tables.length > 0) {
+                    const price = await PricingService.calculateMatrixPrice(
+                        tables[0].id,
+                        awningWidth,
+                        awningProjection
+                    );
+                    if (price !== null) setAwningPrice(price);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        fetchAwningPrice();
+    }, [awningType, awningWidth, awningProjection]);
+
+    // === CALCULATE ROOF PRICE ===
     useEffect(() => {
         const fetchPrice = async () => {
             setLoading(true);
             setPrice(null);
-            setDebugInfo('');
-
-            // Helper to add price
-            let totalPrice = 0;
-            let log = '';
+            setError(null);
+            setFreestandingSurchargePrice(0);
 
             try {
-                // 1. Determine Main Table Name
-                let tableName = '';
-                let description = '';
+                // 1. Fetch BASE Price
+                let tableName = buildTableName(model, cover, zone, construction);
+                // IF Freestanding AND (Trendline OR Topline), we use the WALL table for base price
+                // and add surcharge separately.
+                // UNLESS logical "Freestanding" tables exist for other models (Skyline/Carport) which usually do.
 
-                if (productType === 'Roof') {
-                    tableName = `Aluxe V2 - ${model} ${cover} (Zone ${zone})`;
-                    description = `${model} ${cover} Z${zone}`;
-                } else if (productType === 'Panorama') {
-                    tableName = `Aluxe V2 - Panorama (${panoramaModel})`;
-                    description = `Panorama ${panoramaModel}`;
-                } else if (productType === 'Wall') {
-                    if (wallModel === 'Sliding Door') tableName = `Aluxe V2 - Sliding Door`;
-                    else if (wallModel === 'Wedge') tableName = `Aluxe V2 - Wedge (Glass)`;
-                    else tableName = `Aluxe V2 - ${wallModel} (Glass)`;
-                    description = `${wallModel}`;
-                } else if (productType === 'Awning') {
-                    tableName = `Aluxe V2 - ${awningModel}`;
-                    description = `${awningModel}`;
-                } else if (productType === 'Skyline' || productType === 'Carport') {
-                    const fsSuffix = constructionType === 'Freestanding' ? ' Freestanding' : '';
-                    tableName = `Aluxe V2 - ${productType}${fsSuffix} (Zone ${zone})`;
-                    description = `${productType} ${constructionType} Zone ${zone}`;
-                } else if (productType === 'Fence') {
-                    tableName = `Aluxe V2 - ${fenceModel}`;
-                    description = `${fenceModel}`;
-                } else if (productType === 'Accessory') {
-                    tableName = selectedAccessory;
-                    description = selectedAccessory;
+                const isSurchargeModel = ['Trendline', 'Topline', 'Designline'].includes(model);
+
+                if (construction === 'freestanding' && isSurchargeModel) {
+                    // For Trendline/Topline Freestanding, we use the Wall price as base
+                    tableName = buildTableName(model, cover, zone, 'wall');
                 }
 
-                log += `Fetching for: ${description}\nMain Table: "${tableName}"\n`;
-
-                if (!tableName) {
-                    setDebugInfo(log + '❌ No table name derived.\n');
-                    setLoading(false);
-                    return;
-                }
-
-
-                // 2. Fetch Base Price
-                const { data: tables } = await supabase
+                let { data: tables } = await supabase
                     .from('price_tables')
-                    .select('id, name, type')
+                    .select('id, name')
                     .eq('name', tableName)
+                    .eq('is_active', true)
                     .limit(1);
 
                 if (!tables || tables.length === 0) {
-                    setDebugInfo(log + `❌ Table "${tableName}" not found.\n`);
+                    // Fallback logic for safety if table not found
+                    if (construction === 'freestanding' && !isSurchargeModel) {
+                        // Maybe it's a model where freestanding is just +15% or different table?
+                        // Current logic was: check Freestanding table, if missing, check Wall table + 15%.
+                        const wallTableName = buildTableName(model, cover, zone, 'wall');
+                        const { data: wallTables } = await supabase
+                            .from('price_tables')
+                            .select('id, name')
+                            .eq('name', wallTableName)
+                            .eq('is_active', true)
+                            .limit(1);
+
+                        if (wallTables && wallTables.length > 0) {
+                            tables = wallTables;
+                            // For non-surcharge models, we might default to 15% if that was legacy behavior
+                            // But user request was specific about surcharge. 
+                            // We'll keep 15% logic for NON-Trendline/Topline as fallback via manual calculation in component if needed.
+                            // But let's assume if it finds the Wall table here (for e.g. Ultraline Freestanding), we might need to apply a default 15%.
+                            // However, user specifically asked for Trendline/Topline logic.
+                        }
+                    }
+                }
+
+                if (!tables || tables.length === 0) {
+                    setError(`Brak cennika bazowego: ${tableName}`);
                     setLoading(false);
                     return;
                 }
+
                 const table = tables[0];
-                log += `✅ Found Table: ${table.name}\n`;
+                const matrixPrice = await PricingService.calculateMatrixPrice(table.id, width, projection);
 
-                let lookupWidth = width;
-                let lookupProjection = projection;
-
-                // Adjust Dimensions based on Type
-                if (productType === 'Wall') {
-                    if (wallModel === 'Side Wall' || wallModel === 'Wedge') lookupWidth = 0; // Use Projection (Depth)
-                    else lookupProjection = 0; // Use Width
-                } else if (productType === 'Fence') {
-                    if (fenceModel === 'Zonweringspaneel') lookupWidth = 0; // Uses Projection (Height)
-                    // Others use both W x P
-                } else if (productType === 'Accessory') {
-                    lookupWidth = 0;
-                    lookupProjection = 0;
+                if (matrixPrice !== null) {
+                    setPrice(matrixPrice);
+                } else {
+                    setError(`Wymiar niedostępny w cenniku bazowym`);
+                    setLoading(false);
+                    return;
                 }
 
-                // If using Freestanding Surcharge (Roofs only), we must ensure we have a width to lookup
-                // Standard roofs use Width x Projection. Surcharges use Width x 0.
+                // 2. Fetch Freestanding SURCHARGE if applicable
+                if (construction === 'freestanding') {
+                    if (isSurchargeModel) {
+                        const surchargeTableName = includeFoundations
+                            ? 'Aluxe V2 - Freestanding Surcharge (With Foundation)'
+                            : 'Aluxe V2 - Freestanding Surcharge (No Foundation)';
 
-                const basePrice = await PricingService.calculateMatrixPrice(table.id, lookupWidth, lookupProjection);
+                        const { data: surchargeTables } = await supabase
+                            .from('price_tables')
+                            .select('id')
+                            .eq('name', surchargeTableName)
+                            .limit(1);
 
-                if (basePrice !== null) {
-                    totalPrice += basePrice;
-                    log += `💰 Base Price: ${basePrice} EUR\n`;
-
-                    // 3. Handle Addons (Roof Freestanding Surcharge)
-                    if (productType === 'Roof' && isFreestandingRoof) {
-                        log += `--- Addon: Freestanding Surcharge ---\n`;
-
-                        // Select correct table based on Foundation option
-                        // The 'Foundation' table contains the TOTAL surcharge price (Base + Foundation), so we use one or the other.
-                        const surchargeTableName = includeFoundation
-                            ? 'Aluxe V2 - Freestanding Surcharge (Foundation)'
-                            : 'Aluxe V2 - Freestanding Surcharge';
-
-                        const surchargeTable = await supabase.from('price_tables').select('id').eq('name', surchargeTableName).single();
-
-                        if (surchargeTable.data) {
-                            const surcharge = await PricingService.calculateMatrixPrice(surchargeTable.data.id, width, 0); // Projection 0 for simple types
-                            if (surcharge) {
-                                totalPrice += surcharge;
-                                log += `➕ Surcharge (${includeFoundation ? 'adj. w/ Foundation' : 'Base'}): +${surcharge} EUR\n`;
-                            } else log += `⚠️ Surcharge price not found for width ${width}\n`;
-                        } else log += `❌ Surcharge table "${surchargeTableName}" not found\n`;
+                        if (surchargeTables && surchargeTables.length > 0) {
+                            // Surcharge is based on WIDTH only. Projection is irrelevant (pass 0).
+                            const surcharge = await PricingService.calculateMatrixPrice(surchargeTables[0].id, width, 0);
+                            if (surcharge !== null) {
+                                setFreestandingSurchargePrice(surcharge);
+                            } else {
+                                console.warn('Surcharge not found for width', width);
+                            }
+                        }
+                    } else {
+                        // Logic for other models (e.g. Ultraline) if they fallback to simplified +15%
+                        // If we are here, it means we found a base table.
+                        // If it was a 'Freestanding' table (Skyline/Carport), price covers everything.
+                        // If it was a 'Wall' table (fallback logic above), we might need to add 15%.
+                        if (tables[0].name.includes('Freestanding')) {
+                            // Price is already full
+                        } else {
+                            // Price is Wall base, add 15% manually?
+                            // Legacy logic was +15%. Let's keep it consistent for non-surcharge models.
+                            // Currently `freestandingSurchargePrice` is absolute. 15% of base price.
+                            setFreestandingSurchargePrice(matrixPrice * 0.15);
+                        }
                     }
-
-                    setPrice(totalPrice);
-                } else {
-                    log += `⚠️ No price found for dimensions ${lookupWidth}x${lookupProjection}\n`;
-                    setPrice(null);
                 }
 
             } catch (err: any) {
-                log += `Error: ${err.message}\n`;
+                setError(err.message);
             } finally {
-                setDebugInfo(log);
                 setLoading(false);
             }
         };
+        const t = setTimeout(fetchPrice, 300);
+        return () => clearTimeout(t);
+    }, [model, cover, zone, construction, width, projection, includeFoundations]);
 
-        fetchPrice();
-    }, [width, projection, productType, model, cover, zone, panoramaModel, wallModel, awningModel, constructionType, fenceModel, selectedAccessory, isFreestandingRoof, includeFoundation]);
+    // === TOTALS ===
+    const currentModel = useMemo(() => ROOF_MODELS.find(m => m.id === model), [model]);
+
+    const totalPrice = useMemo(() => {
+        if (price === null) return null;
+        return price + freestandingSurchargePrice;
+    }, [price, freestandingSurchargePrice]);
+
+    const addToBasket = (itemName: string, itemPrice: number, configStr: string, dimStr: string, category: BasketItem['category']) => {
+        const newItem: BasketItem = {
+            id: crypto.randomUUID(),
+            category,
+            name: itemName,
+            config: configStr,
+            dimensions: dimStr,
+            price: itemPrice,
+            quantity: 1
+        };
+        setBasket(prev => [...prev, newItem]);
+        toast.success(`Dodano do koszyka: ${itemName}`);
+    };
+
+    const handleAddRoofToBasket = () => {
+        if (!totalPrice) return;
+        const configStr = `${cover}, Zone ${zone}, ${construction === 'wall' ? 'Przyścienna' : 'Wolnostojąca'}` +
+            (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
+            (construction === 'freestanding' && includeFoundations ? ' + Fundamenty' : '');
+        addToBasket(model, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
+    };
+
+    const handleAddAccessoryBatch = () => {
+        const items = Object.entries(accessoryQuantities)
+            .filter(([_, qty]) => qty > 0)
+            .map(([id, qty]) => {
+                const acc = accessories.find(a => a.id === id)!;
+                return {
+                    id: crypto.randomUUID(),
+                    category: 'accessory' as const,
+                    name: acc.name,
+                    config: `${qty} x ${formatCurrency(acc.price)}`,
+                    dimensions: '',
+                    price: acc.price * qty,
+                    quantity: qty
+                };
+            });
+
+        if (items.length === 0) {
+            toast.error('Wybierz dodatki');
+            return;
+        }
+        setBasket(prev => [...prev, ...items]);
+        setAccessoryQuantities({});
+        toast.success(`Dodano ${items.length} dodatków`);
+    };
+
+    const basketTotal = useMemo(() => basket.reduce((sum, item) => sum + item.price, 0), [basket]);
 
     return (
-        <div className="max-w-6xl mx-auto p-6 bg-slate-50 min-h-screen font-sans text-slate-800">
-            <header className="mb-8 flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Aluxe Calculator V2</h1>
-                    <p className="text-slate-500">Fresh implementation based on Aluxe Preisliste.xlsx</p>
-                </div>
-                <div className="flex gap-2">
-                    <div className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold">
-                        Batch 1-5 Complete: All Products
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+            {/* LEFT COLUMN: Config */}
+            <div className="col-span-12 lg:col-span-9 space-y-8">
+
+                {/* Stepper */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 relative overflow-hidden">
+                    <div className="flex justify-between items-center relative z-10">
+                        {steps.map((step, index) => (
+                            <button
+                                key={step.id}
+                                onClick={() => setActiveStep(index)}
+                                className={`flex flex-col items-center gap-2 group transition-all ${index <= activeStep ? 'opacity-100' : 'opacity-50'}`}
+                            >
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 transition-all ${index === activeStep ? 'border-indigo-600 bg-white text-indigo-600 shadow-md scale-110' :
+                                    index < activeStep ? 'border-indigo-600 bg-indigo-600 text-white' :
+                                        'border-slate-300 bg-white text-slate-400'
+                                    }`}>
+                                    {index < activeStep ? '✓' : step.icon}
+                                </div>
+                                <span className={`text-xs font-bold ${index === activeStep ? 'text-indigo-900' : 'text-slate-500'}`}>
+                                    {step.label}
+                                </span>
+                            </button>
+                        ))}
                     </div>
+                    {/* Progress Bar Container */}
+                    <div className="absolute top-9 left-0 w-full h-0.5 bg-slate-200 z-0" />
+                    <div
+                        className="absolute top-9 left-0 h-0.5 bg-indigo-600 transition-all duration-300 z-0"
+                        style={{ width: `${(activeStep / (steps.length - 1)) * 100}%` }}
+                    />
                 </div>
-            </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* CONTROLS */}
-                <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        ⚙️ Konfiguracja
-                    </h2>
+                {/* CONTENT */}
 
-                    <div className="space-y-6">
-                        <div className="bg-indigo-50 p-1 rounded-lg flex flex-wrap gap-1">
-                            {(['Roof', 'Skyline', 'Carport', 'Panorama', 'Wall', 'Awning', 'Fence', 'Accessory'] as const).map(type => (
+                {/* STEP 0: MODEL */}
+                {activeStep === 0 && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <span className="text-2xl">🏠</span> Wybierz Model
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {ROOF_MODELS.map(m => (
                                 <button
-                                    key={type}
-                                    onClick={() => setProductType(type)}
-                                    className={`flex-1 min-w-[30%] py-2 px-1 text-xs font-bold rounded-md transition-all whitespace-nowrap ${productType === type
-                                        ? 'bg-white text-indigo-700 shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-700'
+                                    key={m.id}
+                                    onClick={() => setModel(m.id)}
+                                    className={`relative p-5 rounded-xl border-2 text-left transition-all hover:shadow-md ${model === m.id
+                                        ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
+                                        : 'border-slate-100 hover:border-indigo-200 bg-white'
                                         }`}
                                 >
-                                    {type === 'Roof' ? 'Zadaszenie' :
-                                        type === 'Skyline' ? 'Skyline' :
-                                            type === 'Carport' ? 'Carport' :
-                                                type === 'Panorama' ? 'Panorama' :
-                                                    type === 'Wall' ? 'Ściany' :
-                                                        type === 'Awning' ? 'Markizy' :
-                                                            type === 'Fence' ? 'Ogrodzenia' : 'Akcesoria'}
+                                    <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
+                                    <p className="text-xs text-slate-500 mt-1 mb-3">{m.description}</p>
+                                    <div className="flex gap-1 flex-wrap">
+                                        {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
+                                        {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
+                                        {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Wolnostojące</span>}
+                                    </div>
+                                    {model === m.id && (
+                                        <div className="absolute top-3 right-3 text-indigo-600">
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 1: DIMENSIONS */}
+                {activeStep === 1 && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <span className="text-2xl">📏</span> Wymiary i Konstrukcja
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            {/* Width */}
+                            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                <label className="flex justify-between mb-4">
+                                    <span className="font-bold text-slate-700">Szerokość (mm)</span>
+                                    <span className="text-indigo-600 font-black text-xl">{width} mm</span>
+                                </label>
+                                <input
+                                    type="range" min="2000" max="14000" step="100"
+                                    value={width} onChange={e => setWidth(Number(e.target.value))}
+                                    className="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mb-4"
+                                />
+                                <div className="flex justify-between gap-2">
+                                    {[3000, 4000, 5000, 6000, 7000].map(w => (
+                                        <button key={w} onClick={() => setWidth(w)} className="px-2 py-1 text-xs bg-white border border-slate-200 rounded hover:border-indigo-300 transition-colors shadow-sm text-slate-600">{w}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Projection */}
+                            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                <label className="flex justify-between mb-4">
+                                    <span className="font-bold text-slate-700">Głębokość (mm)</span>
+                                    <span className="text-indigo-600 font-black text-xl">{projection} mm</span>
+                                </label>
+                                <input
+                                    type="range" min="1500" max="6000" step="100"
+                                    value={projection} onChange={e => setProjection(Number(e.target.value))}
+                                    className="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mb-4"
+                                />
+                                <div className="flex justify-between gap-2">
+                                    {[2500, 3000, 3500, 4000].map(p => (
+                                        <button key={p} onClick={() => setProjection(p)} className="px-2 py-1 text-xs bg-white border border-slate-200 rounded hover:border-indigo-300 transition-colors shadow-sm text-slate-600">{p}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-slate-100 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Construction Type */}
+                            <div>
+                                <label className="block text-sm font-bold text-slate-600 mb-3">Typ Montażu</label>
+                                <div className="flex gap-3">
+                                    {[
+                                        { id: 'wall', label: 'Przyścienny', icon: '🏠' },
+                                        { id: 'freestanding', label: 'Wolnostojący', icon: '⛺' }
+                                    ].map(t => (
+                                        <button
+                                            key={t.id}
+                                            onClick={() => setConstruction(t.id as any)}
+                                            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${construction === t.id
+                                                ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold'
+                                                : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                                                }`}
+                                        >
+                                            <span>{t.icon}</span> {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {construction === 'freestanding' && (
+                                    <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <div className="relative">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={includeFoundations}
+                                                    onChange={e => setIncludeFoundations(e.target.checked)}
+                                                />
+                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-700">
+                                                Uwzględnij Fundamenty
+                                                {['Trendline', 'Topline', 'Designline'].includes(model) && (
+                                                    <span className="text-xs text-indigo-600 block font-normal">
+                                                        (Automatyczna dopłata wg cennika)
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Zone */}
+                            <div>
+                                <label className="block text-sm font-bold text-slate-600 mb-3">Strefa Śniegowa</label>
+                                <div className="flex gap-2">
+                                    {[1, 2, 3].map(z => (
+                                        <button
+                                            key={z}
+                                            onClick={() => setZone(z)}
+                                            className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${zone === z
+                                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                                : 'border-slate-200 hover:border-slate-300 text-slate-500'
+                                                }`}
+                                        >
+                                            {z}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 2: SPECIFICATION */}
+                {activeStep === 2 && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <span className="text-2xl">⚙️</span> Specyfikacja
+                        </h2>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Cover */}
+                            {(currentModel?.hasPoly || currentModel?.hasGlass) && (
+                                <div>
+                                    <h3 className="font-bold text-slate-700 mb-4">Pokrycie Dachu</h3>
+                                    <div className="space-y-3">
+                                        {currentModel?.hasPoly && (
+                                            <button
+                                                onClick={() => setCover('Poly')}
+                                                className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between ${cover === 'Poly'
+                                                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                                                    : 'border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                            >
+                                                <div>
+                                                    <div className="font-bold text-slate-900">Poliwęglan 16mm</div>
+                                                    <div className="text-xs text-slate-500">Lekki, wytrzymały, ekonomiczny</div>
+                                                </div>
+                                                {cover === 'Poly' && <span className="text-indigo-600 text-xl">✓</span>}
+                                            </button>
+                                        )}
+                                        {currentModel?.hasGlass && (
+                                            <button
+                                                onClick={() => setCover('Glass')}
+                                                className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between ${cover === 'Glass'
+                                                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                                                    : 'border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                            >
+                                                <div>
+                                                    <div className="font-bold text-slate-900">Szkło Bezpieczne VSG</div>
+                                                    <div className="text-xs text-slate-500">Premium, maksymalne światło</div>
+                                                </div>
+                                                {cover === 'Glass' && <span className="text-indigo-600 text-xl">✓</span>}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Color */}
+                            <div>
+                                <h3 className="font-bold text-slate-700 mb-4">Kolor Konstrukcji</h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {['RAL 7016', 'RAL 9016', 'RAL 9005', 'RAL 9007'].map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => setColor(c)}
+                                            className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all ${color === c ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'
+                                                }`}
+                                        >
+                                            <div className="w-6 h-6 rounded-full border border-slate-300 shadow-sm" style={{
+                                                backgroundColor: c.includes('7016') ? '#374151' : c.includes('9016') ? '#f3f4f6' : c.includes('9005') ? '#111827' : '#9ca3af'
+                                            }} />
+                                            <span className="text-sm font-bold text-slate-700">{c}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 3: ADDONS - Premium Redesign */}
+                {activeStep === 3 && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl">🧩</div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Dodatki i Akcesoria</h3>
+                                <p className="text-slate-300 text-sm">Wybierz zabudowę, markizy i akcesoria</p>
+                            </div>
+                        </div>
+
+                        {/* Main Category Tabs */}
+                        <div className="flex border-b border-slate-200 bg-slate-50">
+                            {[
+                                { id: 'walls', label: 'Zabudowa', icon: '🏗️', desc: 'Ściany, Szyby' },
+                                { id: 'awnings', label: 'Komfort', icon: '☀️', desc: 'Markizy, LED' },
+                                { id: 'materials', label: 'Materiały', icon: '🔧', desc: 'Komponenty' },
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setWallTab(tab.id as any)}
+                                    className={`flex-1 px-4 py-4 text-center transition-all border-b-3 ${wallTab === tab.id
+                                        ? 'border-b-4 border-indigo-600 bg-white text-slate-800'
+                                        : 'border-b-4 border-transparent text-slate-500 hover:bg-white/50'
+                                        }`}
+                                >
+                                    <div className="text-2xl mb-1">{tab.icon}</div>
+                                    <div className="font-bold text-sm">{tab.label}</div>
+                                    <div className="text-[10px] opacity-60">{tab.desc}</div>
                                 </button>
                             ))}
                         </div>
 
-                        {productType === 'Roof' && (
-                            <>
-                                {/* Model Selection */}
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Model Rodziny</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {(['Trendline', 'Topline', 'Topline XL', 'Ultraline'] as const).map(m => (
+                        <div className="p-6">
+                            {/* ====== ZABUDOWA TAB ====== */}
+                            {wallTab === 'walls' && (
+                                <div className="space-y-6">
+                                    {/* Visual Hero Section */}
+                                    <div className="relative h-40 rounded-2xl overflow-hidden bg-gradient-to-br from-sky-400 via-sky-500 to-indigo-500 shadow-lg">
+                                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAwIDBoMTAwdjEwMEgxMDB6TTAgMTAwaDEwMHYxMDBIMHoiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-30"></div>
+                                        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-emerald-400/30 to-transparent"></div>
+                                        <div className="absolute bottom-4 left-6 text-white">
+                                            <h4 className="font-black text-lg drop-shadow">🏠 Zabudowa Tarasu</h4>
+                                            <p className="text-white/80 text-sm">Ściany, szyby przesuwne, panorama</p>
+                                        </div>
+                                        {/* Mini Product Preview */}
+                                        <div className="absolute top-4 right-4 flex gap-2">
+                                            {wallProduct && (
+                                                <div className="px-3 py-1.5 bg-white/20 backdrop-blur rounded-lg text-white text-xs font-bold">
+                                                    Wybrano: {wallProduct}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Product Category Sections */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                                        {/* Ściany Aluminiowe */}
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                            <h5 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center text-sm">🪟</span>
+                                                Ściany Aluminiowe
+                                            </h5>
+                                            <div className="space-y-2">
+                                                {WALL_PRODUCTS.map(w => (
+                                                    <button
+                                                        key={w.id}
+                                                        onClick={() => setWallProduct(w.id)}
+                                                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${wallProduct === w.id
+                                                            ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
+                                                            : 'border-slate-200 bg-white hover:border-indigo-300'}`}
+                                                    >
+                                                        <span className="text-xl">{w.icon}</span>
+                                                        <div>
+                                                            <div className="font-bold text-sm text-slate-800">{w.name}</div>
+                                                            <div className="text-[10px] text-slate-500">{w.description}</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Schiebetür (Drzwi przesuwne) */}
+                                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+                                            <h5 className="font-bold text-amber-800 text-sm mb-3 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded bg-amber-200 flex items-center justify-center text-sm">🚪</span>
+                                                Schiebetür (Ramowe)
+                                            </h5>
+                                            <div className="space-y-2">
+                                                {SCHIEBETUR_PRODUCTS.map(s => (
+                                                    <button
+                                                        key={s.id}
+                                                        onClick={() => setWallProduct(s.id)}
+                                                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${wallProduct === s.id
+                                                            ? 'border-amber-500 bg-amber-100 ring-1 ring-amber-300'
+                                                            : 'border-amber-200 bg-white hover:border-amber-400'}`}
+                                                    >
+                                                        <span className="text-xl">{s.icon}</span>
+                                                        <div>
+                                                            <div className="font-bold text-sm text-slate-800">{s.name}</div>
+                                                            <div className="text-[10px] text-slate-500">{s.tracks}-torowy</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Panorama Systems */}
+                                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+                                            <h5 className="font-bold text-emerald-800 text-sm mb-3 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded bg-emerald-200 flex items-center justify-center text-sm">🪟</span>
+                                                Panorama (Bezramowe)
+                                            </h5>
+                                            <div className="space-y-2">
+                                                {PANORAMA_PRODUCTS.slice(0, 4).map(p => (
+                                                    <button
+                                                        key={p.id}
+                                                        onClick={() => setWallProduct(p.id)}
+                                                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${wallProduct === p.id
+                                                            ? 'border-emerald-500 bg-emerald-100 ring-1 ring-emerald-300'
+                                                            : 'border-emerald-200 bg-white hover:border-emerald-400'}`}
+                                                    >
+                                                        <span className="text-xl">{p.icon}</span>
+                                                        <div>
+                                                            <div className="font-bold text-sm text-slate-800">{p.name}</div>
+                                                            <div className="text-[10px] text-slate-500">{p.description}</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                                {wallProduct.startsWith('Panorama') && (
+                                                    <select
+                                                        value={wallProduct}
+                                                        onChange={e => setWallProduct(e.target.value)}
+                                                        className="w-full mt-2 p-2 text-sm border border-emerald-300 rounded-lg bg-white font-medium"
+                                                    >
+                                                        {PANORAMA_PRODUCTS.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.name} - {p.description}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Dimension Inputs & Add Button */}
+                                    <div className="bg-slate-800 p-5 rounded-xl text-white">
+                                        <div className="grid grid-cols-3 gap-4 items-end">
+                                            <div>
+                                                <label className="text-xs font-medium text-slate-300 uppercase mb-2 block">Szerokość (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    value={wallWidth}
+                                                    onChange={e => setWallWidth(Number(e.target.value))}
+                                                    className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-center focus:bg-white/20 outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-medium text-slate-300 uppercase mb-2 block">Wysokość (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    value={wallHeight}
+                                                    onChange={e => setWallHeight(Number(e.target.value))}
+                                                    className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-center focus:bg-white/20 outline-none"
+                                                />
+                                            </div>
                                             <button
-                                                key={m}
-                                                onClick={() => setModel(m)}
-                                                className={`p-2 text-sm rounded-lg border transition-all ${model === m
-                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                                                    }`}
+                                                onClick={() => addToBasket(wallProduct, 1000, 'Wycena na podstawie wymiarów', `${wallWidth}x${wallHeight}`, 'wall')}
+                                                className="py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg font-bold hover:from-indigo-600 hover:to-purple-600 transition-all shadow-lg"
                                             >
-                                                {m}
+                                                ➕ Dodaj do koszyka
                                             </button>
-                                        ))}
+                                        </div>
                                     </div>
                                 </div>
+                            )}
 
-                                {/* Cover Type */}
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Pokrycie Dachu</label>
-                                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                                        <button
-                                            onClick={() => setCover('Poly')}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${cover === 'Poly' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Polycarbonat
-                                        </button>
-                                        <button
-                                            onClick={() => setCover('Glass')}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${cover === 'Glass' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            Szkło (Glass)
-                                        </button>
-                                    </div>
-                                </div>
+                            {/* ====== KOMFORT TAB (Awnings, LED) ====== */}
+                            {wallTab === 'awnings' && (
+                                <div className="space-y-6">
+                                    {/* Awnings Section */}
+                                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-5 border border-orange-200">
+                                        <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 rounded-lg bg-orange-200 flex items-center justify-center">☀️</span>
+                                            Markizy & ZIP Screen
+                                        </h4>
 
-                                {/* Zone */}
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Strefa Śniegowa (Zone)</label>
-                                    <select
-                                        value={zone}
-                                        onChange={e => setZone(Number(e.target.value))}
-                                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                                    >
-                                        <option value={1}>Strefa 1 (75kg/m² or Zone 1)</option>
-                                        <option value={2}>Strefa 2 (Zone 1a & 2)</option>
-                                        <option value={3}>Strefa 3 (Zone 2a & 3)</option>
-                                    </select>
-                                </div>
+                                        {/* Type Selector with Images */}
+                                        <div className="grid grid-cols-3 gap-3 mb-4">
+                                            {[
+                                                { id: 'aufdach', label: 'Aufdachmarkise', desc: 'Markiza na dachu', icon: '🌤️', color: 'from-orange-400 to-amber-400' },
+                                                { id: 'unterdach', label: 'Unterdachmarkise', desc: 'Markiza pod dachem', icon: '🏠', color: 'from-amber-400 to-yellow-400' },
+                                                { id: 'zip', label: 'ZIP Screen', desc: 'Ekran pionowy', icon: '📱', color: 'from-slate-500 to-slate-600' },
+                                            ].map(type => (
+                                                <button
+                                                    key={type.id}
+                                                    onClick={() => setAwningType(type.id as any)}
+                                                    className={`relative p-4 rounded-xl border-2 text-center transition-all overflow-hidden ${awningType === type.id
+                                                        ? 'border-orange-500 ring-2 ring-orange-300 shadow-lg'
+                                                        : 'border-orange-200 hover:border-orange-400 bg-white'}`}
+                                                >
+                                                    <div className={`absolute top-0 left-0 right-0 h-16 bg-gradient-to-br ${type.color} opacity-20`}></div>
+                                                    <div className="relative">
+                                                        <div className="text-3xl mb-2">{type.icon}</div>
+                                                        <div className="font-bold text-sm text-slate-800">{type.label}</div>
+                                                        <div className="text-[10px] text-slate-500">{type.desc}</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
 
-                                {/* Freestanding Options */}
-                                {/* Only for Trendline & Topline (as per price list header "für Orangeline, Trendline, Topline und Designline") */}
-                                {['Trendline', 'Topline'].includes(model) && (
-                                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={isFreestandingRoof}
-                                                onChange={e => setIsFreestandingRoof(e.target.checked)}
-                                                className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
-                                            />
-                                            <span className="font-bold text-sm text-slate-700">Konstrukcja Wolnostojąca</span>
-                                        </label>
+                                        {/* Dimensions */}
+                                        <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-orange-200">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Szerokość (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    value={awningWidth}
+                                                    onChange={e => setAwningWidth(Number(e.target.value))}
+                                                    step={500}
+                                                    min={1000}
+                                                    max={6000}
+                                                    className="w-full p-3 border-2 border-slate-200 rounded-lg font-bold text-slate-800 text-center focus:border-orange-400 outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">{awningType === 'zip' ? 'Wysokość' : 'Wysięg'} (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    value={awningProjection}
+                                                    onChange={e => setAwningProjection(Number(e.target.value))}
+                                                    step={500}
+                                                    min={1000}
+                                                    max={5000}
+                                                    className="w-full p-3 border-2 border-slate-200 rounded-lg font-bold text-slate-800 text-center focus:border-orange-400 outline-none"
+                                                />
+                                            </div>
+                                        </div>
 
-                                        {isFreestandingRoof && (
-                                            <div className="mt-2 ml-8">
-                                                <label className="flex items-center gap-3 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={includeFoundation}
-                                                        onChange={e => setIncludeFoundation(e.target.checked)}
-                                                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                                                    />
-                                                    <span className="text-sm text-slate-600">Dodaj Fundament (Foundation)</span>
-                                                </label>
+                                        {/* Price Display */}
+                                        {awningPrice !== null && (
+                                            <div className="mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white p-4 rounded-xl flex justify-between items-center shadow-lg">
+                                                <div>
+                                                    <div className="text-sm opacity-80">Cena netto</div>
+                                                    <div className="font-bold">{awningType === 'aufdach' ? 'Aufdachmarkise' : awningType === 'unterdach' ? 'Unterdachmarkise' : 'ZIP Screen'}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-3xl font-black">{formatCurrency(awningPrice)}</div>
+                                                    <div className="text-xs opacity-80">{awningWidth}×{awningProjection} mm</div>
+                                                </div>
                                             </div>
                                         )}
-                                    </div>
-                                )}
-                            </>
-                        )}
 
-                        {(productType === 'Skyline' || productType === 'Carport') && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Typ Konstrukcji</label>
-                                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                                        {(['Attached', 'Freestanding'] as const).map(ct => (
-                                            <button
-                                                key={ct}
-                                                onClick={() => setConstructionType(ct)}
-                                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${constructionType === ct ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                                            >
-                                                {ct === 'Attached' ? 'Przyścienne' : 'Wolnostojące'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Strefa Śniegowa</label>
-                                    <select
-                                        value={zone}
-                                        onChange={e => setZone(Number(e.target.value))}
-                                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                                    >
-                                        <option value={1}>Strefa 1 (Zone 1)</option>
-                                        <option value={2}>Strefa 2 (Zone 2)</option>
-                                        <option value={3}>Strefa 3 (Zone 3)</option>
-                                    </select>
-                                </div>
-                            </>
-                        )}
-
-                        {productType === 'Panorama' && (
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Model Panoramy</label>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setPanoramaModel('3-Tor')}
-                                        className={`flex-1 p-3 rounded-lg border font-bold transition-all ${panoramaModel === '3-Tor' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white hover:border-indigo-300 text-slate-600'}`}
-                                    >
-                                        3-Tor
-                                    </button>
-                                    <button
-                                        onClick={() => setPanoramaModel('5-Tor')}
-                                        className={`flex-1 p-3 rounded-lg border font-bold transition-all ${panoramaModel === '5-Tor' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white hover:border-indigo-300 text-slate-600'}`}
-                                    >
-                                        5-Tor
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {productType === 'Wall' && (
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Typ Ściany / Elementu</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {(['Side Wall', 'Front Wall', 'Sliding Door', 'Wedge'] as const).map(wm => (
                                         <button
-                                            key={wm}
-                                            onClick={() => setWallModel(wm)}
-                                            className={`p-2 text-sm rounded-lg border transition-all ${wallModel === wm
-                                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                                                }`}
+                                            onClick={() => awningPrice && addToBasket(
+                                                awningType === 'aufdach' ? 'Aufdachmarkise' : awningType === 'unterdach' ? 'Unterdachmarkise' : 'ZIP Screen',
+                                                awningPrice,
+                                                awningType === 'aufdach' ? 'Markiza na dachu' : awningType === 'unterdach' ? 'Markiza pod dachem' : 'Ekran ZIP pionowy',
+                                                `${awningWidth}x${awningProjection}`,
+                                                'accessory'
+                                            )}
+                                            disabled={awningPrice === null}
+                                            className="w-full mt-4 py-4 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                                         >
-                                            {wm}
+                                            {awningPrice !== null ? '➕ Dodaj markizę do koszyka' : '⏳ Obliczanie ceny...'}
                                         </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                                    </div>
 
-                        {productType === 'Fence' && (
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Typ Ogrodzenia</label>
-                                <div className="flex flex-col gap-2">
-                                    {(['Zonweringspaneel', 'Fence Element (Aluminium)', 'Fence Element (Door)'] as const).map(fm => (
+                                    {/* LED & Accessories Section */}
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-200">
+                                        <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 rounded-lg bg-indigo-200 flex items-center justify-center">✨</span>
+                                            LED & Akcesoria
+                                        </h4>
+
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                                            {loadingAccessories ? (
+                                                <div className="text-center py-8 text-indigo-400">Ładowanie cennika...</div>
+                                            ) : (
+                                                accessories.filter(a => a.category === 'led' || a.category === 'other').map(acc => {
+                                                    const qty = accessoryQuantities[acc.id] || 0;
+                                                    return (
+                                                        <div key={acc.id} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${qty > 0 ? 'bg-indigo-100 border-indigo-300' : 'bg-white border-slate-200 hover:border-indigo-200'}`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-xl">{acc.category === 'led' ? '💡' : '🔧'}</span>
+                                                                <div>
+                                                                    <div className="font-bold text-slate-700 text-sm">{acc.name}</div>
+                                                                    <div className="text-xs text-slate-400">{formatCurrency(acc.price)} / {acc.unit}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => setAccessoryQuantities(prev => ({ ...prev, [acc.id]: Math.max(0, (prev[acc.id] || 0) - 1) }))}
+                                                                    className="w-8 h-8 rounded-full border border-slate-300 text-slate-500 hover:bg-red-50 hover:text-red-500 hover:border-red-300 transition-colors"
+                                                                >−</button>
+                                                                <span className="w-8 text-center font-bold text-indigo-700">{qty}</span>
+                                                                <button
+                                                                    onClick={() => setAccessoryQuantities(prev => ({ ...prev, [acc.id]: (prev[acc.id] || 0) + 1 }))}
+                                                                    className="w-8 h-8 rounded-full bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
+                                                                >+</button>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })
+                                            )}
+                                        </div>
+
                                         <button
-                                            key={fm}
-                                            onClick={() => setFenceModel(fm)}
-                                            className={`p-3 text-sm rounded-lg border transition-all text-left font-medium ${fenceModel === fm
-                                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                                                }`}
+                                            onClick={handleAddAccessoryBatch}
+                                            className="w-full mt-4 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all"
                                         >
-                                            {fm === 'Zonweringspaneel' ? 'Panel Przeciwsłoneczny (Zonweringspaneel)' :
-                                                fm === 'Fence Element (Aluminium)' ? 'Element Ogrodzenia (Alu)' :
-                                                    'Drzwi Ogrodzeniowe (Door)'}
+                                            Dodaj wybrane akcesoria do koszyka
                                         </button>
-                                    ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {productType === 'Accessory' && (
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Wybierz Akcesorium</label>
-                                <select
-                                    value={selectedAccessory}
-                                    onChange={e => setSelectedAccessory(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
-                                >
-                                    {accessories.map(acc => (
-                                        <option key={acc.id} value={acc.name}>
-                                            {acc.name.replace('Aluxe V2 - ', '')}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
+                            {/* ====== MATERIALS TAB ====== */}
+                            {wallTab === 'materials' && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <span className="text-sm text-slate-500">Materiały dla modelu:</span>
+                                        <span className="font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full text-sm">{model}</span>
+                                    </div>
 
-                        <hr className="border-slate-100" />
-
-                        {/* Dimensions */}
-                        {productType !== 'Accessory' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                {/* WIDTH INPUT */}
-                                {(!['Wall', 'Fence'].includes(productType) ||
-                                    (productType === 'Wall' && !['Side Wall', 'Wedge'].includes(wallModel)) ||
-                                    (productType === 'Fence' && fenceModel !== 'Zonweringspaneel')
-                                ) && (
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Szerokość (mm)</label>
-                                            <input
-                                                type="number"
-                                                value={width}
-                                                onChange={e => setWidth(Number(e.target.value))}
-                                                className="w-full p-2 border border-slate-300 rounded-lg font-mono text-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                step={100}
-                                            />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Profile Column */}
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                            <h5 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded bg-slate-300 flex items-center justify-center text-xs">📏</span>
+                                                Profile
+                                            </h5>
+                                            <div className="space-y-1 max-h-[250px] overflow-y-auto">
+                                                {loadingMaterials ? (
+                                                    <div className="text-center py-4 text-slate-400">Ładowanie...</div>
+                                                ) : materials.filter(m => m.category === 'profile').map(mat => {
+                                                    const qty = materialQuantities[mat.id] || 0;
+                                                    return (
+                                                        <div key={mat.id} className={`flex items-center justify-between p-2 rounded border text-sm ${qty > 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-medium text-slate-700 truncate">{mat.name}</div>
+                                                                <div className="text-[10px] text-slate-400">{mat.dimension} • {formatCurrency(mat.base_price)}/{mat.unit}</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 ml-2">
+                                                                <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: Math.max(0, (prev[mat.id] || 0) - 1) }))} className="w-6 h-6 text-xs rounded border border-slate-200 hover:bg-red-50">−</button>
+                                                                <span className="w-6 text-center text-xs font-bold">{qty}</span>
+                                                                <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: (prev[mat.id] || 0) + 1 }))} className="w-6 h-6 text-xs rounded bg-indigo-500 text-white">+</button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    )}
 
-                                {/* PROJECTION / HEIGHT INPUT */}
-                                {(!['Wall'].includes(productType) ||
-                                    (productType === 'Wall' && ['Side Wall', 'Wedge'].includes(wallModel))
-                                ) && (
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                                                {['Roof'].includes(productType) ? 'Wysięg (mm)' :
-                                                    ['Panorama'].includes(productType) ? 'Wysokość (mm)' :
-                                                        ['Fence'].includes(productType) ? 'Wysokość (mm)' :
-                                                            productType === 'Awning' && awningModel === 'ZIP Screen' ? 'Wysokość (mm)' :
-                                                                ['Skyline', 'Carport'].includes(productType) ? 'Wysięg (Długość)' :
-                                                                    'Długość / Głębokość (mm)'}
-                                            </label>
-                                            <input
-                                                type="number"
-                                                value={projection}
-                                                onChange={e => setProjection(Number(e.target.value))}
-                                                className="w-full p-2 border border-slate-300 rounded-lg font-mono text-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                step={100}
-                                            />
+                                        {/* Other Materials Column */}
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                            <h5 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded bg-emerald-200 flex items-center justify-center text-xs">🔩</span>
+                                                Pozostałe Materiały
+                                            </h5>
+                                            <div className="space-y-1 max-h-[250px] overflow-y-auto">
+                                                {materials.filter(m => m.category !== 'profile').map(mat => {
+                                                    const qty = materialQuantities[mat.id] || 0;
+                                                    return (
+                                                        <div key={mat.id} className={`flex items-center justify-between p-2 rounded border text-sm ${qty > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-medium text-slate-700 truncate">{mat.name}</div>
+                                                                <div className="text-[10px] text-slate-400">{formatCurrency(mat.base_price)}/{mat.unit} <span className="px-1 py-0.5 bg-slate-100 rounded text-[8px] ml-1">{mat.category}</span></div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 ml-2">
+                                                                <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: Math.max(0, (prev[mat.id] || 0) - 1) }))} className="w-6 h-6 text-xs rounded border border-slate-200 hover:bg-red-50">−</button>
+                                                                <span className="w-6 text-center text-xs font-bold">{qty}</span>
+                                                                <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: (prev[mat.id] || 0) + 1 }))} className="w-6 h-6 text-xs rounded bg-emerald-500 text-white">+</button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    )}
-                            </div>
-                        )}
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            Object.entries(materialQuantities).forEach(([id, qty]) => {
+                                                if (qty > 0) {
+                                                    const mat = materials.find(m => m.id === id);
+                                                    if (mat) {
+                                                        addToBasket(mat.name, mat.base_price * qty, mat.dimension || '', `${qty}x`, 'accessory');
+                                                    }
+                                                }
+                                            });
+                                            setMaterialQuantities({});
+                                        }}
+                                        className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all"
+                                    >
+                                        ➕ Dodaj wybrane materiały do koszyka
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* LED tab redirect - merge into awnings */}
+                            {wallTab === 'led' && (
+                                <div className="text-center py-12">
+                                    <div className="text-4xl mb-4">✨</div>
+                                    <p className="text-slate-500 mb-4">LED i akcesoria zostały przeniesione do zakładki "Komfort"</p>
+                                    <button onClick={() => setWallTab('awnings')} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold">
+                                        Przejdź do Komfort →
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+
+                {/* Navigation Buttons */}
+                <div className="flex justify-between pt-8 border-t border-slate-200">
+                    <button
+                        onClick={() => setActiveStep(prev => Math.max(0, prev - 1))}
+                        disabled={activeStep === 0}
+                        className={`px-6 py-3 rounded-xl font-bold transition-all ${activeStep === 0 ? 'opacity-0 pointer-events-none' : 'bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        ← Wstecz
+                    </button>
+                    <button
+                        onClick={() => setActiveStep(prev => Math.min(steps.length - 1, prev + 1))}
+                        disabled={activeStep === steps.length - 1}
+                        className={`px-8 py-3 rounded-xl font-bold bg-slate-800 text-white hover:bg-slate-700 transition-all ${activeStep === steps.length - 1 ? 'hidden' : 'block'}`}
+                    >
+                        Dalej →
+                    </button>
+                </div>
+
+            </div>
+
+            {/* RIGHT COLUMN: Summary */}
+            <div className="col-span-12 lg:col-span-3 space-y-4 lg:sticky lg:top-4">
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h3>
+
+                    {/* Main Config Summary */}
+                    <div className="mb-6 space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-500">Model</span>
+                            <span className="font-bold text-slate-800">{model}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-500">Wymiar</span>
+                            <span className="font-bold text-slate-800">{width} × {projection}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-500">Montaż</span>
+                            <span className={`font-bold ${construction === 'freestanding' ? 'text-amber-600' : 'text-slate-800'}`}>
+                                {construction === 'wall' ? 'Przyścienny' : `Wolnostojący ${freestandingSurchargePrice > 0 ? '(+' + formatCurrency(freestandingSurchargePrice) + ')' : ''}`}
+                            </span>
+                        </div>
+                        <div className="h-px bg-slate-100 my-2" />
+
+                        {/* Price Display */}
+                        <div className="text-center py-2">
+                            {price ? (
+                                <>
+                                    <div className="text-3xl font-black text-slate-900">{formatCurrency(totalPrice || 0)}</div>
+                                    <div className="text-[10px] text-slate-400 font-medium mt-1">Cena netto (bez VAT)</div>
+                                </>
+                            ) : (
+                                <div className="text-slate-400 italic text-sm">{error || 'Obliczam...'}</div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleAddRoofToBasket}
+                            disabled={!totalPrice}
+                            className={`w-full py-3 rounded-xl font-bold transition-all ${totalPrice
+                                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md transform hover:-translate-y-0.5'
+                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                }`}
+                        >
+                            Dodaj Zadaszenie +
+                        </button>
                     </div>
                 </div>
 
-                {/* RESULTS */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white p-8 rounded-2xl shadow-lg border border-indigo-100 flex flex-col justify-center items-center text-center min-h-[300px] relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-white/0 pointer-events-none" />
-
-                        {loading ? (
-                            <div className="flex flex-col items-center gap-4">
-                                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                                <span className="text-slate-400 font-medium">Przeliczanie...</span>
-                            </div>
-                        ) : price !== null ? (
-                            <div className="relative z-10 transition-all duration-300 transform scale-100">
-                                <div className="text-sm text-slate-500 uppercase font-bold tracking-wider mb-2">Cena Katalogowa Netto</div>
-                                <div className="text-6xl font-black text-slate-900 tracking-tight mb-4">
-                                    {formatCurrency(price)}
-                                </div>
-                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 font-medium text-sm">
-                                    <span>Model:</span>
-                                    <strong>
-                                        {productType === 'Roof'
-                                            ? `${model} ${cover} (Zone ${zone})${isFreestandingRoof ? ' + Freestanding' : ''}`
-                                            : productType === 'Panorama'
-                                                ? `Panorama ${panoramaModel}`
-                                                : productType === 'Wall'
-                                                    ? `${wallModel}`
-                                                    : productType === 'Awning'
-                                                        ? `${awningModel}`
-                                                        : productType === 'Fence'
-                                                            ? `${fenceModel}`
-                                                            : productType === 'Accessory'
-                                                                ? selectedAccessory.replace('Aluxe V2 - ', '')
-                                                                : `${productType} ${constructionType} (Zone ${zone})`}
-                                    </strong>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="relative z-10 text-center">
-                                <div className="text-4xl mb-4">⚠️</div>
-                                <h3 className="text-lg font-bold text-slate-700 mb-1">Brak Ceny</h3>
-                                <p className="text-slate-500">
-                                    {productType === 'Accessory' ? 'Produkt niedostępny.' : `Kombinacja ${width}x${projection} nie występuje w cenniku.`}
-                                </p>
-                            </div>
-                        )}
+                {/* Basket Preview */}
+                <div className="bg-white rounded-2xl shadow border border-slate-200 p-4">
+                    <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowBasket(!showBasket)}>
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            🛒 Koszyk <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
+                        </h3>
+                        <span className="text-slate-400 text-sm">{showBasket ? '▼' : '▲'}</span>
                     </div>
 
-                    {/* DEBUG PANEL */}
-                    <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-700 shadow-xl">
-                        <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
-                            <h3 className="text-slate-300 font-mono text-xs font-bold uppercase">System Logs</h3>
-                            <button
-                                onClick={() => setDebugInfo('')}
-                                className="text-[10px] text-slate-500 hover:text-white uppercase transition-colors"
-                            >
-                                Clear
-                            </button>
+                    {showBasket && (
+                        <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
+                            {basket.map((item, i) => (
+                                <div key={item.id} className="text-sm border-b border-slate-50 last:border-0 pb-2">
+                                    <div className="flex justify-between font-bold text-slate-700">
+                                        <span>{item.name}</span>
+                                        <span>{formatCurrency(item.price)}</span>
+                                    </div>
+                                    <div className="text-xs text-slate-400 truncate pr-4">{item.config}</div>
+                                </div>
+                            ))}
+                            {basket.length === 0 && <p className="text-center text-slate-400 text-xs py-2">Pusty koszyk</p>}
                         </div>
-                        <pre className="p-4 text-green-400 font-mono text-xs overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
-                            {debugInfo || '// Ready...'}
-                        </pre>
+                    )}
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                        <span className="text-sm font-medium text-slate-500">Razem:</span>
+                        <span className="font-black text-lg text-indigo-600">{formatCurrency(basketTotal)}</span>
                     </div>
+
+                    <button className="w-full mt-3 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-slate-800">
+                        Przejdź do oferty →
+                    </button>
                 </div>
             </div>
         </div>

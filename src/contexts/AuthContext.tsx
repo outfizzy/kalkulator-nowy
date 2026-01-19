@@ -1,15 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
-import { createClient } from '@supabase/supabase-js';
-// import { supabase } from '../lib/supabase'; // BYPASSING LIB TO FIX BUILD
-// import { PermissionsService } from '../services/database/permissions.service'; // TEMPORARILY DISABLED TO FIX BUILD
-
-const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder',
-    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
-);
+import { supabase } from '../lib/supabase'; // Use shared client to avoid multiple GoTrueClient instances
 
 interface AuthContextType {
     currentUser: User | null;
@@ -93,8 +85,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, []);
 
     const fetchPermissions = async (role: string) => {
-        console.warn('Permissions temporarily disabled to fix build cycle');
-        setPermissions(new Set());
+        // Basic role-based permissions (no DB dependency for now)
+        const rolePermissions = new Set<string>();
+
+        if (role === 'admin') {
+            rolePermissions.add('*'); // Admin has all permissions
+        } else if (role === 'manager') {
+            rolePermissions.add('dashboard');
+            rolePermissions.add('offers');
+            rolePermissions.add('customers');
+            rolePermissions.add('leads');
+        } else if (role === 'sales_rep') {
+            rolePermissions.add('dashboard');
+            rolePermissions.add('offers');
+            rolePermissions.add('leads');
+        }
+
+        setPermissions(rolePermissions);
     };
 
     const fetchProfile = async (userId: string, email: string) => {
@@ -166,13 +173,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             return { error: { message: 'Hasło jest wymagane' } };
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
             options: {
                 captchaToken
             }
         });
+
+        // Wait for profile to be fetched before returning
+        if (data?.user && !error) {
+            try {
+                await fetchProfile(data.user.id, data.user.email!);
+            } catch (profileError) {
+                return { error: profileError };
+            }
+        }
 
         return { error };
     };
@@ -217,7 +233,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             password,
             options: {
                 data: {
-                    full_name: `${firstName} ${lastName}`,
+                    full_name: `${firstName} ${lastName} `,
                     firstName,
                     lastName,
                     phone,
@@ -233,11 +249,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (loading) {
         return (
-            <div className="fixed inset-0 bg-slate-50 flex items-center justify-center z-50">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <p className="text-slate-500 font-medium animate-pulse">Ładowanie aplikacji...</p>
-                </div>
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
             </div>
         );
     }

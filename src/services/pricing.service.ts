@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import type { ProductConfig, PricingResult, SnowZoneInfo, TransportSettings, PriceTable } from '../types';
 
 import { calculateInstallationCosts, calculateDistanceFromGubin, type InstallationDailyRates } from '../utils/distanceCalculator';
-import { DatabaseService } from './database';
+import { SettingsService } from './database/settings.service';
 import catalogData from '../data/catalog.json';
 
 // --- Types for New Manual Pricing ---
@@ -625,8 +625,8 @@ export const PricingService = {
 
         try {
             const [transport, installation] = await Promise.all([
-                DatabaseService.getTransportSettings(),
-                DatabaseService.getInstallationSettings()
+                SettingsService.getTransportSettings(),
+                SettingsService.getInstallationSettings()
             ]);
             transportSettings = transport;
             installationSettings = installation;
@@ -1511,5 +1511,36 @@ export const PricingService = {
         }
 
         return Number(addon.price_upe_net_eur) || 0;
+    },
+
+    /**
+     * Calculate price from matrix table by table ID and dimensions
+     * Used by ProductConfiguratorV2
+     */
+    async calculateMatrixPrice(tableId: string, width: number, projection: number): Promise<number | null> {
+        if (!tableId) return null;
+
+        try {
+            const { data, error } = await supabase
+                .from('price_matrix_entries')
+                .select('price')
+                .eq('price_table_id', tableId)
+                .gte('width_mm', width)
+                .gte('projection_mm', projection)
+                .order('width_mm', { ascending: true })
+                .order('projection_mm', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) {
+                console.error('Matrix price lookup error:', error);
+                return null;
+            }
+
+            return data?.price ?? null;
+        } catch (err) {
+            console.error('calculateMatrixPrice error:', err);
+            return null;
+        }
     }
 };
