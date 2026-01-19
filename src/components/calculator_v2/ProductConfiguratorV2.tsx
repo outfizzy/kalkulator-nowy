@@ -337,19 +337,40 @@ export const ProductConfiguratorV2: React.FC = () => {
                     // Pattern 643: Linearized Matrix lookup
                     // Side Wall / Wedge: price by HEIGHT (projection), width_mm = 0
                     // Front Wall / Schiebetür: price by WIDTH, projection_mm = 0
+                    // Panorama: fixed price per panel × number of panels
                     const isSideOrWedge = wallProduct.includes('Side') ||
                         wallProduct.includes('Wedge') ||
                         wallProduct.includes('Keilfenster');
+                    const isPanorama = wallProduct.includes('Panorama');
 
-                    const lookupWidth = isSideOrWedge ? 0 : wallWidth;
-                    const lookupProjection = isSideOrWedge ? wallHeight : 0;
+                    let finalPrice: number | null = null;
 
-                    const price = await PricingService.calculateMatrixPrice(
-                        tables[0].id,
-                        lookupWidth,
-                        lookupProjection
-                    );
-                    if (price !== null) setWallPrice(price);
+                    if (isPanorama) {
+                        // Panorama pricing: price per panel (stored at width=850 as representative)
+                        // Panel width range is 600-1100mm, so calculate number of panels needed
+                        const panelPrice = await PricingService.calculateMatrixPrice(
+                            tables[0].id,
+                            850, // Fixed representative width for lookup
+                            0
+                        );
+                        if (panelPrice !== null) {
+                            // Calculate number of panels based on total wall width
+                            // Using 850mm as average panel width
+                            const panelCount = Math.ceil(wallWidth / 850);
+                            finalPrice = panelPrice * panelCount;
+                        }
+                    } else {
+                        const lookupWidth = isSideOrWedge ? 0 : wallWidth;
+                        const lookupProjection = isSideOrWedge ? wallHeight : 0;
+
+                        finalPrice = await PricingService.calculateMatrixPrice(
+                            tables[0].id,
+                            lookupWidth,
+                            lookupProjection
+                        );
+                    }
+
+                    if (finalPrice !== null) setWallPrice(finalPrice);
                 } else {
                     console.warn(`Table not found: ${tableName}`);
                 }
