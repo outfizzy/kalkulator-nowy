@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/translations';
 import { PricingService } from '../../services/pricing.service';
 import { toast } from 'react-hot-toast';
+import { WallVisualizer } from './WallVisualizer';
 
 // ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
@@ -944,164 +945,195 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         <div className="p-6">
                             {/* ====== ZABUDOWA TAB ====== */}
+                            {/* ====== WALLS TAB ====== */}
                             {wallTab === 'walls' && (
-                                <div className="space-y-6">
-                                    {/* Visual Hero Section */}
-                                    <div className="relative h-40 rounded-2xl overflow-hidden bg-gradient-to-br from-sky-400 via-sky-500 to-indigo-500 shadow-lg">
-                                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAwIDBoMTAwdjEwMEgxMDB6TTAgMTAwaDEwMHYxMDBIMHoiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-30"></div>
-                                        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-emerald-400/30 to-transparent"></div>
-                                        <div className="absolute bottom-4 left-6 text-white">
-                                            <h4 className="font-black text-lg drop-shadow">🏠 Zabudowa Tarasu</h4>
-                                            <p className="text-white/80 text-sm">Ściany, szyby przesuwne, panorama</p>
-                                        </div>
-                                        {/* Mini Product Preview */}
-                                        <div className="absolute top-4 right-4 flex gap-2">
-                                            {wallProduct && (
-                                                <div className="px-3 py-1.5 bg-white/20 backdrop-blur rounded-lg text-white text-xs font-bold">
-                                                    Wybrano: {wallProduct}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* LEFT COLUMN - CONTROLS */}
+                                    <div className="lg:col-span-2 space-y-6">
+                                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                            {/* Header */}
+                                            <h4 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+                                                <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">🧱</span>
+                                                Wybierz rodzaj zabudowy
+                                            </h4>
+
+                                            {/* 1. Side Walls Category */}
+                                            <div className="mb-6">
+                                                <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                    Ściany Boczne
+                                                </h5>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {WALL_PRODUCTS.filter(p => p.id.includes('Side') || p.id.includes('Wedge')).map(p => (
+                                                        <button
+                                                            key={p.id}
+                                                            onClick={() => setWallProduct(p.id)}
+                                                            className={`text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${wallProduct === p.id
+                                                                ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200 shadow-sm'
+                                                                : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50'}`}
+                                                        >
+                                                            <span className="text-2xl">{p.icon}</span>
+                                                            <div>
+                                                                <div className="font-bold text-sm text-slate-700">{p.name}</div>
+                                                                <div className="text-[10px] text-slate-400 leading-tight">{p.description}</div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Product Category Sections */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-                                        {/* Ściany Aluminiowe */}
-                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                            <h5 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
-                                                <span className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center text-sm">🪟</span>
-                                                Ściany Aluminiowe
-                                            </h5>
-                                            <div className="space-y-2">
-                                                {WALL_PRODUCTS.map(w => (
-                                                    <button
-                                                        key={w.id}
-                                                        onClick={() => setWallProduct(w.id)}
-                                                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${wallProduct === w.id
-                                                            ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
-                                                            : 'border-slate-200 bg-white hover:border-indigo-300'}`}
-                                                    >
-                                                        <span className="text-xl">{w.icon}</span>
-                                                        <div>
-                                                            <div className="font-bold text-sm text-slate-800">{w.name}</div>
-                                                            <div className="text-[10px] text-slate-500">{w.description}</div>
-                                                        </div>
-                                                    </button>
-                                                ))}
                                             </div>
-                                        </div>
 
-                                        {/* Schiebetür (Drzwi przesuwne) */}
-                                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
-                                            <h5 className="font-bold text-amber-800 text-sm mb-3 flex items-center gap-2">
-                                                <span className="w-6 h-6 rounded bg-amber-200 flex items-center justify-center text-sm">🚪</span>
-                                                Schiebetür (Ramowe)
-                                            </h5>
-                                            <div className="space-y-2">
-                                                {SCHIEBETUR_PRODUCTS.map(s => (
-                                                    <button
-                                                        key={s.id}
-                                                        onClick={() => setWallProduct(s.id)}
-                                                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${wallProduct === s.id
-                                                            ? 'border-amber-500 bg-amber-100 ring-1 ring-amber-300'
-                                                            : 'border-amber-200 bg-white hover:border-amber-400'}`}
-                                                    >
-                                                        <span className="text-xl">{s.icon}</span>
-                                                        <div>
-                                                            <div className="font-bold text-sm text-slate-800">{s.name}</div>
-                                                            <div className="text-[10px] text-slate-500">{s.tracks}-torowy</div>
-                                                        </div>
-                                                    </button>
-                                                ))}
+                                            {/* 2. Front & Sliding Category */}
+                                            <div className="mb-6">
+                                                <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                                                    Front i Przesuwne
+                                                </h5>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {/* Front Wall Generic */}
+                                                    {WALL_PRODUCTS.filter(p => !p.id.includes('Side') && !p.id.includes('Wedge')).map(p => (
+                                                        <button
+                                                            key={p.id}
+                                                            onClick={() => setWallProduct(p.id)}
+                                                            className={`text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${wallProduct === p.id
+                                                                ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200 shadow-sm'
+                                                                : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'}`}
+                                                        >
+                                                            <span className="text-2xl">{p.icon}</span>
+                                                            <div>
+                                                                <div className="font-bold text-sm text-slate-700">{p.name}</div>
+                                                                <div className="text-[10px] text-slate-400 leading-tight">{p.description}</div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                    {/* Schiebetur Variants */}
+                                                    {SCHIEBETUR_PRODUCTS.map(p => (
+                                                        <button
+                                                            key={p.id}
+                                                            onClick={() => setWallProduct(p.id)}
+                                                            className={`text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${wallProduct === p.id
+                                                                ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200 shadow-sm'
+                                                                : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'}`}
+                                                        >
+                                                            <span className="text-2xl">{p.icon}</span>
+                                                            <div>
+                                                                <div className="font-bold text-sm text-slate-700">{p.name}</div>
+                                                                <div className="text-[10px] text-slate-400 leading-tight">{p.description}</div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Panorama Systems */}
-                                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
-                                            <h5 className="font-bold text-emerald-800 text-sm mb-3 flex items-center gap-2">
-                                                <span className="w-6 h-6 rounded bg-emerald-200 flex items-center justify-center text-sm">🪟</span>
-                                                Panorama (Bezramowe)
-                                            </h5>
-                                            <div className="space-y-2">
-                                                {PANORAMA_PRODUCTS.slice(0, 4).map(p => (
-                                                    <button
-                                                        key={p.id}
-                                                        onClick={() => setWallProduct(p.id)}
-                                                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${wallProduct === p.id
-                                                            ? 'border-emerald-500 bg-emerald-100 ring-1 ring-emerald-300'
-                                                            : 'border-emerald-200 bg-white hover:border-emerald-400'}`}
-                                                    >
-                                                        <span className="text-xl">{p.icon}</span>
-                                                        <div>
-                                                            <div className="font-bold text-sm text-slate-800">{p.name}</div>
-                                                            <div className="text-[10px] text-slate-500">{p.description}</div>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                                {wallProduct.startsWith('Panorama') && (
+                                            {/* 3. Panorama Category */}
+                                            <div>
+                                                <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                                    Systemy Panorama
+                                                </h5>
+                                                <div className="relative">
                                                     <select
-                                                        value={wallProduct}
+                                                        value={wallProduct.startsWith('Panorama') ? wallProduct : ''}
                                                         onChange={e => setWallProduct(e.target.value)}
-                                                        className="w-full mt-2 p-2 text-sm border border-emerald-300 rounded-lg bg-white font-medium"
+                                                        className={`w-full appearance-none p-3 pl-4 pr-10 border rounded-xl font-medium text-sm transition-all focus:outline-none focus:ring-2 ${wallProduct.startsWith('Panorama')
+                                                            ? 'border-purple-500 bg-purple-50 text-purple-900 ring-purple-200'
+                                                            : 'border-slate-200 bg-white text-slate-600 focus:border-purple-500'}`}
                                                     >
+                                                        <option value="" disabled>Wybierz system Panorama...</option>
                                                         {PANORAMA_PRODUCTS.map(p => (
                                                             <option key={p.id} value={p.id}>{p.name} - {p.description}</option>
                                                         ))}
                                                     </select>
-                                                )}
+                                                    <div className="absolute right-3 top-3.5 pointer-events-none text-slate-400">▼</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Dimensions Input Area */}
+                                            <div className="mt-8 pt-6 border-t border-slate-100">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h5 className="text-sm font-bold text-slate-700">Wymiary zabudowy</h5>
+                                                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Wybierz wymiar w mm</span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                                                            {(wallProduct.includes('Side') || wallProduct.includes('Wedge')) ? 'Głębokość' : 'Szerokość'} (mm)
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={wallWidth}
+                                                            onChange={e => setWallWidth(Number(e.target.value))}
+                                                            className="w-full p-3 rounded-lg border border-slate-200 font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Wysokość (mm)</label>
+                                                        <input
+                                                            type="number"
+                                                            value={wallHeight}
+                                                            onChange={e => setWallHeight(Number(e.target.value))}
+                                                            className="w-full p-3 rounded-lg border border-slate-200 font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Dimension Inputs & Add Button */}
-                                    <div className="bg-slate-800 p-5 rounded-xl text-white">
-                                        <div className="grid grid-cols-3 gap-4 items-end">
-                                            <div>
-                                                <label className="text-xs font-medium text-slate-300 uppercase mb-2 block">Szerokość (mm)</label>
-                                                <input
-                                                    type="number"
-                                                    value={wallWidth}
-                                                    onChange={e => setWallWidth(Number(e.target.value))}
-                                                    className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-center focus:bg-white/20 outline-none"
-                                                />
+                                    {/* RIGHT COLUMN - VISUALIZER & PRICE */}
+                                    <div className="space-y-6">
+                                        {/* Visualizer Card */}
+                                        <WallVisualizer
+                                            wallProduct={wallProduct}
+                                            width={wallWidth}
+                                            projection={projection}
+                                            height={wallHeight}
+                                            modelName={model}
+                                        />
+
+                                        {/* Price & Action Card */}
+                                        <div className="bg-slate-800 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
+                                            {/* Background decoration */}
+                                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
+
+                                            <div className="relative z-10 text-center space-y-4">
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cena elementu</div>
+                                                    {wallPriceLoading ? (
+                                                        <div className="text-2xl font-bold text-white/50 animate-pulse">Obliczam...</div>
+                                                    ) : wallPrice !== null ? (
+                                                        <div className="text-4xl font-black text-emerald-400 tracking-tight">
+                                                            {formatCurrency(wallPrice)}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Niedostępne dla wymiaru</div>
+                                                    )}
+                                                </div>
+
+                                                <div className="h-px bg-white/10 w-full"></div>
+
+                                                <button
+                                                    onClick={() => wallPrice && addToBasket(wallProduct, wallPrice, `${wallProduct}`, `${wallWidth}x${wallHeight}`, 'wall')}
+                                                    disabled={!wallPrice}
+                                                    className={`w-full py-4 px-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 ${wallPrice
+                                                        ? 'bg-emerald-500 hover:bg-emerald-400 text-white hover:scale-[1.02] active:scale-[0.98]'
+                                                        : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-70'
+                                                        }`}
+                                                >
+                                                    <span>Dodaj do oferty</span>
+                                                    <span>➡️</span>
+                                                </button>
                                             </div>
-                                            <div>
-                                                <label className="text-xs font-medium text-slate-300 uppercase mb-2 block">Wysokość (mm)</label>
-                                                <input
-                                                    type="number"
-                                                    value={wallHeight}
-                                                    onChange={e => setWallHeight(Number(e.target.value))}
-                                                    className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-center focus:bg-white/20 outline-none"
-                                                />
-                                            </div>
-                                            {/* Price Display */}
-                                            <div className="text-center">
-                                                {wallPriceLoading ? (
-                                                    <div className="text-slate-400 text-sm">Obliczam...</div>
-                                                ) : wallPrice !== null ? (
-                                                    <div className="text-2xl font-black text-emerald-400">
-                                                        {formatCurrency(wallPrice)}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-red-400 text-sm">Brak ceny w cenniku</div>
-                                                )}
-                                            </div>
-                                            <button
-                                                onClick={() => wallPrice && addToBasket(wallProduct, wallPrice, `${wallProduct}`, `${wallWidth}x${wallHeight}`, 'wall')}
-                                                disabled={!wallPrice}
-                                                className={`py-3 px-4 rounded-lg font-bold transition-all shadow-lg ${wallPrice
-                                                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600'
-                                                    : 'bg-slate-600 cursor-not-allowed opacity-50'
-                                                    }`}
-                                            >
-                                                ➕ Dodaj do koszyka
-                                            </button>
+                                        </div>
+
+                                        {/* Helper Text */}
+                                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-700 leading-relaxed">
+                                            <strong className="block mb-1">💡 Wskazówka:</strong>
+                                            Wybierz typ zabudowy z listy po lewej. Wizualizacja powyżej pokazuje podgląd wybranego rozwiązania w kontekście konstrukcji.
                                         </div>
                                     </div>
                                 </div>
                             )}
-
                             {/* ====== KOMFORT TAB (Awnings, LED) ====== */}
                             {wallTab === 'awnings' && (
                                 <div className="space-y-6">
