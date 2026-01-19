@@ -126,6 +126,8 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [wallWidth, setWallWidth] = useState<number>(2000);
     const [wallHeight, setWallHeight] = useState<number>(2200);
     const [wallTab, setWallTab] = useState<'walls' | 'awnings' | 'led' | 'materials'>('walls');
+    const [wallPrice, setWallPrice] = useState<number | null>(null);
+    const [wallPriceLoading, setWallPriceLoading] = useState(false);
 
     // === ACCESSORIES ===
     const [accessories, setAccessories] = useState<Accessory[]>([]);
@@ -279,6 +281,71 @@ export const ProductConfiguratorV2: React.FC = () => {
         };
         fetchAwningPrice();
     }, [awningType, awningWidth, awningProjection]);
+
+    // === CALCULATE WALL/ENCLOSURE PRICE ===
+    useEffect(() => {
+        const fetchWallPrice = async () => {
+            setWallPrice(null);
+            setWallPriceLoading(true);
+
+            // Determine target table name based on selected product
+            let tableName = '';
+            if (wallProduct.includes('Side Wall')) {
+                tableName = 'Aluxe V2 - Side Wall (Glass)';
+            } else if (wallProduct.includes('Front Wall')) {
+                tableName = 'Aluxe V2 - Front Wall (Glass)';
+            } else if (wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) {
+                tableName = 'Aluxe V2 - Wedge (Glass)';
+            } else if (wallProduct.includes('Schiebetür')) {
+                // Use exact product ID for sliding doors
+                tableName = `Aluxe V2 - ${wallProduct}`;
+            } else if (wallProduct.includes('Panorama')) {
+                // Handle Panorama systems (AL22-AL26)
+                tableName = `Aluxe V2 - ${wallProduct}`;
+            }
+
+            if (!tableName) {
+                setWallPriceLoading(false);
+                return;
+            }
+
+            try {
+                const { data: tables } = await supabase
+                    .from('price_tables')
+                    .select('id')
+                    .eq('name', tableName)
+                    .limit(1);
+
+                if (tables && tables.length > 0) {
+                    // Pattern 643: Linearized Matrix lookup
+                    // Side Wall / Wedge: price by HEIGHT (projection), width_mm = 0
+                    // Front Wall / Schiebetür: price by WIDTH, projection_mm = 0
+                    const isSideOrWedge = wallProduct.includes('Side') ||
+                        wallProduct.includes('Wedge') ||
+                        wallProduct.includes('Keilfenster');
+
+                    const lookupWidth = isSideOrWedge ? 0 : wallWidth;
+                    const lookupProjection = isSideOrWedge ? wallHeight : 0;
+
+                    const price = await PricingService.calculateMatrixPrice(
+                        tables[0].id,
+                        lookupWidth,
+                        lookupProjection
+                    );
+                    if (price !== null) setWallPrice(price);
+                } else {
+                    console.warn(`Table not found: ${tableName}`);
+                }
+            } catch (e) {
+                console.error('Wall price fetch error:', e);
+            } finally {
+                setWallPriceLoading(false);
+            }
+        };
+
+        const t = setTimeout(fetchWallPrice, 300);
+        return () => clearTimeout(t);
+    }, [wallProduct, wallWidth, wallHeight]);
 
     // === CALCULATE ROOF PRICE ===
     useEffect(() => {
@@ -875,9 +942,25 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-center focus:bg-white/20 outline-none"
                                                 />
                                             </div>
+                                            {/* Price Display */}
+                                            <div className="text-center">
+                                                {wallPriceLoading ? (
+                                                    <div className="text-slate-400 text-sm">Obliczam...</div>
+                                                ) : wallPrice !== null ? (
+                                                    <div className="text-2xl font-black text-emerald-400">
+                                                        {formatCurrency(wallPrice)}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-red-400 text-sm">Brak ceny w cenniku</div>
+                                                )}
+                                            </div>
                                             <button
-                                                onClick={() => addToBasket(wallProduct, 1000, 'Wycena na podstawie wymiarów', `${wallWidth}x${wallHeight}`, 'wall')}
-                                                className="py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg font-bold hover:from-indigo-600 hover:to-purple-600 transition-all shadow-lg"
+                                                onClick={() => wallPrice && addToBasket(wallProduct, wallPrice, `${wallProduct}`, `${wallWidth}x${wallHeight}`, 'wall')}
+                                                disabled={!wallPrice}
+                                                className={`py-3 px-4 rounded-lg font-bold transition-all shadow-lg ${wallPrice
+                                                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600'
+                                                        : 'bg-slate-600 cursor-not-allowed opacity-50'
+                                                    }`}
                                             >
                                                 ➕ Dodaj do koszyka
                                             </button>
