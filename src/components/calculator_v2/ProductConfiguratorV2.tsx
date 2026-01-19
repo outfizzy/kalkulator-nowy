@@ -164,6 +164,7 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === PRICING STATE ===
     const [price, setPrice] = useState<number | null>(null);
     const [freestandingSurchargePrice, setFreestandingSurchargePrice] = useState<number>(0);
+    const [variantSurchargePrice, setVariantSurchargePrice] = useState<number>(0);
     const [includeFoundations, setIncludeFoundations] = useState<boolean>(true);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -478,6 +479,41 @@ export const ProductConfiguratorV2: React.FC = () => {
                     }
                 }
 
+                // 3. Fetch VARIANT SURCHARGE (Glass Matt/Stopsol or Poly IR Gold)
+                setVariantSurchargePrice(0); // Reset
+
+                // Only apply surcharge for non-default variants
+                const needsSurcharge = (cover === 'Glass' && glassVariant !== 'klar') ||
+                    (cover === 'Poly' && polyVariant === 'ir-gold');
+
+                if (needsSurcharge && matrixPrice) {
+                    let variantTableName = '';
+                    if (cover === 'Glass' && glassVariant === 'matt') {
+                        variantTableName = `Aluxe V2 - ${model} Glass Matt Surcharge (Zone ${zone})`;
+                    } else if (cover === 'Glass' && glassVariant === 'stopsol') {
+                        variantTableName = `Aluxe V2 - ${model} Glass Stopsol Surcharge (Zone ${zone})`;
+                    } else if (cover === 'Poly' && polyVariant === 'ir-gold') {
+                        variantTableName = `Aluxe V2 - ${model} Poly IR Gold Surcharge (Zone ${zone})`;
+                    }
+
+                    if (variantTableName) {
+                        const { data: variantTables } = await supabase
+                            .from('price_tables')
+                            .select('id')
+                            .eq('name', variantTableName)
+                            .limit(1);
+
+                        if (variantTables && variantTables.length > 0) {
+                            const variantSurcharge = await PricingService.calculateMatrixPrice(
+                                variantTables[0].id, width, projection
+                            );
+                            if (variantSurcharge !== null) {
+                                setVariantSurchargePrice(variantSurcharge);
+                            }
+                        }
+                    }
+                }
+
             } catch (err: any) {
                 setError(err.message);
             } finally {
@@ -486,15 +522,15 @@ export const ProductConfiguratorV2: React.FC = () => {
         };
         const t = setTimeout(fetchPrice, 300);
         return () => clearTimeout(t);
-    }, [model, cover, zone, construction, width, projection, includeFoundations]);
+    }, [model, cover, zone, construction, width, projection, includeFoundations, glassVariant, polyVariant]);
 
     // === TOTALS ===
     const currentModel = useMemo(() => ROOF_MODELS.find(m => m.id === model), [model]);
 
     const totalPrice = useMemo(() => {
         if (price === null) return null;
-        return price + freestandingSurchargePrice;
-    }, [price, freestandingSurchargePrice]);
+        return price + freestandingSurchargePrice + variantSurchargePrice;
+    }, [price, freestandingSurchargePrice, variantSurchargePrice]);
 
     const addToBasket = (itemName: string, itemPrice: number, configStr: string, dimStr: string, category: BasketItem['category']) => {
         const newItem: BasketItem = {
@@ -515,7 +551,7 @@ export const ProductConfiguratorV2: React.FC = () => {
         const variantName = cover === 'Glass'
             ? GLASS_VARIANTS.find(v => v.id === glassVariant)?.name || glassVariant
             : POLY_VARIANTS.find(v => v.id === polyVariant)?.name || polyVariant;
-        const configStr = `${cover} (${variantName}), Zone ${zone}, ${construction === 'wall' ? 'Przyścienna' : 'Wolnostojąca'}` +
+        const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${zone}, ${construction === 'wall' ? 'Przyścienna' : 'Wolnostojąca'}` +
             (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
             (construction === 'freestanding' && includeFoundations ? ' + Fundamenty' : '');
         addToBasket(model, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
