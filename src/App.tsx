@@ -57,6 +57,7 @@ import { FairDashboard } from './components/fairs/FairDashboard';
 import { FairManagement } from './components/admin/FairManagement';
 import { EmailTemplatesPage } from './pages/admin/EmailTemplatesPage';
 import { ErrorReportsPage } from './pages/admin/ErrorReportsPage';
+import { PricingV2Page } from './pages/admin/PricingV2Page';
 import { AIAssistantPage } from './components/admin/AIAssistantPage';
 import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
@@ -158,6 +159,7 @@ function App() {
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />
+              <Route path="admin/pricing-v2" element={<ProtectedRoute allowedRoles={['admin']}><PricingV2Page /></ProtectedRoute>} />
               <Route path="admin/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><InventoryDashboard /></ProtectedRoute>} />
               <Route path="admin/logs" element={<ProtectedRoute allowedRoles={['admin']}><ActivityLogsPage /></ProtectedRoute>} />
               <Route path="/admin/profitability" element={<InstallationProfitability />} />

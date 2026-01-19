@@ -57,12 +57,11 @@ const GLASS_VARIANTS = [
     { id: 'stopsol', name: 'Stopsol', description: 'Szkło z filtrem słonecznym', icon: '🔶' },
 ];
 
-// Polycarbonate variant options
+// Polycarbonate variant options (per Excel: klar/opal share price, IR Gold is surcharge)
 const POLY_VARIANTS = [
     { id: 'opal', name: 'Opal', description: 'Mleczny, rozpraszający światło', icon: '⚪' },
     { id: 'klar', name: 'Klar', description: 'Przezroczysty poliwęglan', icon: '🟢' },
     { id: 'ir-gold', name: 'IR Gold', description: 'Ochrona przed promieniowaniem IR', icon: '🟡' },
-    { id: 'smokey', name: 'Smokey', description: 'Przyciemniany, elegancki', icon: '🟤' },
 ];
 
 const WALL_PRODUCTS = [
