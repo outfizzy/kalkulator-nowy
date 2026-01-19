@@ -379,7 +379,14 @@ export const ProductConfiguratorV2: React.FC = () => {
                 // and add surcharge separately.
                 // UNLESS logical "Freestanding" tables exist for other models (Skyline/Carport) which usually do.
 
-                const isSurchargeModel = ['Trendline', 'Topline', 'Designline'].includes(model);
+                // Models that use the Freestanding Surcharge table (per Excel sheet 'Freistehende TerrassendächerR')
+                // Applies to: Orangeline, Trendline, Topline, Designline and their Plus/XL variants
+                const isSurchargeModel = [
+                    'Orangeline', 'Orangeline+',
+                    'Trendline', 'Trendline+',
+                    'Topline', 'Topline XL',
+                    'Designline'
+                ].includes(model);
 
                 if (construction === 'freestanding' && isSurchargeModel) {
                     // For Trendline/Topline Freestanding, we use the Wall price as base
@@ -692,7 +699,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             </div>
                                             <span className="text-sm font-medium text-slate-700">
                                                 Uwzględnij Fundamenty
-                                                {['Trendline', 'Topline', 'Designline'].includes(model) && (
+                                                {['Orangeline', 'Orangeline+', 'Trendline', 'Trendline+', 'Topline', 'Topline XL', 'Designline'].includes(model) && (
                                                     <span className="text-xs text-indigo-600 block font-normal">
                                                         (Automatyczna dopłata wg cennika)
                                                     </span>
