@@ -50,6 +50,21 @@ const ROOF_MODELS: RoofModel[] = [
     { id: 'Carport', name: 'Carport', description: 'Wiata garażowa z blachą', hasPoly: false, hasGlass: false, hasFreestanding: true },
 ];
 
+// Glass variant options
+const GLASS_VARIANTS = [
+    { id: 'klar', name: 'Klar (VSG)', description: 'Przezroczyste szkło hartowane', icon: '🟢' },
+    { id: 'matt', name: 'Matt (VSG)', description: 'Szkło matowe, prywatność', icon: '⚪' },
+    { id: 'stopsol', name: 'Stopsol', description: 'Szkło z filtrem słonecznym', icon: '🔶' },
+];
+
+// Polycarbonate variant options
+const POLY_VARIANTS = [
+    { id: 'opal', name: 'Opal', description: 'Mleczny, rozpraszający światło', icon: '⚪' },
+    { id: 'klar', name: 'Klar', description: 'Przezroczysty poliwęglan', icon: '🟢' },
+    { id: 'ir-gold', name: 'IR Gold', description: 'Ochrona przed promieniowaniem IR', icon: '🟡' },
+    { id: 'smokey', name: 'Smokey', description: 'Przyciemniany, elegancki', icon: '🟤' },
+];
+
 const WALL_PRODUCTS = [
     { id: 'Side Wall (Glass)', name: 'Ściana Boczna', icon: '🔲', description: 'Szklana ściana boczna' },
     { id: 'Front Wall (Glass)', name: 'Ściana Frontowa', icon: '⬛', description: 'Szklana ściana frontowa' },
@@ -120,6 +135,8 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [width, setWidth] = useState<number>(3000);
     const [projection, setProjection] = useState<number>(3000);
     const [color, setColor] = useState('RAL 7016');
+    const [glassVariant, setGlassVariant] = useState<string>('klar');
+    const [polyVariant, setPolyVariant] = useState<string>('opal');
 
     // === WALL CONFIG ===
     const [wallProduct, setWallProduct] = useState<string>('Side Wall (Glass)');
@@ -489,7 +506,10 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const handleAddRoofToBasket = () => {
         if (!totalPrice) return;
-        const configStr = `${cover}, Zone ${zone}, ${construction === 'wall' ? 'Przyścienna' : 'Wolnostojąca'}` +
+        const variantName = cover === 'Glass'
+            ? GLASS_VARIANTS.find(v => v.id === glassVariant)?.name || glassVariant
+            : POLY_VARIANTS.find(v => v.id === polyVariant)?.name || polyVariant;
+        const configStr = `${cover} (${variantName}), Zone ${zone}, ${construction === 'wall' ? 'Przyścienna' : 'Wolnostojąca'}` +
             (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
             (construction === 'freestanding' && includeFoundations ? ' + Fundamenty' : '');
         addToBasket(model, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
@@ -749,6 +769,50 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Variant Selector */}
+                                    {cover === 'Glass' && currentModel?.hasGlass && (
+                                        <div className="mt-4 p-4 bg-cyan-50 rounded-xl border border-cyan-200">
+                                            <h4 className="text-sm font-bold text-cyan-800 mb-3">Rodzaj Szkła</h4>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {GLASS_VARIANTS.map(v => (
+                                                    <button
+                                                        key={v.id}
+                                                        onClick={() => setGlassVariant(v.id)}
+                                                        className={`p-3 rounded-lg border-2 text-center transition-all ${glassVariant === v.id
+                                                            ? 'border-cyan-500 bg-white shadow-sm ring-1 ring-cyan-300'
+                                                            : 'border-cyan-100 bg-white/50 hover:border-cyan-300'
+                                                            }`}
+                                                    >
+                                                        <div className="text-lg mb-1">{v.icon}</div>
+                                                        <div className="font-bold text-xs text-slate-800">{v.name}</div>
+                                                        <div className="text-[9px] text-slate-500 leading-tight">{v.description}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {cover === 'Poly' && currentModel?.hasPoly && (
+                                        <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                            <h4 className="text-sm font-bold text-blue-800 mb-3">Rodzaj Poliwęglanu</h4>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {POLY_VARIANTS.map(v => (
+                                                    <button
+                                                        key={v.id}
+                                                        onClick={() => setPolyVariant(v.id)}
+                                                        className={`p-3 rounded-lg border-2 text-center transition-all ${polyVariant === v.id
+                                                            ? 'border-blue-500 bg-white shadow-sm ring-1 ring-blue-300'
+                                                            : 'border-blue-100 bg-white/50 hover:border-blue-300'
+                                                            }`}
+                                                    >
+                                                        <div className="text-lg mb-1">{v.icon}</div>
+                                                        <div className="font-bold text-xs text-slate-800">{v.name}</div>
+                                                        <div className="text-[9px] text-slate-500 leading-tight">{v.description}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -958,8 +1022,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 onClick={() => wallPrice && addToBasket(wallProduct, wallPrice, `${wallProduct}`, `${wallWidth}x${wallHeight}`, 'wall')}
                                                 disabled={!wallPrice}
                                                 className={`py-3 px-4 rounded-lg font-bold transition-all shadow-lg ${wallPrice
-                                                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600'
-                                                        : 'bg-slate-600 cursor-not-allowed opacity-50'
+                                                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600'
+                                                    : 'bg-slate-600 cursor-not-allowed opacity-50'
                                                     }`}
                                             >
                                                 ➕ Dodaj do koszyka
