@@ -385,7 +385,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     'Orangeline', 'Orangeline+',
                     'Trendline', 'Trendline+',
                     'Topline', 'Topline XL',
-                    'Designline'
+                    'Designline', 'Ultraline'
                 ].includes(model);
 
                 if (construction === 'freestanding' && isSurchargeModel) {
@@ -444,9 +444,15 @@ export const ProductConfiguratorV2: React.FC = () => {
                 // 2. Fetch Freestanding SURCHARGE if applicable
                 if (construction === 'freestanding') {
                     if (isSurchargeModel) {
-                        const surchargeTableName = includeFoundations
-                            ? 'Aluxe V2 - Freestanding Surcharge (With Foundation)'
-                            : 'Aluxe V2 - Freestanding Surcharge (No Foundation)';
+                        // Ultraline has its own surcharge table (no foundations variant only)
+                        let surchargeTableName = '';
+                        if (model === 'Ultraline') {
+                            surchargeTableName = 'Aluxe V2 - Ultraline Freestanding Surcharge (No Foundation)';
+                        } else {
+                            surchargeTableName = includeFoundations
+                                ? 'Aluxe V2 - Freestanding Surcharge (With Foundation)'
+                                : 'Aluxe V2 - Freestanding Surcharge (No Foundation)';
+                        }
 
                         const { data: surchargeTables } = await supabase
                             .from('price_tables')
