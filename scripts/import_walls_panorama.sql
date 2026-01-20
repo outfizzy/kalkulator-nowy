@@ -264,6 +264,40 @@ WHERE NOT EXISTS (
     WHERE pt.name = 'Aluxe V2 - Panorama AL24 (5-Tor)' LIMIT 1
 );
 
+-- Aluxe V2 - Panorama AL25 (3-Tor) (1 entries)
+INSERT INTO price_tables (product_definition_id, name, type, is_active, currency)
+SELECT pd.id, 'Aluxe V2 - Panorama AL25 (3-Tor)', 'matrix', true, 'EUR'
+FROM product_definitions pd WHERE pd.code = 'aluxe_v2_walls'
+AND NOT EXISTS (SELECT 1 FROM price_tables WHERE name = 'Aluxe V2 - Panorama AL25 (3-Tor)');
+
+WITH table_id AS (SELECT id FROM price_tables WHERE name = 'Aluxe V2 - Panorama AL25 (3-Tor)')
+INSERT INTO price_matrix_entries (price_table_id, width_mm, projection_mm, price)
+SELECT table_id.id, t.width_mm, t.projection_mm, t.price FROM table_id, (VALUES
+  (850, 0, 279.48)
+) AS t(width_mm, projection_mm, price)
+WHERE NOT EXISTS (
+    SELECT 1 FROM price_matrix_entries pme
+    JOIN price_tables pt ON pme.price_table_id = pt.id
+    WHERE pt.name = 'Aluxe V2 - Panorama AL25 (3-Tor)' LIMIT 1
+);
+
+-- Aluxe V2 - Panorama AL25 (5-Tor) (1 entries)
+INSERT INTO price_tables (product_definition_id, name, type, is_active, currency)
+SELECT pd.id, 'Aluxe V2 - Panorama AL25 (5-Tor)', 'matrix', true, 'EUR'
+FROM product_definitions pd WHERE pd.code = 'aluxe_v2_walls'
+AND NOT EXISTS (SELECT 1 FROM price_tables WHERE name = 'Aluxe V2 - Panorama AL25 (5-Tor)');
+
+WITH table_id AS (SELECT id FROM price_tables WHERE name = 'Aluxe V2 - Panorama AL25 (5-Tor)')
+INSERT INTO price_matrix_entries (price_table_id, width_mm, projection_mm, price)
+SELECT table_id.id, t.width_mm, t.projection_mm, t.price FROM table_id, (VALUES
+  (850, 0, 288.95)
+) AS t(width_mm, projection_mm, price)
+WHERE NOT EXISTS (
+    SELECT 1 FROM price_matrix_entries pme
+    JOIN price_tables pt ON pme.price_table_id = pt.id
+    WHERE pt.name = 'Aluxe V2 - Panorama AL25 (5-Tor)' LIMIT 1
+);
+
 -- Aluxe V2 - Panorama AL26 (3-Tor) (1 entries)
 INSERT INTO price_tables (product_definition_id, name, type, is_active, currency)
 SELECT pd.id, 'Aluxe V2 - Panorama AL26 (3-Tor)', 'matrix', true, 'EUR'

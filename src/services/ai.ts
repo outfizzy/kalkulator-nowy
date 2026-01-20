@@ -77,7 +77,7 @@ export class AiService {
         }
     }
 
-    static async generateEmail(offer: Offer, user: any): Promise<string> {
+    static async generateEmail(offer: Offer, user: any, offerUrl?: string): Promise<string> {
         const apiKey = await this.getApiKey(user);
 
         if (!apiKey) {
@@ -90,7 +90,8 @@ export class AiService {
                 model: translate(offer.product.modelId, 'models'),
                 size: `${offer.product.width}mm x ${offer.product.projection}mm`,
                 addons: offer.product.addons.map(a => a.name).join(', '),
-                imageUrl: offer.product.imageUrl
+                imageUrl: offer.product.imageUrl,
+                offerUrl: offerUrl
             },
             salesRep: user ? `${user.firstName} ${user.lastName}` : 'PolenDach24 Team'
         };
@@ -110,8 +111,9 @@ export class AiService {
         2. Podziękowanie za rozmowę/zainteresowanie.
         3. Krótkie wspomnienie o zaletach wybranego modelu (${context.product.model}).
         4. Zachęcenie do kontaktu w razie pytań.
-        5. Jeśli dostępny jest URL zdjęcia (${context.product.imageUrl ? 'Dostępny' : 'Brak'}), wstaw go w treści jako link do wizualizacji/zdjęcia poglądowego ze słowami "Hier sehen Sie Ihr konfiguriertes Modell: [URL]".
-        6. Stopka.
+        ${context.product.offerUrl ? `5. Wstaw link do interaktywnej oferty: "Ihr persönliches Angebot finden Sie hier: ${context.product.offerUrl}"` : ''}
+        ${context.product.imageUrl ? `6. Jeśli dostępny jest URL zdjęcia (${context.product.imageUrl ? 'Dostępny' : 'Brak'}), wstaw go w treści jako link do wizualizacji/zdjęcia poglądowego ze słowami "Hier sehen Sie Ihr konfiguriertes Modell: [URL]".` : ''}
+        7. Stopka.
         `;
 
         try {

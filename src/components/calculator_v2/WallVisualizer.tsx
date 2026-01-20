@@ -10,9 +10,10 @@ interface WallVisualizerProps {
     projection: number; // For Side walls
     height?: number; // Usually wallHeight
     modelName: string; // To match visualizer style
+    postsCount?: number;
 }
 
-export const WallVisualizer: React.FC<WallVisualizerProps> = ({ wallProduct, width, projection, height = 2500, modelName }) => {
+export const WallVisualizer: React.FC<WallVisualizerProps> = ({ wallProduct, width, projection, height = 2500, modelName, postsCount }) => {
 
     // Construct a mock config to display the chosen wall
     const mockConfig: ProductConfig = useMemo(() => {
@@ -90,7 +91,7 @@ export const WallVisualizer: React.FC<WallVisualizerProps> = ({ wallProduct, wid
 
                     <group position={[0, -1.2, 0]}>
                         <Center>
-                            <PatioCoverModel config={mockConfig} />
+                            <PatioCoverModel config={mockConfig} structureConfig={{ postCount: postsCount }} />
                         </Center>
 
                         {/* Floor */}

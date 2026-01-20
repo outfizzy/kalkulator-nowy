@@ -348,6 +348,8 @@ export interface PricingResult {
     totalCost: number;
     marginPercentage: number;
     marginValue: number;
+    discountPercentage?: number;
+    discountValue?: number;
     sellingPriceNet: number;
     sellingPriceGross: number;
     installationCosts?: InstallationCostResult;

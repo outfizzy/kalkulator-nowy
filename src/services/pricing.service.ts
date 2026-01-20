@@ -1514,6 +1514,135 @@ export const PricingService = {
     },
 
     /**
+     * Get min/max dimensions from a price table
+     * Used to constrain inputs and determine combination logic
+     */
+    async getTableDimensionLimits(tableId: string): Promise<{
+        minWidth: number;
+        maxWidth: number;
+        minDepth: number;
+        maxDepth: number;
+        availableWidths: number[];
+        availableDepths: number[];
+    } | null> {
+        if (!tableId) return null;
+
+        try {
+            const { data, error } = await supabase
+                .from('price_matrix_entries')
+                .select('width_mm, projection_mm')
+                .eq('price_table_id', tableId);
+
+            if (error || !data || data.length === 0) {
+                console.warn('getTableDimensionLimits: No entries found for table', tableId);
+                return null;
+            }
+
+            const widths = [...new Set(data.map(d => d.width_mm))].sort((a, b) => a - b);
+            const depths = [...new Set(data.map(d => d.projection_mm))].sort((a, b) => a - b);
+
+            return {
+                minWidth: Math.min(...widths),
+                maxWidth: Math.max(...widths),
+                minDepth: Math.min(...depths),
+                maxDepth: Math.max(...depths),
+                availableWidths: widths,
+                availableDepths: depths
+            };
+        } catch (err) {
+            console.error('getTableDimensionLimits error:', err);
+            return null;
+        }
+    },
+
+    /**
+     * Calculate price with automatic structure combination
+     * When requestedWidth > maxAvailableWidth, combines multiple structures
+     */
+    async calculateCombinedPrice(
+        tableId: string,
+        requestedWidth: number,
+        projection: number
+    ): Promise<{
+        totalPrice: number;
+        structures: { width: number; price: number }[];
+        note: string;
+        structureCount: number;
+    } | null> {
+        if (!tableId) return null;
+
+        try {
+            // 1. Get dimension limits
+            const limits = await this.getTableDimensionLimits(tableId);
+            if (!limits) return null;
+
+            const { maxWidth, availableWidths } = limits;
+
+            // 2. If requested width fits in single structure, use simple lookup
+            if (requestedWidth <= maxWidth) {
+                const price = await this.calculateMatrixPrice(tableId, requestedWidth, projection);
+                if (price === null) return null;
+                return {
+                    totalPrice: price,
+                    structures: [{ width: requestedWidth, price }],
+                    note: '',
+                    structureCount: 1
+                };
+            }
+
+            // 3. Multi-structure combination needed
+            const structures: { width: number; price: number }[] = [];
+            let remainingWidth = requestedWidth;
+            let totalPrice = 0;
+
+            // Strategy: Use max-width structures, then fill remainder
+            while (remainingWidth > 0) {
+                let structureWidth: number;
+
+                if (remainingWidth >= maxWidth) {
+                    // Use full max-width structure
+                    structureWidth = maxWidth;
+                } else {
+                    // Find smallest available width that covers remainder ("next size up")
+                    const fittingWidth = availableWidths.find(w => w >= remainingWidth);
+                    structureWidth = fittingWidth || availableWidths[availableWidths.length - 1];
+                }
+
+                const price = await this.calculateMatrixPrice(tableId, structureWidth, projection);
+                if (price === null) {
+                    console.error('Failed to get price for structure', structureWidth, projection);
+                    return null;
+                }
+
+                structures.push({ width: structureWidth, price });
+                totalPrice += price;
+                remainingWidth -= structureWidth;
+
+                // Safety: prevent infinite loop
+                if (structures.length > 10) {
+                    console.error('Too many structures calculated, breaking');
+                    break;
+                }
+            }
+
+            const structureCount = structures.length;
+            const note = structureCount > 1
+                ? `${structureCount}× konstrukcja (łączona szerokość)`
+                : '';
+
+            return {
+                totalPrice,
+                structures,
+                note,
+                structureCount
+            };
+        } catch (err) {
+            console.error('calculateCombinedPrice error:', err);
+            return null;
+        }
+    },
+
+    /**
      * Calculate price from matrix table by table ID and dimensions
      * Used by ProductConfiguratorV2
      */
