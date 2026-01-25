@@ -144,11 +144,27 @@ export const OfferService = {
         }
 
         // Ensure customer exists in customers table
-        // Ensure customer exists in customers table
+        // If customer already has an ID, verify it exists; otherwise find/create
         let customerId = offer.customer.id;
-        // Don't swallow errors here - if we can't ensure customer, we shouldn't create orphaned offer
-        const customer = await CustomerService.ensureCustomer(offer.customer);
-        customerId = customer.id;
+
+        if (customerId) {
+            // Verify the customer exists
+            const { data: existingCustomer } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('id', customerId)
+                .single();
+
+            if (!existingCustomer) {
+                // Customer ID was invalid, need to find or create
+                const customer = await CustomerService.ensureCustomer(offer.customer);
+                customerId = customer.id;
+            }
+        } else {
+            // No customer ID provided, find or create
+            const customer = await CustomerService.ensureCustomer(offer.customer);
+            customerId = customer.id;
+        }
 
         const { data, error } = await supabase
             .from('offers')
@@ -661,7 +677,7 @@ export const OfferService = {
 
     async getOfferByToken(token: string): Promise<Offer | null> {
         // 1. Try to use the extended RPC to get Offer + Creator Profile
-        const { data: detailsData, error: detailsError } = await supabase.rpc('get_offer_details_by_token', { token_input: token });
+        const { data: detailsData, error: detailsError } = await supabase.rpc('get_print_view_data', { token_input: token });
 
         if (!detailsError && detailsData) {
             const row = detailsData.offer;
@@ -728,5 +744,175 @@ export const OfferService = {
             return false;
         }
         return data;
+    },
+
+    /**
+     * Track customer interaction with public offer page
+     */
+    async trackInteraction(
+        offerId: string,
+        eventType: 'offer_view' | 'pdf_click' | 'measurement_request' | 'message_sent' | 'addon_inquiry' | 'contact_request',
+        eventData?: Record<string, any>
+    ): Promise<boolean> {
+        try {
+            // Get lead_id and customer_id from offer
+            const { data: offer } = await supabase
+                .from('offers')
+                .select('lead_id, customer_id')
+                .eq('id', offerId)
+                .single();
+
+            const { error } = await supabase
+                .from('offer_interactions')
+                .insert({
+                    offer_id: offerId,
+                    lead_id: offer?.lead_id || null,
+                    customer_id: offer?.customer_id || null,
+                    event_type: eventType,
+                    event_data: eventData || {},
+                    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
+                });
+
+            if (error) {
+                console.error('Error tracking interaction:', error);
+                return false;
+            }
+            return true;
+        } catch (err) {
+            console.error('Error tracking interaction:', err);
+            return false;
+        }
+    },
+
+    /**
+     * Get all interactions for an offer
+     */
+    async getOfferInteractions(offerId: string): Promise<{
+        id: string;
+        eventType: string;
+        eventData: Record<string, any>;
+        createdAt: Date;
+    }[]> {
+        const { data, error } = await supabase
+            .from('offer_interactions')
+            .select('*')
+            .eq('offer_id', offerId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error getting interactions:', error);
+            return [];
+        }
+
+        return data.map(row => ({
+            id: row.id,
+            eventType: row.event_type,
+            eventData: row.event_data || {},
+            createdAt: new Date(row.created_at)
+        }));
+    },
+
+    /**
+     * Get all interactions for a lead (across all their offers)
+     */
+    async getLeadInteractions(leadId: string): Promise<{
+        id: string;
+        offerId: string;
+        eventType: string;
+        eventData: Record<string, any>;
+        createdAt: Date;
+    }[]> {
+        const { data, error } = await supabase
+            .from('offer_interactions')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error getting lead interactions:', error);
+            return [];
+        }
+
+        return data.map(row => ({
+            id: row.id,
+            offerId: row.offer_id,
+            eventType: row.event_type,
+            eventData: row.event_data || {},
+            createdAt: new Date(row.created_at)
+        }));
+    },
+
+    /**
+     * Get all interactions for a customer (across all their offers)
+     */
+    async getCustomerInteractions(customerId: string): Promise<{
+        id: string;
+        offerId: string;
+        eventType: string;
+        eventData: Record<string, any>;
+        createdAt: Date;
+    }[]> {
+        const { data, error } = await supabase
+            .from('offer_interactions')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error getting customer interactions:', error);
+            return [];
+        }
+
+        return data.map(row => ({
+            id: row.id,
+            offerId: row.offer_id,
+            eventType: row.event_type,
+            eventData: row.event_data || {},
+            createdAt: new Date(row.created_at)
+        }));
+    },
+
+    /**
+     * Get recent activity summary for multiple leads (for highlighting active leads)
+     */
+    async getRecentLeadActivity(leadIds: string[]): Promise<Map<string, { count: number; lastActivity: Date | null; isHot: boolean }>> {
+        if (leadIds.length === 0) return new Map();
+
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabase
+            .from('offer_interactions')
+            .select('lead_id, created_at')
+            .in('lead_id', leadIds)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error getting lead activity:', error);
+            return new Map();
+        }
+
+        // Build map of lead activity
+        const activityMap = new Map<string, { count: number; lastActivity: Date | null; isHot: boolean }>();
+
+        // Initialize all leads
+        leadIds.forEach(id => activityMap.set(id, { count: 0, lastActivity: null, isHot: false }));
+
+        // Process results
+        data.forEach(row => {
+            if (!row.lead_id) return;
+            const activity = activityMap.get(row.lead_id);
+            if (activity) {
+                activity.count++;
+                if (!activity.lastActivity) {
+                    activity.lastActivity = new Date(row.created_at);
+                }
+                // Mark as HOT if activity within 24h
+                if (row.created_at >= twentyFourHoursAgo) {
+                    activity.isHot = true;
+                }
+            }
+        });
+
+        return activityMap;
     }
 };

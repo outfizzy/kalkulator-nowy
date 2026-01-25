@@ -58,7 +58,7 @@ export const WallVisualizer: React.FC<WallVisualizerProps> = ({ wallProduct, wid
             // Note: Panorama usually replaces the front posts or goes between them.
             config.addons.push({
                 id: 'preview-front',
-                name: 'Preview Front',
+                name: wallProduct.includes('Panorama') ? 'Panorama' : 'Preview Front',
                 type: 'slidingWall',
                 price: 0,
                 location: 'front'

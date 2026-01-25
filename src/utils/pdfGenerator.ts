@@ -1,597 +1,525 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Offer } from '../types';
-import { getSalesProfile } from './storage';
+import { getSalesProfile, getCurrentUser } from './storage';
 import { translate, formatCurrency } from './translations';
 import { LOGO_BASE64 } from './assets';
 
-// COPORATE IDENTITY COLORS (PolenDach24)
-const COLORS = {
-    primary: [44, 62, 80] as [number, number, number],    // Dark Slate Blue (Professional)
-    accent: [229, 142, 38] as [number, number, number],   // Elegant Orange/Gold accent
-    text: [30, 30, 30] as [number, number, number],       // Almost Black
-    textLight: [100, 100, 100] as [number, number, number], // Gray
-    line: [200, 200, 200] as [number, number, number],    // Light Gray for lines
-    tableHeader: [240, 240, 240] as [number, number, number] // Very light gray for headers
+// --- ULTRA PREMIUM DESIGN SYSTEM ---
+const THEME = {
+    primary: [18, 28, 45] as [number, number, number],      // Dark Midnight Navy (More premium than standard blue)
+    secondary: [197, 160, 101] as [number, number, number], // Muted Brass/Gold (Less yellow, more elegant)
+    surface: [250, 250, 250] as [number, number, number],   // Pure Ultra-Light Gray for surfaces
+    text: [30, 30, 30] as [number, number, number],         // Soft Black
+    textLight: [100, 100, 100] as [number, number, number], // Slate Gray
+    white: [255, 255, 255] as [number, number, number],
+    line: [230, 230, 230] as [number, number, number]
 };
 
-// Draw Header on every page (Logo + Line)
-function addPageHeader(doc: jsPDF, logoBase64: string | null) {
-    const pageWidth = doc.internal.pageSize.getWidth();
+const FONTS = {
+    bold: 'Helvetica',
+    normal: 'Helvetica',
+};
 
-    try {
-        if (logoBase64) {
-            // Logo centered/left aligned - adjusted for layout
-            doc.addImage(logoBase64, 'PNG', 140, 10, 50, 12);
-        } else {
-            // Text Fallback
-            doc.setFontSize(18);
-            doc.setTextColor(...COLORS.primary);
-            doc.setFont('Helvetica', 'bold');
-            doc.text(sanitizeText('PolenDach24'), 140, 20);
-        }
-    } catch (err) {
-        console.warn("Header generation failed", err);
-    }
+const MARGIN = 18; // Slightly tighter margin for modern look
 
-    // Thin line below header area
-    doc.setDrawColor(...COLORS.line);
-    doc.setLineWidth(0.1);
-    doc.line(20, 35, pageWidth - 20, 35);
-}
-
-// Draw Footer (3 Columns: Address, Contact, Bank/Reg)
-function addPageFooter(doc: jsPDF, pageNumber: number) {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const footerY = pageHeight - 35;
-
-    doc.setDrawColor(...COLORS.line);
-    doc.setLineWidth(0.1);
-    doc.line(20, footerY, pageWidth - 20, footerY);
-
-    const safeFont = doc.getFont().fontName === 'Roboto' ? 'Roboto' : 'Helvetica';
-
-    doc.setFontSize(7);
-    doc.setTextColor(...COLORS.textLight);
-    doc.setFont(safeFont, 'normal');
-
-    const colY = footerY + 5;
-    const colW = (pageWidth - 40) / 3;
-
-    // Col 1: Company Address
-    doc.setFont(safeFont, 'bold');
-    doc.text(sanitizeText('POLENDACH24 S.C.'), 20, colY);
-    doc.setFont(safeFont, 'normal');
-    // Owner
-    doc.text(sanitizeText('Inhaber: Tomasz Fijołek, Mariusz Duź'), 20, colY + 4);
-    doc.text(sanitizeText('Kolonia Wałowice dz. nr 221/33'), 20, colY + 8);
-    doc.text(sanitizeText('66-620 Gubin, Polska / Polen'), 20, colY + 12);
-    doc.text(sanitizeText('NIP / Steuernummer PL9261695520'), 20, colY + 16);
-
-    // Col 2: Contact
-    doc.setFont(safeFont, 'bold');
-    doc.text(sanitizeText('Kontakt'), 20 + colW, colY);
-    doc.setFont(safeFont, 'normal');
-    doc.text(sanitizeText('BUERO@POLENDACH24.DE'), 20 + colW, colY + 4);
-    // Add phone if available in generic config, or hardcode main line
-    // doc.text(sanitizeText('Tel: +48 ...'), 20 + colW, colY + 8); 
-
-    // Col 3: Bank / Legal
-    doc.setFont(safeFont, 'bold');
-    doc.text(sanitizeText('Bankverbindung'), 20 + (colW * 2), colY);
-    doc.setFont(safeFont, 'normal');
-    doc.text(sanitizeText('Bank: SPARKASSE'), 20 + (colW * 2), colY + 4);
-    doc.text(sanitizeText('Konto / Bankkonto: DE79 1805 0000 0190 1228 89'), 20 + (colW * 2), colY + 8);
-    doc.text(sanitizeText('SWIFT: WELADED1CBN'), 20 + (colW * 2), colY + 12);
-
-    // Page count centered bottom
-    doc.text(sanitizeText(`Seite ${pageNumber}`), pageWidth / 2, pageHeight - 5, { align: 'center' });
-}
-
-// Helpers for layout
-const MARGIN = 20;
-const CONTENT_START_Y = 40;
-
-export async function generateOfferPDF(offer: Offer) {
-    try {
-        const doc = await createDocument(offer);
-        const safeId = offer.id ? offer.id.substring(0, 7) : 'draft';
-        doc.save(`Angebot_${safeId}.pdf`);
-    } catch (e) {
-        console.error("CRITICAL PDF GENERATION FAILURE", e);
-        const msg = e instanceof Error ? e.message : String(e);
-        const stack = e instanceof Error ? e.stack : '';
-        alert(`Błąd generowania PDF: ${msg}\n\n${stack ? 'Szczegóły w konsoli.' : ''}`);
-    }
-}
-
-export async function generateOfferPDFData(offer: Offer): Promise<string> {
-    try {
-        const doc = await createDocument(offer);
-        return doc.output('datauristring');
-    } catch (e) {
-        console.error("CRITICAL PDF GENERATION FAILURE", e);
-        // Throw actual error message for debugging
-        if (e instanceof Error) {
-            throw new Error(`PDF Generation Failed: ${e.message}`);
-        }
-        throw new Error(`PDF Generation Failed: ${String(e)}`);
-    }
-}
-
-// SAFE STRING CONVERTER
+// SAFE STRING UTILS
 function safeStr(val: any): string {
     if (val === null || val === undefined) return '';
     return String(val);
 }
 
-// Sanitize text for standard fonts (strip Polish diacritics)
 function sanitizeText(text: string): string {
     if (!text) return '';
     const map: Record<string, string> = {
         'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
         'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z',
-        '€': 'EUR' // Euro sign often fails in standard fonts
+        'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss',
+        'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue',
+        '€': 'EUR'
     };
-    return text.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ€]/g, m => map[m] || m);
+    return text.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻäöüßÄÖÜ€]/g, m => map[m] || m);
 }
 
-// Translate known terms for PDF
 function translateForPDF(key: string, category: string): string {
-    // Simple override for common V2 terms if not covered by translations.ts
     const v2Map: Record<string, string> = {
-        'smartline': 'Smartline',
-        'trendline': 'Trendline',
-        'skyline': 'Skyline',
-        'ultraline': 'Ultraline',
-        'topline': 'Topline',
-        'poly': 'Polycarbonat',
-        'glass': 'Glas',
-        'clear': 'Klar',
-        'opal': 'Opal',
-        'tinted': 'Getönt',
-        'standard': 'Standard',
-        'iq-relax': 'IQ-Relax',
-        'ir-gold': 'IR-Gold',
-        'heat-protection': 'Hitzeschutz'
+        // Models - using "style" naming convention
+        'trendline': 'Trendstyle', 'trendstyle': 'Trendstyle',
+        'trendline_new': 'Trendstyle New', 'trendstyle_new': 'Trendstyle New',
+        'trendline_plus': 'Trendstyle+', 'trendstyle_plus': 'Trendstyle+',
+        'skyline': 'Skystyle', 'skystyle': 'Skystyle',
+        'ultraline': 'Ultrastyle', 'ultrastyle': 'Ultrastyle',
+        'topline': 'Topstyle', 'topstyle': 'Topstyle',
+        'topline_xl': 'Topstyle XL', 'topstyle_xl': 'Topstyle XL',
+        'designline': 'Designstyle', 'designstyle': 'Designstyle',
+        'orangeline': 'Orangestyle', 'orangestyle': 'Orangestyle',
+        'orangeline+': 'Orangestyle+', 'orangestyle+': 'Orangestyle+',
+        // Roof types
+        'poly': 'Polycarbonat', 'polycarbonate': 'Polycarbonat', 'glass': 'Glas VSG 8mm',
+        'clear': 'Klar', 'klar': 'Klar', 'opal': 'Opal', 'matt': 'Matt',
+        'stopsol': 'Stopsol (Sonnenschutz)', 'ir-gold': 'IR Gold (Hitzeschutz)',
+        // Installation types
+        'wall': 'Wandmontage', 'wall-mounted': 'Wandmontage',
+        'freestanding': 'Freistehend', 'wedge': 'Keilform',
+        // Colors
+        'anthracite': 'Anthrazit (RAL 7016)', 'white': 'Weiss (RAL 9016)',
+        'ral7016': 'Anthrazit (RAL 7016)', 'ral9016': 'Weiss (RAL 9016)',
+        'silberr': 'Silber (RAL 9006)', 'sepia': 'Sepiabraun (RAL 8014)'
     };
-
     if (v2Map[key.toLowerCase()]) return v2Map[key.toLowerCase()];
     return translate(key, category as any);
 }
 
+export async function generateOfferPDF(offer: Offer) {
+    try {
+        const doc = await createDocument(offer);
+        const safeId = offer.offerNumber || (offer.id ? offer.id.substring(0, 8) : 'draft');
+        doc.save(`Angebot_${safeId}.pdf`);
+    } catch (e) {
+        console.error("PDF Fail:", e);
+        alert("PDF konnte nicht erstellt werden. Bitte versuchen Sie es erneut.");
+    }
+}
+
+export async function generateOfferPDFData(offer: Offer): Promise<string> {
+    const doc = await createDocument(offer);
+    return doc.output('datauristring');
+}
+
 async function createDocument(offer: Offer): Promise<jsPDF> {
-    // 1. SAFE DATA EXTRACTION
-    const profile = getSalesProfile();
-
-    // 2. SETUP DOCUMENT
     const doc = new jsPDF('p', 'mm', 'a4');
-
-    // 3. FONT LOADING STRATEGY
-    // CRITICAL FIX: Custom fonts are corrupt/HTML. Forcing standard font to prevent crash.
-    const customFontsLoaded = false;
-    const fontFamily = customFontsLoaded ? 'Roboto' : 'Helvetica';
-
-    doc.setFont(fontFamily);
-
-    // 4. IMAGE LOADING
-    // Bypass fetch, use embedded asset
-    const logoBase64 = LOGO_BASE64;
-
-    let currentY = CONTENT_START_Y;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
-    // --- PAGE 1 SETUP ---
-    addPageHeader(doc, logoBase64);
+    // --- SALES CONTEXT ---
+    let repName = 'Ihr Expertenteam';
+    let repPhone = '+49 157 5064 6936';
+    let repEmail = 'buero@polendach24.de';
 
-    // 1. Sender Line (Tiny above address) - Standard DIN 5008
-    doc.setFontSize(6);
-    doc.setTextColor(...COLORS.textLight);
-    doc.text('PolenDach24 - Kolonia Wałowice dz. nr 221/33 - 66-620 Gubin', MARGIN, currentY + 5);
-
-    // 2. Recipient Address Block
-    doc.setFontSize(10);
-    doc.setTextColor(...COLORS.text);
-    doc.setFont(fontFamily, 'normal');
-
-    let addrY = currentY + 15;
-    const c = offer.customer || {} as any; // Safe empty obj
-
-    // Defensive coding for address
-    const compName = safeStr(c.companyName);
-    if (compName) {
-        doc.text(sanitizeText(compName), MARGIN, addrY);
-        addrY += 5;
+    if (offer.creator) {
+        repName = `${offer.creator.firstName} ${offer.creator.lastName}`;
+        repPhone = offer.creator.phone || repPhone;
+        repEmail = offer.creator.email || repEmail;
+    } else {
+        const profile = getSalesProfile();
+        if (profile) {
+            repName = `${profile.firstName} ${profile.lastName}`;
+            repPhone = profile.phone || repPhone;
+            repEmail = profile.email || repEmail;
+        } else {
+            const user = getCurrentUser();
+            if (user) {
+                repName = `${user.firstName} ${user.lastName}`;
+                repPhone = user.phone || repPhone;
+                repEmail = user.email || repEmail;
+            }
+        }
     }
 
-    const salutation = safeStr(c.salutation);
-    const firstName = safeStr(c.firstName);
-    const lastName = safeStr(c.lastName);
+    const c = offer.customer || {} as any;
+    const model = translateForPDF(offer.product?.modelId || '', 'models');
 
-    let recipientName = `${salutation} ${firstName} ${lastName}`.trim();
-    if (!recipientName) recipientName = "Kunde"; // Ultimate fallback
+    // --- RENDER HELPERS ---
 
-    doc.text(sanitizeText(recipientName), MARGIN, addrY);
-    addrY += 5;
+    const drawHeader = () => {
+        // High-end dark header
+        doc.setFillColor(...THEME.primary);
+        doc.rect(0, 0, pageWidth, 35, 'F'); // Taller header for elegance
 
-    const street = safeStr(c.street);
-    const houseNumber = safeStr(c.houseNumber);
-    doc.text(sanitizeText(`${street} ${houseNumber}`.trim()), MARGIN, addrY);
-    addrY += 5;
+        // Logo Positioning - Centered vertically in header
+        // Assuming logo is rectangular (approx 4:1)
+        if (LOGO_BASE64) {
+            // Keep logo moderate size to look premium, not shouting
+            doc.addImage(LOGO_BASE64, 'PNG', MARGIN, 10, 42, 14);
+        } else {
+            doc.setFont(FONTS.bold, 'bold');
+            doc.setFontSize(20);
+            doc.setTextColor(...THEME.white);
+            doc.text('POLENDACH24', MARGIN, 24);
+        }
 
-    const postalCode = safeStr(c.postalCode);
-    const city = safeStr(c.city);
-    doc.text(sanitizeText(`${postalCode} ${city}`.trim()), MARGIN, addrY);
-    addrY += 5;
+        // Contact Stack - Right aligned, clean typography
+        doc.setFont(FONTS.normal, 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(200, 200, 200); // Off-white for subtleties
+        doc.text('Ihr Premium Partner fuer Terrassen.', pageWidth - MARGIN, 15, { align: 'right' });
 
-    const country = safeStr(c.country) || 'Deutschland';
-    doc.text(sanitizeText(country), MARGIN, addrY);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.setTextColor(...THEME.secondary); // Gold accent text
+        doc.text('www.polendach24.de', pageWidth - MARGIN, 24, { align: 'right' });
 
-    // Determine Locale for PDF Content (Attributes)
-    const normalizedCountry = country.toLowerCase();
-    const locale = (normalizedCountry === 'polska' || normalizedCountry === 'poland' || normalizedCountry === 'pl') ? 'pl' : 'de';
-
-    const getLocalizedText = (item: any, fallback: string) => {
-        if (!item?.attributes) return fallback;
-        if (locale === 'pl' && item.attributes.name_pl) return item.attributes.name_pl;
-        if (locale === 'de' && item.attributes.name_de) return item.attributes.name_de;
-        return fallback;
+        // Gold Accent Line
+        doc.setFillColor(...THEME.secondary);
+        doc.rect(0, 35, pageWidth, 1.5, 'F'); // Thinner, sharper line
     };
 
-    // 3. Info Block (Right side)
-    const infoX = pageWidth - MARGIN - 70; // 70mm width
-    const infoY = currentY + 10;
+    const drawFooter = (pageNo: number, pageCount: number) => {
+        const y = pageHeight - 22;
+        doc.setDrawColor(...THEME.line);
+        doc.setLineWidth(0.2);
+        doc.line(MARGIN, y, pageWidth - MARGIN, y);
 
+        doc.setFontSize(7);
+        doc.setTextColor(...THEME.textLight);
+        doc.setFont(FONTS.normal, 'normal');
+
+        // Compact columns
+        const col1 = MARGIN;
+        const col2 = MARGIN + 60;
+        const col3 = MARGIN + 120;
+
+        // Col 1: Address
+        doc.text('PolenDach24 S.C.', col1, y + 5);
+        doc.text('Kolonia Wałowice 221/33, 66-620 Gubin', col1, y + 9);
+        doc.text('NIP: PL9261695520', col1, y + 13);
+
+        // Col 2: Contact (Office)
+        doc.text('Zentrale: +49 157 5064 6936', col2, y + 5);
+        doc.text('Email: buero@polendach24.de', col2, y + 9);
+
+        // Col 3: Bank
+        doc.text('Bank: Sparkasse Spree-Neisse', col3, y + 5);
+        doc.text('IBAN: DE79 1805 0000 0190 1228 89', col3, y + 9);
+
+        // Page
+        doc.text(`Seite ${pageNo} / ${pageCount}`, pageWidth - MARGIN, y + 13, { align: 'right' });
+    };
+
+    // --- PAGE 1 START ---
+
+    drawHeader();
+    let y = 50;
+
+    // 1. TOP SECTION: DATA & ADDRESS
+    // Modern "Metadata Bar" design
+
+    // Offer Badge (Right)
+    doc.setFillColor(...THEME.surface);
+    doc.roundedRect(pageWidth - MARGIN - 70, y, 70, 28, 1, 1, 'F'); // Subtle bg
+    doc.setDrawColor(...THEME.line);
+    doc.rect(pageWidth - MARGIN - 70, y, 70, 28, 'S'); // Thin border
+
+    doc.setFontSize(7);
+    doc.setTextColor(...THEME.textLight);
+    doc.text('ANGEBOTS-NUMMER', pageWidth - MARGIN - 65, y + 6);
+    doc.text('DATUM', pageWidth - MARGIN - 25, y + 6);
+
+    doc.setFont(FONTS.bold, 'bold');
     doc.setFontSize(10);
-    // Labels
-    doc.setTextColor(...COLORS.textLight);
-    doc.text('Datum:', infoX, infoY);
-    doc.text('Kundennummer:', infoX, infoY + 6);
-    doc.text('Angebotsnummer:', infoX, infoY + 12);
-    doc.text('Ihr Ansprechpartner:', infoX, infoY + 18);
+    doc.setTextColor(...THEME.primary);
+    const offerNum = safeStr(offer.offerNumber || offer.id?.substring(0, 8) || 'ENTWURF');
+    doc.text(offerNum, pageWidth - MARGIN - 65, y + 13);
+    doc.text(new Date().toLocaleDateString('de-DE'), pageWidth - MARGIN - 25, y + 13);
 
-    // Values
-    doc.setTextColor(...COLORS.text);
-    doc.text(new Date().toLocaleDateString('de-DE'), infoX + 35, infoY);
+    doc.setFontSize(7);
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('BITTE BEI RUECKFRAGEN ANGEBEN', pageWidth - MARGIN - 65, y + 22);
 
-    // Safe check for customerId
-    const customerIdStr = safeStr((offer as any).customerId || c.id);
-    doc.text(customerIdStr ? customerIdStr.substring(0, 8).toUpperCase() : '-', infoX + 35, infoY + 6);
+    // Customer Address (Left)
+    doc.setFontSize(7);
+    doc.setTextColor(...THEME.textLight);
+    doc.text('PolenDach24 S.C. - Kolonia Wałowice 221/33 - 66-620 Gubin', MARGIN, y - 2);
 
-    const offerIdStr = safeStr(offer.offerNumber || offer.id); // Use offerNumber if available
-    doc.text(offerIdStr ? offerIdStr : '-', infoX + 35, infoY + 12);
-
-    const contactName = profile ? `${safeStr(profile.firstName)} ${safeStr(profile.lastName)}` : 'Kundenservice';
-    doc.text(sanitizeText(contactName), infoX + 35, infoY + 18);
-
-    // 4. Offer Title / Subject
-    currentY = 100; // Fixed position usually around 98mm-100mm
-    doc.setFontSize(14);
-    doc.setFont(fontFamily, 'bold');
-    doc.text(sanitizeText(`Angebot #${offerIdStr}`), MARGIN, currentY);
-
-    doc.setFontSize(11);
-    doc.setFont(fontFamily, 'normal');
-    currentY += 8;
-
-    // Safeguard product model
-    const modelId = offer.product ? offer.product.modelId : '';
-    const translatedModel = modelId ? translateForPDF(modelId, 'models') : 'Unbekanntes Modell';
-    doc.text(sanitizeText(`Projekt: Terrassenüberdachung - ${translatedModel}`), MARGIN, currentY);
-
-    // 5. Intro Text
-    currentY += 15;
+    y += 8;
     doc.setFontSize(10);
+    doc.setTextColor(...THEME.text);
 
-    // Standard Fallback Text + Polendach24 Professional Intro
-    let greeting = 'Sehr geehrte Damen und Herren,';
-    if (salutation === 'Firma') {
-        greeting = 'Sehr geehrte Damen und Herren,';
-    } else if (lastName) {
-        const suffix = salutation === 'Herr' ? 'r' : '';
-        if (salutation === 'Herr' || salutation === 'Frau') {
-            greeting = `Sehr geehrte${suffix} ${salutation} ${lastName},`;
-        }
+    if (c.companyName) {
+        doc.setFont(FONTS.bold, 'bold');
+        doc.text(sanitizeText(c.companyName), MARGIN, y);
+        y += 5;
     }
 
-    doc.text(sanitizeText(greeting), MARGIN, currentY);
-    currentY += 6;
-    doc.text(sanitizeText('vielen Dank für Ihre Anfrage und das damit verbundene Interesse an unseren Produkten.'), MARGIN, currentY);
-    currentY += 5;
-    doc.text(sanitizeText('Wir freuen uns, Ihnen basierend auf Ihren Wünschen folgendes Angebot unterbreiten zu dürfen:'), MARGIN, currentY);
+    doc.setFont(FONTS.normal, 'normal');
+    const name = `${safeStr(c.salutation)} ${safeStr(c.firstName)} ${safeStr(c.lastName)}`.trim();
+    doc.text(sanitizeText(name || 'Kunde'), MARGIN, y);
+    y += 5;
+    doc.text(sanitizeText(`${safeStr(c.street)} ${safeStr(c.houseNumber)}`.trim()), MARGIN, y);
+    y += 5;
+    doc.text(sanitizeText(`${safeStr(c.postalCode)} ${safeStr(c.city)}`.trim()), MARGIN, y);
+    y += 5;
+    doc.text(sanitizeText(safeStr(c.country) || 'Deutschland'), MARGIN, y);
 
-    currentY += 10;
+    // 2. HERO TITLE
+    y = 90;
 
-    // 6. Product Table
-    // Define table content
-    const tableBody = [];
-
-    // Main Product
-    const width = offer.product ? safeStr(offer.product.width) : '0';
-    const projection = offer.product ? safeStr(offer.product.projection) : '0';
-    const color = offer.product ? translateForPDF(safeStr(offer.product.color), 'colors') : '-';
-
-    let roofDesc = '-';
-    if (offer.product) {
-        roofDesc = translateForPDF(safeStr(offer.product.roofType), 'roofTypes');
-        if (offer.product.roofType === 'polycarbonate' && offer.product.polycarbonateType) {
-            roofDesc += ` (${translateForPDF(offer.product.polycarbonateType, 'polycarbonateTypes')})`;
-        } else if (offer.product.roofType === 'glass' && offer.product.glassType) {
-            roofDesc += ` (${translateForPDF(offer.product.glassType, 'glassTypes')})`;
-        }
-    }
-
-    const basePrice = offer.pricing ? offer.pricing.basePrice : 0;
-
-    // Determine construction type for display
-    let constructionType = "Wandmontage"; // Default
-    if (offer.product && offer.product.construction === 'freestanding') {
-        constructionType = "Freistehend";
-    }
-
-    tableBody.push([
-        '1',
-        `Terrassenüberdachung Modell "${translatedModel}"\n` +
-        `Typ: ${constructionType}\n` +
-        `Maße: ${width}mm (Breite) x ${projection}mm (Tiefe)\n` +
-        `Farbe: ${color}\n` +
-        `Dacheindeckung: ${roofDesc}`,
-        formatCurrency(basePrice)
-    ]);
-
-    // Consolidate Addons & Custom Items
-    let pos = 2;
-    if (offer.product && offer.product.addons) {
-        offer.product.addons.forEach(addon => {
-            const variant = safeStr(addon.variant);
-            const baseName = getLocalizedText(addon, addon.name);
-            const name = variant ? `${baseName} (${variant})` : baseName;
-            tableBody.push([
-                String(pos),
-                safeStr(name),
-                formatCurrency(addon.price)
-            ]);
-            pos++;
-        });
-    }
-
-    if (offer.product && offer.product.selectedAccessories) {
-        offer.product.selectedAccessories.forEach(acc => {
-            const name = getLocalizedText(acc, acc.name);
-            tableBody.push([
-                String(pos),
-                `${acc.quantity}x ${safeStr(name)}`,
-                formatCurrency(acc.price * acc.quantity)
-            ]);
-            pos++;
-        });
-    }
-
-    // New V2 Custom Items
-    if (offer.product && offer.product.customItems) {
-        offer.product.customItems.forEach(item => {
-            const name = getLocalizedText(item, item.name);
-            // Default quantity 1 if not set
-            const qty = item.quantity || 1;
-            tableBody.push([
-                String(pos),
-                `${name} (Manuelle Position)`,
-                formatCurrency(item.price * qty)
-            ]);
-            pos++;
-        });
-    }
-
-    // Items from V2 Basket (Converted during save to ProductConfig.items)
-    // The previous implementation mapped simple basket items into 'items'.
-    // We should display these if present (ProductConfiguratorV2 saves standardized items)
-    if (offer.product && (offer.product as any).items && Array.isArray((offer.product as any).items)) {
-        (offer.product as any).items.forEach((item: any) => {
-            // Avoid duplicates if main product is already added differently
-            // But V2 basket contains components like "Ściana Stała". 
-            // We should list them.
-            // Check if it's the main roof (usually name matches model) - actually V2 basket separates roof components.
-            // Let's list everything clearly.
-
-            // Note: The V2 saver puts basket items into `product.items`.
-            // We also put the Roof Main config in `product` root props.
-            // We need to decide: Show summarized root props OR show list items.
-            // The tableBody already has the main roof added at Pos 1 based on root props.
-            // So we only add items that are NOT the main roof structure if possible, 
-            // but V2 basket items are like "Wall AL23".
-
-            tableBody.push([
-                String(pos),
-                `${item.name}\n${item.config || ''}`,
-                formatCurrency(item.price)
-            ]);
-            pos++;
-        });
-    }
-
-
-    // Installation
-    if (offer.pricing && offer.pricing.installationCosts) {
-        const days = safeStr(offer.product.installationDays);
-        const dist = safeStr(offer.pricing.installationCosts.travelDistance);
-        tableBody.push([
-            String(pos),
-            `Montage & Lieferung\n` +
-            `- Montage (${days} Tage)\n` +
-            `- Anfahrt (${dist} km)`,
-            formatCurrency(offer.pricing.installationCosts.totalInstallation)
-        ]);
-        pos++;
-    }
-
-    // Sanitize body to ensure no nulls/undefineds
-    const safeBody = tableBody.filter(row => Array.isArray(row) && row.length === 3);
-
-    console.log('[PDF DEBUG] Table Body:', safeBody);
-
-    // Render Table
-    autoTable(doc, {
-        startY: currentY,
-        head: [['Pos.', 'Beschreibung', 'Gesamtpreis']],
-        body: safeBody,
-        theme: 'plain', // Clean look
-        styles: {
-            font: fontFamily,
-            fontSize: 10,
-            cellPadding: 5,
-            lineWidth: 0,
-        },
-        headStyles: {
-            fillColor: COLORS.tableHeader,
-            textColor: COLORS.text,
-            fontStyle: 'bold',
-            halign: 'left'
-        },
-        columnStyles: {
-            0: { cellWidth: 15, halign: 'center' },
-            1: {}, // Auto width (default)
-            2: { cellWidth: 40, halign: 'right' }
-        },
-        didDrawPage: () => {
-            // Handled by manual footer loop
-        }
-    });
-
-    // Update Y
-    // Defensive check for lastAutoTable presence
-    const lastTableY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : currentY;
-    currentY = lastTableY + 10;
-
-    // ensure we have space for totals
-    if (currentY + 60 > doc.internal.pageSize.getHeight() - 50) {
-        doc.addPage();
-        currentY = CONTENT_START_Y;
-        addPageHeader(doc, logoBase64); // Add header to new page
-    }
-
-    // 7. Totals Block (Right aligned)
-    const totalX = pageWidth - MARGIN - 80;
-    const valX = pageWidth - MARGIN;
-
-    // Defensive math
-    const sellingGross = offer.pricing ? Number(offer.pricing.sellingPriceGross) || 0 : 0;
-    const sellingNet = offer.pricing ? Number(offer.pricing.sellingPriceNet) || 0 : 0;
-    // Recalculate VAT from Net for consistency on PDF
-    const vat = sellingNet * 0.19;
-
-    // Check for Discount
-    const discountVal = offer.pricing?.discountValue || 0;
-    const discountPercent = offer.pricing?.discountPercentage || 0;
-
-    doc.setFontSize(10);
-
-    // Subtotal (Zwischensumme) - if discount exists, we should show "Before Discount"
-    // Using sellingNet + discountVal as base
-    let baseNet = sellingNet;
-    if (discountVal > 0) {
-        baseNet = sellingNet + discountVal;
-
-        doc.text(sanitizeText('Zwischensumme (Netto):'), totalX, currentY);
-        doc.text(sanitizeText(formatCurrency(baseNet)), valX, currentY, { align: 'right' });
-        currentY += 6;
-
-        doc.setTextColor(220, 50, 50); // Red for discount
-        doc.text(sanitizeText(`Rabatt (-${discountPercent}%):`), totalX, currentY);
-        doc.text(sanitizeText(`- ${formatCurrency(discountVal)}`), valX, currentY, { align: 'right' });
-        doc.setTextColor(...COLORS.text); // Reset
-        currentY += 6;
-
-        // Line separator
-        doc.setLineWidth(0.1);
-        doc.line(totalX, currentY, pageWidth - MARGIN, currentY);
-        currentY += 4;
-    }
-
-    doc.text(sanitizeText('Nettosumme:'), totalX, currentY);
-    doc.text(sanitizeText(formatCurrency(sellingNet)), valX, currentY, { align: 'right' });
-    currentY += 6;
-
-    doc.text(sanitizeText('Zzgl. 19% MwSt.:'), totalX, currentY);
-    doc.text(sanitizeText(formatCurrency(vat)), valX, currentY, { align: 'right' });
-    currentY += 4;
-
-    // Double Line under totals
-    doc.setDrawColor(...COLORS.text);
-    doc.setLineWidth(0.5);
-    doc.line(totalX, currentY, pageWidth - MARGIN, currentY);
-    currentY += 6;
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(...THEME.primary);
+    doc.text(model, MARGIN, y); // Clean Model Name
 
     doc.setFontSize(12);
-    doc.setFont(fontFamily, 'bold');
-    doc.text(sanitizeText('Gesamtsumme:'), totalX, currentY);
-    // Calculated Gross to avoid rounding diffs
-    const calcGross = sellingNet + vat;
-    doc.text(sanitizeText(formatCurrency(calcGross)), valX, currentY, { align: 'right' });
+    doc.setTextColor(...THEME.secondary);
+    doc.text('Ihr exklusives Angebot', MARGIN + doc.getTextWidth(model) + 5, y); // "Your exclusive offer" next to it or below
 
-    // Double line bottom
-    currentY += 2;
-    doc.setLineWidth(0.5);
-    doc.line(totalX, currentY, pageWidth - MARGIN, currentY);
-    doc.setLineWidth(0.1);
-    doc.line(totalX, currentY + 1, pageWidth - MARGIN, currentY + 1);
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.setTextColor(...THEME.text);
 
-    currentY += 20;
-
-    // 8. Terms & Conditions Block
-    // Check space
-    if (currentY + 100 > doc.internal.pageSize.getHeight() - 50) {
-        doc.addPage();
-        currentY = CONTENT_START_Y;
-        addPageHeader(doc, logoBase64);
+    let greeting = 'Sehr geehrte Damen und Herren,';
+    if (c.lastName) {
+        greeting = c.salutation === 'Frau' ? `Sehr geehrte Frau ${sanitizeText(c.lastName)},` : `Sehr geehrter Herr ${sanitizeText(c.lastName)},`;
     }
 
-    doc.setFontSize(11);
-    doc.setFont(fontFamily, 'bold');
-    doc.setTextColor(...COLORS.primary);
-    doc.text(sanitizeText('Zahlungsmethoden und Bedingungen'), MARGIN, currentY);
-    currentY += 8;
+    doc.text(greeting, MARGIN, y);
+    y += 6;
 
+    const introText = 'vielen Dank fuer Ihr Vertrauen. Wir freuen uns, Ihnen Ihre individuelle massgefertigte Ueberdachung anbieten zu duerfen. ' +
+        'Nachfolgend finden Sie alle Details zu Ihrer Wunschkonfiguration.';
+
+    const lines = doc.splitTextToSize(introText, pageWidth - MARGIN * 2);
+    doc.text(lines, MARGIN, y);
+    y += (lines.length * 5) + 12;
+
+    // 3. PRODUCT HIGHLIGHTS (The "Selling" part)
+    // Dark box with white text for high contrast "Tech Specs"
+    doc.setFillColor(...THEME.primary);
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 30, 1, 1, 'F');
+
+    doc.setTextColor(...THEME.secondary); // Gold Title
+    doc.setFont(FONTS.bold, 'bold');
     doc.setFontSize(9);
-    doc.setTextColor(...COLORS.text);
-    doc.setFont(fontFamily, 'normal');
+    doc.text('IHRE KONFIGURATION', MARGIN + 8, y + 8);
 
-    const conditions = [
-        { t: 'Zahlungsweise', d: 'Gemäß vereinbarter Konditionen.' },
-        { t: 'Lieferzeit', d: 'Die Lieferzeit beträgt ca. 4-6 Wochen nach Auftragsklarheit.' },
-        { t: 'Gewährleistung', d: 'Wir gewähren 5 Jahre Garantie auf die Konstruktion und 2 Jahre auf bewegliche Teile und Elektrokomponenten.' },
-        { t: 'Hinweis', d: 'Das Angebot ist freibleibend. Es gelten unsere allgemeinen Geschäftsbedingungen (AGB).' }
-    ];
+    // Specs columns (White text)
+    doc.setTextColor(...THEME.white);
+    doc.setFontSize(10);
+    doc.setFont(FONTS.normal, 'normal');
 
-    conditions.forEach(item => {
-        // Check for page break
-        if (currentY + 15 > doc.internal.pageSize.getHeight() - 40) {
-            doc.addPage();
-            currentY = CONTENT_START_Y;
-            addPageHeader(doc, logoBase64);
-        }
+    const specsY = y + 16;
+    const colW = (pageWidth - MARGIN * 2) / 3;
 
-        doc.setFont(fontFamily, 'bold');
-        doc.text(sanitizeText(item.t), MARGIN, currentY);
-        currentY += 4;
+    // Col 1
+    doc.text('Dimensionen:', MARGIN + 8, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 8, specsY + 5);
 
-        doc.setFont(fontFamily, 'normal');
-        // Handle multiline text
-        const splitText = doc.splitTextToSize(sanitizeText(item.d), pageWidth - (MARGIN * 2));
-        doc.text(splitText, MARGIN, currentY);
-        currentY += (splitText.length * 4) + 4;
+    // Col 2
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Farbe / Ausfuehrung:', MARGIN + 8 + colW, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    const color = translateForPDF(offer.product?.color || '', 'colors');
+    doc.text(color, MARGIN + 8 + colW, specsY + 5);
+
+    // Col 3
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Dacheindeckung:', MARGIN + 8 + (colW * 2), specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    const roof = translateForPDF(offer.product?.roofType || '', 'roofTypes');
+    doc.text(roof, MARGIN + 8 + (colW * 2), specsY + 5);
+
+    y += 40;
+
+    // 4. PRICING TABLE
+    const bodyRows = [];
+    let pos = 1;
+
+    // Main Product
+    bodyRows.push([
+        { content: String(pos++), styles: { halign: 'center' } },
+        {
+            content: sanitizeText(`${model} Aluminiumkonstruktion\nPremium Pulverbeschichtung, Verstarkte Profile, Integrierte Entwaesserung.`),
+            styles: { fontStyle: 'bold' }
+        },
+        formatCurrency(offer.pricing?.basePrice || 0)
+    ]);
+
+    // Items
+    const items = (offer.product as any).items || [];
+    if (items.length > 0) {
+        items.forEach((item: any) => {
+            if (item.name?.toLowerCase().includes(offer.product?.modelId)) return;
+            bodyRows.push([
+                { content: String(pos++), styles: { halign: 'center' } },
+                sanitizeText(item.name + (item.config ? `\n${item.config}` : '')),
+                formatCurrency(item.price)
+            ]);
+        });
+    } else if (offer.product?.addons) {
+        offer.product.addons.forEach((a: any) => {
+            bodyRows.push([
+                { content: String(pos++), styles: { halign: 'center' } },
+                sanitizeText(a.name + (a.variant ? ` (${a.variant})` : '')),
+                formatCurrency(a.price)
+            ]);
+        });
+    }
+
+    // Installation
+    if (offer.pricing?.installationCosts) {
+        const inst = offer.pricing.installationCosts;
+        bodyRows.push([
+            { content: String(pos++), styles: { halign: 'center' } },
+            sanitizeText(`Fachgerechte Montage & Lieferung\nDurch zertifiziertes Montageteam inkl. Kleinmaterial.`),
+            formatCurrency(inst.totalInstallation)
+        ]);
+    }
+
+    autoTable(doc, {
+        startY: y,
+        head: [['Pos.', 'Beschreibung', 'Betrag']],
+        body: bodyRows,
+        theme: 'grid', // Cleaner lines
+        styles: {
+            font: 'Helvetica',
+            fontSize: 9,
+            cellPadding: 6,
+            lineWidth: 0.1,
+            lineColor: THEME.line,
+            textColor: THEME.text
+        },
+        headStyles: {
+            fillColor: THEME.surface, // Light Header instead of dark
+            textColor: THEME.primary,  // Dark text
+            fontStyle: 'bold',
+            lineWidth: 0.1,
+            lineColor: THEME.line
+        },
+        columnStyles: {
+            0: { cellWidth: 12 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+        },
+        alternateRowStyles: {
+            fillColor: THEME.white // Clean white
+        },
+        margin: { left: MARGIN, right: MARGIN }
     });
 
-    // Add Headers/Footers to all pages at the end
-    const totalPages = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Check Page Break for Bottom Block
+    if (y > pageHeight - 110) { // Need ~110mm for bottom block
+        doc.addPage();
+        drawHeader();
+        y = 50;
+    }
+
+    // 5. SPLIT SECTION: CONTACT CARD (Left) vs TOTALS (Right)
+    const midPoint = pageWidth / 2;
+
+    // --- LEFT: SALES REP CARD (IMPROVED) ---
+    // Floating style card
+    const cardY = y;
+
+    doc.setDrawColor(...THEME.line);
+    doc.setLineWidth(0.1);
+    doc.rect(MARGIN, cardY, 80, 45); // Border
+
+    // Top strip
+    doc.setFillColor(...THEME.primary);
+    doc.rect(MARGIN, cardY, 80, 8, 'F');
+    doc.setTextColor(...THEME.white);
+    doc.setFontSize(8);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text('IHR PERSOENLICHER ANSPRECHPARTNER', MARGIN + 4, cardY + 5);
+
+    // Photo Placeholder (Circle) or just Initials if no photo
+    doc.setFillColor(...THEME.surface);
+    doc.circle(MARGIN + 12, cardY + 22, 6, 'F');
+    doc.setTextColor(...THEME.secondary);
+    const initials = repName.split(' ').map(n => n[0]).join('').substring(0, 2);
+    doc.setFontSize(9);
+    doc.text(initials, MARGIN + 12, cardY + 23, { align: 'center' });
+
+    // Info
+    doc.setFontSize(10);
+    doc.setTextColor(...THEME.primary);
+    doc.text(sanitizeText(repName), MARGIN + 22, cardY + 18);
+
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Experte fuer Ueberdachungen', MARGIN + 22, cardY + 22);
+
+    doc.setTextColor(...THEME.text);
+    doc.text(sanitizeText(repPhone), MARGIN + 22, cardY + 30);
+    doc.text(sanitizeText(repEmail), MARGIN + 22, cardY + 34);
+
+    doc.setTextColor(...THEME.secondary);
+    doc.setFontSize(7);
+    doc.text('Fragen Sie mich nach Aktionen!', MARGIN + 4, cardY + 41);
+
+
+    // --- RIGHT: TOTALS BLOCK ---
+    const totalBoxWidth = 85;
+    const totalBoxX = pageWidth - MARGIN - totalBoxWidth;
+    let ty = y;
+
+    doc.setFontSize(10);
+    const net = offer.pricing?.sellingPriceNet || 0;
+    const discount = offer.pricing?.discountValue || 0;
+    const preDiscount = net + discount;
+    const vat = net * 0.19;
+    const gross = net + vat;
+
+    if (discount > 0) {
+        doc.setTextColor(...THEME.textLight);
+        doc.text('Listenpreis (Netto):', totalBoxX, ty + 5);
+        doc.text(formatCurrency(preDiscount), pageWidth - MARGIN, ty + 5, { align: 'right' });
+        ty += 6;
+
+        doc.setTextColor(...THEME.secondary); // Gold for discount
+        doc.text(`Ihr Vorteil (-${offer.pricing?.discountPercentage}%):`, totalBoxX, ty + 5);
+        doc.text(`- ${formatCurrency(discount)}`, pageWidth - MARGIN, ty + 5, { align: 'right' });
+        ty += 8;
+
+        // Separator
+        doc.setDrawColor(...THEME.line);
+        doc.line(totalBoxX, ty, pageWidth - MARGIN, ty);
+        ty += 2;
+    }
+
+    doc.setTextColor(...THEME.text);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text('Endpreis Netto:', totalBoxX, ty + 5);
+    doc.text(formatCurrency(net), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    ty += 6;
+
+    doc.setFont(FONTS.normal, 'normal');
+    doc.setTextColor(...THEME.textLight);
+    doc.text('zzgl. 19% MwSt.:', totalBoxX, ty + 5);
+    doc.text(formatCurrency(vat), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    ty += 10;
+
+    // Grand Total Box
+    doc.setFillColor(...THEME.primary);
+    doc.roundedRect(totalBoxX, ty, totalBoxWidth, 14, 1, 1, 'F');
+
+    doc.setTextColor(...THEME.white);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(12);
+    doc.text('GESAMT BETRAG:', totalBoxX + 5, ty + 9);
+    doc.text(formatCurrency(gross), pageWidth - MARGIN - 5, ty + 9, { align: 'right' });
+
+    // 6. CLOSING & SIGNATURES
+    y = Math.max(ty + 25, cardY + 55);
+
+    // Trust badges (Text based)
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.textLight);
+    const badges = "✓ Premium Qualitaet Made in Germany    ✓ 5 Jahre Garantie    ✓ Alles aus einer Hand";
+    doc.text(badges, pageWidth / 2, y, { align: 'center' });
+
+    y += 15;
+
+    // Sign lines
+    doc.setDrawColor(...THEME.textLight);
+    doc.setLineWidth(0.1);
+    doc.line(MARGIN, y + 10, MARGIN + 60, y + 10);
+    doc.line(pageWidth - MARGIN - 60, y + 10, pageWidth - MARGIN, y + 10);
+
+    doc.setFontSize(7);
+    doc.text(sanitizeText(repName), MARGIN, y + 14);
+    doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 60, y + 14);
+
+    // Footer Loop
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        // Header is added during creation for page 1/resets, 
-        // but need to ensure footer is on all pages. 
-        // Careful not to double-add header. 
-        // Our 'addPageHeader' is safe to call if we manage positions, 
-        // but here we just want footers.
-        addPageFooter(doc, i);
+        drawFooter(i, pageCount);
     }
 
     return doc;

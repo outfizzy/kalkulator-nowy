@@ -46,7 +46,7 @@ export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, off
                     </div>
 
                     <div className="text-right hidden md:block">
-                        <div className="text-sm opacity-70">Oferta nr</div>
+                        <div className="text-sm opacity-70">Angebotsnr.</div>
                         <div className="text-xl font-mono font-bold">{offerNumber}</div>
                     </div>
                 </div>

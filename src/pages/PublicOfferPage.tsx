@@ -32,6 +32,10 @@ export const PublicOfferPage: React.FC = () => {
                 setOffer(data);
                 // Mark as viewed and notify sales rep
                 OfferService.markAsViewed(token).catch(err => console.error('Failed to mark view', err));
+                // Track interaction
+                if (data?.id) {
+                    OfferService.trackInteraction(data.id, 'offer_view').catch(err => console.error('Failed to track view', err));
+                }
             } catch (error) {
                 console.error('Error loading offer:', error);
             } finally {
@@ -52,6 +56,10 @@ export const PublicOfferPage: React.FC = () => {
                 setMessageSent(true);
                 setNewMessage('');
                 toast.success('Nachricht gesendet!');
+                // Track message interaction
+                if (offer?.id) {
+                    OfferService.trackInteraction(offer.id, 'message_sent', { messagePreview: newMessage.substring(0, 100) });
+                }
             } else {
                 toast.error('Nachricht konnte nicht gesendet werden.');
             }
@@ -64,13 +72,13 @@ export const PublicOfferPage: React.FC = () => {
     };
 
     const handleDownloadPDF = async () => {
-        if (!offer) return;
-        try {
-            await generateOfferPDF(offer);
-        } catch (error) {
-            console.error(error);
-            toast.error('Fehler beim Generieren des PDFs');
+        if (!token) return;
+        // Track PDF/Accept click
+        if (offer?.id) {
+            OfferService.trackInteraction(offer.id, 'pdf_click').catch(err => console.error('Failed to track pdf click', err));
         }
+        // Open the beautiful HTML Print View
+        window.open(`/print/offer/${token}`, '_blank');
     };
 
     if (loading) {
@@ -85,8 +93,8 @@ export const PublicOfferPage: React.FC = () => {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="text-center">
-                    <h1 className="text-2xl font-bold text-slate-800 mb-2">Oferta nie znaleziona</h1>
-                    <p className="text-slate-600">Link może być nieprawidłowy lub wygasł.</p>
+                    <h1 className="text-2xl font-bold text-slate-800 mb-2">Angebot nicht gefunden</h1>
+                    <p className="text-slate-600">Der Link ist möglicherweise ungültig oder abgelaufen.</p>
                 </div>
             </div>
         );
@@ -241,7 +249,7 @@ export const PublicOfferPage: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-500">Rufen Sie uns an</p>
-                                        <p className="font-bold text-slate-800 text-lg">0157 5064 6936</p>
+                                        <p className="font-bold text-slate-800 text-lg">03561 501 9981</p>
                                     </div>
                                 </div>
                             </div>
@@ -275,6 +283,7 @@ export const PublicOfferPage: React.FC = () => {
             {isMeasurementModalOpen && token && (
                 <MeasurementRequestModal
                     offerToken={token}
+                    offerId={offer?.id}
                     onClose={() => setIsMeasurementModalOpen(false)}
                 />
             )}

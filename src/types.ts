@@ -27,7 +27,7 @@ export interface AppSettings {
 }
 
 // User Roles
-export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner' | 'installer';
+export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner' | 'installer' | 'b2b_partner' | 'b2b_manager';
 
 export interface User {
     id: string;
@@ -470,18 +470,26 @@ export interface FailureReport {
 export interface Visit {
     id: string;
     offerId?: string; // Optional link to an offer
+    leadId?: string; // Link to Lead for sync
     customerName: string;
     address: string;
+    customerPhone?: string;
     productSummary: string;
     price: number;
-    outcome: 'signed' | 'measured' | 'rejected' | 'pending';
-    notes: string;
+    outcome: 'signed' | 'measured' | 'rejected' | 'pending' | 'postponed';
+    // Sales potential rating (1-5) when outcome is not 'signed'
+    // 1 = Very unlikely, 5 = Very likely to sign
+    salesPotential?: 1 | 2 | 3 | 4 | 5;
+    salesPotentialNote?: string; // Reason for the rating
+    visitNotes?: string; // Notes specific to this visit
+    notes: string; // Legacy field, kept for backward compat
 }
 
 export interface MeasurementReport {
     id: string;
     date: string; // ISO Date string
     salesRepId: string; // User ID of sales rep who created the report
+    salesRepName?: string; // Joined from profiles
 
     // Car Details
     carPlate: string;
@@ -507,6 +515,12 @@ export interface MeasurementReport {
     signedContractsCount: number;
     offerIds: string[]; // Linked offers for this measurement day
     createdAt: Date;
+
+    // Trip Cost Tracking (Admin/Manager editable)
+    tripCost?: number;        // Koszt wyjazdu w EUR
+    costPerKm?: number;       // Stawka za km
+    tripCostUpdatedBy?: string;
+    tripCostUpdatedAt?: Date;
 }
 
 export interface CommissionHistory {

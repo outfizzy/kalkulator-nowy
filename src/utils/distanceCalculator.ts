@@ -153,12 +153,12 @@ export type InstallationDailyRates = {
     additional: number;
 };
 
-// Default daily rates (Fallback)
+// Default daily rates (Tiered Pricing)
 const DEFAULT_RATES: InstallationDailyRates = {
-    day1: 1250,
-    day2: 830,
-    day3: 790,
-    additional: 790
+    day1: 1200,      // 1st day: 1200 EUR
+    day2: 800,       // 2nd day: 800 EUR
+    day3: 790,       // 3rd day: 790 EUR
+    additional: 790  // 4th+ day: 790 EUR each
 };
 
 const DEFAULT_TRAVEL_RATE = 0.50; // EUR per km (one way)

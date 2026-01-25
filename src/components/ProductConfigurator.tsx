@@ -16,6 +16,7 @@ import { WPCFlooringSelector } from './configurator/WPCFlooringSelector';
 // import ultrastyleData from '../data/ultrastyle_full.json'; // Removed legacy
 // import carportData from '../data/carport_full.json'; // Removed legacy
 import { formatCurrency } from '../utils/translations';
+import { getDisplayModelName } from '../utils/modelDisplayNames';
 import { toast } from 'react-hot-toast';
 import { PricingService, type AdditionalCost } from '../services/pricing.service';
 import { SettingsService } from '../services/database/settings.service';
@@ -1610,11 +1611,11 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     {activeStep === 4 && (
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                             <SectionHeader title="Montaż" icon="🔧" />
-                            <div className="flex flex-col md:flex-row gap-6 items-center">
+                            <div className="flex flex-col md:flex-row gap-6 items-start">
                                 <div className="flex-1 w-full">
                                     <label className="block text-sm font-medium text-slate-700 mb-3">Liczba dni montażowych</label>
                                     <div className="flex gap-2 flex-wrap">
-                                        {[0, 1, 2, 3, 4, 5].map(days => (
+                                        {[0, 1, 2, 3, 4, 5, 6, 7].map(days => (
                                             <button
                                                 key={days}
                                                 onClick={() => handleBasicConfigChange('installationDays', days)}
@@ -1627,16 +1628,49 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                             </button>
                                         ))}
                                     </div>
-                                </div>
-                                <div className="flex-1 w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
-                                    <div className="font-semibold text-slate-900 mb-1">Szacowany koszt montażu</div>
-                                    <p className="text-slate-500 text-xs mb-2">Zawiera dojazd i robociznę (przybliżone)</p>
-                                    {config.installationDays ? (
-                                        <div className="text-xl font-bold text-accent">
-                                            {config.installationDays} dni
+
+                                    {/* Pricing info */}
+                                    <div className="mt-4 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <div className="font-semibold text-slate-700 mb-2">Cennik dni montażowych:</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="flex justify-between"><span>1. dzień:</span> <span className="font-bold text-slate-700">1.200 €</span></div>
+                                            <div className="flex justify-between"><span>2. dzień:</span> <span className="font-bold text-slate-700">800 €</span></div>
+                                            <div className="flex justify-between"><span>3+ dzień:</span> <span className="font-bold text-slate-700">790 €</span></div>
                                         </div>
+                                    </div>
+                                </div>
+                                <div className="flex-1 w-full bg-gradient-to-br from-slate-50 to-slate-100 p-5 rounded-xl border border-slate-200">
+                                    <div className="font-semibold text-slate-900 mb-2">Koszt montażu</div>
+                                    {config.installationDays === 0 ? (
+                                        <div className="text-slate-400 italic">Brak montażu (tylko dostawa)</div>
                                     ) : (
-                                        <div className="text-slate-400 italic">Wybierz ilość dni</div>
+                                        <div className="space-y-2">
+                                            {/* Day-by-day breakdown */}
+                                            {Array.from({ length: config.installationDays }, (_, i) => {
+                                                const dayNumber = i + 1;
+                                                const dayPrice = dayNumber === 1 ? 1200 : dayNumber === 2 ? 800 : 790;
+                                                return (
+                                                    <div key={dayNumber} className="flex justify-between text-sm">
+                                                        <span className="text-slate-600">{dayNumber}. dzień montażowy</span>
+                                                        <span className="font-medium text-slate-800">{dayPrice.toLocaleString('de-DE')} €</span>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Total */}
+                                            <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between items-center">
+                                                <span className="font-bold text-slate-900">Razem:</span>
+                                                <span className="text-xl font-bold text-accent">
+                                                    {(() => {
+                                                        let total = 0;
+                                                        for (let d = 1; d <= config.installationDays; d++) {
+                                                            total += d === 1 ? 1200 : d === 2 ? 800 : 790;
+                                                        }
+                                                        return total.toLocaleString('de-DE');
+                                                    })()} €
+                                                </span>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -1708,12 +1742,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         <div className="space-y-3 pb-6 border-b border-slate-100">
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-sm">Model</span>
-                                <span className="font-bold text-slate-800">{
-                                    config.modelId === 'trendstyle_plus' ? 'Trendstyle+' :
-                                        config.modelId === 'topstyle_xl' ? 'Topstyle XL' :
-                                            config.modelId === 'skystyle' ? 'Skystyle' :
-                                                config.modelId ? config.modelId.charAt(0).toUpperCase() + config.modelId.slice(1) : '-'
-                                }</span>
+                                <span className="font-bold text-slate-800">{getDisplayModelName(config.modelId)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-sm">Wymiary</span>

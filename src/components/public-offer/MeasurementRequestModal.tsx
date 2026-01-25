@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 // We'll reuse LeadService to send the message for now
 import { LeadService } from '../../services/database/lead.service';
+import { OfferService } from '../../services/database/offer.service';
 
 interface MeasurementRequestModalProps {
     offerToken: string;
+    offerId?: string;
     onClose: () => void;
 }
 
-export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = ({ offerToken, onClose }) => {
+export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = ({ offerToken, offerId, onClose }) => {
     const [selectedDays, setSelectedDays] = useState<string[]>([]);
     const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
     const [note, setNote] = useState('');
@@ -34,18 +36,26 @@ export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = (
 
         setSending(true);
         const message = `
-PROŚBA O POMIAR (ANFRAGE AUFMASS)
-Preferowane dni: ${selectedDays.join(', ')}
-Preferowane pory: ${selectedTimes.join(', ')}
-Notatka: ${note}
+ANFRAGE AUFMASS
+Bevorzugte Tage: ${selectedDays.join(', ')}
+Bevorzugte Zeiten: ${selectedTimes.join(', ')}
+Notiz: ${note}
 
-Proszę o kontakt w celu potwierdzenia terminu.
+Bitte um Kontaktaufnahme zur Terminbestätigung.
         `.trim();
 
         try {
             const success = await LeadService.sendClientMessage(offerToken, message);
             if (success) {
                 toast.success('Vielen Dank! Ihre Anfrage wurde gesendet.');
+                // Track measurement request
+                if (offerId) {
+                    OfferService.trackInteraction(offerId, 'measurement_request', {
+                        preferredDays: selectedDays,
+                        preferredTimes: selectedTimes,
+                        note: note
+                    });
+                }
                 onClose();
             } else {
                 toast.error('Fehler beim Senden.');
@@ -103,8 +113,8 @@ Proszę o kontakt w celu potwierdzenia terminu.
                                     type="button"
                                     onClick={() => toggleSelection(time, selectedTimes, setSelectedTimes)}
                                     className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTimes.includes(time)
-                                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
-                                            : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
                                         }`}
                                 >
                                     {time}

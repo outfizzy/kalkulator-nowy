@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { UnifiedBacklogSidebar } from './UnifiedBacklogSidebar';
 import { InstallationCalendar } from './InstallationCalendar';
 import { InstallationTimeline } from './InstallationTimeline';
+import { MonthlyCalendarView } from './MonthlyCalendarView';
 import { InstallationService } from '../../services/database/installation.service';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
-import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability } from '../../types';
+import { UserService } from '../../services/database/user.service';
+import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability, User } from '../../types';
 import toast from 'react-hot-toast';
 
 interface UnifiedInstallationCalendarProps {
@@ -24,9 +26,15 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [unavailability, setUnavailability] = useState<TeamUnavailability[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [salesReps, setSalesReps] = useState<User[]>([]);
+
+    // Filters
+    const [showCompleted, setShowCompleted] = useState(false);
+    const [selectedSalesRep, setSelectedSalesRep] = useState<string>('');
+    const [selectedStatus, setSelectedStatus] = useState<string>('');
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
-    const [viewMode, setViewMode] = useState<'month' | 'timeline'>('month');
+    const [viewMode, setViewMode] = useState<'weekly' | 'monthly' | 'timeline'>('weekly');
 
     // Fetch Data
     const loadData = async () => {
@@ -66,7 +74,21 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
 
     useEffect(() => {
         loadData();
+        // Load sales reps for filter
+        UserService.getSalesReps().then(setSalesReps).catch(console.error);
     }, []);
+
+    // Filter installations
+    const filteredInstallations = installations.filter(inst => {
+        // Status filter
+        if (!showCompleted && inst.status === 'completed') return false;
+        if (selectedStatus && inst.status !== selectedStatus) return false;
+
+        // Sales rep filter (check if installation has salesRepId from contract)
+        if (selectedSalesRep && inst.salesRepId !== selectedSalesRep) return false;
+
+        return true;
+    });
 
     // Drag & Drop Handler
     const handleDragStart = (e: React.DragEvent, id: string, type: 'contract' | 'service' | 'installation') => {
@@ -131,7 +153,8 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
             await loadData(); // Refresh all
         } catch (error) {
             console.error('Drop error:', error);
-            toast.error('Błąd planowania', { id: toastId });
+            const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
+            toast.error(`Błąd planowania: ${errorMessage}`, { id: toastId });
         }
     };
 
@@ -230,7 +253,7 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
                 <div className="flex-1 flex flex-col min-w-0 bg-slate-100">
 
                     {/* Header Toolbar */}
-                    <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm z-10">
+                    <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm z-10 flex-wrap gap-3">
                         <div className="flex items-center gap-3">
                             {/* Toggler */}
                             <button
@@ -247,10 +270,70 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
                             </h2>
                         </div>
 
+                        {/* Filters */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                            {/* Show Completed */}
+                            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100">
+                                <input
+                                    type="checkbox"
+                                    checked={showCompleted}
+                                    onChange={(e) => setShowCompleted(e.target.checked)}
+                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                />
+                                <span>Pokaż zakończone</span>
+                            </label>
+
+                            {/* Sales Rep Filter */}
+                            <select
+                                value={selectedSalesRep}
+                                onChange={(e) => setSelectedSalesRep(e.target.value)}
+                                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Wszyscy handlowcy</option>
+                                {salesReps.map(rep => (
+                                    <option key={rep.id} value={rep.id}>
+                                        {rep.firstName} {rep.lastName}
+                                    </option>
+                                ))}
+                            </select>
+
+                            {/* Status Filter */}
+                            <select
+                                value={selectedStatus}
+                                onChange={(e) => setSelectedStatus(e.target.value)}
+                                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Wszystkie statusy</option>
+                                <option value="pending">Oczekujące</option>
+                                <option value="scheduled">Zaplanowane</option>
+                                <option value="confirmed">Potwierdzone</option>
+                                <option value="in_progress">W trakcie</option>
+                                <option value="completed">Zakończone</option>
+                                <option value="cancelled">Anulowane</option>
+                            </select>
+
+                            {/* Legend */}
+                            <div className="hidden lg:flex items-center gap-2 text-xs text-slate-500 border-l border-slate-200 pl-3">
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Zaplan.</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Potwierdz.</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Zakończ.</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Serwis</span>
+                            </div>
+                        </div>
+
                         <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                             <button
-                                onClick={() => setViewMode('month')}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'month'
+                                onClick={() => setViewMode('weekly')}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'weekly'
+                                    ? 'bg-white text-blue-600 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                <span>📋</span> Tydzień
+                            </button>
+                            <button
+                                onClick={() => setViewMode('monthly')}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'monthly'
                                     ? 'bg-white text-blue-600 shadow-sm'
                                     : 'text-slate-500 hover:text-slate-700'
                                     }`}
@@ -264,16 +347,16 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
                                     : 'text-slate-500 hover:text-slate-700'
                                     }`}
                             >
-                                <span>📊</span> Oś Czasu
+                                <span>📊</span> Gantt
                             </button>
                         </div>
                     </div>
 
                     {/* Calendar / Timeline Area */}
                     <div className="flex-1 overflow-hidden p-4">
-                        {viewMode === 'month' ? (
+                        {viewMode === 'weekly' && (
                             <InstallationCalendar
-                                installations={installations}
+                                installations={filteredInstallations}
                                 serviceTickets={[]}
                                 teams={teams}
                                 onEdit={(inst) => {
@@ -282,9 +365,20 @@ export const UnifiedInstallationCalendar: React.FC<UnifiedInstallationCalendarPr
                                 onDragDrop={handleUnifiedDrop}
                                 unavailability={unavailability}
                             />
-                        ) : (
+                        )}
+                        {viewMode === 'monthly' && (
+                            <MonthlyCalendarView
+                                installations={filteredInstallations}
+                                teams={teams}
+                                onEdit={(inst) => {
+                                    if (onEdit) onEdit(inst);
+                                }}
+                                onDragDrop={handleUnifiedDrop}
+                            />
+                        )}
+                        {viewMode === 'timeline' && (
                             <InstallationTimeline
-                                installations={installations}
+                                installations={filteredInstallations}
                                 serviceTickets={[]}
                                 teams={teams}
                                 onEdit={(inst) => {

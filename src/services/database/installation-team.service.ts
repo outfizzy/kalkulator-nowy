@@ -19,7 +19,8 @@ export const InstallationTeamService = {
             members: typeof row.members === 'string' ? JSON.parse(row.members) : row.members,
             isActive: row.is_active,
             fuelConsumption: row.fuel_consumption,
-            vehicleMaintenanceRate: row.vehicle_maintenance_rate
+            vehicleMaintenanceRate: row.vehicle_maintenance_rate,
+            workingDays: row.working_days || [1, 2, 3, 4, 5]
         }));
     },
 
@@ -33,7 +34,8 @@ export const InstallationTeamService = {
                 members: team.members,
                 is_active: true,
                 fuel_consumption: team.fuelConsumption,
-                vehicle_maintenance_rate: team.vehicleMaintenanceRate
+                vehicle_maintenance_rate: team.vehicleMaintenanceRate,
+                working_days: team.workingDays || [1, 2, 3, 4, 5]
             })
             .select()
             .single();
@@ -48,7 +50,8 @@ export const InstallationTeamService = {
             members: typeof data.members === 'string' ? JSON.parse(data.members) : data.members,
             isActive: data.is_active,
             fuelConsumption: data.fuel_consumption,
-            vehicleMaintenanceRate: data.vehicle_maintenance_rate
+            vehicleMaintenanceRate: data.vehicle_maintenance_rate,
+            workingDays: data.working_days || [1, 2, 3, 4, 5]
         };
     },
 
@@ -61,6 +64,7 @@ export const InstallationTeamService = {
         if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
         if (updates.fuelConsumption !== undefined) dbUpdates.fuel_consumption = updates.fuelConsumption;
         if (updates.vehicleMaintenanceRate !== undefined) dbUpdates.vehicle_maintenance_rate = updates.vehicleMaintenanceRate;
+        if (updates.workingDays !== undefined) dbUpdates.working_days = updates.workingDays;
 
         const { error } = await supabase
             .from('installation_teams')

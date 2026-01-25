@@ -19,6 +19,7 @@ USING (
 );
 
 -- 2. Update SELECT/UPDATE (Managers can still edit/view, usually desired)
+DROP POLICY IF EXISTS "contracts_update_policy" ON public.contracts;
 CREATE POLICY "contracts_update_policy" ON public.contracts
 AS PERMISSIVE FOR UPDATE
 TO authenticated

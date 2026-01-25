@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 const rawRole = data.role as string | null;
 
                 const normalizedRole = ((): UserRole => {
-                    if (rawRole === 'admin' || rawRole === 'sales_rep' || rawRole === 'manager' || rawRole === 'partner' || rawRole === 'installer') {
+                    if (rawRole === 'admin' || rawRole === 'sales_rep' || rawRole === 'manager' || rawRole === 'partner' || rawRole === 'installer' || rawRole === 'b2b_partner' || rawRole === 'b2b_manager') {
                         return rawRole;
                     }
                     return 'sales_rep';

@@ -30,17 +30,17 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
         return (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                 <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                    <span className="text-3xl">📝</span> Specyfikacja (Indywidualna)
+                    <span className="text-3xl">📝</span> Technische Spezifikation (Individuell)
                 </h3>
 
                 <div className="prose prose-slate max-w-none">
                     <div className="whitespace-pre-wrap text-slate-700 leading-relaxed font-medium">
-                        {product.manualDescription || "Brak opisu."}
+                        {product.manualDescription || "Keine Beschreibung verfügbar."}
                     </div>
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-400">
-                    ℹ️ Oferta przygotowana indywidualnie przez doradcę.
+                    ℹ️ Angebot individuell von Ihrem Berater erstellt.
                 </div>
             </div>
         );
@@ -49,7 +49,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
-                <h2 className="text-xl font-bold">Specyfikacja Techniczna</h2>
+                <h2 className="text-xl font-bold">Technische Spezifikation</h2>
                 <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-mono opacity-70">
                     ID: {product.modelId}
                 </span>
@@ -58,35 +58,35 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
             <div className="p-6">
 
                 {/* 1. Dimensions & Structure */}
-                <SectionHeader title="Wymiary i Konstrukcja" icon="📐" />
+                <SectionHeader title="Abmessungen & Konstruktion" icon="📐" />
                 <div className="bg-white border-x border-b border-slate-200 rounded-b-xl mb-6">
-                    <SpecRow label="Szerokość" value={`${product.width} mm`} />
-                    <SpecRow label="Głębokość (Wysięg)" value={`${product.projection} mm`} />
-                    {product.postsHeight && <SpecRow label="Wysokość Słupów" value={`${product.postsHeight} mm`} />}
-                    {product.installationDays && <SpecRow label="Przewidywany czas montażu" value={`${product.installationDays} dni`} />}
-                    {product.numberOfPosts && <SpecRow label="Liczba Słupów" value={`${product.numberOfPosts} szt.`} />}
-                    {product.numberOfFields && <SpecRow label="Liczba Pól (Sekcji)" value={`${product.numberOfFields}`} />}
+                    <SpecRow label="Breite" value={`${product.width} mm`} />
+                    <SpecRow label="Tiefe (Ausladung)" value={`${product.projection} mm`} />
+                    {product.postsHeight && <SpecRow label="Pfostenhöhe" value={`${product.postsHeight} mm`} />}
+                    {product.installationDays && <SpecRow label="Voraussichtliche Montagezeit" value={`${product.installationDays} Tage`} />}
+                    {product.numberOfPosts && <SpecRow label="Anzahl Pfosten" value={`${product.numberOfPosts} Stk.`} />}
+                    {product.numberOfFields && <SpecRow label="Anzahl Felder" value={`${product.numberOfFields}`} />}
                 </div>
 
                 {/* 2. Aesthetics */}
-                <SectionHeader title="Kolorystyka" icon="🎨" />
+                <SectionHeader title="Farbgestaltung" icon="🎨" />
                 <div className="bg-white border-x border-b border-slate-200 rounded-b-xl mb-6">
-                    <SpecRow label="Kolor Konstrukcji" value={product.customColor ? 'Indywidualny (RAL)' : product.color} />
-                    {product.customColor && <SpecRow label="Numer RAL" value={product.customColorRAL} />}
+                    <SpecRow label="Konstruktionsfarbe" value={product.customColor ? 'Individuell (RAL)' : product.color} />
+                    {product.customColor && <SpecRow label="RAL-Nummer" value={product.customColorRAL} />}
                 </div>
 
                 {/* 3. Roof */}
-                <SectionHeader title="Pokrycie Dachowe" icon="🏠" />
+                <SectionHeader title="Dacheindeckung" icon="🏠" />
                 <div className="bg-white border-x border-b border-slate-200 rounded-b-xl mb-6">
-                    <SpecRow label="Typ Dachu" value={product.roofType === 'glass' ? 'Szkło Bezpieczne (VSG)' : 'Poliwęglan Komorowy'} />
-                    {product.roofType === 'glass' && <SpecRow label="Rodzaj Szkła" value={product.glassType || 'Standard (8mm)'} />}
-                    {product.roofType === 'polycarbonate' && <SpecRow label="Rodzaj Poliwęglanu" value={product.polycarbonateType || 'Opal / Klar'} />}
+                    <SpecRow label="Dachtyp" value={product.roofType === 'glass' ? 'Sicherheitsglas (VSG)' : 'Polycarbonat'} />
+                    {product.roofType === 'glass' && <SpecRow label="Glasart" value={product.glassType || 'Standard (8mm)'} />}
+                    {product.roofType === 'polycarbonate' && <SpecRow label="Polycarbonatart" value={product.polycarbonateType || 'Opal / Klar'} />}
                 </div>
 
                 {/* 4. Addons & Extras */}
                 {(product.addons?.length > 0 || (product.selectedAccessories?.length || 0) > 0) && (
                     <>
-                        <SectionHeader title="Dodatki i Wyposażenie" icon="✨" />
+                        <SectionHeader title="Zubehör & Ausstattung" icon="✨" />
                         <div className="bg-white border-x border-b border-slate-200 rounded-b-xl mb-6 p-6">
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                 {product.addons.map((addon, idx) => {
@@ -106,7 +106,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                                                     </div>
                                                 )}
                                                 <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-slate-600 shadow-sm">
-                                                    {addon.quantity || 1} szt.
+                                                    {addon.quantity || 1} Stk.
                                                 </div>
                                             </div>
                                             <div className="p-3">
@@ -114,7 +114,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                                                     {addon.name}
                                                 </div>
                                                 <div className="text-xs text-accent font-medium mt-1">
-                                                    W zestawie
+                                                    Inklusive
                                                 </div>
                                             </div>
                                         </div>
@@ -129,7 +129,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                                                 📦
                                             </div>
                                             <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-slate-600 shadow-sm">
-                                                {acc.quantity} szt.
+                                                {acc.quantity} Stk.
                                             </div>
                                         </div>
                                         <div className="p-3">
@@ -137,7 +137,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                                                 {acc.name}
                                             </div>
                                             <div className="text-xs text-slate-500 font-medium mt-1">
-                                                Akcesoria
+                                                Zubehör
                                             </div>
                                         </div>
                                     </div>
@@ -150,13 +150,13 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                 {/* 5. Custom Items */}
                 {product.customItems && product.customItems.length > 0 && (
                     <>
-                        <SectionHeader title="Elementy Niestandardowe" icon="🛠️" />
+                        <SectionHeader title="Sonderausstattung" icon="🛠️" />
                         <div className="bg-white border-x border-b border-slate-200 rounded-b-xl">
                             {product.customItems.map((item, idx) => (
                                 <SpecRow
                                     key={`custom-${idx}`}
-                                    label={`${item.name} (${item.quantity} szt.)`}
-                                    value={item.description || 'Specjalne zamówienie'}
+                                    label={`${item.name} (${item.quantity} Stk.)`}
+                                    value={item.description || 'Sonderbestellung'}
                                 />
                             ))}
                         </div>

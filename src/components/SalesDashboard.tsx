@@ -318,6 +318,22 @@ export const SalesDashboard: React.FC = () => {
                 </Link>
 
                 <Link
+                    to="/visualizer"
+                    className="group bg-gradient-to-br from-cyan-500 to-teal-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Wizualizator 3D</h3>
+                        <p className="text-white/80 text-sm">Konfiguruj dachy i ogrodzenia</p>
+                    </div>
+                </Link>
+
+                <Link
                     to="/measurements"
                     className="group bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
                 >

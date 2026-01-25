@@ -24,6 +24,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
     // filteredCustomers is now derived via useMemo
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+    // NEW: Toggle for customer-less transactions
+    const [useCustomer, setUseCustomer] = useState(true);
 
     const loadCustomers = async () => {
         try {
@@ -64,8 +66,15 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
             return;
         }
 
-        if (type === 'income' && !selectedCustomer) {
+        // Customer is now optional - only validate if useCustomer is true
+        if (type === 'income' && useCustomer && !selectedCustomer) {
             toast.error('Wybierz klienta dla wpłaty');
+            return;
+        }
+
+        // If not using customer, require description
+        if (type === 'income' && !useCustomer && !description.trim()) {
+            toast.error('Podaj opis dla wpłaty bez klienta');
             return;
         }
 
@@ -79,11 +88,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                 type,
                 amount: Number(amount),
                 currency,
-                category: type === 'income' ? 'Wpłata od klienta' : category,
-                description,
+                category: type === 'income'
+                    ? (useCustomer && selectedCustomer ? 'Wpłata od klienta' : 'Wpłata ogólna')
+                    : category,
+                description: type === 'income' && !useCustomer ? description : description,
                 date: new Date(date).toISOString(),
-                customerId: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
-                customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
+                customerId: (useCustomer && selectedCustomer) ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
+                customerName: (useCustomer && selectedCustomer) ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined,
                 contractNumber: undefined
             };
 
@@ -114,6 +125,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
         setDate(new Date().toISOString().split('T')[0]);
         setSearchTerm('');
         setSelectedCustomer(null);
+        setUseCustomer(true);
     };
 
     if (!isOpen) return null;
@@ -204,62 +216,99 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
 
                     {/* Conditional Fields */}
                     {type === 'income' ? (
-                        <div className="relative">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Klient</label>
-                            {selectedCustomer ? (
-                                <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                                    <div>
-                                        <p className="font-medium text-emerald-900">
-                                            {selectedCustomer.firstName} {selectedCustomer.lastName}
-                                        </p>
-                                        <p className="text-xs text-emerald-700">{selectedCustomer.city}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedCustomer(null);
-                                            setSearchTerm('');
-                                        }}
-                                        className="text-emerald-500 hover:text-emerald-700"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
+                        <div className="space-y-4">
+                            {/* Toggle: Customer or Description Only */}
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                <button
+                                    type="button"
+                                    onClick={() => setUseCustomer(true)}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${useCustomer
+                                        ? 'bg-white text-emerald-600 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Wpłata od Klienta
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setUseCustomer(false);
+                                        setSelectedCustomer(null);
+                                    }}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${!useCustomer
+                                        ? 'bg-white text-indigo-600 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Wpłata z Opisem
+                                </button>
+                            </div>
+
+                            {useCustomer ? (
+                                <div className="relative">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Klient</label>
+                                    {selectedCustomer ? (
+                                        <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                                            <div>
+                                                <p className="font-medium text-emerald-900">
+                                                    {selectedCustomer.firstName} {selectedCustomer.lastName}
+                                                </p>
+                                                <p className="text-xs text-emerald-700">{selectedCustomer.city}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedCustomer(null);
+                                                    setSearchTerm('');
+                                                }}
+                                                className="text-emerald-500 hover:text-emerald-700"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                                placeholder="Szukaj po nazwisku, mieście..."
+                                            />
+                                            {showCustomerDropdown && filteredCustomers.length > 0 && (
+                                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                                    {filteredCustomers.map((item, index) => (
+                                                        <button
+                                                            key={index}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedCustomer(item.customer);
+                                                                setSearchTerm('');
+                                                                setShowCustomerDropdown(false);
+                                                            }}
+                                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                                                        >
+                                                            <p className="font-medium text-slate-800">
+                                                                {item.customer.firstName} {item.customer.lastName}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">
+                                                                {item.customer.city}, {item.customer.street}
+                                                            </p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             ) : (
-                                <>
-                                    <input
-                                        type="text"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                        placeholder="Szukaj po nazwisku, mieście..."
-                                    />
-                                    {showCustomerDropdown && filteredCustomers.length > 0 && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                                            {filteredCustomers.map((item, index) => (
-                                                <button
-                                                    key={index}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setSelectedCustomer(item.customer);
-                                                        setSearchTerm('');
-                                                        setShowCustomerDropdown(false);
-                                                    }}
-                                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
-                                                >
-                                                    <p className="font-medium text-slate-800">
-                                                        {item.customer.firstName} {item.customer.lastName}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        {item.customer.city}, {item.customer.street}
-                                                    </p>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                                    <p className="text-sm text-indigo-700 mb-2">
+                                        <span className="font-medium">💡 Wpłata bez klienta</span> - podaj szczegółowy opis transakcji
+                                    </p>
+                                </div>
                             )}
                         </div>
                     ) : (

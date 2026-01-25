@@ -11,6 +11,8 @@ import { TasksList } from '../tasks/TasksList';
 import { TaskModal } from '../tasks/TaskModal';
 import { NotesList } from '../common/NotesList';
 import { AssigneeSelector } from '../common/AssigneeSelector';
+import { CustomerActivityTimeline } from '../common/CustomerActivityTimeline';
+import { ScheduleMeasurementModal } from './ScheduleMeasurementModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -33,6 +35,7 @@ export const LeadDetailsPage: React.FC = () => {
 
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [isAssigning, setIsAssigning] = useState(false);
+    const [isMeasurementModalOpen, setIsMeasurementModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchLead = async () => {
@@ -212,6 +215,15 @@ export const LeadDetailsPage: React.FC = () => {
                                 className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
                             >
                                 Edytuj
+                            </button>
+                            <button
+                                onClick={() => setIsMeasurementModalOpen(true)}
+                                className="px-4 py-2 border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-medium transition-colors flex items-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Umów Pomiar
                             </button>
                             <button
                                 onClick={handleConvert}
@@ -493,6 +505,17 @@ export const LeadDetailsPage: React.FC = () => {
                                             </button>
                                         </div>
                                         <TasksList leadId={lead.id} refreshTrigger={tasksRefreshTrigger} />
+                                    </div>
+
+                                    {/* Customer Activity Section */}
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                                        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                            <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                            </svg>
+                                            Aktywność Klienta
+                                        </h3>
+                                        <CustomerActivityTimeline leadId={lead.id} />
                                     </div>
 
                                     {lead.emailMessageId && (
@@ -902,6 +925,23 @@ export const LeadDetailsPage: React.FC = () => {
                 onClose={() => setIsTaskModalOpen(false)}
                 initialData={{ leadId: lead.id }}
                 onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
+            />
+            <ScheduleMeasurementModal
+                isOpen={isMeasurementModalOpen}
+                onClose={() => setIsMeasurementModalOpen(false)}
+                onSuccess={() => {
+                    // Refresh lead to show updated status
+                    DatabaseService.getLead(id!).then(setLead);
+                }}
+                leadData={{
+                    leadId: lead.id,
+                    firstName: lead.customerData.firstName,
+                    lastName: lead.customerData.lastName,
+                    phone: lead.customerData.phone,
+                    address: lead.customerData.address,
+                    postalCode: lead.customerData.postalCode,
+                    city: lead.customerData.city
+                }}
             />
         </div >
     );

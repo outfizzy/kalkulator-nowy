@@ -39,6 +39,7 @@ import { InstallationDashboard } from './components/installations/InstallationDa
 import { PortfolioDashboard } from './components/installations/PortfolioDashboard';
 import { NewOfferPage } from './pages/NewOfferPage';
 import { WalletPage } from './components/admin/WalletPage';
+import { ManagerWalletPage } from './components/admin/ManagerWalletPage';
 import { MeasurementDashboard } from './components/measurements/MeasurementDashboard';
 import { MeasurementReportsList } from './components/reports/MeasurementReportsList';
 import { ContractsList } from './components/contracts/ContractsList';
@@ -59,6 +60,8 @@ import { EmailTemplatesPage } from './pages/admin/EmailTemplatesPage';
 import { ErrorReportsPage } from './pages/admin/ErrorReportsPage';
 import { PricingV2Page } from './pages/admin/PricingV2Page';
 import { PriceTableBrowserPage } from './pages/admin/PriceTableBrowserPage';
+import { B2BPartnersPage } from './pages/admin/B2BPartnersPage';
+import { B2BOrdersAdminPage } from './pages/admin/B2BOrdersAdminPage';
 import { AIAssistantPage } from './components/admin/AIAssistantPage';
 import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
@@ -73,6 +76,23 @@ import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
 import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
 import { PartnerLayout } from './components/partner/PartnerLayout';
 import { ScrollToTop } from './components/ScrollToTop';
+
+// B2B Partner Portal
+import { B2BLayout } from './pages/b2b/B2BLayout';
+import { B2BDashboard } from './pages/b2b/B2BDashboard';
+import { B2BOffersPage } from './pages/b2b/B2BOffersPage';
+import { B2BOrdersPage } from './pages/b2b/B2BOrdersPage';
+import { B2BPromotionsPage } from './pages/b2b/B2BPromotionsPage';
+import { B2BCreditPage } from './pages/b2b/B2BCreditPage';
+import { B2BLoginPage } from './pages/b2b/B2BLoginPage';
+
+// B2B Admin
+import { B2BPromotionsAdminPage } from './pages/admin/B2BPromotionsAdminPage';
+import { B2BCreditAdminPage } from './pages/admin/B2BCreditAdminPage';
+import { B2BPartnerAnalyticsPage } from './pages/admin/B2BPartnerAnalyticsPage';
+
+import { OfferPrintView } from './pages/print/OfferPrintView';
+import { DachrechnerPage } from './pages/DachrechnerPage';
 
 // Lazy load heavy components to avoid module evaluation crashes
 const ProductConfiguratorV2 = React.lazy(() => import('./components/calculator_v2/ProductConfiguratorV2').then(m => ({ default: m.ProductConfiguratorV2 })));
@@ -92,6 +112,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactEleme
   }
 
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+    if (currentUser.role === 'b2b_partner') return <Navigate to="/b2b/dashboard" replace />;
     if (currentUser.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
     if (currentUser.role === 'installer') return <Navigate to="/installer" replace />;
     return <Navigate to="/dashboard" replace />;
@@ -105,6 +126,15 @@ function DashboardRouter() {
   if (currentUser?.role === 'admin') return <AdminDashboard />;
   if (currentUser?.role === 'manager') return <ManagerDashboard />;
   return <SalesDashboard />;
+}
+
+// Wallet router - show full wallet for admin, limited for manager
+function WalletRouter() {
+  const { currentUser } = useAuth();
+  // Admin sees full wallet with balance
+  if (currentUser?.role === 'admin') return <WalletPage />;
+  // Manager sees limited wallet without balance
+  return <ManagerWalletPage />;
 }
 
 function App() {
@@ -122,6 +152,9 @@ function App() {
             <Route path="/reklamation" element={<ServiceRequestPage />} />
             <Route path="/partner/login" element={<PartnerLoginPage />} />
             <Route path="/partner/register" element={<PartnerRegisterPage />} />
+            <Route path="/b2b/login" element={<B2BLoginPage />} />
+            <Route path="/b2b/register" element={<PartnerRegisterPage />} />
+            <Route path="/print/offer/:token" element={<OfferPrintView />} />
 
             {/* Sales Rep / Admin Routes */}
             <Route element={
@@ -134,12 +167,13 @@ function App() {
             }>
               <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/offers" element={<OffersList />} />
-              <Route path="/new-offer" element={<NewOfferPage />} />
-              <Route path="/v2" element={
+              <Route path="/new-offer" element={
                 <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>}>
                   <ProductConfiguratorV2 />
                 </Suspense>
               } />
+              {/* Legacy V1 calculator - kept for backwards compatibility */}
+              <Route path="/v1" element={<NewOfferPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/migration" element={<MigrationPage />} />
               <Route path="/admin/users" element={<UserManagementPage />} />
@@ -147,7 +181,7 @@ function App() {
               <Route path="/admin/partner-offers" element={<PartnerOffersPage />} />
               <Route path="/admin/installers" element={<InstallerManagementPanel />} />
               <Route path="/admin/teams" element={<TeamManagementPanel />} />
-              <Route path="/admin/wallet" element={<WalletPage />} />
+              <Route path="/admin/wallet" element={<WalletRouter />} />
               <Route path="/reports" element={<ReportsList />} />
               <Route path="/reports/new" element={<ReportForm />} />
               <Route path="/reports/measurements" element={<MeasurementReportsList />} />
@@ -156,18 +190,26 @@ function App() {
               <Route path="/portfolio" element={<PortfolioDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
+              <Route path="/dachrechner" element={<DachrechnerPage />} />
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
-              <Route path="admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />
+              <Route path="admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PriceTableBrowserPage /></ProtectedRoute>} />
+              {/* Legacy pricing pages - kept for backwards compatibility */}
+              <Route path="admin/pricing-old" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />
               <Route path="admin/pricing-v2" element={<ProtectedRoute allowedRoles={['admin']}><PricingV2Page /></ProtectedRoute>} />
-              <Route path="admin/price-tables" element={<ProtectedRoute allowedRoles={['admin']}><PriceTableBrowserPage /></ProtectedRoute>} />
               <Route path="admin/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><InventoryDashboard /></ProtectedRoute>} />
               <Route path="admin/logs" element={<ProtectedRoute allowedRoles={['admin']}><ActivityLogsPage /></ProtectedRoute>} />
               <Route path="/admin/profitability" element={<InstallationProfitability />} />
               <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><SystemPermissionsPage /></ProtectedRoute>} />
               <Route path="/admin/fairs" element={<ProtectedRoute allowedRoles={['admin']}><FairManagement /></ProtectedRoute>} />
               <Route path="/admin/email-templates" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}><EmailTemplatesPage /></ProtectedRoute>} />
+              {/* B2B Admin Routes */}
+              <Route path="/admin/b2b/partners" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BPartnersPage /></ProtectedRoute>} />
+              <Route path="/admin/b2b/orders" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BOrdersAdminPage /></ProtectedRoute>} />
+              <Route path="/admin/b2b/promotions" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BPromotionsAdminPage /></ProtectedRoute>} />
+              <Route path="/admin/b2b/credit" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BCreditAdminPage /></ProtectedRoute>} />
+              <Route path="/admin/b2b/analytics" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BPartnerAnalyticsPage /></ProtectedRoute>} />
               <Route path="/admin/error-reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorReportsPage /></ProtectedRoute>} />
               <Route path="/fairs" element={<FairDashboard />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
@@ -200,6 +242,25 @@ function App() {
               <Route path="offers" element={<OffersList />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route index element={<Navigate to="/partner/dashboard" replace />} />
+            </Route>
+
+            {/* B2B Partner Portal Routes */}
+            <Route path="/b2b" element={
+              <ProtectedRoute allowedRoles={['b2b_partner']}>
+                <B2BLayout />
+              </ProtectedRoute>
+            }>
+              <Route path="dashboard" element={<B2BDashboard />} />
+              <Route path="calculator" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+                  <ProductConfiguratorV2 mode="b2b" />
+                </Suspense>
+              } />
+              <Route path="offers" element={<B2BOffersPage />} />
+              <Route path="orders" element={<B2BOrdersPage />} />
+              <Route path="promotions" element={<B2BPromotionsPage />} />
+              <Route path="credit" element={<B2BCreditPage />} />
+              <Route index element={<Navigate to="/b2b/dashboard" replace />} />
             </Route>
 
             {/* Installer Protected Routes */}

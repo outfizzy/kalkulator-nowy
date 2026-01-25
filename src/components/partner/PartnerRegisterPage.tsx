@@ -14,7 +14,7 @@ export const PartnerRegisterPage: React.FC = () => {
         phone: '',
         companyName: '',
         nip: '',
-        role: 'partner' as UserRole
+        role: 'b2b_partner' as UserRole
     });
     const [loading, setLoading] = useState(false);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -47,7 +47,7 @@ export const PartnerRegisterPage: React.FC = () => {
             setShowSuccessMessage(true);
 
             setTimeout(() => {
-                navigate('/partner/login');
+                navigate('/b2b/login');
             }, 8000);
         } catch (error: unknown) {
             console.error('Registration error:', error);
@@ -326,7 +326,7 @@ export const PartnerRegisterPage: React.FC = () => {
                         <p className="text-slate-400 text-sm">
                             Masz już konto partnera?{' '}
                             <button
-                                onClick={() => navigate('/partner/login')}
+                                onClick={() => navigate('/b2b/login')}
                                 className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
                             >
                                 Zaloguj się

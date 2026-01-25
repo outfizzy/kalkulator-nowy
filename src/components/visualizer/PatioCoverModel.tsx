@@ -467,6 +467,9 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                         const height = p1.height;
                         const z = p1.position[2] + POST_SIZE / 2 - 0.05;
 
+                        // Check if this is Panorama (frameless)
+                        const isPanorama = slidingWallAddons.some(a => a.name?.includes('Panorama'));
+
                         return (
                             <GlassWallPanel
                                 key={`front-wall-${i}`}
@@ -474,6 +477,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                                 width={width}
                                 height={height}
                                 material={glassWallMaterial}
+                                isFrameless={isPanorama}
                             />
                         );
                     })}
@@ -720,9 +724,10 @@ interface GlassWallPanelProps {
     width: number;
     height: number;
     material: THREE.Material;
+    isFrameless?: boolean;
 }
 
-const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height, material }) => {
+const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height, material, isFrameless }) => {
     // Frame Color
     const frameMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#333', roughness: 0.5 }), []);
     const guideMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#aaa', roughness: 0.5 }), []);
@@ -743,8 +748,8 @@ const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height
             </mesh>
 
             {/* Vertical Lines simulating sliding panes overlap (3-track?) */}
-            {/* Dynamic Vertical Lines for Sliding Panes */}
-            {Array.from({ length: Math.max(2, Math.ceil(width / 1.1)) - 1 }).map((_, i) => {
+            {/* Dynamic Vertical Lines for Sliding Panes - HIDE FOR FRAMELESS PANORAMA */}
+            {!isFrameless && Array.from({ length: Math.max(2, Math.ceil(width / 1.1)) - 1 }).map((_, i) => {
                 const numPanels = Math.max(2, Math.ceil(width / 1.1));
                 // i goes from 0 to numPanels - 2.
                 // Positions: -width/2 + (width/numPanels) * (i+1)

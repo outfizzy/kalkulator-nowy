@@ -9,10 +9,11 @@ interface UpsellSectionProps {
 export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
     const [requesting, setRequesting] = useState<string | null>(null);
 
-    // Identify what's missing in the offer
-    const hasLED = offer.product.addons.some(a => a.type === 'lighting');
-    const hasHeater = offer.product.addons.some(a => a.type === 'heater');
-    const hasSides = offer.product.addons.some(a => a.type === 'slidingWall' || a.type === 'fixedWall');
+    // Identify what's missing in the offer (with null checks for V2 offers)
+    const addons = offer.product?.addons || [];
+    const hasLED = addons.some(a => a.type === 'lighting');
+    const hasHeater = addons.some(a => a.type === 'heater');
+    const hasSides = addons.some(a => a.type === 'slidingWall' || a.type === 'fixedWall');
 
     // Define potential upgrades
     const upgrades = [

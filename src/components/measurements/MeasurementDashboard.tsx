@@ -3,13 +3,13 @@ import { toast } from 'react-hot-toast';
 import { MeasurementCalendar } from './MeasurementCalendar';
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Measurement, Offer } from '../../types';
+import type { Measurement, Offer, User } from '../../types';
 import { AddMeasurementFromOffer } from './AddMeasurementFromOffer';
 import { MeasurementRouteView } from './MeasurementRouteView';
 import { CustomerSelector } from './CustomerSelector';
 import type { Customer } from '../../types';
 import { GeocodingService } from '../../services/GeocodingService';
-import { MapPin } from 'lucide-react';
+import { MapPin, Users } from 'lucide-react';
 import { MeasurementModal } from './MeasurementModal';
 
 export const MeasurementDashboard: React.FC = () => {
@@ -24,6 +24,29 @@ export const MeasurementDashboard: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showCustomerSelector, setShowCustomerSelector] = useState(false);
     const [availableOffersForCustomer, setAvailableOffersForCustomer] = useState<Offer[]>([]);
+    // Sales rep filter for admin/manager
+    const [salesReps, setSalesReps] = useState<User[]>([]);
+    const [selectedSalesRepId, setSelectedSalesRepId] = useState<string>('all');
+
+    // Load sales reps for admin/manager filter
+    useEffect(() => {
+        const loadSalesReps = async () => {
+            if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
+                try {
+                    const allUsers = await DatabaseService.getAllUsers();
+                    // Filter to sales reps and managers (active users who can have measurements)
+                    const reps = allUsers.filter(u =>
+                        (u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin') &&
+                        u.status === 'active'
+                    );
+                    setSalesReps(reps);
+                } catch (error) {
+                    console.error('Error loading sales reps:', error);
+                }
+            }
+        };
+        loadSalesReps();
+    }, [currentUser?.role]);
 
     const loadMeasurements = React.useCallback(async () => {
         try {
@@ -31,7 +54,13 @@ export const MeasurementDashboard: React.FC = () => {
             let data: Measurement[];
 
             if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
-                data = await DatabaseService.getMeasurements();
+                // Admin/Manager can see all measurements or filter by sales rep
+                const allMeasurements = await DatabaseService.getMeasurements();
+                if (selectedSalesRepId === 'all') {
+                    data = allMeasurements;
+                } else {
+                    data = allMeasurements.filter(m => m.salesRepId === selectedSalesRepId);
+                }
             } else if (currentUser?.id) {
                 data = await DatabaseService.getMeasurementsBySalesRep(currentUser.id);
             } else {
@@ -45,7 +74,7 @@ export const MeasurementDashboard: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentUser]);
+    }, [currentUser, selectedSalesRepId]);
 
     useEffect(() => {
         loadMeasurements();
@@ -200,6 +229,24 @@ export const MeasurementDashboard: React.FC = () => {
                     <p className="text-slate-500 mt-1">Zarządzaj pomiarami i trasami handlowców</p>
                 </div>
                 <div className="flex items-center gap-4">
+                    {/* Sales Rep Filter - only for admin/manager */}
+                    {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && salesReps.length > 0 && (
+                        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
+                            <Users className="w-4 h-4 text-blue-600" />
+                            <select
+                                value={selectedSalesRepId}
+                                onChange={(e) => setSelectedSalesRepId(e.target.value)}
+                                className="bg-transparent border-none text-sm font-medium text-blue-700 focus:outline-none cursor-pointer"
+                            >
+                                <option value="all">Wszyscy handlowcy</option>
+                                {salesReps.map(rep => (
+                                    <option key={rep.id} value={rep.id}>
+                                        {rep.firstName} {rep.lastName}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
                         <span className="text-sm text-slate-500 mr-2">Zalogowany jako:</span>
                         <span className="font-bold text-slate-700">

@@ -22,17 +22,38 @@ export const InstallerDashboard: React.FC = () => {
             }
             try {
                 console.log('Loading installations for installer dashboard...');
-                // Get all installations - since installation_assignments table may not exist yet
+
+                // 1. Get teams to find which team this installer belongs to
+                const { InstallationTeamService } = await import('../../services/database/installation-team.service');
+                const teams = await InstallationTeamService.getTeams();
+
+                // Find teams where current user is a member
+                const myTeams = teams.filter(team =>
+                    team.members.some(member => member.id === currentUser.id)
+                );
+                const myTeamIds = myTeams.map(t => t.id);
+
+                console.log('User teams:', myTeams.map(t => t.name));
+
+                // 2. Get all installations
                 const installations = await DatabaseService.getInstallations();
                 console.log('Loaded installations:', installations.length);
 
                 const today = new Date().toISOString().split('T')[0];
 
-                const todayInst = installations.find(inst =>
-                    inst.scheduledDate?.split('T')[0] === today
-                );
+                // 3. Filter by today AND by installer's team (if they have teams)
+                const todayInst = installations.find(inst => {
+                    const isToday = inst.scheduledDate?.split('T')[0] === today;
+                    if (!isToday) return false;
 
-                console.log('Today\'s installation:', todayInst);
+                    // If user has no teams, show all (backward compatibility)
+                    if (myTeamIds.length === 0) return true;
+
+                    // Otherwise, only show installations for user's teams
+                    return inst.teamId && myTeamIds.includes(inst.teamId);
+                });
+
+                console.log('Today\'s installation for my team:', todayInst);
                 setTodayInstallation(todayInst || null);
                 setError(null);
             } catch (error) {
@@ -235,10 +256,98 @@ export const InstallerDashboard: React.FC = () => {
 
                             {/* Expanded Details */}
                             {showDetails && (
-                                <div className="mt-4 pt-4 border-t border-white/20 text-sm space-y-2 animate-fadeIn">
+                                <div className="mt-4 pt-4 border-t border-white/20 text-sm space-y-3 animate-fadeIn">
+                                    {/* Payment Method - IMPORTANT FOR INSTALLER */}
+                                    <div className="bg-white/10 rounded-lg p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {todayInstallation.paymentMethod === 'cash' || todayInstallation.contractData?.paymentMethod === 'cash' ? (
+                                                <>
+                                                    <span className="text-2xl">💵</span>
+                                                    <div>
+                                                        <p className="font-bold text-yellow-200">GOTÓWKA DO POBRANIA</p>
+                                                        <p className="text-lg font-bold">
+                                                            {todayInstallation.contractData?.remainingAmount?.toLocaleString('pl-PL') || todayInstallation.contractData?.totalPrice?.toLocaleString('pl-PL') || '---'} PLN
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="text-2xl">💳</span>
+                                                    <div>
+                                                        <p className="font-bold text-green-200">PRZELEW</p>
+                                                        <p className="text-xs opacity-75">Płatność obsłużona przez biuro</p>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Product Info */}
                                     <p><span className="opacity-75">Produkt:</span> <strong>{todayInstallation.productSummary}</strong></p>
-                                    {todayInstallation.notes && <p><span className="opacity-75">Notatki:</span> {todayInstallation.notes}</p>}
-                                    {/* Add more details here if available, e.g. dimensions */}
+
+                                    {/* Duration */}
+                                    {todayInstallation.expectedDuration && todayInstallation.expectedDuration > 1 && (
+                                        <p className="flex items-center gap-2">
+                                            <span className="bg-orange-500 text-white px-2 py-0.5 rounded text-xs font-bold">
+                                                {todayInstallation.expectedDuration} DNI
+                                            </span>
+                                            <span className="opacity-75">Montaż wielodniowy</span>
+                                        </p>
+                                    )}
+
+                                    {/* Important Notes from Contract */}
+                                    {(todayInstallation.notes || todayInstallation.contractData?.notes || todayInstallation.contractData?.additionalServices) && (
+                                        <div className="bg-red-500/20 border border-red-300/30 rounded-lg p-3">
+                                            <p className="font-bold text-red-200 flex items-center gap-2 mb-2">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                WAŻNE UWAGI
+                                            </p>
+                                            {todayInstallation.notes && <p className="text-sm mb-1">📝 {todayInstallation.notes}</p>}
+                                            {todayInstallation.contractData?.notes && <p className="text-sm mb-1">📋 {todayInstallation.contractData.notes}</p>}
+                                            {todayInstallation.contractData?.additionalServices && (
+                                                <p className="text-sm">🔧 Dodatkowe usługi: {todayInstallation.contractData.additionalServices}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Measurement Report Link */}
+                                    {todayInstallation.measurementId && (
+                                        <a
+                                            href={`/measurements/${todayInstallation.measurementId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 bg-blue-500/20 rounded-lg p-3 hover:bg-blue-500/30 transition-colors"
+                                        >
+                                            <span className="text-xl">📸</span>
+                                            <div>
+                                                <p className="font-bold">Zobacz Zdjęcia z Pomiaru</p>
+                                                <p className="text-xs opacity-75">Raport pomiarowy z wizytacji</p>
+                                            </div>
+                                            <svg className="w-5 h-5 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                        </a>
+                                    )}
+
+                                    {/* Parts Status */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="opacity-75">Materiały:</span>
+                                        {todayInstallation.partsStatus === 'all_delivered' || todayInstallation.partsReady ? (
+                                            <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1">
+                                                ✅ Komplet
+                                            </span>
+                                        ) : todayInstallation.partsStatus === 'partial' ? (
+                                            <span className="bg-yellow-500 text-white px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1">
+                                                ⚠️ Częściowo
+                                            </span>
+                                        ) : (
+                                            <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1">
+                                                ❌ Sprawdź z biurem
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>

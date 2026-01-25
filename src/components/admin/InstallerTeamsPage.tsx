@@ -169,6 +169,12 @@ export const InstallerTeamsPage: React.FC = () => {
                                             {team.vehicle}
                                         </div>
                                     )}
+                                    {(team.fuelConsumption || team.vehicleMaintenanceRate) && (
+                                        <div className="text-xs text-slate-400 mt-1 flex gap-3">
+                                            {team.fuelConsumption ? <span>⛽ {team.fuelConsumption} l/100km</span> : null}
+                                            {team.vehicleMaintenanceRate ? <span>🔧 {team.vehicleMaintenanceRate} EUR/km</span> : null}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -266,6 +272,81 @@ export const InstallerTeamsPage: React.FC = () => {
                                         />
                                     </div>
                                 </div>
+
+                                {/* Vehicle Cost Fields */}
+                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            ⛽ Zużycie paliwa
+                                            <span className="text-xs text-slate-400 ml-1">(l/100km)</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={editingTeam.fuelConsumption || ''}
+                                            onChange={e => setEditingTeam({ ...editingTeam, fuelConsumption: parseFloat(e.target.value) || 0 })}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="np. 8.5"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            🔧 Koszt konserwacji
+                                            <span className="text-xs text-slate-400 ml-1">(EUR/km)</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={editingTeam.vehicleMaintenanceRate || ''}
+                                            onChange={e => setEditingTeam({ ...editingTeam, vehicleMaintenanceRate: parseFloat(e.target.value) || 0 })}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="np. 0.05"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Working Days Section */}
+                            <div className="border-t border-slate-100 pt-6">
+                                <h4 className="font-semibold text-slate-800 mb-3">📅 Dni Robocze</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { day: 1, label: 'Pon', full: 'Poniedziałek' },
+                                        { day: 2, label: 'Wt', full: 'Wtorek' },
+                                        { day: 3, label: 'Śr', full: 'Środa' },
+                                        { day: 4, label: 'Czw', full: 'Czwartek' },
+                                        { day: 5, label: 'Pt', full: 'Piątek' },
+                                        { day: 6, label: 'Sob', full: 'Sobota' },
+                                        { day: 7, label: 'Nd', full: 'Niedziela' }
+                                    ].map(({ day, label, full }) => {
+                                        const workingDays = editingTeam.workingDays || [1, 2, 3, 4, 5];
+                                        const isSelected = workingDays.includes(day);
+                                        return (
+                                            <button
+                                                key={day}
+                                                type="button"
+                                                title={full}
+                                                onClick={() => {
+                                                    const newDays = isSelected
+                                                        ? workingDays.filter(d => d !== day)
+                                                        : [...workingDays, day].sort((a, b) => a - b);
+                                                    setEditingTeam({ ...editingTeam, workingDays: newDays });
+                                                }}
+                                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isSelected
+                                                        ? 'bg-blue-600 text-white shadow-sm'
+                                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                    } ${day >= 6 ? 'border-2 border-dashed border-slate-300' : ''}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-xs text-slate-400 mt-2">
+                                    Kliknij dni, w których ekipa pracuje. Soboty i niedziele oznaczone linią przerywaną.
+                                </p>
                             </div>
 
                             {/* Members Section */}

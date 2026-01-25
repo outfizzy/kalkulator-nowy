@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { OfferService } from '../../services/database/offer.service';
 import { FairService, type Fair } from '../../services/database/fair.service';
 import type { Lead, LeadStatus, User } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,6 +25,7 @@ export const LeadsList: React.FC = () => {
     const [groupByRegion, setGroupByRegion] = useState(false);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [searchQuery, setSearchQuery] = useState('');
+    const [leadActivity, setLeadActivity] = useState<Map<string, { count: number; lastActivity: Date | null; isHot: boolean }>>(new Map());
 
     const loadData = async () => {
         setLoading(true);
@@ -36,6 +38,11 @@ export const LeadsList: React.FC = () => {
             setLeads(leadsData);
             setFairs(fairsData);
             setUsers(usersData);
+
+            // Fetch activity for leads
+            const leadIds = leadsData.map(l => l.id);
+            const activity = await OfferService.getRecentLeadActivity(leadIds);
+            setLeadActivity(activity);
         } catch (error) {
             console.error('Error loading data:', error);
             toast.error('Nie udało się załadować danych');
@@ -173,13 +180,20 @@ export const LeadsList: React.FC = () => {
                         const fair = lead.fairId ? fairs.find(f => f.id === lead.fairId) : null;
 
                         return (
-                            <tr key={lead.id} className="hover:bg-slate-50 transition-colors">
+                            <tr key={lead.id} className={`hover:bg-slate-50 transition-colors ${leadActivity.get(lead.id)?.isHot ? 'bg-orange-50/50' : ''}`}>
                                 <td className="px-6 py-4">
-                                    <div
-                                        className="font-medium text-slate-900 cursor-pointer hover:text-accent"
-                                        onClick={() => navigate(`/leads/${lead.id}`)}
-                                    >
-                                        {lead.customerData.firstName} {lead.customerData.lastName}
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="font-medium text-slate-900 cursor-pointer hover:text-accent"
+                                            onClick={() => navigate(`/leads/${lead.id}`)}
+                                        >
+                                            {lead.customerData.firstName} {lead.customerData.lastName}
+                                        </div>
+                                        {leadActivity.get(lead.id)?.isHot && (
+                                            <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700 animate-pulse" title="Aktywność w ciągu 24h">
+                                                🔥 HOT
+                                            </span>
+                                        )}
                                     </div>
                                     {lead.customerData.companyName && (
                                         <div className="text-xs text-slate-500">{lead.customerData.companyName}</div>

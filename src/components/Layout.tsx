@@ -68,6 +68,7 @@ export const Layout: React.FC = () => {
                             {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
                             {/* Visualizer? */}
                             {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
+                            <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" />
                         </div>
                     )}
 

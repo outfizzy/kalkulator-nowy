@@ -1,28 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { InstallationCalendar } from '../installations/InstallationCalendar';
 import { DatabaseService } from '../../services/database';
+import { InstallationTeamService } from '../../services/database/installation-team.service';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from '../../contexts/TranslationContext';
 import type { Installation, InstallationTeam } from '../../types';
 import { toast } from 'react-hot-toast';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 
 export const InstallerCalendarPage: React.FC = () => {
+    const { currentUser } = useAuth();
     const { t } = useTranslation();
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
+    const [myTeamIds, setMyTeamIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            // Fetch ALL installations and teams, enabled by the new RLS policy
-            const [dbInstallations, dbTeams] = await Promise.all([
-                DatabaseService.getInstallations(),
-                DatabaseService.getTeams()
-            ]);
-            setInstallations(dbInstallations);
-            setTeams(dbTeams);
+            // Fetch teams first to find user's team
+            const dbTeams = await InstallationTeamService.getTeams();
+
+            // Find teams where current user is a member
+            const userTeams = currentUser
+                ? dbTeams.filter(team => team.members.some(m => m.id === currentUser.id))
+                : [];
+            const teamIds = userTeams.map(t => t.id);
+            setMyTeamIds(teamIds);
+
+            // Fetch all installations
+            const dbInstallations = await DatabaseService.getInstallations();
+
+            // Filter installations by user's teams (if they have any)
+            const filteredInstallations = teamIds.length > 0
+                ? dbInstallations.filter(inst => inst.teamId && teamIds.includes(inst.teamId))
+                : dbInstallations; // Show all if user has no team (backward compatibility)
+
+            setInstallations(filteredInstallations);
+            setTeams(userTeams.length > 0 ? userTeams : dbTeams); // Show only user's teams or all
         } catch (error) {
             console.error('Error loading calendar data:', error);
             toast.error(t('calendar.error'));
@@ -33,7 +50,7 @@ export const InstallerCalendarPage: React.FC = () => {
 
     useEffect(() => {
         void loadData();
-    }, [t]);
+    }, [currentUser, t]);
 
     if (loading) {
         return (

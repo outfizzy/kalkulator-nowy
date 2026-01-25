@@ -6,6 +6,7 @@ import { DatabaseService } from '../../services/database';
 import type { Customer, Contract, Installation, Communication, InstallationTeam, Lead, Offer } from '../../types';
 import { NotesList } from '../common/NotesList';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
+import { InstallationStatusCard } from '../installations/InstallationStatusCard';
 import { ProfitabilityDashboard } from './ProfitabilityDashboard';
 import { ManualContractModal } from '../contracts/ManualContractModal';
 
@@ -376,6 +377,41 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                 </div>
                             </div>
                             <div className="space-y-6">
+                                {/* Next Installation Widget */}
+                                {(() => {
+                                    const nextInstallation = installations
+                                        .filter(i => i.status !== 'completed' && i.status !== 'cancelled')
+                                        .sort((a, b) => {
+                                            if (!a.scheduledDate) return 1;
+                                            if (!b.scheduledDate) return -1;
+                                            return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
+                                        })[0];
+
+                                    if (nextInstallation) {
+                                        const team = teams.find(t => t.id === nextInstallation.teamId);
+                                        return (
+                                            <div>
+                                                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    Najbliższy Montaż
+                                                </h3>
+                                                <InstallationStatusCard
+                                                    installation={nextInstallation}
+                                                    team={team}
+                                                    variant="compact"
+                                                    onEdit={() => {
+                                                        setSelectedInstallation(nextInstallation);
+                                                        setIsInstallationModalOpen(true);
+                                                    }}
+                                                    showCalendarLink={false}
+                                                />
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                                 {/* AI Analysis Widget (if Lead exists) */}
                                 {leads.length > 0 && leads[0].aiSummary && (
                                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 shadow-sm p-5 relative overflow-hidden">

@@ -103,6 +103,23 @@ export const MeasurementService = {
         if (error) throw error;
     },
 
+    async updateReportTripCost(id: string, tripCost: number, costPerKm?: number): Promise<void> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { error } = await supabase
+            .from('measurement_reports')
+            .update({
+                trip_cost: tripCost,
+                cost_per_km: costPerKm || null,
+                trip_cost_updated_by: user.id,
+                trip_cost_updated_at: new Date().toISOString()
+            })
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
     async getMeasurementReports(filters?: { userId?: string; dateFrom?: string; dateTo?: string }): Promise<MeasurementReport[]> {
         let query = supabase
             .from('measurement_reports')
@@ -122,10 +139,26 @@ export const MeasurementService = {
         const { data, error } = await query;
         if (error) throw error;
 
-        return data.map(row => ({
+        // Fetch sales rep names separately
+        const userIds = [...new Set((data || []).map(r => r.user_id).filter(Boolean))];
+        const userNameMap = new Map<string, string>();
+
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', userIds);
+
+            if (profiles) {
+                profiles.forEach(p => userNameMap.set(p.id, p.full_name || ''));
+            }
+        }
+
+        return (data || []).map(row => ({
             id: row.id,
             date: row.date,
             salesRepId: row.user_id,
+            salesRepName: userNameMap.get(row.user_id) || '',
             carPlate: row.car_plate,
             odometerStart: row.odometer_start,
             odometerEnd: row.odometer_end,
@@ -137,8 +170,12 @@ export const MeasurementService = {
             signedContractsCount: (row.measurements_snapshot || []).filter((v: { outcome: string }) => v.outcome === 'signed').length,
             offerIds: [],
             is_active: true,
-            currency: 'PLN',
-            createdAt: new Date(row.created_at)
+            currency: 'EUR',
+            createdAt: new Date(row.created_at),
+            tripCost: row.trip_cost ? parseFloat(row.trip_cost) : undefined,
+            costPerKm: row.cost_per_km ? parseFloat(row.cost_per_km) : undefined,
+            tripCostUpdatedBy: row.trip_cost_updated_by,
+            tripCostUpdatedAt: row.trip_cost_updated_at ? new Date(row.trip_cost_updated_at) : undefined
         }));
     },
 
@@ -213,7 +250,6 @@ export const MeasurementService = {
                 customer_phone: measurement.customerPhone || null,
                 status: 'scheduled',
                 notes: measurement.notes || null,
-                estimated_duration: measurement.estimatedDuration || null,
                 location_lat: measurement.locationLat || null,
                 location_lng: measurement.locationLng || null
             })

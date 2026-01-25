@@ -19,9 +19,25 @@ export const translations = {
 
     // Values
     models: {
+        // Aluxe models - all use "style" in display names
         'orangestyle': 'Orangestyle',
         'trendstyle': 'Trendstyle',
+        'trendline': 'Trendstyle',  // Internal code maps to display name
         'trendstyle_plus': 'Trendstyle+',
+        'trendline_plus': 'Trendstyle+',
+        'topstyle': 'Topstyle',
+        'topline': 'Topstyle',
+        'topstyle_xl': 'Topstyle XL',
+        'topline_xl': 'Topstyle XL',
+        'ultrastyle': 'Ultrastyle',
+        'ultraline': 'Ultrastyle',
+        'skystyle': 'Skystyle',
+        'skyline': 'Skystyle',
+        // Pergola models
+        'pergola_bio': 'Pergola Bio',
+        'pergola_deluxe': 'Pergola Deluxe',
+        // Carport
+        'carport': 'Carport',
     },
     colors: {
         'RAL 7016': 'Anthrazitgrau (RAL 7016)',

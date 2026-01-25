@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { generateInstallationProtocolPDF } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
-import type { Contract, ContractComment, ContractAttachment, User } from '../../types';
+import type { Contract, ContractComment, ContractAttachment, User, Installation, InstallationTeam } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { InstallationService } from '../../services/database/installation.service';
@@ -11,7 +11,7 @@ import { UserService } from '../../services/database/user.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { OrderedItemsModule } from './OrderedItemsModule';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
-import type { Installation } from '../../types';
+import { InstallationStatusCard } from '../installations/InstallationStatusCard';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -25,6 +25,7 @@ export const ContractDetails: React.FC = () => {
     // Installation State
     const [installation, setInstallation] = useState<Installation | null>(null);
     const [isInstallationModalOpen, setIsInstallationModalOpen] = useState(false);
+    const [teams, setTeams] = useState<InstallationTeam[]>([]);
 
     const [salesReps, setSalesReps] = useState<User[]>([]);
 
@@ -54,7 +55,9 @@ export const ContractDetails: React.FC = () => {
         };
 
         loadContract();
-        loadContract();
+
+        // Load teams for installation display
+        InstallationService.getTeams().then(setTeams).catch(console.error);
 
         if (isAdmin()) {
             UserService.getSalesReps().then(setSalesReps).catch(console.error);
@@ -784,37 +787,37 @@ export const ContractDetails: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Installation Button */}
+                            {/* Installation Status Card */}
                             <div className="pt-2 border-t border-slate-100">
                                 {installation ? (
-                                    <button
-                                        onClick={() => setIsInstallationModalOpen(true)}
-                                        className="w-full bg-blue-50 hover:bg-blue-100 text-blue-800 p-3 rounded-lg flex items-center justify-center gap-2 font-bold transition-colors"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                        </svg>
-                                        Zarządzaj Montażem
-                                    </button>
+                                    <InstallationStatusCard
+                                        installation={installation}
+                                        team={teams.find(t => t.id === installation.teamId)}
+                                        variant="full"
+                                        onEdit={() => setIsInstallationModalOpen(true)}
+                                        showCalendarLink={true}
+                                    />
                                 ) : (
-                                    <button
-                                        onClick={handlePlanInstallation}
-                                        disabled={contract.status !== 'signed'}
-                                        title={contract.status !== 'signed' ? 'Podpisz umowę aby zaplanować montaż' : ''}
-                                        className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-white transition-colors ${contract.status === 'signed'
-                                            ? 'bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg'
-                                            : 'bg-slate-300 cursor-not-allowed'
-                                            }`}
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        Utwórz Montaż
-                                    </button>
-                                )}
-                                {contract.status !== 'signed' && !installation && (
-                                    <div className="text-center text-xs text-slate-400 mt-2">
-                                        Wymagany status: Podpisana
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={handlePlanInstallation}
+                                            disabled={contract.status !== 'signed'}
+                                            title={contract.status !== 'signed' ? 'Podpisz umowę aby zaplanować montaż' : ''}
+                                            className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-white transition-colors ${contract.status === 'signed'
+                                                ? 'bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg'
+                                                : 'bg-slate-300 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Utwórz Montaż
+                                        </button>
+                                        {contract.status !== 'signed' && (
+                                            <div className="text-center text-xs text-slate-400">
+                                                Wymagany status: Podpisana
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

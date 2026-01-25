@@ -121,9 +121,12 @@ export const LeadService = {
         if (updates.customerData) dbUpdates.customer_data = updates.customerData;
         if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
         if (updates.emailMessageId) dbUpdates.email_message_id = updates.emailMessageId;
-        if (updates.notes) dbUpdates.notes = updates.notes;
+        if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
         if (updates.lastContactDate) dbUpdates.last_contact_date = updates.lastContactDate.toISOString();
         if (updates.clientWillContactAt) dbUpdates.client_will_contact_at = updates.clientWillContactAt.toISOString();
+        // AI Score from measurements or scorer
+        if (updates.aiScore !== undefined) dbUpdates.ai_score = updates.aiScore;
+        if (updates.aiSummary !== undefined) dbUpdates.ai_summary = updates.aiSummary;
 
         const { error } = await supabase
             .from('leads')
