@@ -85,6 +85,7 @@ import { B2BOrdersPage } from './pages/b2b/B2BOrdersPage';
 import { B2BPromotionsPage } from './pages/b2b/B2BPromotionsPage';
 import { B2BCreditPage } from './pages/b2b/B2BCreditPage';
 import { B2BLoginPage } from './pages/b2b/B2BLoginPage';
+import { B2BCalculator } from './components/b2b/calculator/B2BCalculator';
 
 // B2B Admin
 import { B2BPromotionsAdminPage } from './pages/admin/B2BPromotionsAdminPage';
@@ -113,7 +114,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactEleme
 
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     if (currentUser.role === 'b2b_partner') return <Navigate to="/b2b/dashboard" replace />;
-    if (currentUser.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
+    if (currentUser.role === 'partner') return <Navigate to="/b2b/dashboard" replace />;
     if (currentUser.role === 'installer') return <Navigate to="/installer" replace />;
     return <Navigate to="/dashboard" replace />;
   }
@@ -246,14 +247,14 @@ function App() {
 
             {/* B2B Partner Portal Routes */}
             <Route path="/b2b" element={
-              <ProtectedRoute allowedRoles={['b2b_partner']}>
+              <ProtectedRoute allowedRoles={['b2b_partner', 'partner']}>
                 <B2BLayout />
               </ProtectedRoute>
             }>
               <Route path="dashboard" element={<B2BDashboard />} />
               <Route path="calculator" element={
                 <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
-                  <ProductConfiguratorV2 mode="b2b" />
+                  <B2BCalculator />
                 </Suspense>
               } />
               <Route path="offers" element={<B2BOffersPage />} />

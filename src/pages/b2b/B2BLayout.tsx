@@ -19,7 +19,7 @@ const navItems = [
 ];
 
 export function B2BLayout() {
-    const { currentUser, signOut } = useAuth();
+    const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const [partner, setPartner] = useState<B2BPartner | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,7 +38,7 @@ export function B2BLayout() {
     }
 
     async function handleLogout() {
-        await signOut();
+        await logout();
         navigate('/');
     }
 

@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { B2BService, B2BDashboardStats, B2BOffer, B2BOrder } from '../../services/database/b2b.service';
+import { B2BService, B2BDashboardStats, B2BOffer, B2BOrder, B2BPromotion, B2BCreditApplication } from '../../services/database/b2b.service';
 import { formatDistanceToNow, format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -27,6 +27,8 @@ export function B2BDashboard() {
     const [stats, setStats] = useState<B2BDashboardStats | null>(null);
     const [recentOffers, setRecentOffers] = useState<B2BOffer[]>([]);
     const [recentOrders, setRecentOrders] = useState<B2BOrder[]>([]);
+    const [promotions, setPromotions] = useState<B2BPromotion[]>([]);
+    const [creditApp, setCreditApp] = useState<B2BCreditApplication | null>(null);
     const [loading, setLoading] = useState(true);
     const [partnerName, setPartnerName] = useState('');
 
@@ -40,14 +42,18 @@ export function B2BDashboard() {
             const partner = await B2BService.getCurrentPartner();
             if (partner) {
                 setPartnerName(partner.company_name);
-                const [statsData, offers, orders] = await Promise.all([
+                const [statsData, offers, orders, activePromos, creditApps] = await Promise.all([
                     B2BService.getDashboardStats(partner.id),
                     B2BService.getOffers(partner.id),
-                    B2BService.getOrders(partner.id)
+                    B2BService.getOrders(partner.id),
+                    B2BService.getActivePromotions(),
+                    B2BService.getCreditApplications(partner.id)
                 ]);
                 setStats(statsData);
                 setRecentOffers(offers.slice(0, 5));
                 setRecentOrders(orders.slice(0, 5));
+                setPromotions(activePromos);
+                setCreditApp(creditApps.length > 0 ? creditApps[0] : null);
             }
         } catch (err) {
             console.error('Error loading dashboard:', err);
@@ -65,6 +71,40 @@ export function B2BDashboard() {
 
     return (
         <div className="p-6 max-w-[1400px] mx-auto">
+            {/* Promotions Banner */}
+            {promotions.length > 0 && (
+                <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-1 shadow-lg text-white overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full blur-3xl transform translate-x-10 -translate-y-10 pointer-events-none"></div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex-1">
+                            <div className="inline-block bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-3 shadow-sm animate-pulse">
+                                🔥 Nur für kurze Zeit!
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2">
+                                {promotions[0].title}
+                            </h2>
+                            <p className="text-indigo-100 max-w-2xl text-lg">
+                                {promotions[0].description}
+                            </p>
+                            {promotions[0].discount_value > 0 && (
+                                <div className="mt-4 inline-flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg font-bold border border-white/20">
+                                    <span className="text-3xl">-{promotions[0].discount_value}{promotions[0].discount_type === 'percent' ? '%' : '€'}</span>
+                                    <span className="text-xs uppercase opacity-80">Rabatt</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-shrink-0">
+                            <Link
+                                to={`/b2b/promotions`}
+                                className="px-8 py-4 bg-white text-indigo-700 hover:bg-indigo-50 rounded-xl font-bold shadow-xl transition-all transform hover:scale-105 inline-flex items-center gap-2"
+                            >
+                                Jetzt Profitieren ➡️
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900">
@@ -143,6 +183,12 @@ export function B2BDashboard() {
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
                     >
                         📋 Meine Angebote
+                    </Link>
+                    <Link
+                        to="/b2b/credit"
+                        className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
+                    >
+                        💳 Kreditlimit {creditApp ? `(${creditApp.status})` : ''}
                     </Link>
                     <Link
                         to="/b2b/orders"
