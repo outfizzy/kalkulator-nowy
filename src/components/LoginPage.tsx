@@ -34,9 +34,15 @@ export const LoginPage: React.FC = () => {
         setLoading(true);
 
         try {
-            const { error } = await login(email, password);
+            const { error, user } = await login(email, password);
             if (error) throw error;
-            navigate('/dashboard');
+
+            // Redirect based on role
+            if (user?.role === 'partner' || user?.role === 'b2b_partner') {
+                navigate('/b2b/dashboard');
+            } else {
+                navigate('/dashboard');
+            }
         } catch (error: unknown) {
             console.error('Login error:', error);
             const message = error instanceof Error ? error.message : 'Błąd logowania. Sprawdź email i hasło.';

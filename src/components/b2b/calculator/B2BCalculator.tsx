@@ -17,7 +17,7 @@ type CoverType = 'Poly' | 'Glass';
 type ConstructionType = 'wall' | 'freestanding';
 type ViewState = 'customer' | 'config' | 'summary';
 
-import { AiService } from '../../services/ai';
+import { AiService } from '../../../services/ai';
 
 interface RoofModel {
     id: string;
@@ -1224,8 +1224,8 @@ export const B2BCalculator: React.FC = () => {
 
     // === B2B SAVE HANDLER ===
     const saveB2BOffer = async () => {
-        if (!customerState || basket.length === 0) {
-            toast.error('Uzupełnij dane klienta i dodaj produkty');
+        if (basket.length === 0) {
+            toast.error('Dodaj produkty do koszyka');
             return;
         }
 
@@ -1242,11 +1242,18 @@ export const B2BCalculator: React.FC = () => {
             }));
 
             const offerData = {
-                client_reference: `${customerState.firstName} ${customerState.lastName}`,
-                total_amount: basketTotal,
-                status: 'draft',
+                client_reference: customerState
+                    ? `${customerState.firstName || ''} ${customerState.lastName || customerState.name || ''}`.trim()
+                    : `Szybka wycena ${new Date().toLocaleDateString('pl-PL')}`,
+                customer_name: customerState
+                    ? `${customerState.firstName || ''} ${customerState.lastName || customerState.name || ''}`.trim()
+                    : null,
+                total_amount: finalPrice,
+                partner_total: finalPrice, // Partner pays this
+                base_total: purchasePrice, // Our cost (UPE after discount)
+                status: customerState ? 'saved' : 'draft',
                 items: items,
-                customer_contact: customerState // Now we store full customer object in JSONB
+                customer_contact: customerState || null
             };
 
             await B2BService.createOffer(offerData);
@@ -1873,13 +1880,33 @@ export const B2BCalculator: React.FC = () => {
                     </div>
                 )}
 
-                {/* CUSTOMER VIEW */}
                 {view === 'customer' && (
                     <div className="max-w-4xl mx-auto">
                         <B2BCustomerForm
                             onComplete={handleCustomerComplete}
                             initialData={customerState || undefined}
                         />
+
+                        {/* Quick Quote Skip Option */}
+                        <div className="mt-6 text-center">
+                            <div className="relative flex items-center justify-center my-4">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-slate-200"></div>
+                                </div>
+                                <div className="relative bg-slate-50 px-4 text-sm text-slate-500">lub</div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setCustomerState(null);
+                                    setView('config');
+                                    toast.success('Tryb szybkiej wyceny - dane klienta można dodać później');
+                                }}
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-xl border-2 border-amber-200 hover:border-amber-300 transition-all"
+                            >
+                                ⚡ Szybka wycena bez danych klienta
+                            </button>
+                            <p className="text-xs text-slate-400 mt-2">Konfiguruj produkt i poznaj cenę. Dane klienta możesz dodać na końcu.</p>
+                        </div>
                     </div>
                 )}
 
@@ -1887,27 +1914,33 @@ export const B2BCalculator: React.FC = () => {
                 {(view === 'config' || view === 'summary') && (
                     <>
                         {/* Compact Customer Header (replacing the old expandable card) */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-8 flex justify-between items-center">
+                        <div className={`rounded-2xl shadow-sm border p-4 mb-8 flex justify-between items-center ${customerState ? 'bg-white border-slate-200' : 'bg-amber-50 border-amber-200'}`}>
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                    <span className="text-xl">👤</span>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${customerState ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    <span className="text-xl">{customerState ? '👤' : '⚡'}</span>
                                 </div>
                                 <div>
                                     <span className="font-bold text-slate-800 block">
                                         {customerState ?
                                             (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.lastName)
-                                            : 'Wybrany Klient'}
+                                            : 'Szybka wycena (bez danych klienta)'}
                                     </span>
                                     <span className="text-xs text-slate-500 block">
-                                        {customerState?.email} • {customerState?.phone}
+                                        {customerState
+                                            ? `${customerState.email} • ${customerState.phone}`
+                                            : 'Dane klienta możesz dodać przed zapisem oferty'
+                                        }
                                     </span>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setView('customer')}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                                className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors ${customerState
+                                    ? 'text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100'
+                                    : 'text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200'
+                                    }`}
                             >
-                                Zmień
+                                {customerState ? 'Zmień' : '+ Dodaj dane klienta'}
                             </button>
                         </div>
 

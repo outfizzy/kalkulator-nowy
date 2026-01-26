@@ -7,22 +7,24 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { B2BService, B2BOrder, B2BOrderStatus } from '../../services/database/b2b.service';
 import { format } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { de, pl, enUS } from 'date-fns/locale';
+import { useTranslation } from '../../contexts/TranslationContext';
 
-const STATUS_CONFIG: Record<B2BOrderStatus, { label: string; color: string; icon: string; step: number }> = {
-    pending: { label: 'Wartet auf Genehmigung', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: '⏳', step: 1 },
-    approved: { label: 'Genehmigt', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: '✅', step: 2 },
-    rejected: { label: 'Abgelehnt', color: 'bg-red-100 text-red-800 border-red-300', icon: '❌', step: -1 },
-    awaiting_payment: { label: 'Zahlung ausstehend', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: '💳', step: 2 },
-    in_production: { label: 'In Produktion', color: 'bg-purple-100 text-purple-800 border-purple-300', icon: '🏭', step: 3 },
-    shipped: { label: 'Versendet', color: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: '🚚', step: 4 },
-    delivered: { label: 'Geliefert', color: 'bg-green-100 text-green-800 border-green-300', icon: '📦', step: 5 },
-    cancelled: { label: 'Storniert', color: 'bg-gray-100 text-gray-600 border-gray-300', icon: '🚫', step: -1 }
+const STATUS_STYLES: Record<B2BOrderStatus, { color: string; icon: string; step: number }> = {
+    pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: '⏳', step: 1 },
+    approved: { color: 'bg-blue-100 text-blue-800 border-blue-300', icon: '✅', step: 2 },
+    rejected: { color: 'bg-red-100 text-red-800 border-red-300', icon: '❌', step: -1 },
+    awaiting_payment: { color: 'bg-orange-100 text-orange-800 border-orange-300', icon: '💳', step: 2 },
+    in_production: { color: 'bg-purple-100 text-purple-800 border-purple-300', icon: '🏭', step: 3 },
+    shipped: { color: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: '🚚', step: 4 },
+    delivered: { color: 'bg-green-100 text-green-800 border-green-300', icon: '📦', step: 5 },
+    cancelled: { color: 'bg-gray-100 text-gray-600 border-gray-300', icon: '🚫', step: -1 }
 };
 
 type FilterType = 'all' | 'active' | 'completed';
 
 export function B2BOrdersPage() {
+    const { t, language } = useTranslation();
     const [orders, setOrders] = useState<B2BOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState<B2BOrder | null>(null);
@@ -70,11 +72,11 @@ export function B2BOrdersPage() {
 
     // Progress steps for visualization
     const progressSteps = [
-        { step: 1, label: 'Bestellt', icon: '📋' },
-        { step: 2, label: 'Genehmigt', icon: '✅' },
-        { step: 3, label: 'Produktion', icon: '🏭' },
-        { step: 4, label: 'Versand', icon: '🚚' },
-        { step: 5, label: 'Geliefert', icon: '📦' }
+        { step: 1, label: t('b2b.ordersPage.steps.ordered'), icon: '📋' },
+        { step: 2, label: t('b2b.ordersPage.steps.approved'), icon: '✅' },
+        { step: 3, label: t('b2b.ordersPage.steps.production'), icon: '🏭' },
+        { step: 4, label: t('b2b.ordersPage.steps.shipping'), icon: '🚚' },
+        { step: 5, label: t('b2b.ordersPage.steps.delivered'), icon: '📦' }
     ];
 
     return (
@@ -82,9 +84,9 @@ export function B2BOrdersPage() {
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    🛒 Meine Bestellungen
+                    🛒 {t('b2b.ordersPage.title')}
                 </h1>
-                <p className="text-gray-500 mt-1">Verfolgen Sie den Status Ihrer Bestellungen</p>
+                <p className="text-gray-500 mt-1">{t('b2b.ordersPage.subtitle')}</p>
             </div>
 
             {/* Filters */}
@@ -95,13 +97,13 @@ export function B2BOrdersPage() {
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
-                            {f === 'all' && `Alle (${counts.all})`}
-                            {f === 'active' && `Aktiv (${counts.active})`}
-                            {f === 'completed' && `Abgeschlossen (${counts.completed})`}
+                            {f === 'all' && `${t('b2b.offers.filterAll')} (${counts.all})`}
+                            {f === 'active' && `${t('b2b.ordersPage.filterActive')} (${counts.active})`}
+                            {f === 'completed' && `${t('b2b.ordersPage.filterCompleted')} (${counts.completed})`}
                         </button>
                     ))}
                 </div>
@@ -122,9 +124,9 @@ export function B2BOrdersPage() {
                             {filteredOrders.length === 0 ? (
                                 <div className="p-8 text-center text-gray-400">
                                     <div className="text-4xl mb-2">📦</div>
-                                    <p>Keine Bestellungen gefunden</p>
+                                    <p>{t('b2b.ordersPage.noOrders')}</p>
                                     <Link to="/b2b/offers" className="text-blue-600 text-sm hover:underline mt-2 inline-block">
-                                        Angebote anzeigen →
+                                        {t('b2b.ordersPage.viewOffers')} →
                                     </Link>
                                 </div>
                             ) : (
@@ -133,18 +135,18 @@ export function B2BOrdersPage() {
                                         key={order.id}
                                         onClick={() => loadOrderDetail(order.id)}
                                         className={`p-4 cursor-pointer transition-colors ${selectedOrder?.id === order.id
-                                                ? 'bg-blue-50 border-l-4 border-blue-600'
-                                                : 'hover:bg-gray-50 border-l-4 border-transparent'
+                                            ? 'bg-blue-50 border-l-4 border-blue-600'
+                                            : 'hover:bg-gray-50 border-l-4 border-transparent'
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="font-bold text-gray-900">{order.order_number}</span>
-                                            <span className={`px-2 py-1 text-xs rounded-full font-medium border ${STATUS_CONFIG[order.status]?.color}`}>
-                                                {STATUS_CONFIG[order.status]?.icon}
+                                            <span className={`px-2 py-1 text-xs rounded-full font-medium border ${STATUS_STYLES[order.status]?.color}`}>
+                                                {STATUS_STYLES[order.status]?.icon}
                                             </span>
                                         </div>
                                         <div className="text-sm text-gray-500 mb-1">
-                                            {STATUS_CONFIG[order.status]?.label}
+                                            {t(`statuses.${order.status}`)}
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-400">
@@ -168,8 +170,8 @@ export function B2BOrdersPage() {
                                 <div className="flex justify-between items-start mb-6">
                                     <div>
                                         <h2 className="text-2xl font-bold text-gray-900">{selectedOrder.order_number}</h2>
-                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium border ${STATUS_CONFIG[selectedOrder.status]?.color}`}>
-                                            {STATUS_CONFIG[selectedOrder.status]?.icon} {STATUS_CONFIG[selectedOrder.status]?.label}
+                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium border ${STATUS_STYLES[selectedOrder.status]?.color}`}>
+                                            {STATUS_STYLES[selectedOrder.status]?.icon} {t(`statuses.${selectedOrder.status}`)}
                                         </span>
                                     </div>
                                     <div className="text-right">
@@ -204,8 +206,8 @@ export function B2BOrdersPage() {
                                                 return (
                                                     <div key={step.step} className="flex flex-col items-center relative z-10">
                                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${isComplete
-                                                                ? 'bg-blue-500 text-white'
-                                                                : 'bg-gray-200 text-gray-500'
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'bg-gray-200 text-gray-500'
                                                             } ${isCurrent ? 'ring-4 ring-blue-200' : ''}`}>
                                                             {step.icon}
                                                         </div>

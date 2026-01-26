@@ -8,14 +8,17 @@ import { B2BService, B2BPromotion } from '../../services/database/b2b.service';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
 import { de } from 'date-fns/locale';
 
+import { useTranslation } from '../../contexts/TranslationContext';
+
 const DISCOUNT_LABELS: Record<string, string> = {
-    percent: '% Rabatt',
-    fixed: '€ Rabatt',
-    bundle: 'Bundle-Angebot',
-    free_shipping: 'Kostenloser Versand'
+    percent: '%',
+    fixed: '€',
+    bundle: 'Bundle',
+    free_shipping: 'Free Shipping'
 };
 
 export function B2BPromotionsPage() {
+    const { t, language } = useTranslation();
     const [promotions, setPromotions] = useState<B2BPromotion[]>([]);
     const [selectedPromo, setSelectedPromo] = useState<B2BPromotion | null>(null);
     const [loading, setLoading] = useState(true);
@@ -51,16 +54,16 @@ export function B2BPromotionsPage() {
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                    🔥 Aktuelle Aktionen
+                    🔥 {t('b2b.promotionsPage.title')}
                 </h1>
-                <p className="text-gray-500 mt-1">Sonderangebote und Rabatte für unsere B2B Partner</p>
+                <p className="text-gray-500 mt-1">{t('b2b.promotionsPage.subtitle')}</p>
             </div>
 
             {/* Featured Promotions - Large Cards */}
             {featuredPromos.length > 0 && (
                 <div className="mb-10">
                     <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        ⭐ Empfohlene Aktionen
+                        ⭐ {t('b2b.promotionsPage.featured')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {featuredPromos.map(promo => (
@@ -106,7 +109,7 @@ export function B2BPromotionsPage() {
                                             <div className="flex items-center gap-2 text-sm text-blue-100">
                                                 <span>⏰</span>
                                                 <span>
-                                                    Endet {formatDistanceToNow(new Date(promo.end_date), { addSuffix: true, locale: de })}
+                                                    {t('b2b.promotionsPage.valid')} {formatDistanceToNow(new Date(promo.end_date), { addSuffix: true, locale: language === 'de' ? de : undefined })}
                                                 </span>
                                             </div>
                                         )}
@@ -125,7 +128,7 @@ export function B2BPromotionsPage() {
             {regularPromos.length > 0 && (
                 <div>
                     <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                        📋 Alle Aktionen
+                        📋 {t('b2b.promotionsPage.all')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {regularPromos.map(promo => (
@@ -157,11 +160,11 @@ export function B2BPromotionsPage() {
 
                                 <div className="flex items-center justify-between text-xs text-gray-400">
                                     {promo.min_order_value > 0 && (
-                                        <span>Ab €{promo.min_order_value}</span>
+                                        <span>Title €{promo.min_order_value}</span>
                                     )}
                                     {promo.end_date && (
                                         <span>
-                                            Bis {format(new Date(promo.end_date), 'dd.MM.yyyy')}
+                                            {t('b2b.promotionsPage.valid')} {format(new Date(promo.end_date), 'dd.MM.yyyy')}
                                         </span>
                                     )}
                                 </div>
@@ -175,8 +178,8 @@ export function B2BPromotionsPage() {
             {promotions.length === 0 && (
                 <div className="text-center py-20 text-gray-400">
                     <div className="text-6xl mb-4">📭</div>
-                    <h3 className="text-xl font-medium text-gray-600 mb-2">Keine aktiven Aktionen</h3>
-                    <p>Schauen Sie bald wieder vorbei!</p>
+                    <h3 className="text-xl font-medium text-gray-600 mb-2">{t('b2b.promotionsPage.empty')}</h3>
+                    <p>...</p>
                 </div>
             )}
 
@@ -219,7 +222,7 @@ export function B2BPromotionsPage() {
                             <div className="space-y-4 mb-6">
                                 {selectedPromo.promo_code && (
                                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                                        <span className="text-gray-600">Aktionscode:</span>
+                                        <span className="text-gray-600">{t('b2b.promotionsPage.promoCode')}:</span>
                                         <span className="font-mono font-bold text-blue-600 text-lg">
                                             {selectedPromo.promo_code}
                                         </span>
@@ -228,7 +231,7 @@ export function B2BPromotionsPage() {
 
                                 {selectedPromo.min_order_value > 0 && (
                                     <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                                        <span className="text-yellow-700">Mindestbestellwert:</span>
+                                        <span className="text-yellow-700">{t('b2b.promotionsPage.minOrder')}:</span>
                                         <span className="font-bold text-yellow-800">
                                             €{selectedPromo.min_order_value.toLocaleString()}
                                         </span>
@@ -236,7 +239,7 @@ export function B2BPromotionsPage() {
                                 )}
 
                                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <span className="text-gray-600">Gültig:</span>
+                                    <span className="text-gray-600">{t('b2b.promotionsPage.valid')}:</span>
                                     <span className="text-gray-900">
                                         {format(new Date(selectedPromo.start_date), 'dd.MM.yyyy')}
                                         {selectedPromo.end_date && (
@@ -247,7 +250,7 @@ export function B2BPromotionsPage() {
 
                                 {selectedPromo.product_categories?.length > 0 && (
                                     <div className="p-3 bg-blue-50 rounded-lg">
-                                        <span className="text-blue-600 text-sm">Gilt für:</span>
+                                        <span className="text-blue-600 text-sm">{t('b2b.promotionsPage.appliesTo')}:</span>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                             {selectedPromo.product_categories.map(cat => (
                                                 <span key={cat} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
@@ -262,7 +265,7 @@ export function B2BPromotionsPage() {
                             {/* Terms */}
                             {selectedPromo.terms_conditions && (
                                 <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-500 mb-6">
-                                    <h4 className="font-medium text-gray-700 mb-2">Bedingungen:</h4>
+                                    <h4 className="font-medium text-gray-700 mb-2">{t('b2b.promotionsPage.terms')}:</h4>
                                     <p>{selectedPromo.terms_conditions}</p>
                                 </div>
                             )}
@@ -272,7 +275,7 @@ export function B2BPromotionsPage() {
                                 onClick={() => setSelectedPromo(null)}
                                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
                             >
-                                Verstanden
+                                {t('b2b.promotionsPage.understood')}
                             </button>
                         </div>
                     </div>

@@ -232,8 +232,10 @@ export const UserManagementPage: React.FC = () => {
             admin: 'Administrator',
             manager: 'Manager',
             sales_rep: 'Przedstawiciel Handlowy',
-            partner: 'Partner B2B',
-            installer: 'Monter'
+            partner: 'Partner (Legacy)',
+            b2b_partner: 'Partner B2B (Nowy)',
+            installer: 'Monter',
+            b2b_manager: 'Manager B2B'
         };
         return roleMap[role as keyof typeof roleMap] || role;
     };
@@ -419,10 +421,11 @@ export const UserManagementPage: React.FC = () => {
                                         onChange={(e) => handleChangeRole(user.id, e.target.value as User['role'])}
                                         className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-accent"
                                     >
-                                        <option value="admin">Admin</option>
+                                        <option value="admin">Administrator</option>
                                         <option value="manager">Manager</option>
                                         <option value="sales_rep">Handlowiec</option>
-                                        <option value="partner">Partner</option>
+                                        <option value="b2b_partner">Partner B2B (Nowy)</option>
+                                        <option value="partner">Partner (Legacy)</option>
                                         <option value="installer">Monter</option>
                                     </select>
                                 </div>
@@ -637,7 +640,8 @@ export const UserManagementPage: React.FC = () => {
                                             <option value="admin">Administrator</option>
                                             <option value="manager">Manager</option>
                                             <option value="sales_rep">Przedstawiciel Handlowy</option>
-                                            <option value="partner">Partner B2B</option>
+                                            <option value="b2b_partner">Partner B2B (Nowy)</option>
+                                            <option value="partner">Partner (Legacy)</option>
                                             <option value="installer">Monter</option>
                                         </select>
                                     </td>

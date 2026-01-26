@@ -170,16 +170,44 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
             {/* Customer Selection (if exists) */}
             {previousCustomers.length > 0 && (
                 <div className="bg-gradient-to-r from-accent-soft/70 to-accent-soft p-6 rounded-2xl shadow-sm border border-accent/40">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 016 0z" />
-                            </svg>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
+                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 016 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-900">Wyszukaj istniejącego klienta</h3>
+                                <p className="text-sm text-accent-dark">Lub wprowadź nowe dane poniżej</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="font-bold text-slate-900">Wyszukaj istniejącego klienta</h3>
-                            <p className="text-sm text-accent-dark">Lub wprowadź nowe dane poniżej</p>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const anonymousCustomer: Customer = {
+                                    id: undefined, // Will be created or found by ensureCustomer
+                                    salutation: 'Firma',
+                                    firstName: 'Szybka',
+                                    lastName: 'Wycena', // Generic name
+                                    companyName: 'Wycena Wstępna',
+                                    email: 'anonymous@system.local', // Technical email to deduplicate
+                                    phone: '',
+                                    street: '-',
+                                    houseNumber: '-',
+                                    postalCode: '00000',
+                                    city: '-',
+                                    country: 'Deutschland',
+                                    representative_id: currentUser?.id,
+                                };
+                                const defaultSnowZone = { id: 'II', value: 0.85, description: 'Domyślna strefa (Brak adresu)' };
+                                onComplete(anonymousCustomer, defaultSnowZone);
+                            }}
+                            className="px-4 py-2 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:border-accent hover:text-accent font-medium text-sm transition-all flex items-center gap-2"
+                        >
+                            <span className="text-xl">⚡️</span>
+                            Szybka Wycena (Bez danych)
+                        </button>
                     </div>
                     <div className="relative customer-search-container">
                         <input

@@ -6,23 +6,26 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from '../../contexts/TranslationContext';
 import { B2BService, B2BPartner } from '../../services/database/b2b.service';
-
-const navItems = [
-    { path: '/b2b/dashboard', label: 'Dashboard', icon: '🏠' },
-    { path: '/b2b/calculator', label: 'Neues Angebot', icon: '➕' },
-    { path: '/b2b/offers', label: 'Meine Angebote', icon: '📋' },
-    { path: '/b2b/orders', label: 'Bestellungen', icon: '🛒' },
-    { path: '/b2b/promotions', label: 'Aktionen', icon: '🔥' },
-    { path: '/b2b/credit', label: 'Kredit', icon: '💳' },
-    { path: '/b2b/invoices', label: 'Rechnungen', icon: '📄' },
-];
 
 export function B2BLayout() {
     const { currentUser, logout } = useAuth();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [partner, setPartner] = useState<B2BPartner | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    const navItems = [
+        { path: '/b2b/dashboard', label: t('b2b.portalTitle'), icon: '🏠' }, // Using portalTitle temporarily or add dashboard key to b2b
+        { path: '/b2b/calculator', label: t('b2b.newOffer'), icon: '➕' },
+        { path: '/b2b/offers', label: t('b2b.myOffers'), icon: '📋' },
+        { path: '/b2b/orders', label: t('b2b.orders'), icon: '🛒' },
+        { path: '/b2b/promotions', label: t('b2b.promotions'), icon: '🔥' },
+        { path: '/b2b/materials', label: 'Materiały', icon: '📂' },
+        { path: '/b2b/credit', label: t('b2b.credit'), icon: '💳' },
+        { path: '/b2b/invoices', label: t('b2b.invoices'), icon: '📄' },
+    ];
 
     useEffect(() => {
         loadPartner();
@@ -94,7 +97,7 @@ export function B2BLayout() {
                                 onClick={handleLogout}
                                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                             >
-                                Abmelden
+                                {t('b2b.logout')}
                             </button>
 
                             {/* Mobile Menu Button */}
@@ -146,9 +149,9 @@ export function B2BLayout() {
                             © {new Date().getFullYear()} TGA Partner Portal
                         </div>
                         <div className="flex gap-6 text-sm text-gray-500">
-                            <a href="#" className="hover:text-gray-700">Hilfe</a>
-                            <a href="#" className="hover:text-gray-700">Kontakt</a>
-                            <a href="#" className="hover:text-gray-700">AGB</a>
+                            <a href="#" className="hover:text-gray-700">{t('b2b.help')}</a>
+                            <a href="#" className="hover:text-gray-700">{t('b2b.contact')}</a>
+                            <a href="#" className="hover:text-gray-700">{t('b2b.terms')}</a>
                         </div>
                     </div>
                 </div>

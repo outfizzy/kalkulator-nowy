@@ -123,6 +123,43 @@ export function B2BOrdersAdminPage() {
         setProcessing(false);
     }
 
+    async function handleCreatePrepaymentInvoice() {
+        if (!selectedOrder) return;
+        setProcessing(true);
+        try {
+            // Calculate due date (14 days from now)
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 14);
+
+            // Generate invoice number
+            const invoiceNumber = `FZ-${selectedOrder.id.slice(0, 8).toUpperCase()}`;
+
+            await B2BService.createInvoice({
+                order_id: selectedOrder.id,
+                partner_id: selectedOrder.partner_id,
+                invoice_number: invoiceNumber,
+                type: 'prepayment',
+                amount: selectedOrder.prepayment_amount,
+                currency: selectedOrder.currency || 'EUR',
+                due_date: dueDate.toISOString(),
+                paid_at: null,
+                payment_reference: null,
+                pdf_url: null
+            });
+
+            // Update order status to awaiting_payment
+            await B2BService.updateOrderStatus(selectedOrder.id, 'awaiting_payment', 'Faktura zaliczkowa wystawiona');
+
+            await loadOrders();
+            await loadOrderDetail(selectedOrder.id);
+            alert('Faktura zaliczkowa wystawiona pomyślnie!');
+        } catch (err: any) {
+            console.error('Error creating invoice:', err);
+            alert('Błąd wystawiania faktury: ' + (err.message || 'Nieznany błąd'));
+        }
+        setProcessing(false);
+    }
+
     // Filter orders
     const filteredOrders = orders.filter(order => {
         if (filter === 'all') return true;
@@ -206,8 +243,8 @@ export function B2BOrdersAdminPage() {
                                         key={order.id}
                                         onClick={() => loadOrderDetail(order.id)}
                                         className={`p-4 cursor-pointer transition-colors ${selectedOrder?.id === order.id
-                                                ? 'bg-blue-50 border-l-4 border-blue-600'
-                                                : 'hover:bg-gray-50 border-l-4 border-transparent'
+                                            ? 'bg-blue-50 border-l-4 border-blue-600'
+                                            : 'hover:bg-gray-50 border-l-4 border-transparent'
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -290,21 +327,34 @@ export function B2BOrdersAdminPage() {
                                 {selectedOrder.prepayment_status === 'pending' && (
                                     <div className="mb-6 p-4 bg-orange-50 rounded-xl border border-orange-200">
                                         <h3 className="font-semibold text-orange-800 mb-2">💳 Oczekiwana zaliczka</h3>
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center mb-3">
                                             <span className="text-orange-700">
                                                 Kwota: <b>€{selectedOrder.prepayment_amount.toLocaleString()}</b>
                                             </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleCreatePrepaymentInvoice}
+                                                disabled={processing || selectedOrder.status === 'pending'}
+                                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+                                            >
+                                                📄 Wystaw fakturę zaliczkową
+                                            </button>
                                             <button
                                                 onClick={() => {
                                                     setNewStatus('in_production');
                                                     setStatusNote('Zaliczka opłacona');
                                                     setShowStatusModal(true);
                                                 }}
-                                                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm"
+                                                disabled={processing}
+                                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
                                             >
                                                 ✓ Oznacz jako opłacone
                                             </button>
                                         </div>
+                                        {selectedOrder.status === 'pending' && (
+                                            <p className="text-xs text-orange-600 mt-2">⚠️ Najpierw zatwierdź zamówienie aby móc wystawić fakturę</p>
+                                        )}
                                     </div>
                                 )}
 

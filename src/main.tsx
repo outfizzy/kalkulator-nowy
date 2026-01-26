@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { TranslationProvider } from './contexts/TranslationContext'
+import { AuthProvider } from './contexts/AuthContext'
 
 try {
   const rootElement = document.getElementById('root');
@@ -9,7 +11,11 @@ try {
 
   createRoot(rootElement).render(
     <StrictMode>
-      <App />
+      <AuthProvider>
+        <TranslationProvider>
+          <App />
+        </TranslationProvider>
+      </AuthProvider>
     </StrictMode>,
   );
 } catch (e) {

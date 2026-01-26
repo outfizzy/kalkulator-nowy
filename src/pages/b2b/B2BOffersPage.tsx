@@ -10,17 +10,20 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-    draft: { label: 'Entwurf', color: 'bg-gray-100 text-gray-700 border-gray-300', icon: '📝' },
-    saved: { label: 'Gespeichert', color: 'bg-blue-100 text-blue-700 border-blue-300', icon: '💾' },
-    accepted: { label: 'Akzeptiert', color: 'bg-green-100 text-green-700 border-green-300', icon: '✅' },
-    expired: { label: 'Abgelaufen', color: 'bg-red-100 text-red-700 border-red-300', icon: '⏰' },
-    cancelled: { label: 'Storniert', color: 'bg-gray-100 text-gray-500 border-gray-300', icon: '🚫' }
+const STATUS_STYLES: Record<string, { color: string; icon: string }> = {
+    draft: { color: 'bg-gray-100 text-gray-700 border-gray-300', icon: '📝' },
+    saved: { color: 'bg-blue-100 text-blue-700 border-blue-300', icon: '💾' },
+    accepted: { color: 'bg-green-100 text-green-700 border-green-300', icon: '✅' },
+    expired: { color: 'bg-red-100 text-red-700 border-red-300', icon: '⏰' },
+    cancelled: { color: 'bg-gray-100 text-gray-500 border-gray-300', icon: '🚫' }
 };
 
 type FilterType = 'all' | 'draft' | 'saved' | 'accepted';
 
+import { useTranslation } from '../../contexts/TranslationContext';
+
 export function B2BOffersPage() {
+    const { t, language } = useTranslation();
     const navigate = useNavigate();
     const [offers, setOffers] = useState<B2BOffer[]>([]);
     const [loading, setLoading] = useState(true);
@@ -128,15 +131,15 @@ export function B2BOffersPage() {
             <div className="mb-6 flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        📋 Meine Angebote
+                        📋 {t('b2b.offers.title')}
                     </h1>
-                    <p className="text-gray-500 mt-1">Verwalten Sie Ihre Angebote und erstellen Sie Bestellungen</p>
+                    <p className="text-gray-500 mt-1">{t('b2b.offers.subtitle')}</p>
                 </div>
                 <Link
                     to="/b2b/calculator"
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
                 >
-                    ➕ Neues Angebot
+                    ➕ {t('b2b.offers.createFirst')}
                 </Link>
             </div>
 
@@ -148,8 +151,8 @@ export function B2BOffersPage() {
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
                             {f === 'all' && `Alle (${counts.all})`}
@@ -164,7 +167,7 @@ export function B2BOffersPage() {
                         type="text"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        placeholder="🔍 Suchen nach Referenz oder Kunde..."
+                        placeholder={`🔍 ${t('b2b.offers.searchPlaceholder')}`}
                         className="w-full max-w-md px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
@@ -185,9 +188,9 @@ export function B2BOffersPage() {
                             {filteredOffers.length === 0 ? (
                                 <div className="p-8 text-center text-gray-400">
                                     <div className="text-4xl mb-2">📭</div>
-                                    <p>Keine Angebote gefunden</p>
+                                    <p>{t('b2b.offers.noOffers')}</p>
                                     <Link to="/b2b/calculator" className="text-blue-600 text-sm hover:underline mt-2 inline-block">
-                                        Erstes Angebot erstellen →
+                                        {t('b2b.offers.createFirst')} →
                                     </Link>
                                 </div>
                             ) : (
@@ -196,8 +199,8 @@ export function B2BOffersPage() {
                                         key={offer.id}
                                         onClick={() => setSelectedOffer(offer)}
                                         className={`p-4 cursor-pointer transition-colors ${selectedOffer?.id === offer.id
-                                                ? 'bg-blue-50 border-l-4 border-blue-600'
-                                                : 'hover:bg-gray-50 border-l-4 border-transparent'
+                                            ? 'bg-blue-50 border-l-4 border-blue-600'
+                                            : 'hover:bg-gray-50 border-l-4 border-transparent'
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -209,8 +212,8 @@ export function B2BOffersPage() {
                                                     <p className="text-sm text-gray-500">{offer.customer_name}</p>
                                                 )}
                                             </div>
-                                            <span className={`px-2 py-1 text-xs rounded-full font-medium border ${STATUS_CONFIG[offer.status]?.color}`}>
-                                                {STATUS_CONFIG[offer.status]?.icon} {STATUS_CONFIG[offer.status]?.label}
+                                            <span className={`px-2 py-1 text-xs rounded-full font-medium border ${STATUS_STYLES[offer.status]?.color}`}>
+                                                {STATUS_STYLES[offer.status]?.icon} {t(`statuses.${offer.status}`)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-sm">
@@ -245,8 +248,8 @@ export function B2BOffersPage() {
                                         {selectedOffer.customer_name && (
                                             <p className="text-gray-500">{selectedOffer.customer_name}</p>
                                         )}
-                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium border ${STATUS_CONFIG[selectedOffer.status]?.color}`}>
-                                            {STATUS_CONFIG[selectedOffer.status]?.icon} {STATUS_CONFIG[selectedOffer.status]?.label}
+                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium border ${STATUS_STYLES[selectedOffer.status]?.color}`}>
+                                            {STATUS_STYLES[selectedOffer.status]?.icon} {t(`statuses.${selectedOffer.status}`)}
                                         </span>
                                     </div>
                                     <div className="text-right">
@@ -262,20 +265,20 @@ export function B2BOffersPage() {
                                 {/* Actions */}
                                 {selectedOffer.status === 'saved' && (
                                     <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                        <h3 className="font-semibold text-blue-800 mb-3">✅ Angebot bereit zur Bestellung</h3>
+                                        <h3 className="font-semibold text-blue-800 mb-3">✅ {t('b2b.offers.readyToOrder')}</h3>
                                         <button
                                             onClick={() => handleAcceptOffer(selectedOffer.id)}
                                             disabled={processing}
                                             className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
                                         >
-                                            🛒 Jetzt bestellen
+                                            🛒 {t('b2b.offers.orderNow')}
                                         </button>
                                     </div>
                                 )}
 
                                 {/* Products */}
                                 <div className="mb-6">
-                                    <h4 className="font-semibold text-gray-700 mb-3">📦 Positionen</h4>
+                                    <h4 className="font-semibold text-gray-700 mb-3">📦 {t('b2b.offers.positions')}</h4>
                                     {selectedOffer.items?.length > 0 ? (
                                         <div className="space-y-3">
                                             {selectedOffer.items.map((item, idx) => (
@@ -314,7 +317,7 @@ export function B2BOffersPage() {
                                 {/* Customer Contact */}
                                 {selectedOffer.customer_contact && Object.keys(selectedOffer.customer_contact).length > 0 && (
                                     <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                                        <h4 className="font-medium text-gray-700 mb-2">👤 Kundenkontakt</h4>
+                                        <h4 className="font-medium text-gray-700 mb-2">👤 {t('b2b.offers.customerContact')}</h4>
                                         {selectedOffer.customer_contact.email && (
                                             <p className="text-sm text-gray-600">📧 {selectedOffer.customer_contact.email}</p>
                                         )}
@@ -330,7 +333,7 @@ export function B2BOffersPage() {
                                 {/* Notes */}
                                 {selectedOffer.notes && (
                                     <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                                        <h4 className="font-medium text-yellow-800 mb-1">📝 Notizen</h4>
+                                        <h4 className="font-medium text-yellow-800 mb-1">📝 {t('b2b.offers.notes')}</h4>
                                         <p className="text-yellow-700 text-sm">{selectedOffer.notes}</p>
                                     </div>
                                 )}
@@ -362,8 +365,8 @@ export function B2BOffersPage() {
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-gray-400 py-32">
                                 <div className="text-6xl mb-6 opacity-20">👈</div>
-                                <h3 className="text-xl font-medium text-gray-600 mb-2">Angebot auswählen</h3>
-                                <p>Klicken Sie auf ein Angebot, um Details anzuzeigen</p>
+                                <h3 className="text-xl font-medium text-gray-600 mb-2">{t('b2b.offers.selectOffer')}</h3>
+                                <p>{t('b2b.offers.selectOfferDesc')}</p>
                             </div>
                         )}
                     </div>

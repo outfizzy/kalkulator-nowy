@@ -7,23 +7,25 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { B2BService, B2BDashboardStats, B2BOffer, B2BOrder, B2BPromotion, B2BCreditApplication } from '../../services/database/b2b.service';
 import { formatDistanceToNow, format } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { de, pl, enUS } from 'date-fns/locale';
+import { useTranslation } from '../../contexts/TranslationContext';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-    draft: { label: 'Entwurf', color: 'bg-gray-100 text-gray-700', icon: '📝' },
-    saved: { label: 'Gespeichert', color: 'bg-blue-100 text-blue-700', icon: '💾' },
-    accepted: { label: 'Akzeptiert', color: 'bg-green-100 text-green-700', icon: '✅' },
-    pending: { label: 'Wartet auf Genehmigung', color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
-    approved: { label: 'Genehmigt', color: 'bg-blue-100 text-blue-800', icon: '✅' },
-    awaiting_payment: { label: 'Zahlung ausstehend', color: 'bg-orange-100 text-orange-800', icon: '💳' },
-    in_production: { label: 'In Produktion', color: 'bg-purple-100 text-purple-800', icon: '🏭' },
-    shipped: { label: 'Versendet', color: 'bg-indigo-100 text-indigo-800', icon: '🚚' },
-    delivered: { label: 'Geliefert', color: 'bg-green-100 text-green-800', icon: '📦' },
-    rejected: { label: 'Abgelehnt', color: 'bg-red-100 text-red-800', icon: '❌' },
-    cancelled: { label: 'Storniert', color: 'bg-gray-100 text-gray-600', icon: '🚫' }
+const STATUS_STYLES: Record<string, { color: string; icon: string }> = {
+    draft: { color: 'bg-gray-100 text-gray-700', icon: '📝' },
+    saved: { color: 'bg-blue-100 text-blue-700', icon: '💾' },
+    accepted: { color: 'bg-green-100 text-green-700', icon: '✅' },
+    pending: { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
+    approved: { color: 'bg-blue-100 text-blue-800', icon: '✅' },
+    awaiting_payment: { color: 'bg-orange-100 text-orange-800', icon: '💳' },
+    in_production: { color: 'bg-purple-100 text-purple-800', icon: '🏭' },
+    shipped: { color: 'bg-indigo-100 text-indigo-800', icon: '🚚' },
+    delivered: { color: 'bg-green-100 text-green-800', icon: '📦' },
+    rejected: { color: 'bg-red-100 text-red-800', icon: '❌' },
+    cancelled: { color: 'bg-gray-100 text-gray-600', icon: '🚫' }
 };
 
 export function B2BDashboard() {
+    const { t, language } = useTranslation();
     const [stats, setStats] = useState<B2BDashboardStats | null>(null);
     const [recentOffers, setRecentOffers] = useState<B2BOffer[]>([]);
     const [recentOrders, setRecentOrders] = useState<B2BOrder[]>([]);
@@ -108,9 +110,9 @@ export function B2BDashboard() {
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900">
-                    Willkommen, {partnerName} 👋
+                    {t('dashboard.welcome')}, {partnerName} 👋
                 </h1>
-                <p className="text-gray-500 mt-1">Ihr B2B Partner Dashboard</p>
+                <p className="text-gray-500 mt-1">{t('b2b.portalTitle')}</p>
             </div>
 
             {/* KPI Cards */}
@@ -120,10 +122,10 @@ export function B2BDashboard() {
                         <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">
                             📋
                         </div>
-                        <span className="text-sm text-gray-500">Aktive</span>
+                        <span className="text-sm text-gray-500">Active</span>
                     </div>
                     <div className="text-3xl font-bold text-gray-900">{stats?.activeOffers || 0}</div>
-                    <div className="text-sm text-gray-500 mt-1">Angebote</div>
+                    <div className="text-sm text-gray-500 mt-1">{t('b2b.myOffers')}</div>
                 </div>
 
                 <div className="bg-white rounded-2xl p-6 border shadow-sm hover:shadow-md transition-shadow">
@@ -131,12 +133,12 @@ export function B2BDashboard() {
                         <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-2xl">
                             🏭
                         </div>
-                        <span className="text-sm text-gray-500">In Bearbeitung</span>
+                        <span className="text-sm text-gray-500">In Progress</span>
                     </div>
                     <div className="text-3xl font-bold text-gray-900">
                         {(stats?.pendingOrders || 0) + (stats?.inProductionOrders || 0)}
                     </div>
-                    <div className="text-sm text-gray-500 mt-1">Bestellungen</div>
+                    <div className="text-sm text-gray-500 mt-1">{t('b2b.orders')}</div>
                 </div>
 
                 <div className="bg-white rounded-2xl p-6 border shadow-sm hover:shadow-md transition-shadow">
@@ -144,13 +146,13 @@ export function B2BDashboard() {
                         <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl">
                             💰
                         </div>
-                        <span className="text-sm text-gray-500">Offen</span>
+                        <span className="text-sm text-gray-500">Open</span>
                     </div>
                     <div className="text-3xl font-bold text-orange-600">
                         €{(stats?.unpaidInvoicesAmount || 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-500 mt-1">
-                        {stats?.unpaidInvoicesCount || 0} Rechnungen
+                        {stats?.unpaidInvoicesCount || 0} {t('b2b.invoices')}
                     </div>
                 </div>
 
@@ -159,48 +161,48 @@ export function B2BDashboard() {
                         <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">
                             📈
                         </div>
-                        <span className="text-sm text-gray-500">Diesen Monat</span>
+                        <span className="text-sm text-gray-500">Month</span>
                     </div>
                     <div className="text-3xl font-bold text-green-600">
                         €{(stats?.monthlyRevenue || 0).toLocaleString()}
                     </div>
-                    <div className="text-sm text-gray-500 mt-1">Umsatz</div>
+                    <div className="text-sm text-gray-500 mt-1">Revenue</div>
                 </div>
             </div>
 
             {/* Quick Actions */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-8 text-white">
-                <h2 className="text-lg font-semibold mb-4">⚡ Schnellaktionen</h2>
+                <h2 className="text-lg font-semibold mb-4">⚡ Quick Actions</h2>
                 <div className="flex flex-wrap gap-4">
                     <Link
                         to="/b2b/calculator"
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
                     >
-                        ➕ Neues Angebot erstellen
+                        ➕ {t('b2b.newOffer')}
                     </Link>
                     <Link
                         to="/b2b/offers"
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
                     >
-                        📋 Meine Angebote
+                        📋 {t('b2b.myOffers')}
                     </Link>
                     <Link
                         to="/b2b/credit"
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
                     >
-                        💳 Kreditlimit {creditApp ? `(${creditApp.status})` : ''}
+                        💳 {t('b2b.credit')} {creditApp ? `(${creditApp.status})` : ''}
                     </Link>
                     <Link
                         to="/b2b/orders"
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
                     >
-                        🛒 Bestellungen
+                        🛒 {t('b2b.orders')}
                     </Link>
                     <Link
                         to="/b2b/invoices"
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors flex items-center gap-2"
                     >
-                        📄 Rechnungen
+                        📄 {t('b2b.invoices')}
                     </Link>
                 </div>
             </div>
@@ -238,8 +240,8 @@ export function B2BDashboard() {
                                                 </span>
                                             )}
                                         </div>
-                                        <span className={`px-2 py-1 text-xs rounded-full ${STATUS_CONFIG[offer.status]?.color || 'bg-gray-100'}`}>
-                                            {STATUS_CONFIG[offer.status]?.icon} {STATUS_CONFIG[offer.status]?.label}
+                                        <span className={`px-2 py-1 text-xs rounded-full ${STATUS_STYLES[offer.status]?.color || 'bg-gray-100'}`}>
+                                            {STATUS_STYLES[offer.status]?.icon} {t(`statuses.${offer.status}`)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
@@ -275,8 +277,8 @@ export function B2BDashboard() {
                                 <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors">
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-bold text-gray-900">{order.order_number}</span>
-                                        <span className={`px-2 py-1 text-xs rounded-full ${STATUS_CONFIG[order.status]?.color || 'bg-gray-100'}`}>
-                                            {STATUS_CONFIG[order.status]?.icon} {STATUS_CONFIG[order.status]?.label}
+                                        <span className={`px-2 py-1 text-xs rounded-full ${STATUS_STYLES[order.status]?.color || 'bg-gray-100'}`}>
+                                            {STATUS_STYLES[order.status]?.icon} {t(`statuses.${order.status}`)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">

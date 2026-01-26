@@ -10,13 +10,15 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-    draft: { label: 'Entwurf', color: 'bg-gray-100 text-gray-700', icon: '📝' },
-    submitted: { label: 'Eingereicht', color: 'bg-blue-100 text-blue-700', icon: '📤' },
-    under_review: { label: 'In Prüfung', color: 'bg-yellow-100 text-yellow-800', icon: '🔍' },
-    approved: { label: 'Genehmigt', color: 'bg-green-100 text-green-700', icon: '✅' },
-    rejected: { label: 'Abgelehnt', color: 'bg-red-100 text-red-700', icon: '❌' },
-    cancelled: { label: 'Storniert', color: 'bg-gray-100 text-gray-500', icon: '🚫' }
+import { useTranslation } from '../../contexts/TranslationContext';
+
+const STATUS_STYLES: Record<string, { color: string; icon: string }> = {
+    draft: { color: 'bg-gray-100 text-gray-700', icon: '📝' },
+    submitted: { color: 'bg-blue-100 text-blue-700', icon: '📤' },
+    under_review: { color: 'bg-yellow-100 text-yellow-800', icon: '🔍' },
+    approved: { color: 'bg-green-100 text-green-700', icon: '✅' },
+    rejected: { color: 'bg-red-100 text-red-700', icon: '❌' },
+    cancelled: { color: 'bg-gray-100 text-gray-500', icon: '🚫' }
 };
 
 interface TradeReference {
@@ -27,6 +29,7 @@ interface TradeReference {
 }
 
 export function B2BCreditPage() {
+    const { t, language } = useTranslation();
     const navigate = useNavigate();
     const [partner, setPartner] = useState<B2BPartner | null>(null);
     const [applications, setApplications] = useState<B2BCreditApplication[]>([]);
@@ -175,16 +178,16 @@ export function B2BCreditPage() {
             <div className="mb-6 flex justify-between items-start">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        💳 Kredyt kupiecki
+                        💳 {t('b2b.creditPage.title')}
                     </h1>
-                    <p className="text-gray-500 mt-1">Beantragen Sie einen Kreditrahmen für Ihre Bestellungen</p>
+                    <p className="text-gray-500 mt-1">{t('b2b.creditPage.subtitle')}</p>
                 </div>
                 {!showForm && !activeApplication && (
                     <button
                         onClick={() => setShowForm(true)}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
                     >
-                        ➕ Neuen Antrag stellen
+                        ➕ {t('b2b.creditPage.newApplication')}
                     </button>
                 )}
             </div>
@@ -192,29 +195,29 @@ export function B2BCreditPage() {
             {/* Current Credit Info */}
             {partner && partner.credit_limit > 0 && (
                 <div className="mb-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
-                    <h3 className="font-semibold text-green-800 mb-4">✅ Ihr aktueller Kreditrahmen</h3>
+                    <h3 className="font-semibold text-green-800 mb-4">✅ {t('b2b.creditPage.currentLimit')}</h3>
                     <div className="grid grid-cols-3 gap-6">
                         <div>
                             <div className="text-3xl font-bold text-green-700">
                                 €{partner.credit_limit.toLocaleString()}
                             </div>
-                            <div className="text-sm text-green-600">Kreditrahmen</div>
+                            <div className="text-sm text-green-600">{t('b2b.creditPage.title')}</div>
                         </div>
                         <div>
                             <div className="text-3xl font-bold text-orange-600">
                                 €{partner.credit_used.toLocaleString()}
                             </div>
-                            <div className="text-sm text-orange-500">Genutzt</div>
+                            <div className="text-sm text-orange-500">{t('b2b.creditPage.used')}</div>
                         </div>
                         <div>
                             <div className="text-3xl font-bold text-green-700">
                                 €{(partner.credit_limit - partner.credit_used).toLocaleString()}
                             </div>
-                            <div className="text-sm text-green-600">Verfügbar</div>
+                            <div className="text-sm text-green-600">{t('b2b.creditPage.available')}</div>
                         </div>
                     </div>
                     <div className="mt-4 text-sm text-green-700">
-                        Zahlungsziel: <b>{partner.payment_terms_days} Tage</b>
+                        {t('b2b.creditPage.paymentTerms')}: <b>{partner.payment_terms_days} Days</b>
                     </div>
                 </div>
             )}
@@ -224,13 +227,13 @@ export function B2BCreditPage() {
                 <div className="mb-6 p-6 bg-blue-50 rounded-2xl border border-blue-200">
                     <div className="flex items-start justify-between">
                         <div>
-                            <h3 className="font-semibold text-blue-800 mb-2">📋 Aktiver Antrag</h3>
+                            <h3 className="font-semibold text-blue-800 mb-2">📋 {t('b2b.creditPage.activeApp')}</h3>
                             <p className="text-blue-700">
-                                Sie haben einen Antrag über <b>€{activeApplication.requested_amount.toLocaleString()}</b> eingereicht.
+                                Requesting <b>€{activeApplication.requested_amount.toLocaleString()}</b>
                             </p>
                             <div className="mt-2">
-                                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${STATUS_CONFIG[activeApplication.status]?.color}`}>
-                                    {STATUS_CONFIG[activeApplication.status]?.icon} {STATUS_CONFIG[activeApplication.status]?.label}
+                                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${STATUS_STYLES[activeApplication.status]?.color}`}>
+                                    {STATUS_STYLES[activeApplication.status]?.icon} {t(`statuses.${activeApplication.status}`)}
                                 </span>
                             </div>
                         </div>
@@ -264,15 +267,15 @@ export function B2BCreditPage() {
             {/* Application Form */}
             {showForm && (
                 <form onSubmit={handleSubmit} className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">📝 Kreditantrag</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-6">📝 {t('b2b.creditPage.formTitle')}</h2>
 
                     {/* Requested Amount Section */}
                     <div className="mb-8 p-6 bg-blue-50 rounded-xl border border-blue-200">
-                        <h3 className="font-semibold text-blue-800 mb-4">💰 Gewünschter Kreditrahmen</h3>
+                        <h3 className="font-semibold text-blue-800 mb-4">💰 {t('b2b.creditPage.requestedAmount')}</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Kreditrahmen (€) *
+                                    {t('b2b.creditPage.requestedAmount')} *
                                 </label>
                                 <input
                                     type="number"
@@ -285,7 +288,7 @@ export function B2BCreditPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Zahlungsziel (Tage) *
+                                    {t('b2b.creditPage.paymentTerms')} (Days) *
                                 </label>
                                 <select
                                     value={formData.requested_payment_days}
@@ -304,10 +307,10 @@ export function B2BCreditPage() {
 
                     {/* Company Information */}
                     <div className="mb-8">
-                        <h3 className="font-semibold text-gray-800 mb-4">🏢 Unternehmensdaten</h3>
+                        <h3 className="font-semibold text-gray-800 mb-4">🏢 {t('b2b.creditPage.companyData')}</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Firmenname *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.companyName')} *</label>
                                 <input
                                     type="text"
                                     value={formData.company_name}
@@ -317,7 +320,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Steuernummer / USt-IdNr. *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.taxId')} *</label>
                                 <input
                                     type="text"
                                     value={formData.tax_id}
@@ -328,7 +331,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Handelsregisternummer</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.regNumber')}</label>
                                 <input
                                     type="text"
                                     value={formData.registration_number}
@@ -338,7 +341,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Branche</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.industry')}</label>
                                 <input
                                     type="text"
                                     value={formData.industry}
@@ -352,7 +355,7 @@ export function B2BCreditPage() {
                         {/* Address */}
                         <div className="mt-4 grid grid-cols-4 gap-4">
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Straße</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.street')}</label>
                                 <input
                                     type="text"
                                     value={formData.company_address.street}
@@ -361,7 +364,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">PLZ</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.zip')}</label>
                                 <input
                                     type="text"
                                     value={formData.company_address.zip}
@@ -370,7 +373,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Stadt</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.city')}</label>
                                 <input
                                     type="text"
                                     value={formData.company_address.city}
@@ -383,10 +386,10 @@ export function B2BCreditPage() {
 
                     {/* Financial Information */}
                     <div className="mb-8">
-                        <h3 className="font-semibold text-gray-800 mb-4">📊 Finanzielle Angaben</h3>
+                        <h3 className="font-semibold text-gray-800 mb-4">📊 {t('b2b.creditPage.financialData')}</h3>
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Jahresumsatz (€)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.annualRevenue')}</label>
                                 <input
                                     type="number"
                                     value={formData.annual_revenue}
@@ -396,7 +399,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Jahre in Geschäft</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.yearsInBusiness')}</label>
                                 <input
                                     type="number"
                                     value={formData.years_in_business}
@@ -405,7 +408,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Mitarbeiteranzahl</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.employees')}</label>
                                 <input
                                     type="number"
                                     value={formData.number_of_employees}
@@ -418,10 +421,10 @@ export function B2BCreditPage() {
 
                     {/* Bank Information */}
                     <div className="mb-8">
-                        <h3 className="font-semibold text-gray-800 mb-4">🏦 Bankverbindung</h3>
+                        <h3 className="font-semibold text-gray-800 mb-4">🏦 {t('b2b.creditPage.bankData')}</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Bank</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.bank')}</label>
                                 <input
                                     type="text"
                                     value={formData.bank_name}
@@ -430,7 +433,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.iban')}</label>
                                 <input
                                     type="text"
                                     value={formData.bank_account_iban}
@@ -444,10 +447,10 @@ export function B2BCreditPage() {
 
                     {/* Contact Person */}
                     <div className="mb-8">
-                        <h3 className="font-semibold text-gray-800 mb-4">👤 Ansprechpartner für Kreditangelegenheiten</h3>
+                        <h3 className="font-semibold text-gray-800 mb-4">👤 {t('b2b.creditPage.contactPerson')}</h3>
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.contactName')}</label>
                                 <input
                                     type="text"
                                     value={formData.credit_contact_name}
@@ -456,7 +459,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.email')}</label>
                                 <input
                                     type="email"
                                     value={formData.credit_contact_email}
@@ -465,7 +468,7 @@ export function B2BCreditPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('b2b.creditPage.phone')}</label>
                                 <input
                                     type="tel"
                                     value={formData.credit_contact_phone}
@@ -478,9 +481,9 @@ export function B2BCreditPage() {
 
                     {/* Trade References */}
                     <div className="mb-8">
-                        <h3 className="font-semibold text-gray-800 mb-4">📇 Handelsreferenzen</h3>
+                        <h3 className="font-semibold text-gray-800 mb-4">📇 {t('b2b.creditPage.tradeRefs')}</h3>
                         <p className="text-sm text-gray-500 mb-4">
-                            Bitte geben Sie mindestens eine Handelsreferenz an (z.B. bestehende Lieferanten)
+                            {t('b2b.creditPage.minRefs')}
                         </p>
                         {formData.trade_references.map((ref, idx) => (
                             <div key={idx} className="grid grid-cols-4 gap-3 mb-3 p-3 bg-gray-50 rounded-lg">
@@ -488,28 +491,28 @@ export function B2BCreditPage() {
                                     type="text"
                                     value={ref.company}
                                     onChange={e => updateReference(idx, 'company', e.target.value)}
-                                    placeholder="Firma"
+                                    placeholder={t('b2b.creditPage.company')}
                                     className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                                 <input
                                     type="text"
                                     value={ref.contact}
                                     onChange={e => updateReference(idx, 'contact', e.target.value)}
-                                    placeholder="Ansprechpartner"
+                                    placeholder={t('b2b.creditPage.contact')}
                                     className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                                 <input
                                     type="tel"
                                     value={ref.phone}
                                     onChange={e => updateReference(idx, 'phone', e.target.value)}
-                                    placeholder="Telefon"
+                                    placeholder={t('b2b.creditPage.phone')}
                                     className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                                 <input
                                     type="email"
                                     value={ref.email}
                                     onChange={e => updateReference(idx, 'email', e.target.value)}
-                                    placeholder="E-Mail"
+                                    placeholder={t('b2b.creditPage.email')}
                                     className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -519,7 +522,7 @@ export function B2BCreditPage() {
                             onClick={addReference}
                             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                         >
-                            ➕ Weitere Referenz hinzufügen
+                            ➕ {t('b2b.creditPage.addReference')}
                         </button>
                     </div>
 
@@ -530,7 +533,7 @@ export function B2BCreditPage() {
                             onClick={() => setShowForm(false)}
                             className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
                         >
-                            Abbrechen
+                            {t('b2b.creditPage.cancel')}
                         </button>
                         <button
                             type="submit"
@@ -540,10 +543,10 @@ export function B2BCreditPage() {
                             {submitting ? (
                                 <>
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    Wird eingereicht...
+                                    ...
                                 </>
                             ) : (
-                                '📤 Antrag einreichen'
+                                `📤 ${t('b2b.creditPage.submit')}`
                             )}
                         </button>
                     </div>
@@ -569,8 +572,8 @@ export function B2BCreditPage() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[app.status]?.color}`}>
-                                            {STATUS_CONFIG[app.status]?.icon} {STATUS_CONFIG[app.status]?.label}
+                                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[app.status]?.color}`}>
+                                            {STATUS_STYLES[app.status]?.icon} {t(`statuses.${app.status}`)}
                                         </span>
                                         <div className="text-xs text-gray-400 mt-1">
                                             {format(new Date(app.created_at), 'dd.MM.yyyy')}

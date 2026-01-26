@@ -445,6 +445,20 @@ export const B2BService = {
         return data || [];
     },
 
+    /**
+     * Get ALL offers (Admin/Manager view)
+     * No partner filter - returns all B2B offers for analysis
+     */
+    async getAllOffers(): Promise<B2BOffer[]> {
+        const { data, error } = await supabase
+            .from('b2b_offers')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    },
+
     async getOfferById(id: string): Promise<B2BOffer | null> {
         const { data, error } = await supabase
             .from('b2b_offers')
@@ -502,7 +516,7 @@ export const B2BService = {
         if (!offer) throw new Error('Offer not found');
         if (offer.status !== 'saved') throw new Error('Offer must be saved before accepting');
 
-        // Get partner to check prepayment settings
+        // Get partner to check prepayment settings and credit
         const partner = await this.getPartnerById(offer.partner_id);
         if (!partner) throw new Error('Partner not found');
 
@@ -512,10 +526,34 @@ export const B2BService = {
             .update({ status: 'accepted' })
             .eq('id', offerId);
 
-        // Calculate prepayment
-        const prepaymentAmount = partner.prepayment_required
-            ? offer.partner_total * (partner.prepayment_percent / 100)
+        // Check if partner has trade credit (kredyt kupiecki)
+        const orderAmount = offer.partner_total;
+        const hasTradeCredit = partner.credit_limit && partner.credit_limit > 0;
+        const availableCredit = hasTradeCredit
+            ? (partner.credit_limit - (partner.credit_used || 0))
             : 0;
+        const canUseCredit = hasTradeCredit && availableCredit >= orderAmount;
+
+        // Determine prepayment requirements
+        let prepaymentAmount = 0;
+        let prepaymentStatus: 'pending' | 'not_required' | 'paid' = 'not_required';
+        let orderStatus: 'pending' | 'approved' = 'pending';
+
+        if (canUseCredit) {
+            // Partner has sufficient credit - no prepayment needed
+            prepaymentStatus = 'not_required';
+            orderStatus = 'pending'; // Still needs admin approval
+
+            // Update partner's used credit
+            await supabase
+                .from('b2b_partners')
+                .update({ credit_used: (partner.credit_used || 0) + orderAmount })
+                .eq('id', partner.id);
+        } else if (partner.prepayment_required) {
+            // Partner requires prepayment
+            prepaymentAmount = orderAmount * (partner.prepayment_percent / 100);
+            prepaymentStatus = 'pending';
+        }
 
         // Create order
         const { data: order, error } = await supabase
@@ -523,12 +561,13 @@ export const B2BService = {
             .insert({
                 offer_id: offerId,
                 partner_id: offer.partner_id,
-                status: 'pending',
-                total_amount: offer.partner_total,
+                status: orderStatus,
+                total_amount: orderAmount,
                 prepayment_amount: prepaymentAmount,
-                prepayment_status: partner.prepayment_required ? 'pending' : 'not_required',
+                prepayment_status: prepaymentStatus,
                 currency: offer.currency,
-                shipping_address: offer.customer_contact
+                shipping_address: offer.customer_contact,
+                payment_method: canUseCredit ? 'trade_credit' : 'prepayment'
             })
             .select()
             .single();

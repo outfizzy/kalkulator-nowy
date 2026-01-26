@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'; // Use shared client to avoid multip
 
 interface AuthContextType {
     currentUser: User | null;
-    login: (email: string, password?: string, captchaToken?: string) => Promise<{ error: any }>;
+    login: (email: string, password?: string, captchaToken?: string) => Promise<{ error: any; user?: User | null }>;
     verifyOtp: (email: string, token: string) => Promise<{ error: any }>;
     register: (data: { email: string; password?: string; firstName: string; lastName: string; phone: string; role: UserRole }) => Promise<{ error: any }>;
     logout: () => Promise<void>;
@@ -104,7 +104,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setPermissions(rolePermissions);
     };
 
-    const fetchProfile = async (userId: string, email: string) => {
+    const fetchProfile = async (userId: string, email: string): Promise<User | null> => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -158,7 +158,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setCurrentUser(profile);
                 // Load permissions for this role
                 await fetchPermissions(normalizedRole);
+                return profile;
             }
+            return null;
         } catch (error) {
             console.error('Error fetching profile:', error);
             setCurrentUser(null);
@@ -168,7 +170,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const login = async (email: string, password?: string, captchaToken?: string): Promise<{ error: any }> => {
+    const login = async (email: string, password?: string, captchaToken?: string): Promise<{ error: any; user?: User | null }> => {
         if (!password) {
             return { error: { message: 'Hasło jest wymagane' } };
         }
@@ -184,7 +186,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Wait for profile to be fetched before returning
         if (data?.user && !error) {
             try {
-                await fetchProfile(data.user.id, data.user.email!);
+                const user = await fetchProfile(data.user.id, data.user.email!);
+                return { error: null, user };
             } catch (profileError) {
                 return { error: profileError };
             }

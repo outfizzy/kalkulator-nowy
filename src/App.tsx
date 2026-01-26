@@ -62,6 +62,7 @@ import { PricingV2Page } from './pages/admin/PricingV2Page';
 import { PriceTableBrowserPage } from './pages/admin/PriceTableBrowserPage';
 import { B2BPartnersPage } from './pages/admin/B2BPartnersPage';
 import { B2BOrdersAdminPage } from './pages/admin/B2BOrdersAdminPage';
+import { B2BOffersAdminPage } from './pages/admin/B2BOffersAdminPage';
 import { AIAssistantPage } from './components/admin/AIAssistantPage';
 import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
@@ -84,6 +85,8 @@ import { B2BOffersPage } from './pages/b2b/B2BOffersPage';
 import { B2BOrdersPage } from './pages/b2b/B2BOrdersPage';
 import { B2BPromotionsPage } from './pages/b2b/B2BPromotionsPage';
 import { B2BCreditPage } from './pages/b2b/B2BCreditPage';
+import { B2BMaterialsPage } from './pages/b2b/B2BMaterialsPage';
+import { B2BInvoicesPage } from './pages/b2b/B2BInvoicesPage';
 import { B2BLoginPage } from './pages/b2b/B2BLoginPage';
 import { B2BCalculator } from './components/b2b/calculator/B2BCalculator';
 
@@ -91,6 +94,7 @@ import { B2BCalculator } from './components/b2b/calculator/B2BCalculator';
 import { B2BPromotionsAdminPage } from './pages/admin/B2BPromotionsAdminPage';
 import { B2BCreditAdminPage } from './pages/admin/B2BCreditAdminPage';
 import { B2BPartnerAnalyticsPage } from './pages/admin/B2BPartnerAnalyticsPage';
+import { MarketingManagerPage } from './pages/admin/MarketingManagerPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
@@ -151,7 +155,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/reklamation" element={<ServiceRequestPage />} />
-            <Route path="/partner/login" element={<PartnerLoginPage />} />
+            <Route path="/partner/login" element={<Navigate to="/b2b/login" replace />} />
             <Route path="/partner/register" element={<PartnerRegisterPage />} />
             <Route path="/b2b/login" element={<B2BLoginPage />} />
             <Route path="/b2b/register" element={<PartnerRegisterPage />} />
@@ -211,6 +215,8 @@ function App() {
               <Route path="/admin/b2b/promotions" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BPromotionsAdminPage /></ProtectedRoute>} />
               <Route path="/admin/b2b/credit" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BCreditAdminPage /></ProtectedRoute>} />
               <Route path="/admin/b2b/analytics" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager']}><B2BPartnerAnalyticsPage /></ProtectedRoute>} />
+              <Route path="/admin/b2b/offers" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager', 'manager']}><B2BOffersAdminPage /></ProtectedRoute>} />
+              <Route path="/admin/b2b/marketing" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager', 'manager']}><MarketingManagerPage /></ProtectedRoute>} />
               <Route path="/admin/error-reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorReportsPage /></ProtectedRoute>} />
               <Route path="/fairs" element={<FairDashboard />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
@@ -232,22 +238,12 @@ function App() {
               <Route path="/visualizer" element={<VisualizerPage />} />
             </Route>
 
-            {/* Partner Protected Routes */}
-            <Route path="/partner" element={
-              <ProtectedRoute allowedRoles={['partner']}>
-                <PartnerLayout />
-              </ProtectedRoute>
-            }>
-              <Route path="dashboard" element={<OffersList />} />
-              <Route path="new-offer" element={<NewOfferPage mode="partner" />} />
-              <Route path="offers" element={<OffersList />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route index element={<Navigate to="/partner/dashboard" replace />} />
-            </Route>
+            {/* Partner Protected Routes - Redirect to B2B */}
+            <Route path="/partner/*" element={<Navigate to="/b2b/dashboard" replace />} />
 
             {/* B2B Partner Portal Routes */}
             <Route path="/b2b" element={
-              <ProtectedRoute allowedRoles={['b2b_partner', 'partner']}>
+              <ProtectedRoute allowedRoles={['b2b_partner', 'partner', 'admin', 'b2b_manager']}>
                 <B2BLayout />
               </ProtectedRoute>
             }>
@@ -260,7 +256,9 @@ function App() {
               <Route path="offers" element={<B2BOffersPage />} />
               <Route path="orders" element={<B2BOrdersPage />} />
               <Route path="promotions" element={<B2BPromotionsPage />} />
+              <Route path="materials" element={<B2BMaterialsPage />} />
               <Route path="credit" element={<B2BCreditPage />} />
+              <Route path="invoices" element={<B2BInvoicesPage />} />
               <Route index element={<Navigate to="/b2b/dashboard" replace />} />
             </Route>
 
