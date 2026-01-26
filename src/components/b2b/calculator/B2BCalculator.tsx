@@ -466,6 +466,9 @@ export const B2BCalculator: React.FC = () => {
                 if (!tables) return;
 
                 const accessoryList: Accessory[] = [];
+                // Apply markup to accessory prices
+                const markupMultiplier = 1 + (partnerMarkup / 100);
+
                 for (const table of tables) {
                     const { data: priceData } = await supabase
                         .from('price_matrix_entries')
@@ -485,7 +488,7 @@ export const B2BCalculator: React.FC = () => {
                     accessoryList.push({
                         id: table.id,
                         name: table.name.replace('Aluxe V2 - ', ''),
-                        price: Number(price),
+                        price: Number(price) * markupMultiplier,
                         category,
                         unit: 'szt'
                     });
@@ -498,7 +501,7 @@ export const B2BCalculator: React.FC = () => {
             }
         };
         loadAccessories();
-    }, []);
+    }, [partnerMarkup]);
 
     // === LOAD MATERIALS ===
     useEffect(() => {
@@ -801,9 +804,10 @@ export const B2BCalculator: React.FC = () => {
                 } else {
                     // Fallback: calculate based on formula from Excel (89.10 EUR per meter depth per field)
                     const fallbackUnitPrice = Math.round((projection / 1000) * 89.10 * 100) / 100;
-                    setSchiebeeinheitUnitPrice(fallbackUnitPrice);
-                    setSchiebeeinheitTotalPrice(fallbackUnitPrice * schiebeeinheitCount);
-                    console.log(`[SCHIEBEEINHEIT] Using fallback formula: ${fallbackUnitPrice}€ per field`);
+                    const markupMultiplier = 1 + (partnerMarkup / 100);
+                    setSchiebeeinheitUnitPrice(fallbackUnitPrice * markupMultiplier);
+                    setSchiebeeinheitTotalPrice(fallbackUnitPrice * schiebeeinheitCount * markupMultiplier);
+                    console.log(`[SCHIEBEEINHEIT] Using fallback formula: ${fallbackUnitPrice}€ per field (Markup: ${partnerMarkup}%)`);
                 }
             } catch (e) {
                 console.error('Schiebeeinheit price fetch error:', e);
@@ -811,7 +815,7 @@ export const B2BCalculator: React.FC = () => {
         };
 
         fetchSchiebeeinheitPrice();
-    }, [model, projection, schiebeeinheitCount]);
+    }, [model, projection, schiebeeinheitCount, partnerMarkup]);
 
     // === CALCULATE ROOF PRICE ===
     useEffect(() => {
@@ -905,7 +909,8 @@ export const B2BCalculator: React.FC = () => {
                 const combinedResult = await PricingService.calculateCombinedPrice(table.id, width, projection);
 
                 if (combinedResult !== null) {
-                    setPrice(combinedResult.totalPrice);
+                    const markupMultiplier = 1 + (partnerMarkup / 100);
+                    setPrice(combinedResult.totalPrice * markupMultiplier);
                     setStructureCount(combinedResult.structureCount);
                     setStructureNote(combinedResult.note);
                 } else {
@@ -959,7 +964,8 @@ export const B2BCalculator: React.FC = () => {
                             }
 
                             if (totalSurcharge > 0) {
-                                setFreestandingSurchargePrice(totalSurcharge);
+                                const markupMultiplier = 1 + (partnerMarkup / 100);
+                                setFreestandingSurchargePrice(totalSurcharge * markupMultiplier);
                             } else {
                                 console.warn('Surcharge not found for width', width);
                             }
@@ -975,7 +981,8 @@ export const B2BCalculator: React.FC = () => {
                             // Price is Wall base, add 15% manually?
                             // Legacy logic was +15%. Let's keep it consistent for non-surcharge models.
                             // Currently `freestandingSurchargePrice` is absolute. 15% of base price.
-                            setFreestandingSurchargePrice((combinedResult?.totalPrice || 0) * 0.15);
+                            const markupMultiplier = 1 + (partnerMarkup / 100);
+                            setFreestandingSurchargePrice((combinedResult?.totalPrice || 0) * 0.15 * markupMultiplier);
                         }
                     }
                 }
@@ -1045,7 +1052,8 @@ export const B2BCalculator: React.FC = () => {
                             console.log('[SURCHARGE DEBUG] Surcharge price:', surchargePrice);
 
                             if (surchargePrice !== null && surchargePrice > 0) {
-                                setVariantSurchargePrice(surchargePrice);
+                                const markupMultiplier = 1 + (partnerMarkup / 100);
+                                setVariantSurchargePrice(surchargePrice * markupMultiplier);
                             }
                         } else {
                             console.warn('[SURCHARGE DEBUG] Surcharge table not found:', surchargeTableName);
@@ -1058,7 +1066,8 @@ export const B2BCalculator: React.FC = () => {
                     const constructionPrice = combinedResult.totalPrice;
                     const sonderfarbenAmount = Math.round(constructionPrice * 0.20 * 100) / 100;
                     console.log(`[SONDERFARBEN] Applied +20% = ${sonderfarbenAmount}€`);
-                    setSonderfarbenSurcharge(sonderfarbenAmount);
+                    const markupMultiplier = 1 + (partnerMarkup / 100);
+                    setSonderfarbenSurcharge(sonderfarbenAmount * markupMultiplier);
                 } else {
                     setSonderfarbenSurcharge(0);
                 }
@@ -1071,7 +1080,7 @@ export const B2BCalculator: React.FC = () => {
         };
         const t = setTimeout(fetchPrice, 300);
         return () => clearTimeout(t);
-    }, [model, cover, zone, construction, width, projection, includeFoundations, glassVariant, polyVariant, sonderfarben]);
+    }, [model, cover, zone, construction, width, projection, includeFoundations, glassVariant, polyVariant, sonderfarben, partnerMarkup]);
 
     // === FETCH WPC PRICE PER M² ===
     useEffect(() => {
@@ -1355,9 +1364,10 @@ export const B2BCalculator: React.FC = () => {
     const customItemsTotal = customItems.reduce((sum, item) => sum + item.price, 0);
     const subtotal = basketTotal + customItemsTotal;
 
-    // Step 1: Apply Partner Markup (Cennik + Marża)
-    const systemMarkupValue = subtotal * (partnerMarkup / 100);
-    const purchasePrice = subtotal + systemMarkupValue;
+    // Step 1: Apply Partner Markup (ALREADY INCLUDED IN PRICES)
+    // Prices in basket now include markup.
+    // const systemMarkupValue = subtotal * (partnerMarkup / 100);
+    const purchasePrice = subtotal; // Price is final
 
     // Step 2: Apply margin on top of purchase price
     const marginValue = purchasePrice * (margin / 100);
@@ -1580,7 +1590,7 @@ export const B2BCalculator: React.FC = () => {
                                 <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Twoja Cena Zakupu (Netto)</p>
                                 <p className="text-4xl font-black">{formatCurrency(purchasePrice)}</p>
                                 <p className="text-slate-400 text-sm mt-1">
-                                    Cena bazowa: {formatCurrency(subtotal)} {partnerMarkup > 0 && `(+${partnerMarkup}% Marży)`}
+                                    Cena zawiera wszystkie narzuty
                                 </p>
                             </div>
                             <div className="text-right">
@@ -1829,7 +1839,7 @@ export const B2BCalculator: React.FC = () => {
                             <div className="bg-slate-100 rounded-xl p-5 border border-slate-200">
                                 <h4 className="text-sm text-slate-500 mb-1">💰 Cena Zakupu Towaru (Twój koszt)</h4>
                                 <p className="text-2xl font-black text-slate-800">{formatCurrency(purchasePrice)}</p>
-                                <p className="text-xs text-slate-500 mt-1">UPE z narzutem {partnerMarkup}%</p>
+                                <p className="text-xs text-slate-500 mt-1">Cena końcowa</p>
                             </div>
 
                             {/* Final Price for Customer */}
