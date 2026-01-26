@@ -57,6 +57,7 @@ export function B2BPartnersPage() {
     async function loadPartners() {
         setLoading(true);
         try {
+            await B2BService.syncMissingPartners();
             const data = await B2BService.getPartners();
             setPartners(data);
         } catch (err) {
@@ -242,8 +243,8 @@ export function B2BPartnersPage() {
                                             setShowForm(false);
                                         }}
                                         className={`p-4 cursor-pointer transition-colors ${selectedPartner?.id === partner.id
-                                                ? 'bg-blue-50 border-l-4 border-blue-600'
-                                                : 'hover:bg-gray-50 border-l-4 border-transparent'
+                                            ? 'bg-blue-50 border-l-4 border-blue-600'
+                                            : 'hover:bg-gray-50 border-l-4 border-transparent'
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -475,8 +476,8 @@ export function B2BPartnersPage() {
                                         <button
                                             onClick={() => toggleStatus(selectedPartner)}
                                             className={`px-3 py-1 text-sm rounded ${selectedPartner.status === 'active'
-                                                    ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                                                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                                : 'bg-green-100 text-green-700 hover:bg-green-200'
                                                 }`}
                                         >
                                             {selectedPartner.status === 'active' ? '⏸ Zawieś' : '▶️ Aktywuj'}

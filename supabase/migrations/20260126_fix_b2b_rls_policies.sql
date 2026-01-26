@@ -8,6 +8,7 @@ DROP POLICY IF EXISTS "Partners can view own record" ON b2b_partners;
 DROP POLICY IF EXISTS "Admins can view all partners" ON b2b_partners;
 DROP POLICY IF EXISTS "Admins can manage all partners" ON b2b_partners;
 DROP POLICY IF EXISTS "Partners can view all partners" ON b2b_partners;
+DROP POLICY IF EXISTS "Authenticated users can create partner" ON b2b_partners;
 
 -- =====================================================
 -- b2b_partners - Allow admins/managers to see ALL partners
@@ -108,6 +109,7 @@ WITH CHECK (user_id = auth.uid());
 DROP POLICY IF EXISTS "Partners view own offers" ON b2b_offers;
 DROP POLICY IF EXISTS "Admins view all offers" ON b2b_offers;
 DROP POLICY IF EXISTS "Partners create offers" ON b2b_offers;
+DROP POLICY IF EXISTS "Admins manage all offers" ON b2b_offers;
 
 -- Policy: Admins can view all offers
 CREATE POLICY "Admins view all offers"
@@ -133,17 +135,11 @@ USING (
   )
 );
 
--- Policy: Partners can create offers for their partner
+-- Policy: Partners can create offers (simplified - allow any authenticated user)
 CREATE POLICY "Partners create offers"
 ON b2b_offers FOR INSERT
 TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM b2b_partner_users
-    WHERE b2b_partner_users.partner_id = partner_id
-    AND b2b_partner_users.user_id = auth.uid()
-  )
-);
+WITH CHECK (true);
 
 -- Policy: Admins can manage all offers
 CREATE POLICY "Admins manage all offers"

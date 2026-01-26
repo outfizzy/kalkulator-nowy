@@ -530,6 +530,72 @@ export const B2BService = {
         }
     },
 
+    /**
+     * Check for users with 'b2b_partner' role who don't have a partner record
+     * and auto-create it. This fixes the "Partner not found" error.
+     */
+    async syncMissingPartners(): Promise<void> {
+        console.log('[B2B] Syncing missing partners (admin fix)...');
+
+        const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('role', ['b2b_partner']);
+
+        if (error || !profiles) return;
+
+        let fixedCount = 0;
+
+        for (const profile of profiles) {
+            const { data: links } = await supabase
+                .from('b2b_partner_users')
+                .select('id')
+                .eq('user_id', profile.id)
+                .limit(1);
+
+            if (!links || links.length === 0) {
+                console.log('[B2B] Fixing missing partner for:', profile.email);
+
+                const companyName = profile.full_name || profile.email?.split('@')[0] || 'Partner B2B';
+
+                try {
+                    const { data: newPartner } = await supabase
+                        .from('b2b_partners')
+                        .insert({
+                            company_name: companyName,
+                            contact_email: profile.email,
+                            primary_contact: {
+                                email: profile.email,
+                                name: profile.full_name || ''
+                            },
+                            address: {},
+                            status: 'active',
+                            margin_percent: 15,
+                            payment_terms_days: 14,
+                            credit_limit: 0,
+                            prepayment_required: true,
+                            prepayment_percent: 100
+                        })
+                        .select()
+                        .single();
+
+                    if (newPartner) {
+                        await supabase.from('b2b_partner_users').insert({
+                            partner_id: newPartner.id,
+                            user_id: profile.id,
+                            role: 'admin'
+                        });
+                        fixedCount++;
+                    }
+                } catch (err) {
+                    console.error('[B2B] Failed to fix partner:', err);
+                }
+            }
+        }
+
+        if (fixedCount > 0) console.log(`[B2B] Synced ${fixedCount} missing partners.`);
+    },
+
     async getPartnerPricing(partnerId: string): Promise<{ marginPercent: number }> {
         const partner = await this.getPartnerById(partnerId);
         return {
