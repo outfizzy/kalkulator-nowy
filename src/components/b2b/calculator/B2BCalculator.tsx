@@ -1231,8 +1231,8 @@ export const B2BCalculator: React.FC = () => {
 
         const loadingToast = toast.loading('Zapisywanie oferty...');
         try {
-            // Get current partner
-            const partner = await B2BService.getCurrentPartner();
+            // Get current partner (auto-creates if not exists)
+            const partner = await B2BService.getOrCreateCurrentPartner();
             if (!partner) {
                 toast.dismiss(loadingToast);
                 toast.error('Nie znaleziono partnera B2B');

@@ -456,6 +456,75 @@ export const B2BService = {
         return null;
     },
 
+    /**
+     * Get current partner or auto-create one for the logged-in user
+     * Creates a new B2B partner record if the user doesn't have one
+     */
+    async getOrCreateCurrentPartner(): Promise<B2BPartner | null> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !user.email) return null;
+
+        // First try to get existing partner
+        let partner = await this.getCurrentPartner();
+        if (partner) return partner;
+
+        // No partner found - create one automatically
+        console.log('[B2B] Creating new partner for user:', user.email);
+
+        // Get user profile for name
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+
+        const companyName = profile?.full_name || user.email.split('@')[0] || 'Partner B2B';
+
+        try {
+            // Create new partner
+            const { data: newPartner, error: partnerError } = await supabase
+                .from('b2b_partners')
+                .insert({
+                    company_name: companyName,
+                    contact_email: user.email,
+                    primary_contact: {
+                        email: user.email,
+                        name: profile?.full_name || ''
+                    },
+                    address: {},
+                    margin_percent: 0,
+                    payment_terms_days: 14,
+                    credit_limit: 0,
+                    credit_used: 0,
+                    prepayment_required: true,
+                    prepayment_percent: 100,
+                    status: 'active'
+                })
+                .select()
+                .single();
+
+            if (partnerError) {
+                console.error('[B2B] Error creating partner:', partnerError);
+                return null;
+            }
+
+            // Link user to partner
+            await supabase
+                .from('b2b_partner_users')
+                .insert({
+                    partner_id: newPartner.id,
+                    user_id: user.id,
+                    role: 'admin'
+                });
+
+            console.log('[B2B] Partner created and linked:', newPartner.company_name);
+            return newPartner as B2BPartner;
+        } catch (error) {
+            console.error('[B2B] Failed to create partner:', error);
+            return null;
+        }
+    },
+
     async getPartnerPricing(partnerId: string): Promise<{ marginPercent: number }> {
         const partner = await this.getPartnerById(partnerId);
         return {
