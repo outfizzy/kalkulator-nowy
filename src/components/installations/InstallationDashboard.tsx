@@ -4,6 +4,7 @@ import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
 import { ManualInstallationModal } from './ManualInstallationModal';
 import { UnifiedInstallationCalendar } from './UnifiedInstallationCalendar';
+import { InstallationCalendarV2 } from '../calendar-v2';
 import { InstallationReports } from './reports/InstallationReports';
 import { ContractBulkSelectionPanel } from './ContractBulkSelectionPanel';
 import { GroupingControls } from './GroupingControls';
@@ -19,7 +20,7 @@ export const InstallationDashboard: React.FC = () => {
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeocoding, setIsGeocoding] = useState(false);
-    const [view, setView] = useState<'list' | 'calendar' | 'contracts' | 'reports'>('calendar');
+    const [view, setView] = useState<'list' | 'calendar' | 'calendarV2' | 'contracts' | 'reports'>('calendarV2');
 
     // Modal State
     const [editingInstallation, setEditingInstallation] = useState<Installation | null>(null);
@@ -273,7 +274,8 @@ export const InstallationDashboard: React.FC = () => {
             {/* View Tabs */}
             <div className="bg-slate-100 p-1 rounded-full flex gap-1 self-start">
                 {[
-                    { id: 'calendar', label: '📅 Kalendarz (Unified)' },
+                    { id: 'calendarV2', label: '🗓️ Kalendarz V2' },
+                    { id: 'calendar', label: '📅 Kalendarz (Legacy)' },
                     { id: 'list', label: '📍 Mapa/Lista' },
                     { id: 'reports', label: '📈 Raporty' },
                     { id: 'contracts', label: '📝 Umowy' }
@@ -317,7 +319,13 @@ export const InstallationDashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 flex gap-4 min-h-0">
-                {view === 'calendar' ? (
+                {view === 'calendarV2' ? (
+                    <div className="w-full h-[calc(100vh-300px)] bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+                        <InstallationCalendarV2
+                            onEditInstallation={handleEdit}
+                        />
+                    </div>
+                ) : view === 'calendar' ? (
                     <div className="w-full h-full bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
                         <UnifiedInstallationCalendar
                             onEdit={handleEdit}
