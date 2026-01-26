@@ -374,7 +374,8 @@ export const B2BCalculator: React.FC = () => {
 
     const [margin, setMargin] = useState(40); // Default 40%
     const [discount, setDiscount] = useState(0); // Default 0%
-    const [purchaseDiscount, setPurchaseDiscount] = useState(0); // Global purchase discount from Admin
+    // const [purchaseDiscount, setPurchaseDiscount] = useState(0); // REMOVED: System discount
+    const [partnerDiscount, setPartnerDiscount] = useState(0); // Partner's buy discount
     const [savingOffer, setSavingOffer] = useState(false);
     const [savedOfferId, setSavedOfferId] = useState<string | null>(null);
     const [savedOffer, setSavedOffer] = useState<Offer | null>(null); // Store full offer for PDF
@@ -415,33 +416,17 @@ export const B2BCalculator: React.FC = () => {
         }
     }, [model, cover]);
 
-    // === FETCH PURCHASE DISCOUNT FROM ADMIN ===
+    // === FETCH PURCHASE DISCOUNT (DISABLED) ===
+    // User requested to hide internal purchase costs. 
+    // Instead we use Partner Discount loaded from profile.
+    /*
     useEffect(() => {
         const fetchPurchaseDiscount = async () => {
-            try {
-                // Try to find discount for specific model, fallback to GLOBAL
-                const { data } = await supabase
-                    .from('pricing_discounts')
-                    .select('model_family, discount_percent')
-                    .in('model_family', [model, 'GLOBAL']);
-
-                if (data && data.length > 0) {
-                    // Prefer model-specific discount, fallback to GLOBAL
-                    const modelDiscount = data.find(d => d.model_family === model);
-                    const globalDiscount = data.find(d => d.model_family === 'GLOBAL');
-
-                    const discountPercent = modelDiscount?.discount_percent ?? globalDiscount?.discount_percent ?? 0;
-                    setPurchaseDiscount(discountPercent);
-                } else {
-                    setPurchaseDiscount(0);
-                }
-            } catch (e) {
-                console.error('Error fetching purchase discount:', e);
-                setPurchaseDiscount(0);
-            }
+             // ... logic disabled ...
         };
         fetchPurchaseDiscount();
-    }, [model]);
+    }, [model]); 
+    */
 
     // === LOAD PARTNER SETTINGS ===
     useEffect(() => {
@@ -450,6 +435,11 @@ export const B2BCalculator: React.FC = () => {
                 const partner = await B2BService.getCurrentPartner();
                 if (partner && partner.margin_percent !== undefined && partner.margin_percent !== null) {
                     setMargin(Number(partner.margin_percent));
+                }
+
+                // Load Partner Discount
+                if (partner && (partner as any).discount_percent !== undefined) {
+                    setPartnerDiscount(Number((partner as any).discount_percent));
                 }
             } catch (error) {
                 console.error('Error loading partner settings:', error);
@@ -1363,8 +1353,8 @@ export const B2BCalculator: React.FC = () => {
     const customItemsTotal = customItems.reduce((sum, item) => sum + item.price, 0);
     const subtotal = basketTotal + customItemsTotal;
 
-    // Step 1: Apply purchase discount (this is the cost price after your discount from supplier)
-    const purchaseDiscountValue = subtotal * (purchaseDiscount / 100);
+    // Step 1: Apply purchase discount (Partner Discount)
+    const purchaseDiscountValue = subtotal * (partnerDiscount / 100);
     const purchasePrice = subtotal - purchaseDiscountValue;
 
     // Step 2: Apply margin on top of purchase price
@@ -1588,7 +1578,7 @@ export const B2BCalculator: React.FC = () => {
                                 <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Twoja Cena Zakupu (Netto)</p>
                                 <p className="text-4xl font-black">{formatCurrency(purchasePrice)}</p>
                                 <p className="text-slate-400 text-sm mt-1">
-                                    Cena bazowa: {formatCurrency(subtotal)} {purchaseDiscount > 0 && `(-${purchaseDiscount}%)`}
+                                    Cena bazowa: {formatCurrency(subtotal)} {partnerDiscount > 0 && `(Rabat -${partnerDiscount}%)`}
                                 </p>
                             </div>
                             <div className="text-right">
@@ -1837,7 +1827,7 @@ export const B2BCalculator: React.FC = () => {
                             <div className="bg-slate-100 rounded-xl p-5 border border-slate-200">
                                 <h4 className="text-sm text-slate-500 mb-1">💰 Cena Zakupu Towaru (Twój koszt)</h4>
                                 <p className="text-2xl font-black text-slate-800">{formatCurrency(purchasePrice)}</p>
-                                <p className="text-xs text-slate-500 mt-1">UPE po rabacie {purchaseDiscount}%</p>
+                                <p className="text-xs text-slate-500 mt-1">UPE po rabacie {partnerDiscount}%</p>
                             </div>
 
                             {/* Final Price for Customer */}
