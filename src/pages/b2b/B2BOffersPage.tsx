@@ -215,6 +215,18 @@ export function B2BOffersPage() {
                                             <span className={`px-2 py-1 text-xs rounded-full font-medium border ${STATUS_STYLES[offer.status]?.color}`}>
                                                 {STATUS_STYLES[offer.status]?.icon} {t(`statuses.${offer.status}`)}
                                             </span>
+                                            {(offer.status === 'draft' || offer.status === 'saved') && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleAcceptOffer(offer.id);
+                                                    }}
+                                                    className="ml-2 p-1 text-green-600 hover:bg-green-100 rounded-full"
+                                                    title={t('b2b.offers.orderNow')}
+                                                >
+                                                    🛒
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">
@@ -263,7 +275,7 @@ export function B2BOffersPage() {
                                 </div>
 
                                 {/* Actions */}
-                                {selectedOffer.status === 'saved' && (
+                                {['saved', 'draft'].includes(selectedOffer.status) && (
                                     <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
                                         <h3 className="font-semibold text-blue-800 mb-3">✅ {t('b2b.offers.readyToOrder')}</h3>
                                         <button
