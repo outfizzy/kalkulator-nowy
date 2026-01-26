@@ -242,9 +242,11 @@ export const UserManagementPage: React.FC = () => {
 
     const filteredUsers = users.filter(user => {
         if (activeTab === 'partners') {
-            return user.role === 'partner';
+            // Show both legacy partners and new B2B partners
+            return user.role === 'partner' || user.role === 'b2b_partner';
         }
-        return user.role !== 'partner';
+        // Internal tab: exclude both partner types
+        return user.role !== 'partner' && user.role !== 'b2b_partner';
     });
 
     // Calculate statistics
@@ -253,8 +255,8 @@ export const UserManagementPage: React.FC = () => {
         pending: users.filter(u => u.status === 'pending').length,
         active: users.filter(u => u.status === 'active').length,
         blocked: users.filter(u => u.status === 'blocked').length,
-        partners: users.filter(u => u.role === 'partner').length,
-        internal: users.filter(u => u.role !== 'partner').length
+        partners: users.filter(u => u.role === 'partner' || u.role === 'b2b_partner').length,
+        internal: users.filter(u => u.role !== 'partner' && u.role !== 'b2b_partner').length
     };
 
     if (loading) {
@@ -387,9 +389,9 @@ export const UserManagementPage: React.FC = () => {
                         }`}
                 >
                     Partnerzy B2B
-                    {users.filter(u => u.role === 'partner' && u.status === 'pending').length > 0 && (
+                    {users.filter(u => (u.role === 'partner' || u.role === 'b2b_partner') && u.status === 'pending').length > 0 && (
                         <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold">
-                            {users.filter(u => u.role === 'partner' && u.status === 'pending').length}
+                            {users.filter(u => (u.role === 'partner' || u.role === 'b2b_partner') && u.status === 'pending').length}
                         </span>
                     )}
                 </button>
