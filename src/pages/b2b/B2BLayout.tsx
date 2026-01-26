@@ -33,10 +33,11 @@ export function B2BLayout() {
 
     async function loadPartner() {
         try {
-            const data = await B2BService.getCurrentPartner();
+            // Auto-create partner record if it doesn't exist
+            const data = await B2BService.getOrCreateCurrentPartner();
             setPartner(data);
         } catch (err) {
-            console.error('Error loading partner:', err);
+            console.error('Error loading/creating partner:', err);
         }
     }
 
