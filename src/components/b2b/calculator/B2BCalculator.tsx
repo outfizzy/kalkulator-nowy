@@ -1231,29 +1231,46 @@ export const B2BCalculator: React.FC = () => {
 
         const loadingToast = toast.loading('Zapisywanie oferty...');
         try {
+            // Get current partner
+            const partner = await B2BService.getCurrentPartner();
+            if (!partner) {
+                toast.dismiss(loadingToast);
+                toast.error('Nie znaleziono partnera B2B');
+                return;
+            }
+
             // Prepare items for B2B API format
             const items = basket.map(item => ({
-                name: item.name,
-                description: item.config,
-                quantity: 1, // Basket items logic
-                unit_price: item.price,
-                total_price: item.price,
-                type: 'product'
+                product_name: item.name,
+                variant: item.config,
+                quantity: 1,
+                base_price: item.price,
+                partner_price: item.price,
             }));
 
+            // Build customer contact object
+            const customerContact = customerState ? {
+                email: customerState.email || '',
+                phone: customerState.phone || '',
+                address: `${customerState.street || ''} ${customerState.houseNumber || ''}, ${customerState.postalCode || ''} ${customerState.city || ''}`.trim()
+            } : {};
+
             const offerData = {
-                client_reference: customerState
+                partner_id: partner.id,
+                reference_number: customerState
                     ? `${customerState.firstName || ''} ${customerState.lastName || customerState.name || ''}`.trim()
                     : `Szybka wycena ${new Date().toLocaleDateString('pl-PL')}`,
                 customer_name: customerState
                     ? `${customerState.firstName || ''} ${customerState.lastName || customerState.name || ''}`.trim()
                     : null,
-                total_amount: finalPrice,
-                partner_total: finalPrice, // Partner pays this
-                base_total: purchasePrice, // Our cost (UPE after discount)
-                status: customerState ? 'saved' : 'draft',
+                partner_total: finalPrice,
+                base_total: purchasePrice,
+                currency: 'EUR',
+                status: customerState ? 'saved' : 'draft' as const,
                 items: items,
-                customer_contact: customerState || null
+                customer_contact: customerContact,
+                notes: null,
+                valid_until: null
             };
 
             await B2BService.createOffer(offerData);
@@ -1261,10 +1278,10 @@ export const B2BCalculator: React.FC = () => {
             toast.dismiss(loadingToast);
             toast.success('Oferta zapisana pomyślnie!');
             navigate('/b2b/offers');
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            console.error('Error saving offer:', error);
             toast.dismiss(loadingToast);
-            toast.error('Błąd zapisu oferty');
+            toast.error('Błąd zapisu oferty: ' + (error.message || 'Nieznany błąd'));
         }
     };
 
