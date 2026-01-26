@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarSidebar } from './CalendarSidebar';
 import { CalendarGrid } from './CalendarGrid';
 import { CalendarMap } from './CalendarMap';
+import { CalendarMonthView } from './CalendarMonthView';
+import { CalendarTimeline } from './CalendarTimeline';
 import { InstallationService } from '../../services/database/installation.service';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
 import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability } from '../../types';
@@ -16,7 +18,7 @@ interface CalendarV2Props {
     onEditInstallation?: (installation: Installation) => void;
 }
 
-type ViewMode = 'week' | 'month' | 'map';
+type ViewMode = 'week' | 'month' | 'timeline' | 'map';
 
 export const InstallationCalendarV2: React.FC<CalendarV2Props> = ({ onEditInstallation }) => {
     // === STATE ===
@@ -215,17 +217,18 @@ export const InstallationCalendarV2: React.FC<CalendarV2Props> = ({ onEditInstal
 
                 {/* View Mode Switcher */}
                 <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
-                    {(['week', 'month', 'map'] as ViewMode[]).map((mode) => (
+                    {(['week', 'month', 'timeline', 'map'] as ViewMode[]).map((mode) => (
                         <button
                             key={mode}
                             onClick={() => setViewMode(mode)}
                             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === mode
-                                    ? 'bg-white text-indigo-600 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-white text-indigo-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
                                 }`}
                         >
                             {mode === 'week' && '📋 Tydzień'}
                             {mode === 'month' && '📅 Miesiąc'}
+                            {mode === 'timeline' && '📊 Gantt'}
                             {mode === 'map' && '🗺️ Mapa'}
                         </button>
                     ))}
@@ -266,9 +269,21 @@ export const InstallationCalendarV2: React.FC<CalendarV2Props> = ({ onEditInstal
                         />
                     )}
                     {viewMode === 'month' && (
-                        <div className="flex items-center justify-center h-full text-slate-400">
-                            Widok miesięczny - wkrótce
-                        </div>
+                        <CalendarMonthView
+                            installations={installations}
+                            teams={teams}
+                            currentDate={currentDate}
+                            onDrop={handleDrop}
+                            onEditInstallation={onEditInstallation}
+                        />
+                    )}
+                    {viewMode === 'timeline' && (
+                        <CalendarTimeline
+                            installations={installations}
+                            teams={teams}
+                            currentDate={currentDate}
+                            onEditInstallation={onEditInstallation}
+                        />
                     )}
                 </div>
             </div>
