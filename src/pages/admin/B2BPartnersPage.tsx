@@ -62,7 +62,8 @@ export function B2BPartnersPage() {
             if (report.errors && report.errors.length > 0) {
                 if (report.found > 0) {
                     console.error('Sync errors:', report.errors);
-                    toast.error('Błąd synchronizacji (RLS?). Uruchom SQL w Supabase!');
+                    const errorMsg = report.errors[0]?.message || JSON.stringify(report.errors[0] || 'Unknown');
+                    toast.error(`Błąd Sync: ${errorMsg}`);
                 }
             } else if (report.synced > 0) {
                 toast.success(`Naprawiono ${report.synced} brakujących partnerów!`);
