@@ -1581,39 +1581,44 @@ export const B2BCalculator: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Margin & Discount */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
-
-                        {/* Purchase Discount Info (from Admin) */}
-                        {purchaseDiscount > 0 && (
-                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
-                                    <span className="font-bold text-green-800">{purchaseDiscount}%</span>
-                                </div>
-                                <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                    <span>Cena zakupu:</span>
-                                    <span className="font-bold">{formatCurrency(purchasePrice)}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-6">
+                    {/* Purchase Price (Review for Partner) */}
+                    <div className="bg-slate-900 rounded-2xl shadow-lg p-6 text-white mb-6">
+                        <div className="flex justify-between items-center">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
+                                <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Twoja Cena Zakupu (Netto)</p>
+                                <p className="text-4xl font-black">{formatCurrency(purchasePrice)}</p>
+                                <p className="text-slate-400 text-sm mt-1">
+                                    Cena bazowa: {formatCurrency(subtotal)} {purchaseDiscount > 0 && `(-${purchaseDiscount}%)`}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold uppercase border border-green-500/30">
+                                    B2B Partner
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Margin & Offer Calculation (Secondary) */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
+                            <span>📝</span> Kalkulacja Oferty dla Klienta (Opcjonalne)
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Twoja Marża (%)</label>
                                 <input
                                     type="number"
                                     value={margin}
                                     onChange={e => setMargin(parseFloat(e.target.value) || 0)}
                                     min={0}
-                                    max={100}
                                     className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
                                 />
-                                <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
+                                <p className="text-xs text-slate-400 mt-1">Zysk: {formatCurrency(marginValue)}</p>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabatt (%)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabat dla Klienta (%)</label>
                                 <input
                                     type="number"
                                     value={discount}
@@ -1622,23 +1627,13 @@ export const B2BCalculator: React.FC = () => {
                                     max={100}
                                     className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
                                 />
-                                <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
+                                <p className="text-xs text-slate-400 mt-1">Upust: {formatCurrency(discountValue)}</p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Final Price */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
-                                <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                <p className="text-indigo-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-indigo-200 text-xs">Fläche</p>
-                                <p className="text-2xl font-bold">{areaM2.toFixed(2)} m²</p>
-                            </div>
+                        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex justify-between items-center">
+                            <span className="text-indigo-900 font-medium">Sugerowana cena końcowa (dla Klienta):</span>
+                            <span className="text-2xl font-bold text-indigo-700">{formatCurrency(finalPrice)}</span>
                         </div>
                     </div>
 
@@ -1728,16 +1723,28 @@ export const B2BCalculator: React.FC = () => {
                         </div>
 
                     ) : (
-                        <button
-                            onClick={() => saveB2BOffer(true)}
-                            disabled={savingOffer || basket.length === 0}
-                            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || basket.length === 0
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
-                                }`}
-                        >
-                            {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
-                        </button>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => saveB2BOffer(true)}
+                                disabled={savingOffer || basket.length === 0}
+                                className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || basket.length === 0
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-50'
+                                    }`}
+                            >
+                                {savingOffer ? 'Zapisywanie...' : '💾 Zapisz (Szkic)'}
+                            </button>
+                            <button
+                                onClick={handleSaveAndOrder}
+                                disabled={savingOffer || basket.length === 0}
+                                className={`flex-[1.5] py-4 rounded-xl font-bold text-lg transition-all shadow-xl shadow-green-900/10 ${savingOffer || basket.length === 0
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-green-600 text-white hover:bg-green-500'
+                                    }`}
+                            >
+                                <span>🛒 Zapisz i Zamów</span>
+                            </button>
+                        </div>
                     )}
                 </div >
             </div >
