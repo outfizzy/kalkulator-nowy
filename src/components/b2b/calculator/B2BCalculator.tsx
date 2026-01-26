@@ -443,6 +443,21 @@ export const B2BCalculator: React.FC = () => {
         fetchPurchaseDiscount();
     }, [model]);
 
+    // === LOAD PARTNER SETTINGS ===
+    useEffect(() => {
+        const loadPartnerSettings = async () => {
+            try {
+                const partner = await B2BService.getCurrentPartner();
+                if (partner && partner.margin_percent !== undefined && partner.margin_percent !== null) {
+                    setMargin(Number(partner.margin_percent));
+                }
+            } catch (error) {
+                console.error('Error loading partner settings:', error);
+            }
+        };
+        loadPartnerSettings();
+    }, []);
+
     // === LOAD ACCESSORIES ===
     useEffect(() => {
         const loadAccessories = async () => {
