@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../../lib/supabase';
+import { UserService } from './user.service';
 
 // =====================================================
 // Types
@@ -538,13 +539,21 @@ export const B2BService = {
         console.log('[B2B] Syncing missing partners (admin fix)...');
         const errors: any[] = [];
 
-        const { data: profiles, error } = await supabase
+        // Fetch ALL profiles to debug role issues and avoid filter quirks
+        const { data: allProfiles, error } = await supabase
             .from('profiles')
-            .select('*')
-            .in('role', ['b2b_partner']);
+            .select('*');
 
-        if (error) return { found: 0, synced: 0, errors: [error] };
-        if (!profiles) return { found: 0, synced: 0, errors: [] };
+        if (error) {
+            console.error('Profile fetch error:', error);
+            return { found: 0, synced: 0, errors: [error] };
+        }
+
+        if (!allProfiles) return { found: 0, synced: 0, errors: [] };
+
+        // Filter valid targets (legacy partners OR new b2b partners)
+        const profiles = allProfiles.filter(p => p.role === 'b2b_partner' || p.role === 'partner');
+        console.log(`[B2B] Found ${profiles.length} potential partners out of ${allProfiles.length} profiles`);
 
         let fixedCount = 0;
 
@@ -556,18 +565,21 @@ export const B2BService = {
                 .limit(1);
 
             if (!links || links.length === 0) {
-                console.log('[B2B] Fixing missing partner for:', profile.email);
+                // Use email if available, otherwise placeholder
+                const email = profile.email || `partner_${profile.id}@placeholder.com`;
+                console.log('[B2B] Fixing missing partner for:', email);
 
-                const companyName = profile.full_name || profile.email?.split('@')[0] || 'Partner B2B';
+                const companyName = profile.company_name || profile.full_name || (email.includes('@') ? email.split('@')[0] : 'Partner B2B');
 
                 try {
-                    const { data: newPartner } = await supabase
+                    const { data: newPartner, error: createError } = await supabase
                         .from('b2b_partners')
                         .insert({
                             company_name: companyName,
-                            contact_email: profile.email,
+                            contact_email: email,
+                            priority: 'normal',
                             primary_contact: {
-                                email: profile.email,
+                                email: email,
                                 name: profile.full_name || ''
                             },
                             address: {},
@@ -581,12 +593,15 @@ export const B2BService = {
                         .select()
                         .single();
 
+                    if (createError) throw createError;
+
                     if (newPartner) {
-                        await supabase.from('b2b_partner_users').insert({
+                        const { error: linkError } = await supabase.from('b2b_partner_users').insert({
                             partner_id: newPartner.id,
                             user_id: profile.id,
                             role: 'admin'
                         });
+                        if (linkError) throw linkError;
                         fixedCount++;
                     }
                 } catch (err) {
@@ -596,7 +611,6 @@ export const B2BService = {
             }
         }
 
-        if (fixedCount > 0) console.log(`[B2B] Synced ${fixedCount} missing partners.`);
         return { found: profiles.length, synced: fixedCount, errors };
     },
 
