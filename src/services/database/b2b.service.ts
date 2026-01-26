@@ -309,6 +309,7 @@ export const B2BService = {
     // =========================================
 
     async getPartners(): Promise<B2BPartner[]> {
+        console.log('[B2B] Fetching all partners...');
         const { data, error } = await supabase
             .from('b2b_partners')
             .select(`
@@ -317,7 +318,11 @@ export const B2BService = {
             `)
             .order('company_name');
 
-        if (error) throw error;
+        if (error) {
+            console.error('[B2B] Error fetching partners:', error);
+            throw error;
+        }
+        console.log('[B2B] Fetched partners:', data?.length || 0, 'records');
         return data || [];
     },
 
