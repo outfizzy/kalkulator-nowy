@@ -412,15 +412,31 @@ export const B2BService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return null;
 
+        // First try: lookup via b2b_partner_users table
         const { data: partnerUser } = await supabase
             .from('b2b_partner_users')
             .select('partner_id')
             .eq('user_id', user.id)
             .single();
 
-        if (!partnerUser) return null;
+        if (partnerUser) {
+            return this.getPartnerById(partnerUser.partner_id);
+        }
 
-        return this.getPartnerById(partnerUser.partner_id);
+        // Fallback: lookup partner by user email in primary_contact
+        if (user.email) {
+            const { data: partners } = await supabase
+                .from('b2b_partners')
+                .select('*')
+                .eq('primary_contact->>email', user.email)
+                .limit(1);
+
+            if (partners && partners.length > 0) {
+                return partners[0] as B2BPartner;
+            }
+        }
+
+        return null;
     },
 
     async getPartnerPricing(partnerId: string): Promise<{ marginPercent: number }> {
