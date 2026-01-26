@@ -372,10 +372,9 @@ export const B2BCalculator: React.FC = () => {
 
     // === SUMMARY VIEW ===
 
-    const [margin, setMargin] = useState(40); // Default 40%
-    const [discount, setDiscount] = useState(0); // Default 0%
-    // const [purchaseDiscount, setPurchaseDiscount] = useState(0); // REMOVED: System discount
-    const [partnerDiscount, setPartnerDiscount] = useState(0); // Partner's buy discount
+    const [margin, setMargin] = useState(0); // Default 0% for End Customer
+    const [discount, setDiscount] = useState(0); // Default 0% for End Customer
+    const [partnerMarkup, setPartnerMarkup] = useState(0); // System Markup for Partner (from DB)
     const [savingOffer, setSavingOffer] = useState(false);
     const [savedOfferId, setSavedOfferId] = useState<string | null>(null);
     const [savedOffer, setSavedOffer] = useState<Offer | null>(null); // Store full offer for PDF
@@ -433,14 +432,17 @@ export const B2BCalculator: React.FC = () => {
         const loadPartnerSettings = async () => {
             try {
                 const partner = await B2BService.getCurrentPartner();
+                // Load System Markup (Partner's fixed margin)
                 if (partner && partner.margin_percent !== undefined && partner.margin_percent !== null) {
-                    setMargin(Number(partner.margin_percent));
+                    setPartnerMarkup(Number(partner.margin_percent));
                 }
 
-                // Load Partner Discount
+                // Discount logic removed as per user request (markup only)
+                /*
                 if (partner && (partner as any).discount_percent !== undefined) {
-                    setPartnerDiscount(Number((partner as any).discount_percent));
+                     setPartnerDiscount(Number((partner as any).discount_percent));
                 }
+                */
             } catch (error) {
                 console.error('Error loading partner settings:', error);
             }
@@ -1353,9 +1355,9 @@ export const B2BCalculator: React.FC = () => {
     const customItemsTotal = customItems.reduce((sum, item) => sum + item.price, 0);
     const subtotal = basketTotal + customItemsTotal;
 
-    // Step 1: Apply purchase discount (Partner Discount)
-    const purchaseDiscountValue = subtotal * (partnerDiscount / 100);
-    const purchasePrice = subtotal - purchaseDiscountValue;
+    // Step 1: Apply Partner Markup (Cennik + Marża)
+    const systemMarkupValue = subtotal * (partnerMarkup / 100);
+    const purchasePrice = subtotal + systemMarkupValue;
 
     // Step 2: Apply margin on top of purchase price
     const marginValue = purchasePrice * (margin / 100);
@@ -1578,7 +1580,7 @@ export const B2BCalculator: React.FC = () => {
                                 <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Twoja Cena Zakupu (Netto)</p>
                                 <p className="text-4xl font-black">{formatCurrency(purchasePrice)}</p>
                                 <p className="text-slate-400 text-sm mt-1">
-                                    Cena bazowa: {formatCurrency(subtotal)} {partnerDiscount > 0 && `(Rabat -${partnerDiscount}%)`}
+                                    Cena bazowa: {formatCurrency(subtotal)} {partnerMarkup > 0 && `(+${partnerMarkup}% Marży)`}
                                 </p>
                             </div>
                             <div className="text-right">
@@ -1827,7 +1829,7 @@ export const B2BCalculator: React.FC = () => {
                             <div className="bg-slate-100 rounded-xl p-5 border border-slate-200">
                                 <h4 className="text-sm text-slate-500 mb-1">💰 Cena Zakupu Towaru (Twój koszt)</h4>
                                 <p className="text-2xl font-black text-slate-800">{formatCurrency(purchasePrice)}</p>
-                                <p className="text-xs text-slate-500 mt-1">UPE po rabacie {partnerDiscount}%</p>
+                                <p className="text-xs text-slate-500 mt-1">UPE z narzutem {partnerMarkup}%</p>
                             </div>
 
                             {/* Final Price for Customer */}
