@@ -36,7 +36,7 @@ export function B2BLoginPage() {
             navigate('/b2b/dashboard');
         } catch (error: any) {
             console.error('Login error:', error);
-            toast.error(error.message || 'Błąd logowania. Sprawdź dane i spróbuj ponownie.');
+            toast.error(`BŁĄD: ${error.message || JSON.stringify(error)}`);
         } finally {
             setLoading(false);
         }

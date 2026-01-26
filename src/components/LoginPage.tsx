@@ -45,8 +45,8 @@ export const LoginPage: React.FC = () => {
             }
         } catch (error: unknown) {
             console.error('Login error:', error);
-            const message = error instanceof Error ? error.message : 'Błąd logowania. Sprawdź email i hasło.';
-            toast.error(message);
+            const rawError = (error as any)?.message || (error as any)?.error_description || JSON.stringify(error);
+            toast.error(`BŁĄD: ${rawError}`);
         } finally {
             setLoading(false);
         }
