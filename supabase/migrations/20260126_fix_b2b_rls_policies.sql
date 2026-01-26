@@ -1,12 +1,21 @@
--- FINAL FIX FOR RECURSION ERROR & LOGIN
--- RUN THIS IN SUPABASE SQL EDITOR
+-- FINAL FIX: SCHEMA + RECURSION + PERMISSIONS
 -- ==========================================================
 
 BEGIN;
 
--- 1. Helper Function to avoid Infinite Recursion
--- This function runs with elevated permissions (SECURITY DEFINER)
--- to check role without triggering RLS policies again.
+-- 0. FIX SCHEMA (Missing columns causing sync errors)
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS primary_contact JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'normal';
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS margin_percent NUMERIC DEFAULT 15;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS payment_terms_days INTEGER DEFAULT 14;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS credit_limit NUMERIC DEFAULT 0;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS prepayment_required BOOLEAN DEFAULT true;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS prepayment_percent NUMERIC DEFAULT 100;
+ALTER TABLE b2b_partners ADD COLUMN IF NOT EXISTS company_name TEXT;
+
+-- 1. Helper Function
 CREATE OR REPLACE FUNCTION public.check_user_role(required_roles text[])
 RETURNS boolean AS $$
 BEGIN
@@ -51,7 +60,7 @@ USING (
   public.check_user_role(ARRAY['admin', 'b2b_manager', 'manager', 'superadmin'])
 );
 
--- 4. Fixes "Error saving offer" for Partners
+-- 4. Offers Policies
 DROP POLICY IF EXISTS "Partners can insert offers" ON offers;
 CREATE POLICY "Partners can insert offers" ON offers 
 FOR INSERT

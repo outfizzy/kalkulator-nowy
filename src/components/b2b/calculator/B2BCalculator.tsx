@@ -1223,7 +1223,7 @@ export const B2BCalculator: React.FC = () => {
     };
 
     // === B2B SAVE HANDLER ===
-    const saveB2BOffer = async () => {
+    const saveB2BOffer = async (redirect = true) => {
         if (basket.length === 0) {
             toast.error('Dodaj produkty do koszyka');
             return;
@@ -1273,15 +1273,43 @@ export const B2BCalculator: React.FC = () => {
                 valid_until: null
             };
 
-            await B2BService.createOffer(offerData);
+            const newOffer = await B2BService.createOffer(offerData);
 
             toast.dismiss(loadingToast);
-            toast.success('Oferta zapisana pomyślnie!');
-            navigate('/b2b/offers');
+
+            if (redirect) {
+                toast.success('Oferta zapisana pomyślnie!');
+                navigate('/b2b/offers');
+            }
+            return newOffer.id;
         } catch (error: any) {
             console.error('Error saving offer:', error);
             toast.dismiss(loadingToast);
             toast.error('Błąd zapisu oferty: ' + (error.message || 'Nieznany błąd'));
+            return null;
+        }
+    };
+
+    const handleSaveAndOrder = async () => {
+        if (!confirm('Czy na pewno chcesz zaakceptować ofertę i złożyć zamówienie?')) return;
+
+        // 1. Save as draft/saved first (without redirect)
+        const offerId = await saveB2BOffer(false);
+        if (!offerId) return; // Save failed
+
+        // 2. Accept offer (create order)
+        const loadingToast = toast.loading('Przetwarzanie zamówienia...');
+        try {
+            await B2BService.acceptOffer(offerId);
+            toast.dismiss(loadingToast);
+            toast.success('Zamówienie przyjęte! Dziękujemy.');
+            navigate('/b2b/orders');
+        } catch (error: any) {
+            console.error('Order creation error:', error);
+            toast.dismiss(loadingToast);
+            toast.error('Oferta zapisana, ale wystąpił błąd przy tworzeniu zamówienia: ' + error.message);
+            // Redirect to offers list so user can see the saved offer
+            navigate('/b2b/offers');
         }
     };
 
@@ -1686,7 +1714,7 @@ export const B2BCalculator: React.FC = () => {
 
                     ) : (
                         <button
-                            onClick={handleSaveOffer}
+                            onClick={() => saveB2BOffer(true)}
                             disabled={savingOffer || basket.length === 0}
                             className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || basket.length === 0
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
@@ -1809,15 +1837,20 @@ export const B2BCalculator: React.FC = () => {
                             <button onClick={() => setView('config')} className="px-6 py-3 text-slate-500 hover:text-slate-800 font-bold">
                                 ← Wróć do konfiguracji
                             </button>
-                            <button
-                                onClick={saveB2BOffer}
-                                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-3"
-                            >
-                                <span>💾 Zapisz Ofertę</span>
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                            </button>
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => saveB2BOffer(true)}
+                                    className="px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
+                                >
+                                    <span>💾 Zapisz Ofertę</span>
+                                </button>
+                                <button
+                                    onClick={handleSaveAndOrder}
+                                    className="px-8 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-500/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
+                                >
+                                    <span>🛒 Zapisz i Zamów</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
