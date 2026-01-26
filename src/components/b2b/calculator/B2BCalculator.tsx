@@ -15,7 +15,7 @@ import { B2BService } from '../../../services/database/b2b.service';
 // ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
 type ConstructionType = 'wall' | 'freestanding';
-type ViewState = 'customer' | 'config' | 'summary';
+type ViewState = 'start' | 'customer' | 'config' | 'summary';
 
 import { AiService } from '../../../services/ai';
 
@@ -275,7 +275,7 @@ export const B2BCalculator: React.FC = () => {
     ];
 
     // === VIEW STATE ===
-    const [view, setView] = useState<ViewState>('customer');
+    const [view, setView] = useState<ViewState>('start');
     const [customerState, setCustomerState] = useState<Customer | null>(null);
 
     // === ROOF CONFIG ===
@@ -1804,41 +1804,56 @@ export const B2BCalculator: React.FC = () => {
                         <div className="flex items-center gap-4 mb-8">
                             <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold">✓</div>
                             <div>
-                                <h2 className="text-2xl font-bold text-slate-800">Zusammenfassung</h2>
-                                <p className="text-slate-500">Überprüfen Sie Ihre Konfiguration vor dem Speichern</p>
+                                <h2 className="text-2xl font-bold text-slate-800">Podsumowanie Oferty</h2>
+                                <p className="text-slate-500">Sprawdź konfigurację przed zapisaniem</p>
                             </div>
                         </div>
 
-                        {/* Customer Summary */}
-                        <div className="bg-slate-50 rounded-xl p-6 mb-8 border border-slate-100">
-                            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                                <span>👤</span> Kunde
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span className="text-slate-500 block">Name:</span>
-                                    <span className="font-bold text-slate-800">{customerState?.firstName} {customerState?.lastName}</span>
+                        {/* Customer Summary - only if customer data exists */}
+                        {customerState ? (
+                            <div className="bg-slate-50 rounded-xl p-6 mb-8 border border-slate-100">
+                                <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                    <span>👤</span> Dane Klienta
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-slate-500 block">Nazwa:</span>
+                                        <span className="font-bold text-slate-800">{customerState?.firstName} {customerState?.lastName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-500 block">Adres:</span>
+                                        <span className="font-bold text-slate-800">{customerState?.street} {customerState?.houseNumber}, {customerState?.postalCode} {customerState?.city}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-500 block">Kontakt:</span>
+                                        <span className="font-bold text-slate-800">{customerState?.email || '-'} / {customerState?.phone || '-'}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="text-slate-500 block">Adresse:</span>
-                                    <span className="font-bold text-slate-800">{customerState?.street} {customerState?.houseNumber}, {customerState?.postalCode} {customerState?.city}</span>
-                                </div>
-                                <div>
-                                    <span className="text-slate-500 block">Kontakt:</span>
-                                    <span className="font-bold text-slate-800">{customerState?.email || '-'} / {customerState?.phone || '-'}</span>
-                                </div>
+                                <button onClick={() => setView('customer')} className="text-blue-600 text-sm font-bold mt-4 hover:underline">Edytuj dane</button>
                             </div>
-                            <button onClick={() => setView('customer')} className="text-blue-600 text-sm font-bold mt-4 hover:underline">Bearbeiten</button>
-                        </div>
+                        ) : (
+                            <div className="bg-amber-50 rounded-xl p-6 mb-8 border border-amber-200">
+                                <h3 className="font-bold text-amber-800 mb-2 flex items-center gap-2">
+                                    <span>⚡</span> Szybka Wycena
+                                </h3>
+                                <p className="text-amber-700 text-sm mb-3">Oferta bez danych klienta - zapisana jako szkic.</p>
+                                <button
+                                    onClick={() => setView('customer')}
+                                    className="text-amber-700 text-sm font-bold hover:underline"
+                                >
+                                    + Dodaj dane klienta
+                                </button>
+                            </div>
+                        )}
 
                         {/* Basket Table */}
-                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-8">
+                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
                             <table className="w-full">
                                 <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
                                     <tr>
                                         <th className="px-6 py-4 text-left">Produkt</th>
-                                        <th className="px-6 py-4 text-left">Konfiguration</th>
-                                        <th className="px-6 py-4 text-right">Preis</th>
+                                        <th className="px-6 py-4 text-left">Konfiguracja</th>
+                                        <th className="px-6 py-4 text-right">Cena</th>
                                         <th className="px-6 py-4 w-10"></th>
                                     </tr>
                                 </thead>
@@ -1853,29 +1868,108 @@ export const B2BCalculator: React.FC = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    <tr className="bg-blue-50/50">
-                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-600">Total (Netto):</td>
-                                        <td className="px-6 py-4 text-right font-black text-xl text-blue-600">{formatCurrency(basketTotal)}</td>
-                                        <td></td>
-                                    </tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Price Summary with Purchase Price */}
+                        <div className="grid grid-cols-2 gap-4 mb-8">
+                            {/* Partner Purchase Price (Koszt) */}
+                            <div className="bg-slate-100 rounded-xl p-5 border border-slate-200">
+                                <h4 className="text-sm text-slate-500 mb-1">💰 Cena Zakupu Towaru (Twój koszt)</h4>
+                                <p className="text-2xl font-black text-slate-800">{formatCurrency(purchasePrice)}</p>
+                                <p className="text-xs text-slate-500 mt-1">UPE po rabacie {purchaseDiscount}%</p>
+                            </div>
+
+                            {/* Final Price for Customer */}
+                            <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+                                <h4 className="text-sm text-blue-600 mb-1">🏷️ Cena dla Klienta (Twoja sprzedaż)</h4>
+                                <p className="text-2xl font-black text-blue-700">{formatCurrency(finalPrice)}</p>
+                                <p className="text-xs text-blue-500 mt-1">Z marżą +{margin}%</p>
+                            </div>
+                        </div>
+
+                        {/* Your Profit */}
+                        <div className="bg-green-50 rounded-xl p-5 mb-8 border border-green-200 text-center">
+                            <h4 className="text-sm text-green-600 mb-1">📈 Twój Zysk na Ofercie</h4>
+                            <p className="text-3xl font-black text-green-700">{formatCurrency(finalPrice - purchasePrice)}</p>
                         </div>
 
                         {/* Actions */}
                         <div className="flex justify-between items-center pt-4 border-t border-slate-100">
                             <button onClick={() => setView('config')} className="px-6 py-3 text-slate-500 hover:text-slate-800 font-bold">
-                                ← Zurück zur Konfiguration
+                                ← Wróć do konfiguracji
                             </button>
                             <button
                                 onClick={saveB2BOffer}
                                 className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-3"
                             >
-                                <span>Angebot Speichern</span>
+                                <span>💾 Zapisz Ofertę</span>
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* START VIEW - Chooser Tiles */}
+                {view === 'start' && (
+                    <div className="max-w-4xl mx-auto py-12">
+                        <div className="text-center mb-10">
+                            <h1 className="text-3xl font-black text-slate-800 mb-2">Nowa Oferta</h1>
+                            <p className="text-slate-500">Wybierz tryb tworzenia oferty</p>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-6">
+                            {/* Quick Quote Tile */}
+                            <button
+                                onClick={() => {
+                                    setCustomerState(null);
+                                    setView('config');
+                                }}
+                                className="group relative p-8 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl hover:border-amber-400 hover:shadow-xl transition-all text-left"
+                            >
+                                <div className="absolute top-4 right-4 text-5xl opacity-30 group-hover:opacity-50 transition-opacity">⚡</div>
+                                <div className="text-4xl mb-4">⚡</div>
+                                <h3 className="text-xl font-bold text-amber-800 mb-2">Szybka Wycena</h3>
+                                <p className="text-amber-700 text-sm mb-4">
+                                    Bez danych klienta - idealne do szybkiego sprawdzenia cen i stworzenia wstępnej kalkulacji.
+                                </p>
+                                <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm">
+                                    <span>Rozpocznij</span>
+                                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </button>
+
+                            {/* Full Quote with Customer Tile */}
+                            <button
+                                onClick={() => setView('customer')}
+                                className="group relative p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl hover:border-blue-400 hover:shadow-xl transition-all text-left"
+                            >
+                                <div className="absolute top-4 right-4 text-5xl opacity-30 group-hover:opacity-50 transition-opacity">📋</div>
+                                <div className="text-4xl mb-4">📋</div>
+                                <h3 className="text-xl font-bold text-blue-800 mb-2">Pełna Oferta</h3>
+                                <p className="text-blue-700 text-sm mb-4">
+                                    Z danymi klienta - profesjonalna oferta gotowa do wysłania i konwersji na zamówienie.
+                                </p>
+                                <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm">
+                                    <span>Wypełnij dane klienta</span>
+                                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* Info Box */}
+                        <div className="mt-8 p-4 bg-slate-100 rounded-xl border border-slate-200 text-center">
+                            <p className="text-sm text-slate-600">
+                                💡 <strong>Szybka wycena</strong> pozwala poznać cenę bez wpisywania danych klienta.
+                                Możesz dodać dane klienta później przed zapisaniem oferty.
+                            </p>
                         </div>
                     </div>
                 )}
