@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { B2BService, B2BPartner, B2BPartnerUser } from '../../services/database/b2b.service';
 import { UserService } from '../../services/database/user.service';
 import { formatDistanceToNow } from 'date-fns';
@@ -57,11 +58,21 @@ export function B2BPartnersPage() {
     async function loadPartners() {
         setLoading(true);
         try {
-            await B2BService.syncMissingPartners();
+            const report = await B2BService.syncMissingPartners();
+            if (report.errors && report.errors.length > 0) {
+                if (report.found > 0) {
+                    console.error('Sync errors:', report.errors);
+                    toast.error('Błąd synchronizacji (RLS?). Uruchom SQL w Supabase!');
+                }
+            } else if (report.synced > 0) {
+                toast.success(`Naprawiono ${report.synced} brakujących partnerów!`);
+            }
+
             const data = await B2BService.getPartners();
             setPartners(data);
         } catch (err) {
             console.error('Error loading partners:', err);
+            toast.error('Błąd ładowania listy partnerów');
         }
         setLoading(false);
     }

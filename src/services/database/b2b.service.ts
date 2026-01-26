@@ -534,15 +534,17 @@ export const B2BService = {
      * Check for users with 'b2b_partner' role who don't have a partner record
      * and auto-create it. This fixes the "Partner not found" error.
      */
-    async syncMissingPartners(): Promise<void> {
+    async syncMissingPartners(): Promise<{ found: number, synced: number, errors: any[] }> {
         console.log('[B2B] Syncing missing partners (admin fix)...');
+        const errors: any[] = [];
 
         const { data: profiles, error } = await supabase
             .from('profiles')
             .select('*')
             .in('role', ['b2b_partner']);
 
-        if (error || !profiles) return;
+        if (error) return { found: 0, synced: 0, errors: [error] };
+        if (!profiles) return { found: 0, synced: 0, errors: [] };
 
         let fixedCount = 0;
 
@@ -589,11 +591,13 @@ export const B2BService = {
                     }
                 } catch (err) {
                     console.error('[B2B] Failed to fix partner:', err);
+                    errors.push(err);
                 }
             }
         }
 
         if (fixedCount > 0) console.log(`[B2B] Synced ${fixedCount} missing partners.`);
+        return { found: profiles.length, synced: fixedCount, errors };
     },
 
     async getPartnerPricing(partnerId: string): Promise<{ marginPercent: number }> {
