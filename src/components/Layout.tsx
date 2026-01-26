@@ -92,15 +92,26 @@ export const Layout: React.FC = () => {
                             <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Administracja</div>
                             {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />}
                             {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" />}
-                            {hasPermission('partner_management') && <NavLink to="/admin/partner-offers" label="Partnerzy B2B" icon="clipboard" />}
                             {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
                             {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
                             {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
-                            {hasPermission('system_notifications') && <NavLink to="/admin/notifications" label="Uprawnienia" icon="settings" />}
-                            {hasPermission('system_notifications') && <NavLink to="/admin/notifications" label="Uprawnienia" icon="settings" />}
                             <NavLink to="/admin/error-reports" label="Raporty Błędów" icon="bell" />
                             <NavLink to="/admin/email-templates" label="Szablony Wiadomości" icon="mail" />
                             {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" />}
+                        </div>
+                    )}
+
+                    {/* PORTAL B2B */}
+                    {hasPermission('partner_management') && (
+                        <div className="space-y-1">
+                            <div className="px-4 text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🏢 Portal B2B</div>
+                            <NavLink to="/admin/b2b/partners" label="Partnerzy B2B" icon="users" />
+                            <NavLink to="/admin/b2b/offers" label="Oferty B2B" icon="clipboard" />
+                            <NavLink to="/admin/b2b/orders" label="Zamówienia B2B" icon="box" />
+                            <NavLink to="/admin/b2b/promotions" label="Promocje" icon="offers" />
+                            <NavLink to="/admin/b2b/credit" label="Kredyt Kupiecki" icon="clipboard" />
+                            <NavLink to="/admin/b2b/analytics" label="Analityka" icon="dashboard" />
+                            <NavLink to="/admin/b2b/marketing" label="Materiały Marketingowe" icon="offers" />
                         </div>
                     )}
                 </nav>
