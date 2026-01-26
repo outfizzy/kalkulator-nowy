@@ -140,10 +140,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                 <div
                                     key={dateStr}
                                     className={`p-1 border-r border-slate-100 min-h-[100px] transition-colors ${unavailable
-                                            ? 'bg-red-50'
-                                            : isWeekend
-                                                ? 'bg-slate-50'
-                                                : 'hover:bg-indigo-50'
+                                        ? 'bg-red-50'
+                                        : isWeekend
+                                            ? 'bg-slate-50'
+                                            : 'hover:bg-indigo-50'
                                         }`}
                                     onDragOver={!unavailable ? handleDragOver : undefined}
                                     onDrop={!unavailable ? (e) => handleDrop(e, dateStr, team.id) : undefined}
@@ -164,14 +164,28 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 }));
                                             }}
                                             onClick={() => onEditInstallation?.(inst)}
-                                            className={`p-1.5 mb-1 rounded border cursor-pointer text-xs ${getStatusColor(inst.status)} hover:shadow-sm transition-shadow`}
+                                            className={`p-1.5 mb-1 rounded border cursor-pointer text-xs ${getStatusColor(inst.status)} hover:shadow-md transition-all`}
                                         >
-                                            <p className="font-medium truncate">
-                                                {inst.title || `${inst.client?.firstName} ${inst.client?.lastName}`}
+                                            {/* Contract Number */}
+                                            {inst.contractNumber && (
+                                                <p className="font-bold text-[10px] opacity-70 truncate">
+                                                    📋 {inst.contractNumber}
+                                                </p>
+                                            )}
+                                            {/* Client Name */}
+                                            <p className="font-semibold truncate">
+                                                {inst.client?.firstName} {inst.client?.lastName}
                                             </p>
-                                            <p className="truncate text-xs opacity-75">
-                                                📍 {inst.client?.city || 'Brak'}
+                                            {/* City */}
+                                            <p className="truncate opacity-75">
+                                                📍 {inst.client?.city || 'Brak miasta'}
                                             </p>
+                                            {/* Duration if multi-day */}
+                                            {inst.expectedDuration && inst.expectedDuration > 1 && (
+                                                <p className="text-[10px] font-medium mt-0.5">
+                                                    ⏱️ {inst.expectedDuration} dni
+                                                </p>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
