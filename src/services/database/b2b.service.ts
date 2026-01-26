@@ -432,7 +432,24 @@ export const B2BService = {
                 .limit(1);
 
             if (partners && partners.length > 0) {
-                return partners[0] as B2BPartner;
+                const partner = partners[0] as B2BPartner;
+
+                // Auto-create link in b2b_partner_users for future lookups
+                try {
+                    await supabase
+                        .from('b2b_partner_users')
+                        .insert({
+                            partner_id: partner.id,
+                            user_id: user.id,
+                            role: 'admin' // Primary contact gets admin role
+                        });
+                    console.log('[B2B] Auto-linked user to partner:', partner.company_name);
+                } catch (linkError) {
+                    // Ignore if link already exists or RLS blocks it
+                    console.warn('[B2B] Could not auto-link user to partner:', linkError);
+                }
+
+                return partner;
             }
         }
 
