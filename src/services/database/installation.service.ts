@@ -102,6 +102,10 @@ export const InstallationService = {
     },
 
     async bulkCreateInstallations(contractIds: string[]): Promise<Installation[]> {
+        if (!supabase) {
+            throw new Error('Supabase client not initialized');
+        }
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
