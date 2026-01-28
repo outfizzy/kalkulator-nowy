@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 
 import { TasksList } from '../components/tasks/TasksList';
 import { TaskModal } from '../components/tasks/TaskModal';
+import { ManualContractModal } from '../components/contracts/ManualContractModal';
 
 type Tab = 'overview' | 'leads' | 'offers' | 'contracts' | 'installations' | 'communications' | 'edit' | 'gallery' | 'tasks';
 
@@ -28,6 +29,7 @@ export const CustomerDetailsPage: React.FC = () => {
     const [communications, setCommunications] = useState<Communication[]>([]);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
+    const [isManualContractModalOpen, setIsManualContractModalOpen] = useState(false);
 
     const fetchData = React.useCallback(async () => {
         if (!id) return;
@@ -576,6 +578,19 @@ export const CustomerDetailsPage: React.FC = () => {
 
                         {activeTab === 'contracts' && (
                             <div className="space-y-4">
+                                {/* Add Contract Button */}
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={() => setIsManualContractModalOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors font-medium"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Dodaj Umowę
+                                    </button>
+                                </div>
+
                                 {clientContracts.length === 0 ? (
                                     <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed text-slate-500">Brak umów dla tego klienta</div>
                                 ) : (
@@ -768,6 +783,16 @@ export const CustomerDetailsPage: React.FC = () => {
                 onClose={() => setIsTaskModalOpen(false)}
                 initialData={{ customerId: customer.id }}
                 onSuccess={() => setTasksRefreshTrigger(prev => prev + 1)}
+            />
+
+            <ManualContractModal
+                isOpen={isManualContractModalOpen}
+                onClose={() => setIsManualContractModalOpen(false)}
+                onSuccess={() => {
+                    setIsManualContractModalOpen(false);
+                    fetchData(); // Refresh to show new contract
+                }}
+                preselectedCustomer={customer}
             />
         </div>
     );
