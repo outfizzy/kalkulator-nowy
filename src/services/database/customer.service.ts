@@ -147,6 +147,7 @@ export const CustomerService = {
             city: customer.city?.trim() || null,
             street: customer.street?.trim() || null,
             houseNumber: customer.houseNumber?.trim() || null,
+            contract_number: customer.contract_number?.trim() || null,
         };
 
         const { data, error } = await supabase
