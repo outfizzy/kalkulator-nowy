@@ -47,6 +47,7 @@ import { ContractDetails } from './components/contracts/ContractDetails';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
 import { ProcurementDashboard } from './components/logistics/ProcurementDashboard';
+import { CalendarV3 } from './components/calendar-v3/CalendarV3';
 import { CustomersList } from './components/customers/CustomersList';
 import { CustomerPage } from './components/customers/CustomerPage';
 import { LeadsList } from './components/leads/LeadsList';
@@ -223,6 +224,7 @@ function App() {
               <Route path="/service" element={<ServiceDashboard />} />
               <Route path="/service/:id" element={<ServiceTicketDetailsPage />} />
               <Route path="/logistics" element={<LogisticsCalendar />} />
+              <Route path="/calendar-v3" element={<CalendarV3 />} />
               <Route path="/procurement" element={<ProcurementDashboard />} />
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/customers/new" element={<CustomerPage />} />
