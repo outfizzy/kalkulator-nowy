@@ -187,6 +187,19 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                         <span>{customer.city}</span>
                         <span>•</span>
                         <span className="select-all">{customer.phone}</span>
+                        {customer.representative && (
+                            <>
+                                <span>•</span>
+                                <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                                    <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span className="font-medium text-indigo-700">
+                                        Opiekun: {customer.representative.firstName} {customer.representative.lastName}
+                                    </span>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="flex gap-3">
@@ -550,7 +563,13 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                     </span>
                                                 </td>
                                                 <td className="p-3 text-right">
-                                                    <Link to={`/offers/${offer.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Podgląd</Link>
+                                                    <Link to={`/offers/${offer.id}`} className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                        Podgląd
+                                                    </Link>
                                                 </td>
                                             </tr>
                                         ))}
@@ -625,7 +644,12 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                 </span>
                                             </td>
                                             <td className="p-3 text-right">
-                                                <Link to={`/contracts/${contract.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Podgląd</Link>
+                                                <Link to={`/contracts/${contract.id}`} className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    Szczegóły
+                                                </Link>
                                             </td>
                                         </tr>
                                     ))}
