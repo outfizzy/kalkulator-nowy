@@ -54,25 +54,30 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
         );
     });
 
-    // Group contracts by postal code
+    // Group contracts by postal code (first 2 digits)
     const groupedContracts = React.useMemo(() => {
         const groups = new Map<string, Contract[]>();
 
         filteredContracts.forEach(contract => {
             const clientData = contract.contractData?.client || contract.contractData?.customer || contract.client;
-            const postalCode = clientData?.postalCode || 'Brak kodu';
+            const fullPostalCode = clientData?.postalCode || '';
 
-            if (!groups.has(postalCode)) {
-                groups.set(postalCode, []);
+            // Extract first 2 digits like in LeadsList
+            const region = fullPostalCode.length >= 2
+                ? `PLZ ${fullPostalCode.substring(0, 2)}xxx`
+                : 'Inne / Brak kodu';
+
+            if (!groups.has(region)) {
+                groups.set(region, []);
             }
-            groups.get(postalCode)!.push(contract);
+            groups.get(region)!.push(contract);
         });
 
-        // Sort groups by postal code
+        // Sort groups by region code
         return Array.from(groups.entries())
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([postalCode, contracts]) => ({
-                postalCode,
+            .map(([region, contracts]) => ({
+                postalCode: region,
                 contracts: contracts.sort((a, b) => {
                     // Sort by contract number within group
                     const numA = a.contractNumber || '';
