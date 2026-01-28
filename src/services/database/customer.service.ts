@@ -137,22 +137,29 @@ export const CustomerService = {
             throw error;
         }
 
-        // [Sanitization] Convert empty strings to null to avoid Unique Constraint violations
-        const safeCustomer = {
-            ...customer,
-            email: customer.email?.trim() || null,
-            phone: customer.phone?.trim() || null,
-            companyName: customer.companyName?.trim() || null,
-            postalCode: customer.postalCode?.trim() || null,
-            city: customer.city?.trim() || null,
+        // [Sanitization & Mapping] Convert camelCase to snake_case and sanitize
+        // Database uses snake_case column names (company_name, first_name, etc.)
+        const dbCustomer = {
+            salutation: customer.salutation,
+            first_name: customer.firstName?.trim() || null,
+            last_name: customer.lastName?.trim() || null,
+            company_name: customer.companyName?.trim() || null,
             street: customer.street?.trim() || null,
-            houseNumber: customer.houseNumber?.trim() || null,
+            house_number: customer.houseNumber?.trim() || null,
+            postal_code: customer.postalCode?.trim() || null,
+            city: customer.city?.trim() || null,
+            country: customer.country || 'Deutschland',
+            phone: customer.phone?.trim() || null,
+            email: customer.email?.trim() || null,
+            representative_id: customer.representative_id || null,
+            contract_signer_id: customer.contract_signer_id || null,
             contract_number: customer.contract_number?.trim() || null,
+            source: customer.source || 'manual',
         };
 
         const { data, error } = await supabase
             .from('customers')
-            .insert([safeCustomer])
+            .insert([dbCustomer])
             .select()
             .single();
 
@@ -256,9 +263,30 @@ export const CustomerService = {
     },
 
     async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer> {
+        // Convert camelCase to snake_case for database
+        const dbUpdates: any = {};
+
+        if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName?.trim() || null;
+        if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName?.trim() || null;
+        if (updates.companyName !== undefined) dbUpdates.company_name = updates.companyName?.trim() || null;
+        if (updates.houseNumber !== undefined) dbUpdates.house_number = updates.houseNumber?.trim() || null;
+        if (updates.postalCode !== undefined) dbUpdates.postal_code = updates.postalCode?.trim() || null;
+        if (updates.salutation !== undefined) dbUpdates.salutation = updates.salutation;
+        if (updates.street !== undefined) dbUpdates.street = updates.street?.trim() || null;
+        if (updates.city !== undefined) dbUpdates.city = updates.city?.trim() || null;
+        if (updates.country !== undefined) dbUpdates.country = updates.country;
+        if (updates.phone !== undefined) dbUpdates.phone = updates.phone?.trim() || null;
+        if (updates.email !== undefined) dbUpdates.email = updates.email?.trim() || null;
+        if (updates.representative_id !== undefined) dbUpdates.representative_id = updates.representative_id;
+        if (updates.contract_signer_id !== undefined) dbUpdates.contract_signer_id = updates.contract_signer_id;
+        if (updates.contract_number !== undefined) dbUpdates.contract_number = updates.contract_number?.trim() || null;
+        if (updates.source !== undefined) dbUpdates.source = updates.source;
+        if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+        if (updates.status !== undefined) dbUpdates.status = updates.status;
+
         const { data, error } = await supabase
             .from('customers')
-            .update(updates)
+            .update(dbUpdates)
             .eq('id', id)
             .select()
             .single();
