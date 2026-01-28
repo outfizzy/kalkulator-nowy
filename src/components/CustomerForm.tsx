@@ -9,6 +9,7 @@ interface CustomerFormProps {
     onComplete: (customer: Customer, snowZone: any) => void;
     initialData?: Customer;
     submitLabel?: string;
+    hideSearch?: boolean; // Hide customer search (for new customer page)
 }
 
 const normalizeCustomer = (raw: Partial<Customer> | any): Customer => {
@@ -31,10 +32,11 @@ const normalizeCustomer = (raw: Partial<Customer> | any): Customer => {
         country: (raw.country || 'Deutschland').toString(),
         representative_id: raw.representative_id || undefined,
         contract_signer_id: raw.contract_signer_id || undefined,
+        contract_number: raw.contract_number || undefined,
     };
 };
 
-export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialData, submitLabel }) => {
+export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialData, submitLabel, hideSearch = false }) => {
     const { currentUser } = useAuth();
     const [customer, setCustomer] = useState<Customer>(() => {
         const normalized = normalizeCustomer(initialData || {});
@@ -416,28 +418,48 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         <h3 className="text-xl font-bold text-slate-800">Kontakt</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Telefon</label>
-                            <input
-                                type="tel"
-                                name="phone"
-                                value={customer.phone}
-                                onChange={handleChange}
-                                className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
-                                placeholder="+49 ..."
-                            />
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Telefon</label>
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    value={customer.phone}
+                                    onChange={handleChange}
+                                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                                    placeholder="+49 ..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={customer.email}
+                                    onChange={handleChange}
+                                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                                    placeholder="kunde@example.de"
+                                />
+                            </div>
                         </div>
+
+                        {/* Contract Number Field */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Numer Umowy (opcjonalnie)
+                            </label>
                             <input
-                                type="email"
-                                name="email"
-                                value={customer.email}
+                                type="text"
+                                name="contract_number"
+                                value={customer.contract_number || ''}
                                 onChange={handleChange}
                                 className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
-                                placeholder="kunde@example.de"
+                                placeholder="np. PL/001/01/2026"
                             />
+                            <p className="text-xs text-slate-500 mt-1">
+                                💡 Jeśli podasz numer umowy, zostanie automatycznie utworzona umowa w systemie (status: szkic). Szczegóły możesz uzupełnić później w sekcji Umowy.
+                            </p>
                         </div>
                     </div>
                 </section>

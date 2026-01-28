@@ -83,6 +83,7 @@ export const CustomerPage: React.FC = () => {
                         onComplete={(data) => handleSave(data)}
                         submitLabel="Dodaj Klienta"
                         initialData={initialPhone ? { phone: initialPhone } as any : undefined}
+                        hideSearch={true}
                     />
                 </div>
             </div>

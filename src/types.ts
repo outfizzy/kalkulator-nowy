@@ -87,6 +87,7 @@ export interface Customer {
         firstName: string;
         lastName: string;
     };
+    contract_number?: string; // Optional contract number for pre-filling
 }
 
 export interface CustomerCost {

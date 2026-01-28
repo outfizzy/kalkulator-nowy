@@ -130,6 +130,13 @@ export const CustomerService = {
     },
 
     async createCustomer(customer: Omit<Customer, 'id'>): Promise<Customer> {
+        // [Defensive] Check if supabase client is initialized
+        if (!supabase) {
+            const error = new Error('Supabase client is not initialized');
+            console.error('Error creating customer:', error);
+            throw error;
+        }
+
         // [Sanitization] Convert empty strings to null to avoid Unique Constraint violations
         const safeCustomer = {
             ...customer,
@@ -152,6 +159,39 @@ export const CustomerService = {
             console.error('Error creating customer:', error);
             throw error;
         }
+
+        // Auto-create contract if contract_number is provided
+        if (customer.contract_number?.trim()) {
+            try {
+                const { ContractService } = await import('./contract.service');
+
+                // Create minimal manual contract with just the contract number
+                await ContractService.createManualContract({
+                    customer: data,
+                    items: [{
+                        id: crypto.randomUUID(),
+                        modelId: 'other',
+                        description: 'Umowa importowana - szczegóły do uzupełnienia',
+                        quantity: 1,
+                        price: 0
+                    }],
+                    contractDetails: {
+                        contractNumber: customer.contract_number.trim(),
+                        createdAt: new Date(),
+                        signedAt: undefined, // Draft status
+                        advance: 0,
+                        comments: 'Automatycznie utworzona przy dodawaniu klienta. Uzupełnij szczegóły w sekcji Umowy.'
+                    }
+                });
+
+                console.log(`Auto-created contract ${customer.contract_number} for customer ${data.id}`);
+            } catch (contractError) {
+                console.error('Failed to auto-create contract:', contractError);
+                // Don't fail customer creation if contract creation fails
+                // User can create contract manually later
+            }
+        }
+
         return data;
     },
 
