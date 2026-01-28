@@ -100,7 +100,8 @@ export const ContractService = {
             requirements: contract.requirements,
             comments: contract.comments,
             attachments: contract.attachments,
-            orderedItems: contract.orderedItems || []
+            orderedItems: contract.orderedItems || [],
+            installation_days_estimate: contract.installation_days_estimate
         };
 
         const { data, error } = await supabase
@@ -688,7 +689,20 @@ export const ContractService = {
                 createdAt: new Date()
             }] : [],
             attachments: [],
-            contractNumber: contractDetails.contractNumber?.trim() || undefined
+            contractNumber: contractDetails.contractNumber?.trim() || undefined,
+            // Add orderedItems for delivery tracking in calendar
+            orderedItems: items.map(i => ({
+                id: i.id,
+                category: 'Other' as const,
+                name: i.description,
+                details: i.modelId !== 'other' ? `Model: ${i.modelId}` : undefined,
+                status: 'pending' as const,
+                plannedDeliveryDate: undefined,
+                orderedAt: undefined,
+                purchaseCost: undefined
+            })),
+            // Add installation estimate (default to 1 day for manual contracts)
+            installation_days_estimate: 1
         });
     }
 };
