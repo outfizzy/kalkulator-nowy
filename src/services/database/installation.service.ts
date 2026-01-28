@@ -827,11 +827,11 @@ export const InstallationService = {
         const activeOfferIds = new Set(activeInstallations.map(i => i.offerId).filter(Boolean));
         const activeSourceIds = new Set(activeInstallations.map(i => i.sourceId).filter(Boolean));
 
-        // 3. Contracts (Signed, not in active installations)
+        // 3. Contracts (Draft or Signed, not in active installations)
         const { data: contracts } = await supabase
             .from('contracts')
             .select('*, offers!inner(product)')
-            .eq('status', 'signed');
+            .in('status', ['draft', 'signed']);
 
         const backlogContracts = (contracts || []).filter((c: any) =>
             !activeOfferIds.has(c.offer_id) && !activeSourceIds.has(c.id)
