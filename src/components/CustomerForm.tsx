@@ -443,24 +443,6 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 />
                             </div>
                         </div>
-
-                        {/* Contract Number Field */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Numer Umowy (opcjonalnie)
-                            </label>
-                            <input
-                                type="text"
-                                name="contract_number"
-                                value={customer.contract_number || ''}
-                                onChange={handleChange}
-                                className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
-                                placeholder="np. PL/001/01/2026"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">
-                                💡 Jeśli podasz numer umowy, zostanie automatycznie utworzona umowa w systemie (status: szkic). Szczegóły możesz uzupełnić później w sekcji Umowy.
-                            </p>
-                        </div>
                     </div>
                 </section>
 
