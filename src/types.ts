@@ -128,7 +128,7 @@ export type RoofType = 'polycarbonate' | 'glass' | 'tin';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
 // --- Leads Types ---
-export type LeadStatus = 'new' | 'contacted' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair';
+export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair';
 export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'targi' | 'other';
 
 export interface Lead {
