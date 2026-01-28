@@ -830,23 +830,28 @@ export const InstallationService = {
         // 3. Contracts (Draft or Signed, not in active installations)
         const { data: contracts, error: contractsError } = await supabase
             .from('contracts')
-            .select('*, contract_number, offers(product)')
+            .select('id, offer_id, status, created_at, signed_at, contract_number, contract_data, offers(product)')
             .in('status', ['draft', 'signed']);
 
         if (contractsError) {
             console.error('Error fetching contracts:', contractsError);
         }
 
+        console.log('Fetched contracts for calendar:', contracts?.length || 0, contracts);
+
         const backlogContracts = (contracts || []).filter((c: any) =>
             !activeOfferIds.has(c.offer_id) && !activeSourceIds.has(c.id)
         ).map((c: any) => ({
             ...c,
             contractNumber: c.contract_number, // Map snake_case to camelCase
-            client: c.contract_data?.customer || c.contract_data?.client || {}, // Ensure client data is accessible
+            contractData: c.contract_data, // Preserve original contract_data
+            client: c.contract_data?.client || c.contract_data?.customer || {}, // Ensure client data is accessible
             product: c.offers?.product, // Lift product for easier access (may be null for manual contracts)
             orderedItems: c.contract_data?.orderedItems || [], // Ensure ordered items are accessible
             installationDaysEstimate: c.contract_data?.installation_days_estimate || c.installation_days_estimate
         }));
+
+        console.log('Backlog contracts after filtering:', backlogContracts.length, backlogContracts);
 
         // 4. Service Tickets (Active, not in active installations)
         // Tickets that need scheduling: 'new', 'open'
