@@ -54,6 +54,35 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
         );
     });
 
+    // Group contracts by postal code
+    const groupedContracts = React.useMemo(() => {
+        const groups = new Map<string, Contract[]>();
+
+        filteredContracts.forEach(contract => {
+            const postalCode = contract.contractData?.customer?.postalCode ||
+                contract.client?.postalCode ||
+                'Brak kodu';
+
+            if (!groups.has(postalCode)) {
+                groups.set(postalCode, []);
+            }
+            groups.get(postalCode)!.push(contract);
+        });
+
+        // Sort groups by postal code
+        return Array.from(groups.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([postalCode, contracts]) => ({
+                postalCode,
+                contracts: contracts.sort((a, b) => {
+                    // Sort by contract number within group
+                    const numA = a.contractNumber || '';
+                    const numB = b.contractNumber || '';
+                    return numA.localeCompare(numB);
+                })
+            }));
+    }, [filteredContracts]);
+
     const handleDragStart = (e: React.DragEvent, id: string, type: 'contract' | 'service' | 'installation') => {
         e.dataTransfer.setData('application/json', JSON.stringify({ id, type }));
         e.dataTransfer.effectAllowed = 'move';
@@ -107,177 +136,194 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {/* Contracts Tab */}
-                {activeTab === 'contracts' && filteredContracts.map((contract) => {
-                    const isExpanded = expandedContract === contract.id;
-                    const orderedItems = contract.orderedItems || [];
-                    const hasItems = orderedItems.length > 0;
-
-                    // Calculate delivery readiness
-                    const allDelivered = hasItems && orderedItems.every(i => i.status === 'delivered');
-                    const someDelivered = hasItems && orderedItems.some(i => i.status === 'delivered');
-                    const noneOrdered = hasItems && orderedItems.every(i => i.status === 'pending');
-                    const someOrdered = hasItems && orderedItems.some(i => i.status === 'ordered');
-
-                    return (
-                        <div
-                            key={contract.id}
-                            className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all"
-                        >
-                            {/* Header - Always Visible */}
-                            <div
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, contract.id, 'contract')}
-                                className="p-3 cursor-grab group"
-                            >
-                                <div className="flex items-start justify-between mb-2">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-sm text-slate-800 truncate">
-                                            {contract.contractNumber}
-                                        </p>
-                                        <p className="font-medium text-slate-700 truncate">
-                                            {contract.contractData?.customer?.name || contract.client?.firstName + ' ' + contract.client?.lastName || 'Brak nazwy'}
-                                        </p>
-                                        <p className="text-xs text-slate-500 truncate">
-                                            📍 {contract.contractData?.customer?.city || contract.client?.city || 'Brak miasta'}
-                                        </p>
-                                    </div>
-
-                                    {/* Quick Schedule Button */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSchedule(contract.id, 'contract');
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition-opacity"
-                                        title="Utwórz zlecenie"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                    </button>
-                                </div>
-
-                                {/* Readiness Indicator */}
-                                <div className="flex items-center justify-between">
-                                    {hasItems ? (
-                                        allDelivered ? (
-                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                                                ✓ Gotowe do montażu
-                                            </span>
-                                        ) : someDelivered ? (
-                                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">
-                                                ⚠️ Częściowo dostarczone
-                                            </span>
-                                        ) : noneOrdered ? (
-                                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
-                                                ❌ Nie zamówiono
-                                            </span>
-                                        ) : someOrdered ? (
-                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                                                🚚 W dostawie
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-medium">
-                                                ⏳ Oczekuje
-                                            </span>
-                                        )
-                                    ) : (
-                                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-medium">
-                                            📦 Brak elementów
-                                        </span>
-                                    )}
-
-                                    {/* Expand Button */}
-                                    {hasItems && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setExpandedContract(isExpanded ? null : contract.id);
-                                            }}
-                                            className="text-slate-400 hover:text-slate-600 p-1"
-                                        >
-                                            <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Installation Days Estimate */}
-                                {contract.installationDaysEstimate && (
-                                    <p className="text-xs text-indigo-600 mt-2">
-                                        ⏱️ Szacowany czas montażu: ~{contract.installationDaysEstimate} dni
-                                    </p>
-                                )}
+            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                {/* Contracts Tab - Grouped by Postal Code */}
+                {activeTab === 'contracts' && groupedContracts.map((group) => (
+                    <div key={group.postalCode} className="space-y-2">
+                        {/* Postal Code Group Header */}
+                        <div className="sticky top-0 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 shadow-sm z-10">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-sm text-slate-700">
+                                    📮 {group.postalCode}
+                                </h3>
+                                <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full font-medium">
+                                    {group.contracts.length} {group.contracts.length === 1 ? 'umowa' : 'umów'}
+                                </span>
                             </div>
+                        </div>
 
-                            {/* Expanded Details */}
-                            {isExpanded && hasItems && (
-                                <div className="px-3 pb-3 pt-0 border-t border-slate-100 space-y-3">
-                                    {/* Product Info */}
-                                    {contract.product && (
-                                        <div className="text-xs">
-                                            <p className="font-medium text-slate-700 mb-1">Produkt:</p>
-                                            <p className="text-slate-600">
-                                                {contract.product.modelId || 'Nieokreślony'}
-                                                {contract.product.width && contract.product.projection &&
-                                                    ` - ${contract.product.width}x${contract.product.projection}mm`
-                                                }
-                                            </p>
+                        {/* Contracts in this group */}
+                        {group.contracts.map((contract) => {
+                            const isExpanded = expandedContract === contract.id;
+                            const orderedItems = contract.orderedItems || [];
+                            const hasItems = orderedItems.length > 0;
+
+                            // Calculate delivery readiness
+                            const allDelivered = hasItems && orderedItems.every(i => i.status === 'delivered');
+                            const someDelivered = hasItems && orderedItems.some(i => i.status === 'delivered');
+                            const noneOrdered = hasItems && orderedItems.every(i => i.status === 'pending');
+                            const someOrdered = hasItems && orderedItems.some(i => i.status === 'ordered');
+
+                            return (
+                                <div
+                                    key={contract.id}
+                                    className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all"
+                                >
+                                    {/* Header - Always Visible */}
+                                    <div
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, contract.id, 'contract')}
+                                        className="p-3 cursor-grab group"
+                                    >
+                                        <div className="flex items-start justify-between mb-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-slate-800 truncate">
+                                                    {contract.contractNumber}
+                                                </p>
+                                                <p className="font-medium text-slate-700 truncate">
+                                                    {contract.contractData?.customer?.name || contract.client?.firstName + ' ' + contract.client?.lastName || 'Brak nazwy'}
+                                                </p>
+                                                <p className="text-xs text-slate-500 truncate">
+                                                    📍 {contract.contractData?.customer?.city || contract.client?.city || 'Brak miasta'}
+                                                </p>
+                                            </div>
+
+                                            {/* Quick Schedule Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onSchedule(contract.id, 'contract');
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition-opacity"
+                                                title="Utwórz zlecenie"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                </svg>
+                                            </button>
                                         </div>
-                                    )}
 
-                                    {/* Ordered Items */}
-                                    <div className="text-xs">
-                                        <p className="font-medium text-slate-700 mb-2">Zamówione elementy:</p>
-                                        <div className="space-y-1.5">
-                                            {orderedItems.map((item) => (
-                                                <div key={item.id} className="flex justify-between items-start gap-2 p-2 bg-slate-50 rounded">
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-slate-700 font-medium truncate">{item.name}</p>
-                                                        {item.details && (
-                                                            <p className="text-slate-500 text-[10px] truncate">{item.details}</p>
-                                                        )}
-                                                        {item.plannedDeliveryDate && (
-                                                            <p className="text-slate-500 text-[10px] mt-0.5">
-                                                                📅 {new Date(item.plannedDeliveryDate).toLocaleDateString('pl-PL')}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${item.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                                                        item.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-yellow-100 text-yellow-700'
-                                                        }`}>
-                                                        {item.status === 'delivered' ? '✓ Dostarczone' :
-                                                            item.status === 'ordered' ? '🚚 Zamówione' :
-                                                                '⏳ Oczekuje'}
+                                        {/* Readiness Indicator */}
+                                        <div className="flex items-center justify-between">
+                                            {hasItems ? (
+                                                allDelivered ? (
+                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                                        ✓ Gotowe do montażu
                                                     </span>
-                                                </div>
-                                            ))}
+                                                ) : someDelivered ? (
+                                                    <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">
+                                                        ⚠️ Częściowo dostarczone
+                                                    </span>
+                                                ) : noneOrdered ? (
+                                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
+                                                        ❌ Nie zamówiono
+                                                    </span>
+                                                ) : someOrdered ? (
+                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                                                        🚚 W dostawie
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-medium">
+                                                        ⏳ Oczekuje
+                                                    </span>
+                                                )
+                                            ) : (
+                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-medium">
+                                                    📦 Brak elementów
+                                                </span>
+                                            )}
+
+                                            {/* Expand Button */}
+                                            {hasItems && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setExpandedContract(isExpanded ? null : contract.id);
+                                                    }}
+                                                    className="text-slate-400 hover:text-slate-600 p-1"
+                                                >
+                                                    <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </div>
+
+                                        {/* Installation Days Estimate */}
+                                        {contract.installationDaysEstimate && (
+                                            <p className="text-xs text-indigo-600 mt-2">
+                                                ⏱️ Szacowany czas montażu: ~{contract.installationDaysEstimate} dni
+                                            </p>
+                                        )}
                                     </div>
 
-                                    {/* Earliest Delivery Date */}
-                                    {orderedItems.some(i => i.plannedDeliveryDate) && (
-                                        <div className="text-xs bg-indigo-50 p-2 rounded">
-                                            <p className="font-medium text-indigo-700">
-                                                📦 Najwcześniejsza dostawa:{' '}
-                                                {new Date(
-                                                    Math.min(...orderedItems
-                                                        .filter(i => i.plannedDeliveryDate)
-                                                        .map(i => new Date(i.plannedDeliveryDate!).getTime())
-                                                    )
-                                                ).toLocaleDateString('pl-PL')}
-                                            </p>
+                                    {/* Expanded Details */}
+                                    {isExpanded && hasItems && (
+                                        <div className="px-3 pb-3 pt-0 border-t border-slate-100 space-y-3">
+                                            {/* Product Info */}
+                                            {contract.product && (
+                                                <div className="text-xs">
+                                                    <p className="font-medium text-slate-700 mb-1">Produkt:</p>
+                                                    <p className="text-slate-600">
+                                                        {contract.product.modelId || 'Nieokreślony'}
+                                                        {contract.product.width && contract.product.projection &&
+                                                            ` - ${contract.product.width}x${contract.product.projection}mm`
+                                                        }
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Ordered Items */}
+                                            <div className="text-xs">
+                                                <p className="font-medium text-slate-700 mb-2">Zamówione elementy:</p>
+                                                <div className="space-y-1.5">
+                                                    {orderedItems.map((item) => (
+                                                        <div key={item.id} className="flex justify-between items-start gap-2 p-2 bg-slate-50 rounded">
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-slate-700 font-medium truncate">{item.name}</p>
+                                                                {item.details && (
+                                                                    <p className="text-slate-500 text-[10px] truncate">{item.details}</p>
+                                                                )}
+                                                                {item.plannedDeliveryDate && (
+                                                                    <p className="text-slate-500 text-[10px] mt-0.5">
+                                                                        📅 {new Date(item.plannedDeliveryDate).toLocaleDateString('pl-PL')}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${item.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                                                item.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-yellow-100 text-yellow-700'
+                                                                }`}>
+                                                                {item.status === 'delivered' ? '✓ Dostarczone' :
+                                                                    item.status === 'ordered' ? '🚚 Zamówione' :
+                                                                        '⏳ Oczekuje'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Earliest Delivery Date */}
+                                            {orderedItems.some(i => i.plannedDeliveryDate) && (
+                                                <div className="text-xs bg-indigo-50 p-2 rounded">
+                                                    <p className="font-medium text-indigo-700">
+                                                        📦 Najwcześniejsza dostawa:{' '}
+                                                        {new Date(
+                                                            Math.min(...orderedItems
+                                                                .filter(i => i.plannedDeliveryDate)
+                                                                .map(i => new Date(i.plannedDeliveryDate!).getTime())
+                                                            )
+                                                        ).toLocaleDateString('pl-PL')}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </div>
-                    );
-                })}
+                            );
+                        })}
+                    </div>
+                ))}
 
                 {/* Services Tab */}
                 {activeTab === 'services' && filteredTickets.map((ticket) => (
