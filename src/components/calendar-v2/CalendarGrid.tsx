@@ -81,9 +81,37 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
     // Get installations for a specific day and team
     const getInstallationsForCell = (date: string, teamId: string): Installation[] => {
-        return installations.filter(
-            (inst) => inst.scheduledDate === date && inst.teamId === teamId
-        );
+        return installations.filter((inst) => {
+            if (inst.teamId !== teamId) return false;
+            if (!inst.scheduledDate) return false;
+
+            const startDate = new Date(inst.scheduledDate);
+            const cellDate = new Date(date);
+            const duration = inst.expectedDuration || 1;
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + duration - 1);
+
+            // Check if cell date falls within installation range
+            return cellDate >= startDate && cellDate <= endDate;
+        });
+    };
+
+    // Get installation position for visual styling (start/middle/end/single)
+    const getInstallationPosition = (inst: Installation, date: string): 'start' | 'middle' | 'end' | 'single' => {
+        if (!inst.scheduledDate) return 'single';
+
+        const startDate = toISODateString(new Date(inst.scheduledDate));
+        const duration = inst.expectedDuration || 1;
+
+        if (duration === 1) return 'single';
+
+        const endDate = new Date(inst.scheduledDate);
+        endDate.setDate(endDate.getDate() + duration - 1);
+        const endDateStr = toISODateString(endDate);
+
+        if (date === startDate) return 'start';
+        if (date === endDateStr) return 'end';
+        return 'middle';
     };
 
     // Check if team is unavailable on a day
@@ -153,41 +181,65 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     )}
 
                                     {/* Installation Cards */}
-                                    {cellInstallations.map((inst) => (
-                                        <div
-                                            key={inst.id}
-                                            draggable
-                                            onDragStart={(e) => {
-                                                e.dataTransfer.setData('application/json', JSON.stringify({
-                                                    id: inst.id,
-                                                    type: 'installation'
-                                                }));
-                                            }}
-                                            onClick={() => onEditInstallation?.(inst)}
-                                            className={`p-1.5 mb-1 rounded border cursor-pointer text-xs ${getStatusColor(inst.status)} hover:shadow-md transition-all`}
-                                        >
-                                            {/* Contract Number */}
-                                            {inst.contractNumber && (
-                                                <p className="font-bold text-[10px] opacity-70 truncate">
-                                                    📋 {inst.contractNumber}
-                                                </p>
-                                            )}
-                                            {/* Client Name */}
-                                            <p className="font-semibold truncate">
-                                                {inst.client?.firstName} {inst.client?.lastName}
-                                            </p>
-                                            {/* City */}
-                                            <p className="truncate opacity-75">
-                                                📍 {inst.client?.city || 'Brak miasta'}
-                                            </p>
-                                            {/* Duration if multi-day */}
-                                            {inst.expectedDuration && inst.expectedDuration > 1 && (
-                                                <p className="text-[10px] font-medium mt-0.5">
-                                                    ⏱️ {inst.expectedDuration} dni
-                                                </p>
-                                            )}
-                                        </div>
-                                    ))}
+                                    {cellInstallations.map((inst) => {
+                                        const position = getInstallationPosition(inst, dateStr);
+                                        const isMultiDay = (inst.expectedDuration || 1) > 1;
+
+                                        return (
+                                            <div
+                                                key={inst.id}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    e.dataTransfer.setData('application/json', JSON.stringify({
+                                                        id: inst.id,
+                                                        type: 'installation'
+                                                    }));
+                                                }}
+                                                onClick={() => onEditInstallation?.(inst)}
+                                                className={`p-1.5 mb-1 border cursor-pointer text-xs ${getStatusColor(inst.status)} hover:shadow-md transition-all ${position === 'start' ? 'rounded-l' :
+                                                        position === 'end' ? 'rounded-r' :
+                                                            position === 'middle' ? '' :
+                                                                'rounded'
+                                                    } ${isMultiDay ? 'border-l-4' : ''}`}
+                                            >
+                                                {/* Show full details on start day, abbreviated on middle/end */}
+                                                {position === 'start' || position === 'single' ? (
+                                                    <>
+                                                        {/* Contract Number */}
+                                                        {inst.contractNumber && (
+                                                            <p className="font-bold text-[10px] opacity-70 truncate">
+                                                                📋 {inst.contractNumber}
+                                                            </p>
+                                                        )}
+                                                        {/* Client Name */}
+                                                        <p className="font-semibold truncate">
+                                                            {inst.client?.firstName} {inst.client?.lastName}
+                                                        </p>
+                                                        {/* City */}
+                                                        <p className="truncate opacity-75">
+                                                            📍 {inst.client?.city || 'Brak miasta'}
+                                                        </p>
+                                                        {/* Duration if multi-day */}
+                                                        {inst.expectedDuration && inst.expectedDuration > 1 && (
+                                                            <p className="text-[10px] font-medium mt-0.5">
+                                                                ⏱️ {inst.expectedDuration} dni
+                                                            </p>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {/* Abbreviated view for middle/end days */}
+                                                        <p className="font-semibold truncate text-center">
+                                                            {position === 'middle' ? '━━━' : '━━▶'}
+                                                        </p>
+                                                        <p className="text-[10px] truncate text-center opacity-75">
+                                                            {inst.client?.lastName}
+                                                        </p>
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             );
                         })}
