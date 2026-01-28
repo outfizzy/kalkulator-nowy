@@ -828,17 +828,24 @@ export const InstallationService = {
         const activeSourceIds = new Set(activeInstallations.map(i => i.sourceId).filter(Boolean));
 
         // 3. Contracts (Draft or Signed, not in active installations)
-        const { data: contracts } = await supabase
+        const { data: contracts, error: contractsError } = await supabase
             .from('contracts')
-            .select('*, offers!inner(product)')
+            .select('*, contract_number, offers(product)')
             .in('status', ['draft', 'signed']);
+
+        if (contractsError) {
+            console.error('Error fetching contracts:', contractsError);
+        }
 
         const backlogContracts = (contracts || []).filter((c: any) =>
             !activeOfferIds.has(c.offer_id) && !activeSourceIds.has(c.id)
         ).map((c: any) => ({
             ...c,
-            client: c.contract_data?.client || {}, // Ensure client data is accessible
-            product: c.offers?.product // Lift product for easier access
+            contractNumber: c.contract_number, // Map snake_case to camelCase
+            client: c.contract_data?.customer || c.contract_data?.client || {}, // Ensure client data is accessible
+            product: c.offers?.product, // Lift product for easier access (may be null for manual contracts)
+            orderedItems: c.contract_data?.orderedItems || [], // Ensure ordered items are accessible
+            installationDaysEstimate: c.contract_data?.installation_days_estimate || c.installation_days_estimate
         }));
 
         // 4. Service Tickets (Active, not in active installations)
