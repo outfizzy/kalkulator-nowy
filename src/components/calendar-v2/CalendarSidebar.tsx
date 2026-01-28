@@ -59,9 +59,8 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
         const groups = new Map<string, Contract[]>();
 
         filteredContracts.forEach(contract => {
-            const postalCode = contract.contractData?.customer?.postalCode ||
-                contract.client?.postalCode ||
-                'Brak kodu';
+            const clientData = contract.contractData?.client || contract.contractData?.customer || contract.client;
+            const postalCode = clientData?.postalCode || 'Brak kodu';
 
             if (!groups.has(postalCode)) {
                 groups.set(postalCode, []);
@@ -181,10 +180,29 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
                                                     {contract.contractNumber}
                                                 </p>
                                                 <p className="font-medium text-slate-700 truncate">
-                                                    {contract.contractData?.customer?.name || contract.client?.firstName + ' ' + contract.client?.lastName || 'Brak nazwy'}
+                                                    {(() => {
+                                                        const clientData = contract.contractData?.client || contract.contractData?.customer || contract.client;
+                                                        if (clientData?.name) return clientData.name;
+                                                        if (clientData?.firstName || clientData?.lastName) {
+                                                            return `${clientData.firstName || ''} ${clientData.lastName || ''}`.trim();
+                                                        }
+                                                        return 'Brak nazwy';
+                                                    })()}
                                                 </p>
                                                 <p className="text-xs text-slate-500 truncate">
-                                                    📍 {contract.contractData?.customer?.city || contract.client?.city || 'Brak miasta'}
+                                                    {(() => {
+                                                        const clientData = contract.contractData?.client || contract.contractData?.customer || contract.client;
+                                                        const street = clientData?.street || '';
+                                                        const postalCode = clientData?.postalCode || '';
+                                                        const city = clientData?.city || '';
+
+                                                        const parts = [];
+                                                        if (street) parts.push(street);
+                                                        if (postalCode && city) parts.push(`${postalCode} ${city}`);
+                                                        else if (city) parts.push(city);
+
+                                                        return parts.length > 0 ? `📍 ${parts.join(', ')}` : '📍 Brak adresu';
+                                                    })()}
                                                 </p>
                                             </div>
 
