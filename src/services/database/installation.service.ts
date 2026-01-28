@@ -105,44 +105,76 @@ export const InstallationService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        // Fetch contracts with associated offers
+        // Fetch contracts with associated offers (LEFT JOIN to include manual contracts)
         const { data: contracts, error: contractsError } = await supabase
             .from('contracts')
-            .select('*, offers!inner(product)')
+            .select('*, contract_data, contract_number, offers(product)')
             .in('id', contractIds);
 
-        if (contractsError) throw contractsError;
+        if (contractsError) {
+            console.error('Error fetching contracts:', contractsError);
+            throw contractsError;
+        }
         if (!contracts || contracts.length === 0) return [];
 
         const createdInstallations: Installation[] = [];
 
         for (const contractRow of contracts) {
-            // Check if installation already exists
-            const exists = await this.checkInstallationForContract(contractRow.offer_id);
-            if (exists) {
-                console.warn(`Installation already exists for offer ${contractRow.offer_id}, skipping`);
-                continue;
+            // Check if installation already exists (skip if offer_id exists and has installation)
+            if (contractRow.offer_id) {
+                const exists = await this.checkInstallationForContract(contractRow.offer_id);
+                if (exists) {
+                    console.warn(`Installation already exists for offer ${contractRow.offer_id}, skipping`);
+                    continue;
+                }
             }
 
             const contractData = contractRow.contract_data;
-            const client = contractData.client;
+            if (!contractData) {
+                console.error(`Contract ${contractRow.id} has no contract_data, skipping`);
+                continue;
+            }
+
+            const client = contractData.client || contractData.customer;
+            if (!client) {
+                console.error(`Contract ${contractRow.id} has no client data, skipping`);
+                continue;
+            }
+
+            // Build product summary - handle both regular and manual contracts
+            let productSummary = '';
+            if (contractData.product) {
+                const product = contractData.product;
+                if (product.modelId && product.width && product.projection) {
+                    productSummary = `${product.modelId} ${product.width}x${product.projection} mm`;
+                } else if (product.modelId) {
+                    productSummary = product.modelId;
+                } else if (product.customItems && product.customItems.length > 0) {
+                    // Manual contract with custom items
+                    productSummary = product.customItems.map((item: any) => item.name).join(', ');
+                } else {
+                    productSummary = 'Umowa manualna';
+                }
+            } else {
+                productSummary = contractRow.contract_number || 'Montaż';
+            }
 
             const installationData = {
                 client: {
-                    firstName: client.firstName || '',
-                    lastName: client.lastName || '',
+                    firstName: client.firstName || client.name?.split(' ')[0] || '',
+                    lastName: client.lastName || client.name?.split(' ').slice(1).join(' ') || '',
                     city: client.city || '',
                     address: `${client.street || ''} ${client.houseNumber || ''} `.trim(),
                     phone: client.phone || '',
                     coordinates: undefined
                 },
-                productSummary: `${contractData.product.modelId} ${contractData.product.width}x${contractData.product.projection} mm`
+                productSummary
             };
 
             const { data: newInstallation, error: insertError } = await supabase
                 .from('installations')
                 .insert({
-                    offer_id: contractRow.offer_id,
+                    offer_id: contractRow.offer_id || null,
                     user_id: user.id,
                     status: 'pending',
                     installation_data: installationData,
@@ -158,8 +190,8 @@ export const InstallationService = {
                 continue;
             }
 
-            // Automation: Sync order items from offer configuration
-            const offerData = contractRow.offers as unknown as { product: ProductConfig };
+            // Automation: Sync order items from offer configuration (only if offer exists)
+            const offerData = contractRow.offers as unknown as { product: ProductConfig } | null;
             const offerConfig = offerData?.product;
             if (offerConfig) {
                 try {
@@ -171,7 +203,7 @@ export const InstallationService = {
 
             createdInstallations.push({
                 id: newInstallation.id,
-                offerId: contractRow.offer_id,
+                offerId: contractRow.offer_id || undefined,
                 client: installationData.client,
                 productSummary: installationData.productSummary,
                 status: 'pending' as Installation['status'],
