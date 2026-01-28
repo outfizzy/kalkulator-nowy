@@ -4,7 +4,8 @@ import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { OfferService } from '../../services/database/offer.service';
 import { FairService, type Fair } from '../../services/database/fair.service';
-import type { Lead, LeadStatus, User } from '../../types';
+import { MeasurementService } from '../../services/database/measurement.service';
+import type { Lead, LeadStatus, User, Measurement } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { LeadsKanban } from './LeadsKanban';
 import { LeadsFunnelChart } from './LeadsFunnelChart';
@@ -14,6 +15,7 @@ export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [fairs, setFairs] = useState<Fair[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const [measurements, setMeasurements] = useState<Measurement[]>([]);
     const [filterAssignee, setFilterAssignee] = useState<string>('all');
     const { isAdmin } = useAuth();
     const navigate = useNavigate();
@@ -30,14 +32,16 @@ export const LeadsList: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [leadsData, fairsData, usersData] = await Promise.all([
+            const [leadsData, fairsData, usersData, measurementsData] = await Promise.all([
                 DatabaseService.getLeads(),
                 FairService.getAllFairs(),
-                DatabaseService.getAllUsers()
+                DatabaseService.getAllUsers(),
+                MeasurementService.getMeasurements()
             ]);
             setLeads(leadsData);
             setFairs(fairsData);
             setUsers(usersData);
+            setMeasurements(measurementsData);
 
             // Fetch activity for leads
             const leadIds = leadsData.map(l => l.id);
@@ -170,6 +174,8 @@ export const LeadsList: React.FC = () => {
                         <th className="px-6 py-3">Źródło / Lokalizacja</th>
                         <th className="px-6 py-3">Kontakt</th>
                         <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Umówiony na pomiar</th>
+                        <th className="px-6 py-3">Po pomiarze</th>
                         <th className="px-6 py-3">Przypisany</th>
                         <th className="px-6 py-3 text-right">Dodano</th>
                         <th className="px-6 py-3 text-right">Akcje</th>
@@ -178,6 +184,9 @@ export const LeadsList: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                     {items.map((lead) => {
                         const fair = lead.fairId ? fairs.find(f => f.id === lead.fairId) : null;
+                        const leadMeasurements = measurements.filter(m => m.leadId === lead.id);
+                        const scheduledMeasurement = leadMeasurements.find(m => m.status === 'scheduled');
+                        const completedMeasurement = leadMeasurements.find(m => m.status === 'completed');
 
                         return (
                             <tr key={lead.id} className={`hover:bg-slate-50 transition-colors ${leadActivity.get(lead.id)?.isHot ? 'bg-orange-50/50' : ''}`}>
@@ -229,6 +238,34 @@ export const LeadsList: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4">
                                     {getStatusBadge(lead.status)}
+                                </td>
+                                <td className="px-6 py-4">
+                                    {scheduledMeasurement ? (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                📅 {new Date(scheduledMeasurement.scheduledDate).toLocaleDateString('pl-PL')}
+                                            </span>
+                                            {scheduledMeasurement.salesRepName && (
+                                                <span className="text-xs text-slate-500">{scheduledMeasurement.salesRepName}</span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-400 text-xs">-</span>
+                                    )}
+                                </td>
+                                <td className="px-6 py-4">
+                                    {completedMeasurement && !lead.status.includes('won') ? (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                                🤔 Zastanawia się
+                                            </span>
+                                            <span className="text-xs text-slate-500">
+                                                Pomiar: {new Date(completedMeasurement.scheduledDate).toLocaleDateString('pl-PL')}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-400 text-xs">-</span>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 text-slate-600">
                                     {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName} ` : '-'}
