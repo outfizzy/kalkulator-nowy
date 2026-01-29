@@ -5,22 +5,27 @@ import { InstallationDetailsModal } from './InstallationDetailsModal';
 import { ManualInstallationModal } from './ManualInstallationModal';
 import { UnifiedInstallationCalendar } from './UnifiedInstallationCalendar';
 import { InstallationCalendarV2 } from '../calendar-v2';
+import { CalendarV3Enhanced } from '../calendar-v3-enhanced';
 import { InstallationReports } from './reports/InstallationReports';
 import { ContractBulkSelectionPanel } from './ContractBulkSelectionPanel';
 import { GroupingControls } from './GroupingControls';
 import { groupInstallations, sortInstallations, getStatusLabel, getStatusColor, getTeamAvailability } from '../../utils/installationUtils';
-import type { Installation, InstallationTeam } from '../../types';
+import type { Installation, InstallationTeam, Contract, ServiceTicket, TeamUnavailability } from '../../types';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { InstallationService } from '../../services/database/installation.service';
 
 
 export const InstallationDashboard: React.FC = () => {
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
+    const [contracts, setContracts] = useState<Contract[]>([]);
+    const [serviceTickets, setServiceTickets] = useState<ServiceTicket[]>([]);
+    const [unavailability, setUnavailability] = useState<TeamUnavailability[]>([]);
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeocoding, setIsGeocoding] = useState(false);
-    const [view, setView] = useState<'list' | 'calendar' | 'calendarV2' | 'contracts' | 'reports'>('calendarV2');
+    const [view, setView] = useState<'list' | 'calendar' | 'calendarV2' | 'calendarV3' | 'contracts' | 'reports'>('calendarV3');
 
     // Modal State
     const [editingInstallation, setEditingInstallation] = useState<Installation | null>(null);
@@ -42,31 +47,38 @@ export const InstallationDashboard: React.FC = () => {
             const results = await Promise.allSettled([
                 DatabaseService.getInstallations(),
                 DatabaseService.getTeams(),
-                // DatabaseService.getAllTeamUnavailability(),
+                InstallationService.getAllTeamUnavailability(),
                 DatabaseService.getInstallers(),
-                DatabaseService.getSalesReps()
+                DatabaseService.getSalesReps(),
+                InstallationService.getBacklogItems()
             ]);
 
             const [
                 installationsResult,
                 teamsResult,
-                // unavailabilityResult, // Unused
+                unavailabilityResult,
                 installersResult,
-                salesRepsResult
+                salesRepsResult,
+                backlogResult
             ] = results;
 
             // Log any errors
             results.forEach((result, index) => {
                 if (result.status === 'rejected') {
-                    const services = ['Installations', 'Teams', 'Unavailability', 'Installers', 'SalesReps'];
+                    const services = ['Installations', 'Teams', 'Unavailability', 'Installers', 'SalesReps', 'Backlog'];
                     console.error(`Error loading ${services[index]}:`, result.reason);
                 }
             });
 
             if (installationsResult.status === 'fulfilled') setInstallations(installationsResult.value);
             if (teamsResult.status === 'fulfilled') setTeams(teamsResult.value);
+            if (unavailabilityResult.status === 'fulfilled') setUnavailability(unavailabilityResult.value);
             if (installersResult.status === 'fulfilled') setInstallers(installersResult.value);
             if (salesRepsResult.status === 'fulfilled') setSalesReps(salesRepsResult.value);
+            if (backlogResult.status === 'fulfilled') {
+                setContracts(backlogResult.value.contracts);
+                setServiceTickets(backlogResult.value.serviceTickets);
+            }
 
             // If critical data failed (Installations or Teams), show error toast
             if (installationsResult.status === 'rejected' || teamsResult.status === 'rejected') {
@@ -274,8 +286,7 @@ export const InstallationDashboard: React.FC = () => {
             {/* View Tabs */}
             <div className="bg-slate-100 p-1 rounded-full flex gap-1 self-start">
                 {[
-                    { id: 'calendarV2', label: '🗓️ Kalendarz V2' },
-                    { id: 'calendar', label: '📅 Kalendarz (Legacy)' },
+                    { id: 'calendarV3', label: '🗓️ Kalendarz' },
                     { id: 'list', label: '📍 Mapa/Lista' },
                     { id: 'reports', label: '📈 Raporty' },
                     { id: 'contracts', label: '📝 Umowy' }
@@ -319,7 +330,19 @@ export const InstallationDashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 flex gap-4 min-h-0">
-                {view === 'calendarV2' ? (
+                {view === 'calendarV3' ? (
+                    <div className="w-full h-[calc(100vh-300px)] bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+                        <CalendarV3Enhanced
+                            installations={installations}
+                            teams={teams}
+                            contracts={contracts}
+                            serviceTickets={serviceTickets}
+                            unavailability={unavailability}
+                            onRefresh={loadData}
+                            onEditInstallation={handleEdit}
+                        />
+                    </div>
+                ) : view === 'calendarV2' ? (
                     <div className="w-full h-[calc(100vh-300px)] bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
                         <InstallationCalendarV2
                             onEditInstallation={handleEdit}

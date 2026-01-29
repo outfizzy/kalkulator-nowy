@@ -46,25 +46,28 @@ export const InstallerTeamsPage: React.FC = () => {
             }
 
             if (editingTeam.id) {
+                console.log('Updating team:', editingTeam.id, editingTeam);
                 await InstallationTeamService.updateTeam(editingTeam.id, editingTeam);
                 toast.success('Ekipa zaktualizowana');
             } else {
+                console.log('Creating team:', editingTeam);
                 await InstallationTeamService.createTeam({
                     name: editingTeam.name!,
                     color: editingTeam.color || '#3b82f6',
                     vehicle: editingTeam.vehicle,
                     members: editingTeam.members || [],
                     fuelConsumption: editingTeam.fuelConsumption,
-                    vehicleMaintenanceRate: editingTeam.vehicleMaintenanceRate
+                    vehicleMaintenanceRate: editingTeam.vehicleMaintenanceRate,
+                    workingDays: editingTeam.workingDays || [1, 2, 3, 4, 5]
                 } as any);
                 toast.success('Ekipa utworzona');
             }
             setIsEditing(false);
             setEditingTeam({});
             loadData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving team:', error);
-            toast.error('Błąd zapisu ekipy');
+            toast.error(`Błąd zapisu ekipy: ${error?.message || 'Nieznany błąd'}`);
         }
     };
 
@@ -335,8 +338,8 @@ export const InstallerTeamsPage: React.FC = () => {
                                                     setEditingTeam({ ...editingTeam, workingDays: newDays });
                                                 }}
                                                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isSelected
-                                                        ? 'bg-blue-600 text-white shadow-sm'
-                                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                                                     } ${day >= 6 ? 'border-2 border-dashed border-slate-300' : ''}`}
                                             >
                                                 {label}

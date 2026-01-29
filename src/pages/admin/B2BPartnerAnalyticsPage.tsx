@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { B2BService, B2BPartner, B2BPartnerActivity } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BPartner, B2BPartnerActivity } from '../../services/database/b2b.service';
 import { format, formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -123,8 +124,8 @@ export function B2BPartnerAnalyticsPage() {
                             key={days}
                             onClick={() => setDateRange(days)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === days
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                 }`}
                         >
                             {days} Tage
@@ -186,8 +187,8 @@ export function B2BPartnerAnalyticsPage() {
                                         key={item.partner_id}
                                         onClick={() => loadPartnerDetail(partner)}
                                         className={`p-4 cursor-pointer transition-colors ${selectedPartner?.id === item.partner_id
-                                                ? 'bg-blue-50 border-l-4 border-blue-600'
-                                                : 'hover:bg-gray-50 border-l-4 border-transparent'
+                                            ? 'bg-blue-50 border-l-4 border-blue-600'
+                                            : 'hover:bg-gray-50 border-l-4 border-transparent'
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -232,8 +233,8 @@ export function B2BPartnerAnalyticsPage() {
                                             <p className="text-gray-500">{selectedPartner.contact_email}</p>
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedPartner.status === 'active'
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-gray-100 text-gray-600'
+                                            ? 'bg-green-100 text-green-700'
+                                            : 'bg-gray-100 text-gray-600'
                                             }`}>
                                             {selectedPartner.status === 'active' ? '🟢 Aktiv' : '⚪ Inaktiv'}
                                         </span>

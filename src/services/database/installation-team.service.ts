@@ -1,9 +1,18 @@
 import { supabase } from '../../lib/supabase';
 import type { InstallationTeam } from '../../types';
 
+// Defensive check for supabase client
+const getSupabaseClient = () => {
+    if (!supabase) {
+        throw new Error('Supabase client is not initialized. Check environment variables.');
+    }
+    return supabase;
+};
+
 export const InstallationTeamService = {
     async getTeams(): Promise<InstallationTeam[]> {
-        const { data, error } = await supabase
+        const client = getSupabaseClient();
+        const { data, error } = await client
             .from('installation_teams')
             .select('*')
             .eq('is_active', true)
@@ -25,7 +34,8 @@ export const InstallationTeamService = {
     },
 
     async createTeam(team: Omit<InstallationTeam, 'id' | 'isActive'>): Promise<InstallationTeam> {
-        const { data, error } = await supabase
+        const client = getSupabaseClient();
+        const { data, error } = await client
             .from('installation_teams')
             .insert({
                 name: team.name,
@@ -66,7 +76,8 @@ export const InstallationTeamService = {
         if (updates.vehicleMaintenanceRate !== undefined) dbUpdates.vehicle_maintenance_rate = updates.vehicleMaintenanceRate;
         if (updates.workingDays !== undefined) dbUpdates.working_days = updates.workingDays;
 
-        const { error } = await supabase
+        const client = getSupabaseClient();
+        const { error } = await client
             .from('installation_teams')
             .update(dbUpdates)
             .eq('id', id);
@@ -76,7 +87,8 @@ export const InstallationTeamService = {
 
     async deleteTeam(id: string): Promise<void> {
         // Soft delete
-        const { error } = await supabase
+        const client = getSupabaseClient();
+        const { error } = await client
             .from('installation_teams')
             .update({ is_active: false })
             .eq('id', id);

@@ -77,7 +77,7 @@ export const ScheduleMeasurementModal: React.FC<ScheduleMeasurementModalProps> =
             // Step 2: Update lead status (optional - don't fail if this fails)
             try {
                 await DatabaseService.updateLead(leadData.leadId, {
-                    status: 'contacted' // Use existing status instead of new one
+                    status: 'measurement_scheduled' // Correct status for scheduled measurement
                 });
             } catch (leadError) {
                 console.warn('Could not update lead status:', leadError);

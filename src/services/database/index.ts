@@ -41,7 +41,8 @@ export const DatabaseService = {
     ...StorageService,
     ...SupportService,
     ...TaskService,
-    ...UserService
+    ...UserService,
+    ...ProjectMeasurementService
 };
 
 export * from './activity.service';
@@ -53,6 +54,7 @@ export * from './installation.service';
 export * from './inventory.service';
 export * from './lead.service';
 export * from './measurement.service';
+export * from './project-measurement.service';
 export * from './note.service';
 export * from './notification.service';
 export * from './offer.service';

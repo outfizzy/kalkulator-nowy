@@ -16,10 +16,148 @@ interface DachrechnerDiagramProps {
     inputs: DachrechnerInputs;
     results: DachrechnerResults | null;
     options?: DimensionOptions;
+    view?: 'side' | 'front';
 }
 
-export const DachrechnerDiagram: React.FC<DachrechnerDiagramProps> = ({ modelId, inputs, results, options }) => {
+export const DachrechnerDiagram: React.FC<DachrechnerDiagramProps> = ({ modelId, inputs, results, options, view = 'side' }) => {
     const model = ROOF_MODELS[modelId];
+
+    // --- FRONT VIEW IMPLEMENTATION ---
+    if (view === 'front') {
+        const width = inputs.width || 5000;
+        const posts = inputs.postCount || 2;
+        const h3 = inputs.h3 || 2250;
+        const postWidth = 110;
+        // Calculate spacing: (Width - (Posts * 110)) / (Posts - 1)
+        const totalPostWidth = posts * postWidth;
+        const innerWidth = posts > 1 ? (width - totalPostWidth) / (posts - 1) : 0;
+
+        // Canvas Scale - reuse similar dims
+        const W = 980, H = 750;
+        const PAD = { left: 100, right: 100, top: 150, bottom: 150 }; // More top pad for dimensions
+        const DW = W - PAD.left - PAD.right;
+        const DH = H - PAD.top - PAD.bottom;
+
+        const maxH = h3 * 1.5;
+        const maxW = width * 1.2;
+        const scale = Math.min(DH / maxH, DW / maxW);
+
+        const OX = PAD.left + (DW - width * scale) / 2; // Center horizontally
+        const OY = H - PAD.bottom;
+
+        const pt = (x: number, y: number) => ({ x: OX + x * scale, y: OY - y * scale });
+
+        const COL = {
+            height: '#7c3aed',
+            width: '#2563eb', // Blue for widths
+            struct: '#334155',
+            post: '#cbd5e1',
+        };
+
+        // Dimension Helpers (Front Specific)
+        const DimH = ({ y, x1, x2, label, value, color = COL.width }: any) => {
+            const p1 = pt(x1, y);
+            const p2 = pt(x2, y);
+            return (
+                <g>
+                    <line x1={p1.x} y1={p1.y - 5} x2={p1.x} y2={p1.y + 5} stroke={color} strokeWidth="1.5" />
+                    <line x1={p2.x} y1={p2.y - 5} x2={p2.x} y2={p2.y + 5} stroke={color} strokeWidth="1.5" />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth="1.5" />
+                    <rect x={(p1.x + p2.x) / 2 - 40} y={p1.y - 10} width="80" height="20" fill="white" stroke={color} rx="4" />
+                    <text x={(p1.x + p2.x) / 2} y={p1.y + 4} textAnchor="middle" fontSize="11" fontWeight="bold" fill={color}>
+                        {label ? `${label}: ` : ''}{Math.round(value)}
+                    </text>
+                </g>
+            );
+        };
+
+        const DimV = ({ x, y1, y2, label, value, color = COL.height, align = 'left' }: any) => {
+            const p1 = pt(x, y1);
+            const p2 = pt(x, y2);
+            const txtOff = align === 'left' ? -10 : 10;
+            const anchor = align === 'left' ? 'end' : 'start';
+            return (
+                <g>
+                    <line x1={p1.x - 5} y1={p1.y} x2={p1.x + 5} y2={p1.y} stroke={color} strokeWidth="1.5" />
+                    <line x1={p2.x - 5} y1={p2.y} x2={p2.x + 5} y2={p2.y} stroke={color} strokeWidth="1.5" />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth="1.5" />
+                    <rect x={p1.x - (align === 'left' ? 60 : -10)} y={(p1.y + p2.y) / 2 - 10} width="50" height="20" fill="white" stroke={color} rx="4" />
+                    <text x={p1.x - (align === 'left' ? 35 : -35)} y={(p1.y + p2.y) / 2 + 5} textAnchor="middle" fontWeight="bold" fontSize="11" fill={color}>
+                        {Math.round(value)}
+                    </text>
+                </g>
+            );
+        };
+
+        return (
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full select-none" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                <defs>
+                    <linearGradient id="postGradFront" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#e2e8f0" />
+                        <stop offset="50%" stopColor="#f8fafc" />
+                        <stop offset="100%" stopColor="#e2e8f0" />
+                    </linearGradient>
+                    <pattern id="groundFront" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                        <line x1="0" y1="0" x2="0" y2="12" stroke="#94a3b8" strokeWidth="1" />
+                    </pattern>
+                </defs>
+
+                <rect x="0" y="0" width={W} height={H} fill="#f8fafc" />
+
+                {/* Title */}
+                <text x={W / 2} y="35" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#1e293b">{model.name} (Widok z frontu)</text>
+
+                {/* Ground */}
+                <rect x={PAD.left - 50} y={OY} width={DW + 100} height="15" fill="url(#groundFront)" opacity="0.6" />
+                <line x1={PAD.left - 50} y1={OY} x2={PAD.left + DW + 50} y2={OY} stroke={COL.struct} strokeWidth="3" />
+
+                {/* Posts and Beam */}
+                {Array.from({ length: posts }).map((_, i) => {
+                    // x position of left edge of post
+                    const x = i * (postWidth + innerWidth);
+                    return (
+                        <g key={i}>
+                            <rect
+                                x={pt(x, 0).x}
+                                y={pt(x, h3).y}
+                                width={postWidth * scale}
+                                height={h3 * scale}
+                                fill="url(#postGradFront)"
+                                stroke={COL.struct}
+                            />
+                            {/* Inner Width Dimension between posts */}
+                            {i < posts - 1 && options?.showPostDimensions && (
+                                <DimH
+                                    y={h3 / 2}
+                                    x1={x + postWidth}
+                                    x2={x + postWidth + innerWidth}
+                                    value={innerWidth}
+                                    label=""
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
+                {/* Gutter / Beam */}
+                <rect x={pt(0, h3).x} y={pt(0, h3 + 150).y} width={width * scale} height={150 * scale} fill="#0ea5e9" stroke={COL.struct} opacity="0.1" />
+                <rect x={pt(0, h3).x} y={pt(0, h3 + 20).y} width={width * scale} height={20 * scale} fill="#0ea5e9" stroke={COL.struct} />
+
+                {/* Total Width Dimension */}
+                {options?.showPostDimensions && (
+                    <DimH y={-200} x1={0} x2={width} label="Szerokość Całkowita" value={width} />
+                )}
+
+                {/* Height H3 */}
+                {options?.showHeights && (
+                    <DimV x={-150} y1={0} y2={h3} label="H3" value={h3} align="left" />
+                )}
+
+            </svg>
+        );
+    }
+
+    // --- SIDE VIEW (Existing) ---
     const cat = model.category;
 
     const opts: DimensionOptions = options || {

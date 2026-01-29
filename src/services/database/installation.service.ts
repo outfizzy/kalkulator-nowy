@@ -112,7 +112,7 @@ export const InstallationService = {
         // Fetch contracts with associated offers (LEFT JOIN to include manual contracts)
         const { data: contracts, error: contractsError } = await supabase
             .from('contracts')
-            .select('*, contract_data, contract_number, offers(product)')
+            .select('*, contract_data, offers(*)')
             .in('id', contractIds);
 
         if (contractsError) {
@@ -168,7 +168,9 @@ export const InstallationService = {
                     firstName: client.firstName || client.name?.split(' ')[0] || '',
                     lastName: client.lastName || client.name?.split(' ').slice(1).join(' ') || '',
                     city: client.city || '',
+                    postalCode: client.postalCode || client.zip || '',
                     address: `${client.street || ''} ${client.houseNumber || ''} `.trim(),
+
                     phone: client.phone || '',
                     coordinates: undefined
                 },
@@ -864,28 +866,137 @@ export const InstallationService = {
         const activeSourceIds = new Set(activeInstallations.map(i => i.sourceId).filter(Boolean));
 
         // 3. Contracts (Draft or Signed, not in active installations)
+        // Manual fetch approach - JOIN was breaking the query
         const { data: contracts, error: contractsError } = await supabase
             .from('contracts')
-            .select('*, contract_data, offers(*)') // Use wildcard but explicitly add contract_data
-            .in('status', ['draft', 'signed']);
+            .select('*, contract_data')
+            .in('status', ['draft', 'sent', 'viewed', 'signed', 'accepted']);
 
         if (contractsError) {
             console.error('Error fetching contracts:', contractsError);
+        }
+
+        // 3b. Fetch Offers separately for supply info and fallback data
+        const offerIds = (contracts || [])
+            .map((c: any) => c.offer_id)
+            .filter((id: string) => !!id);
+
+        const offerMap = new Map();
+
+        if (offerIds.length > 0) {
+            const { data: offers, error: offersError } = await supabase
+                .from('offers')
+                .select('id, offer_number, customer_id, client_id, customer_data, product_config, orders(status, delivery_date, planned_delivery_date)')
+                .in('id', offerIds);
+
+            if (offersError) {
+                console.error('Error fetching offers:', offersError);
+            }
+
+            offers?.forEach((o: any) => {
+                offerMap.set(o.id, o);
+            });
+        }
+
+        // 3c. Fetch Customer Data Separately (Robustness for legacy data/live updates)
+        const clientIds = new Set<string>();
+        (contracts || []).forEach((c: any) => {
+            // Try all possible fields for client ID
+            if (c.client_id) clientIds.add(c.client_id);
+            if (c.customer_id) clientIds.add(c.customer_id);
+            if (c.contract_data?.client?.id) clientIds.add(c.contract_data.client.id);
+            if (c.contract_data?.customer?.id) clientIds.add(c.contract_data.customer.id);
+
+            // Check linked Offer
+            const offer = offerMap.get(c.offer_id);
+            if (offer) {
+                if (offer.customer_id) clientIds.add(offer.customer_id);
+                if (offer.client_id) clientIds.add(offer.client_id);
+                if (offer.customer_data?.id) clientIds.add(offer.customer_data.id);
+            }
+        });
+
+
+
+        const clientMap = new Map();
+        if (clientIds.size > 0) {
+            const { data: clients } = await supabase
+                .from('customers')
+                .select('*')
+                .in('id', Array.from(clientIds));
+
+            clients?.forEach(c => clientMap.set(c.id, c));
         }
 
         console.log('Fetched contracts for calendar:', contracts?.length || 0);
 
         const backlogContracts = (contracts || []).filter((c: any) =>
             !activeOfferIds.has(c.offer_id) && !activeSourceIds.has(c.id)
-        ).map((c: any) => ({
-            ...c,
-            contractNumber: c.contract_number, // Map snake_case to camelCase
-            contractData: c.contract_data, // Preserve original contract_data
-            client: c.contract_data?.client || c.contract_data?.customer || {}, // Ensure client data is accessible
-            product: c.offers?.product, // Lift product for easier access (may be null for manual contracts)
-            orderedItems: c.contract_data?.orderedItems || [], // Ensure ordered items are accessible
-            installationDaysEstimate: c.contract_data?.installation_days_estimate || c.installation_days_estimate
-        }));
+        ).map((c: any) => {
+            const offer = offerMap.get(c.offer_id); // Use manual map
+            const orders = offer?.orders || [];
+
+            // Supply Status Logic
+            const isDelivered = orders.length > 0 && orders.every((o: any) => o.status === 'delivered');
+            const isOrdered = orders.length > 0 && orders.some((o: any) => o.status === 'ordered' || o.status === 'confirmed');
+            const deliveryDate = orders.find((o: any) => o.delivery_date)?.delivery_date || orders.find((o: any) => o.planned_delivery_date)?.planned_delivery_date;
+
+            // Resolve Client Data
+            const snapshotClient = c.contract_data?.client || c.contract_data?.customer || offer?.customer_data || {};
+            // Try to find the live record
+            const clientId = c.client_id || c.customer_id || snapshotClient.id || offer?.customer_id || offer?.client_id;
+            const liveClient = clientMap.get(clientId) || {};
+
+            // Construct address from live client if available (handling both 'address' col and 'street'+'house_number')
+            const liveAddress = liveClient.address || (liveClient.street ? `${liveClient.street} ${liveClient.house_number || ''}`.trim() : '');
+
+            const resolvedClient = {
+                // Base on snapshot (camelCase)
+                ...snapshotClient,
+                // Overwrite with live data (these take precedence)
+                ...liveClient,
+                // Final explicit mappings to ensure correct values
+                address: liveAddress || snapshotClient.address || '',
+                city: liveClient.city || snapshotClient.city || '',
+                postalCode: liveClient.postal_code || snapshotClient.postalCode || snapshotClient.postal_code || '',
+                firstName: liveClient.first_name || snapshotClient.firstName || '',
+                lastName: liveClient.last_name || snapshotClient.lastName || '',
+                name: liveClient.name || snapshotClient.name || ''
+            };
+
+            // DEBUG: Log what we have for this contract
+            const debugContractNumber = c.contract_number || c.contract_data?.contractNumber || offer?.offer_number;
+            console.log('[BACKLOG DEBUG]', {
+                contractId: c.id,
+                hasOffer: !!offer,
+                offerNumber: offer?.offer_number,
+                contractNumber: c.contract_number,
+                contractDataNumber: c.contract_data?.contractNumber,
+                resolvedNumber: debugContractNumber || 'Brak numeru',
+                clientId,
+                hasLiveClient: !!clientMap.get(clientId),
+                liveCity: liveClient.city,
+                snapshotCity: snapshotClient.city,
+                resolvedCity: liveClient.city || snapshotClient.city || 'Brak miasta'
+            });
+
+            return {
+                ...c,
+                contractNumber: c.contract_number || c.contract_data?.contractNumber || offer?.offer_number || 'Brak numeru',
+                contractData: {
+                    ...c.contract_data,
+                    client: resolvedClient
+                },
+                client: resolvedClient, // Direct access
+                product: c.contract_data?.product || c.product || offer?.product_config,
+                orderedItems: c.contract_data?.orderedItems || [],
+                installationDaysEstimate: c.contract_data?.installation_days_estimate || c.installation_days_estimate,
+                supplyInfo: {
+                    status: isDelivered ? 'delivered' : isOrdered ? 'ordered' : 'none',
+                    deliveryDate: deliveryDate
+                }
+            };
+        });
 
         console.log('Backlog contracts after filtering:', backlogContracts.length);
 
@@ -1212,37 +1323,39 @@ export const InstallationService = {
         fuelConsumption: number = 12,
         vehicleMaintenanceRate: number = 0
     ): Promise<void> {
-        // 1. Create team
-        const { data: team, error: teamError } = await supabase
-            .from('teams')
+        // Get installer details for members
+        const validMemberIds = memberIds.filter(mid => mid && typeof mid === 'string' && mid.trim() !== '');
+
+        let membersJson: any[] = [];
+        if (validMemberIds.length > 0) {
+            const { data: installers } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, hourly_rate')
+                .in('id', validMemberIds);
+
+            membersJson = (installers || []).map(inst => ({
+                id: inst.id,
+                firstName: inst.first_name || '',
+                lastName: inst.last_name || '',
+                hourlyRate: inst.hourly_rate || 0,
+                type: 'user'
+            }));
+        }
+
+        // Create in installation_teams table (same table that getTeams reads from)
+        const { error: teamError } = await supabase
+            .from('installation_teams')
             .insert({
                 name,
                 color,
-                tags,
-                notes,
+                members: membersJson,
                 is_active,
                 working_days: workingDays,
                 fuel_consumption: fuelConsumption,
                 vehicle_maintenance_rate: vehicleMaintenanceRate
-            })
-            .select()
-            .single();
+            });
 
         if (teamError) throw teamError;
-
-        // 2. Add members
-        if (memberIds.length > 0) {
-            const membersData = memberIds.map(userId => ({
-                team_id: team.id,
-                user_id: userId
-            }));
-
-            const { error: membersError } = await supabase
-                .from('team_members')
-                .insert(membersData);
-
-            if (membersError) throw membersError;
-        }
     },
 
     async updateTeam(
@@ -1257,14 +1370,32 @@ export const InstallationService = {
         fuelConsumption: number = 12,
         vehicleMaintenanceRate: number = 0
     ): Promise<void> {
-        // 1. Update team details
+        // Get installer details for members
+        const validMemberIds = memberIds.filter(mid => mid && typeof mid === 'string' && mid.trim() !== '');
+
+        let membersJson: any[] = [];
+        if (validMemberIds.length > 0) {
+            const { data: installers } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, hourly_rate')
+                .in('id', validMemberIds);
+
+            membersJson = (installers || []).map(inst => ({
+                id: inst.id,
+                firstName: inst.first_name || '',
+                lastName: inst.last_name || '',
+                hourlyRate: inst.hourly_rate || 0,
+                type: 'user'
+            }));
+        }
+
+        // Update installation_teams table (same table that getTeams reads from)
         const { error: teamError } = await supabase
-            .from('teams')
+            .from('installation_teams')
             .update({
                 name,
                 color,
-                tags,
-                notes,
+                members: membersJson,
                 is_active,
                 working_days: workingDays,
                 fuel_consumption: fuelConsumption,
@@ -1273,34 +1404,13 @@ export const InstallationService = {
             .eq('id', id);
 
         if (teamError) throw teamError;
-
-        // 2. Update members (delete all and re-insert)
-        // Transaction would be better but simple approach for now
-        const { error: deleteError } = await supabase
-            .from('team_members')
-            .delete()
-            .eq('team_id', id);
-
-        if (deleteError) throw deleteError;
-
-        if (memberIds.length > 0) {
-            const membersData = memberIds.map(userId => ({
-                team_id: id,
-                user_id: userId
-            }));
-
-            const { error: membersError } = await supabase
-                .from('team_members')
-                .insert(membersData);
-
-            if (membersError) throw membersError;
-        }
     },
 
     async deleteTeam(id: string): Promise<void> {
+        // Soft delete from installation_teams table
         const { error } = await supabase
-            .from('teams')
-            .delete()
+            .from('installation_teams')
+            .update({ is_active: false })
             .eq('id', id);
 
         if (error) throw error;
@@ -1411,6 +1521,139 @@ export const InstallationService = {
         if (error) throw error;
     },
 
+    async createInstallationFromContract(contractId: string, scheduledDate: string, teamId: string): Promise<Installation> {
+        let installation: Installation | null = null;
+
+        // 1. Try creating (this handles 'if not exists')
+        // Using bulkCreate logic to reuse object mapping and creation logic
+        const created = await this.bulkCreateInstallations([contractId]);
+
+        if (created.length > 0) {
+            installation = created[0];
+        } else {
+            // Already exists? Find it.
+            const { data: contract } = await supabase
+                .from('contracts')
+                .select('offer_id, id')
+                .eq('id', contractId)
+                .single();
+
+            if (contract?.offer_id) {
+                installation = await this.getInstallationByOfferId(contract.offer_id);
+            }
+            // If manual contract without offer
+            if (!installation) {
+                const { data: inst } = await supabase
+                    .from('installations')
+                    .select('*')
+                    .eq('source_id', contractId)
+                    .eq('source_type', 'contract')
+                    .single();
+
+                if (inst) {
+                    // Need to map raw DB row to Installation object. 
+                    // Simplest way is to fetch via getInstallations (but that fetches all). 
+                    // Or just use ID to fetch via getInstallationByOfferId logic (if refactored)
+                    // For now, let's assume getInstallationByOfferId handles offer_id.
+                    // If manual contract, we might need a direct fetch helper.
+                    // Let's use getInstallations filtered by ID in-memory or improve getInstallationByOfferId.
+                    // Optimization: Use getInstallationByOfferId if offer_id exists, else direct map.
+                    // But getInstallationByOfferId takes offerId.
+                    // Let's rely on bulkCreate returning empty ONLY if checkInstallationForContract returned true OR error.
+                    // bulkCreate uses checkInstallationForContract which uses offer_id.
+
+                    // If we are here, bulkCreate didn't create it.
+                    // Let's assume it exists.
+                    // We need the ID to update.
+                    installation = { id: inst.id } as Installation; // Minimal needed for update
+                }
+            }
+        }
+
+        if (!installation) throw new Error('Could not create or find installation for contract ' + contractId);
+
+        // 2. Update with schedule details
+        await this.updateInstallation(installation.id, {
+            scheduledDate,
+            teamId,
+            status: 'scheduled'
+        });
+
+        return installation;
+    },
+
+    async createInstallationFromServiceTicket(ticketId: string, scheduledDate: string, teamId: string): Promise<Installation> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // 1. Fetch Ticket
+        const { data: ticket, error: ticketError } = await supabase
+            .from('service_tickets')
+            .select('*, client:customers(*)')
+            .eq('id', ticketId)
+            .single();
+
+        if (ticketError || !ticket) throw new Error('Service ticket not found');
+
+        // Check if installation already exists for this ticket
+        if (ticket.installation_id) {
+            await this.updateInstallation(ticket.installation_id, {
+                scheduledDate,
+                teamId,
+                status: 'scheduled'
+            });
+            return { id: ticket.installation_id } as Installation;
+        }
+
+        // 2. Create Installation
+        const client = ticket.client || {};
+        const installationData = {
+            client: {
+                firstName: client.name?.split(' ')[0] || '',
+                lastName: client.name?.split(' ').slice(1).join(' ') || '',
+                city: client.city || '',
+                address: `${client.street || ''} ${client.houseNumber || ''}`.trim(),
+                phone: client.phone || '',
+                coordinates: undefined
+            },
+            productSummary: `Zgłoszenie: ${ticket.title || 'Serwis'}`,
+            teamId: teamId,
+            notes: ticket.description
+        };
+
+        const { data: newInst, error: insertError } = await supabase
+            .from('installations')
+            .insert({
+                user_id: user.id,
+                status: 'scheduled',
+                scheduled_date: scheduledDate,
+                team_id: teamId,
+                installation_data: installationData,
+                source_type: 'service',
+                source_id: ticket.id,
+                parts_ready: true // Service usually ready
+            })
+            .select()
+            .single();
+
+        if (insertError) throw insertError;
+
+        // 3. Link back to Ticket
+        await supabase
+            .from('service_tickets')
+            .update({
+                installation_id: newInst.id,
+                status: 'assigned'
+            })
+            .eq('id', ticket.id);
+
+        return {
+            id: newInst.id,
+            // ... minimal fields
+            createdAt: new Date(newInst.created_at)
+        } as Installation;
+    },
+
     async syncOrderItemsFromConfig(installationId: string, config: ProductConfig): Promise<void> {
         const existingItems = await this.getOrderItems(installationId);
         const existingNames = new Set(existingItems.map(i => i.name));
@@ -1491,5 +1734,13 @@ export const InstallationService = {
 
             if (error) console.error('Error syncing order items:', error);
         }
+    },
+    async deleteInstallation(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('installations')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     },
 };

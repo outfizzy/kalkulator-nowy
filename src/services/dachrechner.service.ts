@@ -139,6 +139,8 @@ export interface DachrechnerInputs {
     depth: number;    // C: Bestelltiefe [mm]
     h1?: number;      // D: Höhe Unterkante Wandprofil [mm]
     overhang?: number; // E: Dachüberstand [mm] (Ultraline only)
+    width?: number;   // Säulen Außen-Außen (Szerokość całkowita) [mm]
+    postCount?: number; // Anzahl Pfosten (Liczba słupów)
 }
 
 export interface DachrechnerResults {
@@ -178,6 +180,9 @@ export interface DachrechnerResults {
     // Wedge heights (Keilhöhe)
     keilhoeheK1: number | null;      // U: Keilhöhe Rinnenseite
     keilhoeheK2: number | null;      // V: Keilhöhe Hausseite
+
+    // Widths
+    innerWidth: number | null;       // Säulen Innen-Innen (Szerokość między słupami)
 }
 
 // Helper functions
@@ -721,6 +726,21 @@ function calcCarport(inputs: DachrechnerInputs, r: DachrechnerResults): Dachrech
     r.fensterF2 = r.depthD2alt;
     // W = S
     r.fensterF3 = r.fensterF1;
+
+    // Width Calculation (Standard 110mm Post)
+    if (inputs.width) {
+        const posts = inputs.postCount || 2;
+        const postWidth = 110; // Standard 110mm
+        // Inner Width = (Total - (Posts * PostWidth)) / (Posts - 1) gives spacing
+        // But usually user wants "Total Clearance" or "Spacing between posts"?
+        // "Szerokość w świetle" usually means spacing between two posts.
+        // If 3 posts, it's spacing between 1 and 2 (assuming equal).
+        if (posts > 1) {
+            r.innerWidth = (inputs.width - (posts * postWidth)) / (posts - 1);
+        } else {
+            r.innerWidth = inputs.width - postWidth; // Single post? Weird.
+        }
+    }
 
     return r;
 }

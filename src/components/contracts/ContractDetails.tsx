@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { generateInstallationProtocolPDF } from '../../utils/installationProtocolPDF';
-import { PhotoGallery } from '../PhotoGallery';
-import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
+// import { PhotoGallery } from '../PhotoGallery';
+// import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
 import type { Contract, ContractComment, ContractAttachment, User, Installation, InstallationTeam } from '../../types';
+import { StorageService } from '../../services/database/storage.service';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { InstallationService } from '../../services/database/installation.service';
@@ -12,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { OrderedItemsModule } from './OrderedItemsModule';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 import { InstallationStatusCard } from '../installations/InstallationStatusCard';
+import { ProjectMeasurementsList } from '../measurements/ProjectMeasurementsList';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -38,7 +40,7 @@ export const ContractDetails: React.FC = () => {
                 const found = contracts.find(c => c.id === id);
                 if (found) {
                     setContract(found);
-                    setPhotos(getOfferPhotos(found.offerId));
+                    // setPhotos(getOfferPhotos(found.offerId)); // Legacy photos removed
 
                     // Check for installation
                     const existingInstallation = await InstallationService.getInstallationByOfferId(found.offerId);
@@ -124,67 +126,70 @@ export const ContractDetails: React.FC = () => {
         }
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!contract || !e.target.files || e.target.files.length === 0) return;
+    const [isUploading, setIsUploading] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-        const file = e.target.files[0];
-        // Simulate file upload
-        const attachment: ContractAttachment = {
-            id: crypto.randomUUID(),
-            name: file.name,
-            url: URL.createObjectURL(file), // Temporary local URL
-            type: file.type.startsWith('image/') ? 'image' : 'document',
-            createdAt: new Date()
-        };
+    // Reuse StorageService for uploads
+    const uploadAttachment = async (file: File, type: 'document' | 'image') => {
+        if (!contract) return;
+        setIsUploading(true);
+        const toastId = toast.loading('Wgrywanie pliku...');
 
-        const updatedContract: Contract = {
-            ...contract,
-            attachments: [...contract.attachments, attachment]
-        };
-
-        setContract(updatedContract);
         try {
+            const path = `contracts/${contract.id}`;
+            const publicUrl = await StorageService.uploadFile(file, 'attachments', path);
+
+            const attachment: ContractAttachment = {
+                id: crypto.randomUUID(),
+                name: file.name,
+                url: publicUrl,
+                type: type,
+                createdAt: new Date()
+            };
+
+            const updatedContract: Contract = {
+                ...contract,
+                attachments: [...contract.attachments, attachment],
+                // If it's a signed contract PDF, strictly update status if needed
+                ...(file.name.toLowerCase().includes('podpisan') && type === 'document' ? { status: 'signed', signedAt: new Date() } : {})
+            };
+
+            setContract(updatedContract);
             await DatabaseService.updateContract(updatedContract.id, updatedContract);
-            toast.success('Dodano załącznik');
+
+            toast.success('Plik wgrany pomyślnie', { id: toastId });
         } catch (error) {
-            console.error('Error updating contract with attachment:', error);
-            toast.error('Błąd dodawania załącznika');
+            console.error('Upload error:', error);
+            toast.error('Błąd wgrywania pliku', { id: toastId });
+        } finally {
+            setIsUploading(false);
         }
     };
 
-    const handleSignedContractUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!contract || !e.target.files || e.target.files.length === 0) return;
-
+    const handleSignedContractUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
         const file = e.target.files[0];
         if (file.type !== 'application/pdf') {
-            toast.error('Tylko pliki PDF są dozwolone dla umowy');
+            toast.error('Tylko pliki PDF są dozwolone');
             return;
         }
+        // Rename file for clarity
+        const renamedFile = new File([file], `UMOWA-PODPISANA-${contract?.contractNumber.replace(/\//g, '-')}.pdf`, { type: file.type });
+        uploadAttachment(renamedFile, 'document');
+    };
 
-        // Simulate file upload - in real app upload to storage
-        const attachment: ContractAttachment = {
-            id: crypto.randomUUID(),
-            name: `UMOWA POPDISANA - ${file.name}`,
-            url: URL.createObjectURL(file), // Temporary local URL
-            type: 'document',
-            createdAt: new Date()
-        };
+    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        Array.from(e.target.files).forEach(file => {
+            if (!file.type.startsWith('image/')) return;
+            uploadAttachment(file, 'image');
+        });
+    };
 
-        const updatedContract: Contract = {
-            ...contract,
-            attachments: [...contract.attachments, attachment],
-            status: 'signed', // Auto-mark as signed when contract uploaded
-            signedAt: new Date() // Set signed date
-        };
-
-        setContract(updatedContract);
-        try {
-            await DatabaseService.updateContract(updatedContract.id, updatedContract);
-            toast.success('Wgrano podpisaną umowę');
-        } catch (error) {
-            console.error('Error updating contract with signed pdf:', error);
-            toast.error('Błąd zapisu');
-        }
+    const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        const file = e.target.files[0];
+        uploadAttachment(file, 'document');
     };
 
     const handlePlanInstallation = async () => {
@@ -486,6 +491,17 @@ export const ContractDetails: React.FC = () => {
                             </label>
                         </div>
                     </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <div className="mb-4">
+                            <h3 className="font-bold text-slate-800">Pomiary Techniczne</h3>
+                            <p className="text-xs text-slate-500">Pomiary z modułu Dachrechner</p>
+                        </div>
+                        <ProjectMeasurementsList
+                            customerId={contract.client.id}
+                            contractId={contract.id}
+                        />
+                    </div>
                 </div>
 
                 {/* Middle Column: Product & Financials */}
@@ -769,23 +785,100 @@ export const ContractDetails: React.FC = () => {
                                 </label>
                             </div>
 
-                            {/* Show uploaded signed contracts */}
-                            {contract.attachments.filter(a => a.name.includes('UMOWA') || a.name.includes('podpisan')).length > 0 && (
+                            {/* Measurement Photos Section */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="font-bold text-slate-700">Zdjęcia z Pomiaru / Montażu</h4>
+                                    <label className={`cursor-pointer px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            onChange={handlePhotoUpload}
+                                            disabled={isUploading}
+                                            className="hidden"
+                                        />
+                                        {isUploading ? 'Wgrywanie...' : '+ Dodaj Zdjęcia'}
+                                    </label>
+                                </div>
+
+                                {contract.attachments.filter(a => a.type === 'image').length > 0 ? (
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {contract.attachments.filter(a => a.type === 'image').map((photo, index) => {
+                                            const allImages = contract.attachments.filter(a => a.type === 'image');
+                                            const originalIndex = allImages.findIndex(img => img.id === photo.id);
+                                            return (
+                                                <div
+                                                    key={photo.id}
+                                                    className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group cursor-pointer"
+                                                    onClick={() => setLightboxIndex(originalIndex)}
+                                                >
+                                                    <img src={photo.url} alt={photo.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                        <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm">
+                                        Brak zdjęć. Kliknij "+ Dodaj Zdjęcia" aby wgrać.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Documents Section */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="font-bold text-slate-700">Dokumenty / Pliki</h4>
+                                    <label className={`cursor-pointer px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                                            onChange={handleDocumentUpload}
+                                            disabled={isUploading}
+                                            className="hidden"
+                                        />
+                                        {isUploading ? 'Wgrywanie...' : '+ Dodaj Plik'}
+                                    </label>
+                                </div>
+
                                 <div className="space-y-2">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Wgrane dokumenty:</h4>
-                                    {contract.attachments.filter(a => a.name.includes('UMOWA') || a.name.includes('podpisan')).map(att => (
-                                        <div key={att.id} className="flex items-center justify-between p-2 bg-green-50 border border-green-100 rounded text-green-800 text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                                <span className="truncate max-w-[180px]">{att.name}</span>
+                                    {contract.attachments.filter(a => a.type === 'document').length === 0 && (
+                                        <div className="text-center text-xs text-slate-400 italic">Brak dokumentów</div>
+                                    )}
+                                    {contract.attachments.filter(a => a.type === 'document').map(doc => (
+                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors group">
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <div className={`p-2 rounded-lg flex-shrink-0 ${doc.name.toLowerCase().includes('podpisan') ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="truncate">
+                                                    <div className="text-sm font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</div>
+                                                    <div className="text-[10px] text-slate-400">{new Date(doc.createdAt).toLocaleDateString()}</div>
+                                                </div>
                                             </div>
-                                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-green-700 underline text-xs font-bold">Pobierz</a>
+                                            <a
+                                                href={doc.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                title="Otwórz / Pobierz"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </a>
                                         </div>
                                     ))}
                                 </div>
-                            )}
+                            </div>
 
                             {/* Installation Status Card */}
                             <div className="pt-2 border-t border-slate-100">
@@ -823,88 +916,6 @@ export const ContractDetails: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                    {/* Photos Section */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-slate-800">Zdjęcia</h3>
-                            <label className="cursor-pointer text-accent hover:text-accent-dark text-sm font-bold flex items-center gap-1">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={(e) => {
-                                        const files = Array.from(e.target.files || []);
-                                        files.forEach(file => {
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                                const imageData = event.target?.result as string;
-                                                addOfferPhoto(contract.offerId, imageData);
-                                                setPhotos(getOfferPhotos(contract.offerId));
-                                            };
-                                            reader.readAsDataURL(file);
-                                        });
-                                        e.target.value = '';
-                                        toast.success('Dodano zdjęcia');
-                                    }}
-                                    className="hidden"
-                                />
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Dodaj
-                            </label>
-                        </div>
-                        <PhotoGallery
-                            photos={photos}
-                            onDelete={(index) => {
-                                removeOfferPhoto(contract.offerId, index);
-                                setPhotos(getOfferPhotos(contract.offerId));
-                                toast.success('Usunięto zdjęcie');
-                            }}
-                        />
-                    </div>
-
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-slate-800">Załączniki</h3>
-                            <label className="cursor-pointer text-accent hover:text-accent-dark text-sm font-bold flex items-center gap-1">
-                                <input type="file" className="hidden" onChange={handleFileUpload} />
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Dodaj
-                            </label>
-                        </div>
-                        <div className="space-y-2">
-                            {contract.attachments.length === 0 && (
-                                <div className="text-center text-slate-400 text-sm py-4">Brak załączników</div>
-                            )}
-                            {contract.attachments.map(att => (
-                                <div key={att.id} className="flex items-center gap-3 p-2 border rounded-lg hover:bg-slate-50 group">
-                                    <div className="w-8 h-8 bg-slate-100 rounded flex items-center justify-center text-slate-500">
-                                        {att.type === 'image' ? (
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        ) : (
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-slate-800 truncate">{att.name}</div>
-                                        <div className="text-xs text-slate-500">{new Date(att.createdAt).toLocaleDateString()}</div>
-                                    </div>
-                                    <a href={att.url} download={att.name} className="text-slate-400 hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -932,6 +943,61 @@ export const ContractDetails: React.FC = () => {
                     }}
                 />
             )}
-        </div >
+
+            {/* Lightbox Modal */}
+            {lightboxIndex !== null && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm"
+                    onClick={() => setLightboxIndex(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 text-white/50 hover:text-white p-2"
+                        onClick={() => setLightboxIndex(null)}
+                    >
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
+                    {/* Navigation Buttons */}
+                    <button
+                        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const images = contract.attachments.filter(a => a.type === 'image');
+                            setLightboxIndex((prev) => prev !== null ? (prev - 1 + images.length) % images.length : 0);
+                        }}
+                    >
+                        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+
+                    <button
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const images = contract.attachments.filter(a => a.type === 'image');
+                            setLightboxIndex((prev) => prev !== null ? (prev + 1) % images.length : 0);
+                        }}
+                    >
+                        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+
+                    <img
+                        src={contract.attachments.filter(a => a.type === 'image')[lightboxIndex].url}
+                        alt="Preview"
+                        className="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl rounded-sm"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
+                        {lightboxIndex + 1} / {contract.attachments.filter(a => a.type === 'image').length}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };

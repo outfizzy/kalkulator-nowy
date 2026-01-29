@@ -5,6 +5,7 @@ import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/off
 import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { DatabaseService } from '../../services/database';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
 import { SchedulerService, type ScheduleSuggestion } from '../../services/SchedulerService';
@@ -40,8 +41,25 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
 
     const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
     const [hasConflict, setHasConflict] = useState(false);
+    const [contractDetails, setContractDetails] = useState<any>(null);
 
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
+
+    useEffect(() => {
+        if (isOpen && installation.offerId) {
+            void (async () => {
+                const { data: contract } = await supabase.from('contracts').select('*, contract_data').eq('offer_id', installation.offerId).single();
+                const { data: offer } = await supabase.from('offers').select('*, orders(*)').eq('id', installation.offerId).single();
+
+                if (contract) {
+                    setContractDetails({
+                        ...contract,
+                        offerOrders: offer?.orders || []
+                    });
+                }
+            })();
+        }
+    }, [isOpen, installation.offerId]);
 
     useEffect(() => {
         if (isOpen) {
@@ -192,6 +210,22 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
             console.error('Error saving installation:', error);
             toast.error('Błąd zapisu');
         } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRestoreToBacklog = async () => {
+        if (readOnly) return;
+        if (!window.confirm('Czy na pewno chcesz usunąć z kalendarza? Instalacja wróci do listy umów/zleceń.')) return;
+        setSaving(true);
+        try {
+            await DatabaseService.deleteInstallation(installation.id);
+            toast.success('Przywrócono do listy');
+            onClose();
+            onUpdate();
+        } catch (e) {
+            console.error(e);
+            toast.error('Błąd usuwania');
             setSaving(false);
         }
     };
@@ -349,6 +383,13 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                     </div>
 
                     <div className="flex justify-end gap-3 mt-6">
+                        <button
+                            onClick={handleRestoreToBacklog}
+                            disabled={readOnly || saving}
+                            className="mr-auto px-4 py-2 text-red-600 font-medium hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                        >
+                            Usuń z kalendarza
+                        </button>
                         <button
                             onClick={onClose}
                             className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
@@ -549,6 +590,15 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                     />
                                 </div>
                                 <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Kod Pocztowy</label>
+                                    <input
+                                        type="text"
+                                        value={formData.client?.postalCode || ''}
+                                        onChange={(e) => handleClientChange('postalCode', e.target.value)}
+                                        className="w-full p-1 border border-slate-300 rounded text-sm"
+                                    />
+                                </div>
+                                <div>
                                     <label className="block text-xs text-slate-500 mb-1">Miasto</label>
                                     <input
                                         type="text"
@@ -564,7 +614,98 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             </div>
                         </div>
 
+                        {/* Contract Details Section */}
+                        {contractDetails && (
+                            <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                                <h4 className="font-bold text-slate-700 mb-3 text-sm border-b pb-2">Szczegóły Umowy</h4>
+                                <div className="space-y-3 text-sm">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">Numer umowy</span>
+                                            <span className="font-medium text-slate-800">
+                                                {contractDetails.contract_number || contractDetails.contract_data?.contractNumber || 'Brak'}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">Data podpisania</span>
+                                            <span className="font-medium text-slate-800">
+                                                {contractDetails.signed_at ? new Date(contractDetails.signed_at).toLocaleDateString('pl-PL') : '-'}
+                                            </span>
+                                        </div>
+                                    </div>
 
+                                    {/* Client Data from Contract (readonly reference) */}
+                                    <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 mt-2">
+                                        <div className="col-span-2">
+                                            <span className="text-xs text-slate-500 block font-semibold">Dane klienta z umowy:</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">Klient</span>
+                                            <span className="text-sm text-slate-700">
+                                                {contractDetails.contract_data?.client?.firstName} {contractDetails.contract_data?.client?.lastName}
+                                                {contractDetails.contract_data?.customer?.firstName} {contractDetails.contract_data?.customer?.lastName}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">Adres</span>
+                                            <span className="text-sm text-slate-700">
+                                                {contractDetails.contract_data?.client?.address || contractDetails.contract_data?.customer?.address || '-'}
+                                                {/* Postal Code / City */}
+                                                {(contractDetails.contract_data?.client?.city || contractDetails.contract_data?.client?.postalCode) &&
+                                                    `, ${contractDetails.contract_data?.client?.postalCode || ''} ${contractDetails.contract_data?.client?.city || ''}`}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">Telefon</span>
+                                            <span className="text-sm text-slate-700">
+                                                {contractDetails.contract_data?.client?.phone || contractDetails.contract_data?.customer?.phone || '-'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Supply Status */}
+                                    <div className="bg-slate-50 p-3 rounded text-xs border border-slate-100">
+                                        <div className="font-semibold text-slate-700 mb-2 uppercase tracking-wide">Status Materiałów</div>
+                                        {contractDetails.offerOrders?.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {contractDetails.offerOrders.map((o: any) => (
+                                                    <div key={o.id} className="flex flex-col gap-1 bg-white p-2 border border-slate-200 rounded">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="font-bold text-slate-800">{o.order_number || 'Zamówienie'}</span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${o.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                                                o.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-slate-100 text-slate-500'
+                                                                }`}>
+                                                                {o.status === 'delivered' ? 'Dostarczono' :
+                                                                    o.status === 'ordered' ? 'Zamówiono' : o.status}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between text-slate-500">
+                                                            <span>{o.items_summary || 'Materiał'}</span>
+                                                            {(o.delivery_date || o.planned_delivery_date) && (
+                                                                <span>Dostawa: {new Date(o.delivery_date || o.planned_delivery_date).toLocaleDateString('pl-PL')}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-slate-400 italic">Brak powiązanych zamówień.</div>
+                                        )}
+                                    </div>
+
+                                    {/* Comments */}
+                                    {contractDetails.contract_data?.comments?.length > 0 && (
+                                        <div className="mt-2 text-xs">
+                                            <span className="text-slate-500 block mb-1">Uwagi z umowy:</span>
+                                            <div className="bg-yellow-50 p-2 rounded text-slate-700 border border-yellow-100 italic">
+                                                {contractDetails.contract_data.comments[0].text}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Notes */}
                         <div>

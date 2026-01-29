@@ -125,22 +125,25 @@ export const OfferService = {
         // [GUARDRAILS] Check Margin for Sales Reps
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, commission_rate')
             .eq('id', user.id)
             .single();
 
         if (profile?.role === 'sales_rep') {
-            // Margin Percentage comes as 30.0 (percent) or 0.30 (decimal)?
-            // normalizePricing usually ensures standard format.
-            // In pricing.ts calculatePrice returns { marginPercentage: 30 } (percent value).
-            // Let's verify format.
-            // `pricing.ts`: marginPercentage: marginPercentage * 100
-            // So it stores 30, 40, etc.
-
             const margin = offer.pricing.marginPercentage;
             if (margin < 30) {
                 throw new Error('MarginGuard: Nie można utworzyć oferty z marżą poniżej 30% (Polityka firmy).');
             }
+        }
+
+        // [AUTOMATION] Calculate Commission for Sales Reps
+        let calculatedCommission = offer.commission;
+        if (profile?.commission_rate && profile.commission_rate > 0) {
+            // Commission = Net Price * Rate (e.g. 0.05)
+            // Ensure sellingPriceNet exists and is correct relative to totalCost
+            const netPrice = offer.pricing.sellingPriceNet || (offer.pricing.totalCost / 1.23); // Fallback to 23% VAT reverse if net missing
+            calculatedCommission = Math.round(netPrice * profile.commission_rate * 100) / 100;
+            console.log(`[Commission] Auto-calculated: ${calculatedCommission} (${profile.commission_rate * 100}% of ${netPrice})`);
         }
 
         // Ensure customer exists in customers table
@@ -178,7 +181,7 @@ export const OfferService = {
                 pricing: offer.pricing,
                 status: offer.status,
                 snow_zone: offer.snowZone,
-                commission: offer.commission,
+                commission: calculatedCommission,
                 margin_percentage: offer.pricing.marginPercentage
             })
             .select()
@@ -279,7 +282,7 @@ export const OfferService = {
             if (user) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('role')
+                    .select('role, commission_rate')
                     .eq('id', user.id)
                     .single();
 
@@ -290,6 +293,12 @@ export const OfferService = {
                     // Let's assume updates.pricing is the FULL pricing object if present.
                     if (typeof margin === 'number' && margin < 30) {
                         throw new Error('MarginGuard: Nie można zaktualizować oferty z marżą poniżej 30% (Polityka firmy).');
+                    }
+
+                    // [AUTOMATION] Recalculate Commission on Pricing Change
+                    if (profile.commission_rate && profile.commission_rate > 0) {
+                        const netPrice = updates.pricing.sellingPriceNet || (updates.pricing.totalCost / 1.23);
+                        updates.commission = Math.round(netPrice * profile.commission_rate * 100) / 100;
                     }
                 }
             }

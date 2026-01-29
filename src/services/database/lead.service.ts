@@ -160,7 +160,8 @@ export const LeadService = {
 
                         // --- Phase 3: Automation (Welcome Email) ---
                         // Trigger only if we have customer data and a new specific assignee
-                        await this.sendWelcomeEmail(id, updates.assignedTo, leadData.customer_id);
+                        // [Disabled by user request 2026-01-29]
+                        // await this.sendWelcomeEmail(id, updates.assignedTo, leadData.customer_id);
                     }
                 }
             } catch (err) {

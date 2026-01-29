@@ -92,13 +92,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('*'); // Admin has all permissions
         } else if (role === 'manager') {
             rolePermissions.add('dashboard');
-            rolePermissions.add('offers');
-            rolePermissions.add('customers');
-            rolePermissions.add('leads');
+            rolePermissions.add('offers_list');
+            rolePermissions.add('offers_create');
+            rolePermissions.add('crm_clients');
+            rolePermissions.add('crm_leads');
+            rolePermissions.add('crm_tasks');
+            rolePermissions.add('crm_mail');
+            rolePermissions.add('contracts_list');
         } else if (role === 'sales_rep') {
             rolePermissions.add('dashboard');
-            rolePermissions.add('offers');
-            rolePermissions.add('leads');
+            rolePermissions.add('offers_list');
+            rolePermissions.add('offers_create');
+            rolePermissions.add('crm_leads');
+            rolePermissions.add('crm_clients');
+            rolePermissions.add('contracts_list');
         }
 
         setPermissions(rolePermissions);

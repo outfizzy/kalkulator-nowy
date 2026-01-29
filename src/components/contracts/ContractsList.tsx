@@ -248,7 +248,7 @@ export const ContractsList: React.FC = () => {
                                                 {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">
-                                                {contract.commission.toFixed(2)} EUR
+                                                {(contract.commission || 0).toFixed(2)} EUR
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <button

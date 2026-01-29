@@ -241,6 +241,7 @@ export interface SelectedAddon {
     attributes?: Record<string, unknown>; // For multilingual names (name_pl, name_de)
     pricing_basis?: 'FIXED' | 'MATRIX';
     properties?: Record<string, any>; // For matrix calculation metadata
+}
 
 export interface ProductConfig {
     modelId: string; // e.g., "trendstyle"
@@ -796,6 +797,35 @@ export interface DeletedWalletTransaction extends WalletTransaction {
     deletionReason: string;
     deletedBy: string;
     deletedAt: Date;
+}
+
+// --- Project Measurements (Dachrechner) ---
+
+export interface ProjectMeasurement {
+    id: string;
+    name: string;
+    customerId?: string;
+    contractId?: string;
+    status: 'draft' | 'final';
+
+    // Calculator State
+    modelId: string;
+    inputs: Record<string, number>;
+    results?: Record<string, number | null>; // Partial results
+    dimensionOptions?: Record<string, boolean>;
+
+    images?: { url: string; caption?: string }[];
+    notes?: string;
+
+    createdBy: string;
+    createdAt: Date;
+    updatedAt: Date;
+
+    // Joined data
+    creator?: {
+        firstName: string;
+        lastName: string;
+    };
 }
 
 
