@@ -9,7 +9,8 @@ import {
     type DachrechnerResults
 } from '../../services/dachrechner.service';
 import { DachrechnerDiagram } from '../dachrechner/DachrechnerDiagram';
-import { ProjectMeasurement } from '../../types';
+import { ProjectMeasurement, SiteDetails } from '../../types';
+import { Camera, ChevronRight, ClipboardList, PenTool } from 'lucide-react';
 
 // Dimension display options
 interface DimensionOptions {
@@ -30,6 +31,7 @@ interface MeasurementCalculatorProps {
         inputs: DachrechnerInputs;
         results: DachrechnerResults;
         dimensionOptions: DimensionOptions;
+        siteDetails: SiteDetails;
         notes?: string;
     }) => Promise<void>;
     readOnly?: boolean;
@@ -62,6 +64,9 @@ export const MeasurementCalculator: React.FC<MeasurementCalculatorProps> = ({ in
         showPostDimensions: true,
     });
 
+    const [siteDetails, setSiteDetails] = useState<SiteDetails>(initialData?.siteDetails || {});
+    const [activeTab, setActiveTab] = useState<'calc' | 'survey'>('calc');
+
     const [isSaving, setIsSaving] = useState(false);
 
     const modelOptions = useMemo(() => getModelOptions(), []);
@@ -92,6 +97,7 @@ export const MeasurementCalculator: React.FC<MeasurementCalculatorProps> = ({ in
                 inputs,
                 results,
                 dimensionOptions: dimOptions,
+                siteDetails,
                 notes
             });
         } finally {
@@ -146,115 +152,268 @@ export const MeasurementCalculator: React.FC<MeasurementCalculatorProps> = ({ in
                 </div>
             </div>
 
-            {/* Model Selector */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 transition-all">
-                <label className="block text-sm font-bold text-slate-700 mb-3">Wybierz Model Dachu</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                    {modelOptions.map(opt => (
-                        <button
-                            key={opt.id}
-                            onClick={() => !readOnly && setSelectedModel(opt.id)}
-                            disabled={readOnly}
-                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-center border ${selectedModel === opt.id
-                                ? 'bg-blue-600 text-white shadow-md border-blue-600'
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                                } ${readOnly ? 'cursor-default opacity-80' : ''}`}
-                        >
-                            {opt.name}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Calculations Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                {/* Left Column: Inputs & Toggles */}
-                <div className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-100 rounded-bl-full -mr-10 -mt-10 opacity-50"></div>
-                        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 relative z-10">
-                            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                            Wymiary (mm)
-                        </h2>
-
-                        <div className="space-y-4 relative z-10">
-                            {requiredInputs.includes('h3') && (
-                                <InputField label="H3 - Rinne" sublabel="Wysokość rynny" value={inputs.h3 || ''} onChange={v => handleInputChange('h3', v)} readOnly={readOnly} />
-                            )}
-                            <InputField label="Bestelltiefe" sublabel="Głębokość (D)" value={inputs.depth || ''} onChange={v => handleInputChange('depth', v)} readOnly={readOnly} />
-
-                            {/* Width Inputs */}
-                            <InputField label="Szerokość całk." sublabel="Systembreite" value={inputs.width || ''} onChange={v => handleInputChange('width', v)} readOnly={readOnly} />
-                            <InputField label="Liczba słupów" sublabel="Ilość (Pfosten)" value={inputs.postCount || ''} onChange={v => handleInputChange('postCount', v)} readOnly={readOnly} />
-                            {requiredInputs.includes('h1') && (
-                                <InputField label="H1 - Wandprofil" sublabel="Wysokość przy ścianie" value={inputs.h1 || ''} onChange={v => handleInputChange('h1', v)} readOnly={readOnly} />
-                            )}
-                            {requiredInputs.includes('overhang') && (
-                                <InputField label="U1 - Überstand" sublabel="Wysunięcie dachu" value={inputs.overhang || ''} onChange={v => handleInputChange('overhang', v)} readOnly={readOnly} />
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Dimension Display Toggles */}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                            Widoczność Wymiarów
-                        </h2>
-                        <div className="space-y-2">
-                            <ToggleBtn active={dimOptions.showHeights} onClick={() => toggleOption('showHeights')} label="Wysokości (H)" color="purple" />
-                            <ToggleBtn active={dimOptions.showDepths} onClick={() => toggleOption('showDepths')} label="Głębokości (D)" color="cyan" />
-                            <ToggleBtn active={dimOptions.showPostDimensions} onClick={() => toggleOption('showPostDimensions')} label="Słupy (D)" color="blue" />
-                            <ToggleBtn active={dimOptions.showRafters} onClick={() => toggleOption('showRafters')} label="Krokwie (S)" color="orange" />
-                            <ToggleBtn active={dimOptions.showWindows} onClick={() => toggleOption('showWindows')} label="Okna (F)" color="teal" />
-                            <ToggleBtn active={dimOptions.showWedges} onClick={() => toggleOption('showWedges')} label="Kliny (K)" color="amber" />
-                            <ToggleBtn active={dimOptions.showAngles} onClick={() => toggleOption('showAngles')} label="Kąty" color="red" />
-                        </div>
+            {/* Model Selector - Only show in Calc Tab */}
+            {activeTab === 'calc' && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 transition-all">
+                    <label className="block text-sm font-bold text-slate-700 mb-3">Wybierz Model Dachu</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                        {modelOptions.map(opt => (
+                            <button
+                                key={opt.id}
+                                onClick={() => !readOnly && setSelectedModel(opt.id)}
+                                disabled={readOnly}
+                                className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-center border ${selectedModel === opt.id
+                                    ? 'bg-blue-600 text-white shadow-md border-blue-600'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                    } ${readOnly ? 'cursor-default opacity-80' : ''}`}
+                            >
+                                {opt.name}
+                            </button>
+                        ))}
                     </div>
                 </div>
+            )}
 
-                {/* Right Column: Visualization */}
-                <div className="xl:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-slate-800">Wizualizacja Techniczna</h2>
-                        <div className="flex bg-slate-100 p-1 rounded-lg">
-                            <button
-                                onClick={() => setView('side')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'side'
-                                    ? 'bg-white text-slate-800 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                Widok z Boku
-                            </button>
-                            <button
-                                onClick={() => setView('front')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'front'
-                                    ? 'bg-white text-slate-800 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                Widok z Frontu
-                            </button>
+            {/* Calculations Grid OR Survey Form */}
+            {activeTab === 'calc' ? (
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                    {/* Left Column: Inputs & Toggles */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-100 rounded-bl-full -mr-10 -mt-10 opacity-50"></div>
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 relative z-10">
+                                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                Wymiary (mm)
+                            </h2>
+
+                            <div className="space-y-4 relative z-10">
+                                {requiredInputs.includes('h3') && (
+                                    <InputField label="H3 - Rinne" sublabel="Wysokość rynny" value={inputs.h3 || ''} onChange={v => handleInputChange('h3', v)} readOnly={readOnly} />
+                                )}
+                                <InputField label="Bestelltiefe" sublabel="Głębokość (D)" value={inputs.depth || ''} onChange={v => handleInputChange('depth', v)} readOnly={readOnly} />
+
+                                {/* Width Inputs */}
+                                <InputField label="Szerokość całk." sublabel="Systembreite" value={inputs.width || ''} onChange={v => handleInputChange('width', v)} readOnly={readOnly} />
+                                <InputField label="Liczba słupów" sublabel="Ilość (Pfosten)" value={inputs.postCount || ''} onChange={v => handleInputChange('postCount', v)} readOnly={readOnly} />
+                                {requiredInputs.includes('h1') && (
+                                    <InputField label="H1 - Wandprofil" sublabel="Wysokość przy ścianie" value={inputs.h1 || ''} onChange={v => handleInputChange('h1', v)} readOnly={readOnly} />
+                                )}
+                                {requiredInputs.includes('overhang') && (
+                                    <InputField label="U1 - Überstand" sublabel="Wysunięcie dachu" value={inputs.overhang || ''} onChange={v => handleInputChange('overhang', v)} readOnly={readOnly} />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Dimension Display Toggles */}
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                                Widoczność Wymiarów
+                            </h2>
+                            <div className="space-y-2">
+                                <ToggleBtn active={dimOptions.showHeights} onClick={() => toggleOption('showHeights')} label="Wysokości (H)" color="purple" />
+                                <ToggleBtn active={dimOptions.showDepths} onClick={() => toggleOption('showDepths')} label="Głębokości (D)" color="cyan" />
+                                <ToggleBtn active={dimOptions.showPostDimensions} onClick={() => toggleOption('showPostDimensions')} label="Słupy (D)" color="blue" />
+                                <ToggleBtn active={dimOptions.showRafters} onClick={() => toggleOption('showRafters')} label="Krokwie (S)" color="orange" />
+                                <ToggleBtn active={dimOptions.showWindows} onClick={() => toggleOption('showWindows')} label="Okna (F)" color="teal" />
+                                <ToggleBtn active={dimOptions.showWedges} onClick={() => toggleOption('showWedges')} label="Kliny (K)" color="amber" />
+                                <ToggleBtn active={dimOptions.showAngles} onClick={() => toggleOption('showAngles')} label="Kąty" color="red" />
+                            </div>
                         </div>
                     </div>
-                    <div className="bg-slate-50/50 rounded-xl p-4 flex-1 min-h-[500px] flex items-center justify-center border border-slate-100 relative group">
-                        <DachrechnerDiagram
-                            modelId={selectedModel}
-                            inputs={inputs}
-                            results={results}
-                            options={dimOptions}
-                            view={view}
+
+                    {/* Right Column: Visualization */}
+                    <div className="xl:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold text-slate-800">Wizualizacja Techniczna</h2>
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => setView('side')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'side'
+                                        ? 'bg-white text-slate-800 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Widok z Boku
+                                </button>
+                                <button
+                                    onClick={() => setView('front')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'front'
+                                        ? 'bg-white text-slate-800 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Widok z Frontu
+                                </button>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50/50 rounded-xl p-4 flex-1 min-h-[500px] flex items-center justify-center border border-slate-100 relative group">
+                            <DachrechnerDiagram
+                                modelId={selectedModel}
+                                inputs={inputs}
+                                results={results}
+                                options={dimOptions}
+                                view={view}
+                            />
+                            <div className="absolute bottom-4 right-4 text-xs text-slate-300 pointer-events-none opacity-50">
+                                Generated by OfferApp
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                // --- SURVEY TAB ---
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {/* 1. Ground & Foundation */}
+                    <SurveySection title="1. Podłoże i Fundamenty" icon={<div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">1</div>}>
+                        <SelectField
+                            label="Rodzaj podłoża"
+                            value={siteDetails.groundType || ''}
+                            onChange={v => setSiteDetails(p => ({ ...p, groundType: v as any }))}
+                            options={[
+                                { label: 'Wybierz...', value: '' },
+                                { label: 'Wylewka betonowa', value: 'concrete' },
+                                { label: 'Kostka brukowa', value: 'paving_stones' },
+                                { label: 'Trawnik / Grunt', value: 'grass' },
+                                { label: 'Taras wentylowany', value: 'terrace' },
+                                { label: 'Inne', value: 'other' },
+                            ]}
+                            readOnly={readOnly}
                         />
-                        <div className="absolute bottom-4 right-4 text-xs text-slate-300 pointer-events-none opacity-50">
-                            Generated by OfferApp
+                        {siteDetails.groundType === 'other' && (
+                            <TextField label="Jakie inne?" value={siteDetails.groundTypeOther || ''} onChange={v => setSiteDetails(p => ({ ...p, groundTypeOther: v }))} readOnly={readOnly} />
+                        )}
+
+                        <div className="border-t border-slate-100 pt-4"></div>
+                        <SelectField
+                            label="Istniejące stopy fundamentowe"
+                            value={siteDetails.hasFoundation || ''}
+                            onChange={v => setSiteDetails(p => ({ ...p, hasFoundation: v as any }))}
+                            options={[
+                                { label: 'Wybierz...', value: '' },
+                                { label: 'Tak - gotowe', value: 'yes' },
+                                { label: 'Nie', value: 'no' },
+                                { label: 'Do wykonania przez nas', value: 'to_do' },
+                            ]}
+                            readOnly={readOnly}
+                        />
+
+                        <div className="border-t border-slate-100 pt-4"></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <InputField label="Spadek L-P" sublabel="Lewa-Prawa" value={siteDetails.slopeLeftRight || ''} onChange={v => setSiteDetails(p => ({ ...p, slopeLeftRight: parseFloat(v) }))} readOnly={readOnly} />
+                            <InputField label="Spadek Ś-O" sublabel="Ściana-Ogród" value={siteDetails.slopeFrontBack || ''} onChange={v => setSiteDetails(p => ({ ...p, slopeFrontBack: parseFloat(v) }))} readOnly={readOnly} />
                         </div>
+                    </SurveySection>
+
+                    {/* 2. Wall Construction */}
+                    <SurveySection title="2. Montaż do ściany" icon={<div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">2</div>}>
+                        <SelectField
+                            label="Rodzaj ściany"
+                            value={siteDetails.wallType || ''}
+                            onChange={v => setSiteDetails(p => ({ ...p, wallType: v as any }))}
+                            options={[
+                                { label: 'Wybierz...', value: '' },
+                                { label: 'Beton', value: 'concrete' },
+                                { label: 'Cegła pełna', value: 'brick' },
+                                { label: 'Porotherm / Pustak', value: 'porotherm' },
+                                { label: 'Gazobeton (Ytong)', value: 'ytong' },
+                                { label: 'Drewno', value: 'wood' },
+                                { label: 'Inne', value: 'other' },
+                            ]}
+                            readOnly={readOnly}
+                        />
+
+                        <div className="border-t border-slate-100 pt-4"></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <SelectField
+                                label="Ocieplenie"
+                                value={siteDetails.insulationType || ''}
+                                onChange={v => setSiteDetails(p => ({ ...p, insulationType: v as any }))}
+                                options={[
+                                    { label: 'Brak', value: 'none' },
+                                    { label: 'Styropian', value: 'styrofoam' },
+                                    { label: 'Wełna', value: 'wool' },
+                                ]}
+                                readOnly={readOnly}
+                            />
+                            {siteDetails.insulationType !== 'none' && (
+                                <InputField label="Grubość" sublabel="mm" value={siteDetails.insulationThickness || ''} onChange={v => setSiteDetails(p => ({ ...p, insulationThickness: parseFloat(v) }))} readOnly={readOnly} />
+                            )}
+                        </div>
+
+                        <div className="border-t border-slate-100 pt-4"></div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Przeszkody na ścianie</label>
+                        <textarea
+                            value={siteDetails.wallObstacles || ''}
+                            onChange={e => setSiteDetails(p => ({ ...p, wallObstacles: e.target.value }))}
+                            className="w-full border-slate-200 rounded-lg text-sm p-3 focus:ring-2 focus:ring-blue-100 placeholder-slate-300"
+                            placeholder="Np. rynny spustowe, gniazdka, oświetlenie, rolety..."
+                            rows={3}
+                            disabled={readOnly}
+                        />
+                    </SurveySection>
+
+                    {/* 3. Logistics */}
+                    <SurveySection title="3. Logistyka i Dostęp" icon={<div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-bold">3</div>}>
+                        <SelectField
+                            label="Dojście na montaż"
+                            value={siteDetails.accessType || ''}
+                            onChange={v => setSiteDetails(p => ({ ...p, accessType: v as any }))}
+                            options={[
+                                { label: 'Wybierz...', value: '' },
+                                { label: 'Swobodne (ogród)', value: 'free' },
+                                { label: 'Przez dom', value: 'house' },
+                                { label: 'Wąskie przejście', value: 'narrow' },
+                                { label: 'Schody', value: 'stairs' },
+                                { label: 'Winda (apartament)', value: 'elevator' },
+                            ]}
+                            readOnly={readOnly}
+                        />
+
+                        <SelectField
+                            label="Miejsce montażu"
+                            value={siteDetails.installationFloor || ''}
+                            onChange={v => setSiteDetails(p => ({ ...p, installationFloor: v as any }))}
+                            options={[
+                                { label: 'Parter', value: 'ground' },
+                                { label: 'Balkon', value: 'balcony' },
+                                { label: 'Taras na dachu', value: 'roof' },
+                            ]}
+                            readOnly={readOnly}
+                        />
+
+                        <div className="border-t border-slate-100 pt-4"></div>
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-slate-700">Dostęp do prądu (230V)</label>
+                            <input
+                                type="checkbox"
+                                checked={siteDetails.hasPower || false}
+                                onChange={e => setSiteDetails(p => ({ ...p, hasPower: e.target.checked }))}
+                                className="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
+                                disabled={readOnly}
+                            />
+                        </div>
+                        {!siteDetails.hasPower && (
+                            <InputField label="Ile metrów kabla?" sublabel="Wymagany przedłużacz" value={siteDetails.cablesLengthIfNeeded || ''} onChange={v => setSiteDetails(p => ({ ...p, cablesLengthIfNeeded: parseFloat(v) }))} readOnly={readOnly} />
+                        )}
+                    </SurveySection>
+
+                    {/* 4. Photos Placeholder */}
+                    <div className="md:col-span-2 xl:col-span-3 bg-white rounded-2xl border border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+                            <Camera className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">Zdjęcia z Pomiaru</h3>
+                        <p className="text-sm text-slate-500 max-w-sm mb-6">Dodaj zdjęcia obecnego stanu, detali montażowych, przeszkód oraz podłoża.</p>
+                        <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium py-2 px-6 rounded-lg shadow-sm transition-all" disabled>
+                            Dodaj Zdjęcia (Wkrótce)
+                        </button>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Results Panel */}
-            {results && (
+            {/* Results Panel - only in Calc tab */}
+            {activeTab === 'calc' && results && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Construction Dimensions */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -358,7 +517,6 @@ export const MeasurementCalculator: React.FC<MeasurementCalculatorProps> = ({ in
         </div>
     );
 };
-
 
 // ===== Component Helpers =====
 
@@ -467,3 +625,44 @@ const ResultRow: React.FC<ResultRowProps> = ({ label, value, show, highlight }) 
         </div>
     );
 };
+
+const SurveySection = ({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) => (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-6">
+            {icon}
+            <h3 className="font-bold text-slate-800 text-lg">{title}</h3>
+        </div>
+        <div className="space-y-4">
+            {children}
+        </div>
+    </div>
+);
+
+const SelectField = ({ label, value, onChange, options, readOnly }: { label: string, value: string, onChange: (v: string) => void, options: { label: string, value: string }[], readOnly?: boolean }) => (
+    <div>
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label>
+        <select
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            disabled={readOnly}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 outline-none transition-all appearance-none"
+        >
+            {options.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+        </select>
+    </div>
+);
+
+const TextField = ({ label, value, onChange, readOnly }: { label: string, value: string, onChange: (v: string) => void, readOnly?: boolean }) => (
+    <div>
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label>
+        <input
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            disabled={readOnly}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 outline-none transition-all"
+        />
+    </div>
+);

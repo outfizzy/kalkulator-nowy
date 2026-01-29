@@ -801,6 +801,28 @@ export interface DeletedWalletTransaction extends WalletTransaction {
 
 // --- Project Measurements (Dachrechner) ---
 
+export interface SiteDetails {
+    // 1. Ground & Foundation
+    groundType?: 'concrete' | 'paving_stones' | 'grass' | 'terrace' | 'other';
+    groundTypeOther?: string;
+    hasFoundation?: 'yes' | 'no' | 'to_do';
+    slopeLeftRight?: number; // mm
+    slopeFrontBack?: number; // mm
+
+    // 2. Wall
+    wallType?: 'concrete' | 'brick' | 'porotherm' | 'ytong' | 'wood' | 'other';
+    wallTypeOther?: string;
+    insulationThickness?: number; // mm
+    insulationType?: 'styrofoam' | 'wool' | 'none';
+    wallObstacles?: string; // Text description
+
+    // 3. Logistics
+    accessType?: 'free' | 'house' | 'narrow' | 'stairs' | 'elevator';
+    installationFloor?: 'ground' | 'balcony' | 'roof';
+    hasPower?: boolean;
+    cablesLengthIfNeeded?: number; // meters
+}
+
 export interface ProjectMeasurement {
     id: string;
     name: string;
@@ -814,6 +836,8 @@ export interface ProjectMeasurement {
     results?: Record<string, number | null>; // Partial results
     dimensionOptions?: Record<string, boolean>;
 
+    // Site Survey
+    siteDetails?: SiteDetails;
     images?: { url: string; caption?: string }[];
     notes?: string;
 

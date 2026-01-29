@@ -59,6 +59,7 @@ export const ProjectMeasurementService = {
                 inputs: measurement.inputs,
                 results: measurement.results,
                 dimension_options: measurement.dimensionOptions,
+                site_details: measurement.siteDetails,
                 images: measurement.images || [],
                 notes: measurement.notes,
                 created_by: user.id
@@ -77,7 +78,9 @@ export const ProjectMeasurementService = {
         if (updates.modelId) dbUpdates.model_id = updates.modelId;
         if (updates.inputs) dbUpdates.inputs = updates.inputs;
         if (updates.results) dbUpdates.results = updates.results;
+
         if (updates.dimensionOptions) dbUpdates.dimension_options = updates.dimensionOptions;
+        if (updates.siteDetails) dbUpdates.site_details = updates.siteDetails;
         if (updates.images) dbUpdates.images = updates.images;
         if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
 
@@ -114,7 +117,9 @@ function mapMeasurement(row: any): ProjectMeasurement {
         modelId: row.model_id,
         inputs: row.inputs,
         results: row.results,
+
         dimensionOptions: row.dimension_options,
+        siteDetails: row.site_details,
         images: row.images || [],
         notes: row.notes,
         createdBy: row.created_by,
