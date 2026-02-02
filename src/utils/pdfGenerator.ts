@@ -428,10 +428,10 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 6;
 
-    // Check Page Break for Bottom Block - reduced from 110 to 100 for tighter fit
-    if (y > pageHeight - 100) {
+    // Check Page Break for Bottom Block - need ~85mm for bottom content + ~25mm for footer
+    if (y > pageHeight - 85) {
         doc.addPage();
         drawHeader();
         y = 50;
@@ -440,47 +440,48 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // 5. SPLIT SECTION: CONTACT CARD (Left) vs TOTALS (Right)
     const midPoint = pageWidth / 2;
 
-    // --- LEFT: SALES REP CARD (IMPROVED) ---
-    // Floating style card
+    // --- LEFT: SALES REP CARD (COMPACT) ---
     const cardY = y;
+    const cardHeight = 35;
 
     doc.setDrawColor(...THEME.line);
     doc.setLineWidth(0.1);
-    doc.rect(MARGIN, cardY, 80, 45); // Border
+    doc.rect(MARGIN, cardY, 75, cardHeight);
 
     // Top strip
     doc.setFillColor(...THEME.primary);
-    doc.rect(MARGIN, cardY, 80, 8, 'F');
+    doc.rect(MARGIN, cardY, 75, 6, 'F');
     doc.setTextColor(...THEME.white);
-    doc.setFontSize(8);
+    doc.setFontSize(6);
     doc.setFont(FONTS.bold, 'bold');
-    doc.text('IHR PERSOENLICHER ANSPRECHPARTNER', MARGIN + 4, cardY + 5);
+    doc.text('IHR PERSOENLICHER ANSPRECHPARTNER', MARGIN + 3, cardY + 4);
 
-    // Photo Placeholder (Circle) or just Initials if no photo
+    // Initials circle
     doc.setFillColor(...THEME.surface);
-    doc.circle(MARGIN + 12, cardY + 22, 6, 'F');
+    doc.circle(MARGIN + 10, cardY + 18, 5, 'F');
     doc.setTextColor(...THEME.secondary);
     const initials = repName.split(' ').map(n => n[0]).join('').substring(0, 2);
-    doc.setFontSize(9);
-    doc.text(initials, MARGIN + 12, cardY + 23, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text(initials, MARGIN + 10, cardY + 19, { align: 'center' });
 
     // Info
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(...THEME.primary);
-    doc.text(sanitizeText(repName), MARGIN + 22, cardY + 18);
+    doc.text(sanitizeText(repName), MARGIN + 18, cardY + 14);
 
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setTextColor(...THEME.textLight);
     doc.setFont(FONTS.normal, 'normal');
-    doc.text('Experte fuer Ueberdachungen', MARGIN + 22, cardY + 22);
+    doc.text('Experte fuer Ueberdachungen', MARGIN + 18, cardY + 18);
 
     doc.setTextColor(...THEME.text);
-    doc.text(sanitizeText(repPhone), MARGIN + 22, cardY + 30);
-    doc.text(sanitizeText(repEmail), MARGIN + 22, cardY + 34);
+    doc.text(sanitizeText(repPhone), MARGIN + 18, cardY + 24);
+    doc.text(sanitizeText(repEmail), MARGIN + 18, cardY + 28);
 
     doc.setTextColor(...THEME.secondary);
-    doc.setFontSize(7);
-    doc.text('Fragen Sie mich nach Aktionen!', MARGIN + 4, cardY + 41);
+    doc.setFontSize(6);
+    doc.text('Fragen Sie mich nach Aktionen!', MARGIN + 3, cardY + 33);
+
 
 
     // --- RIGHT: TOTALS BLOCK ---
@@ -534,26 +535,26 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     doc.text('GESAMT BETRAG:', totalBoxX + 5, ty + 9);
     doc.text(formatCurrency(gross), pageWidth - MARGIN - 5, ty + 9, { align: 'right' });
 
-    // 6. CLOSING & SIGNATURES
-    y = Math.max(ty + 25, cardY + 55);
+    // 6. CLOSING & SIGNATURES (Compact)
+    y = Math.max(ty + 18, cardY + cardHeight + 5);
 
-    // Trust badges (Text based)
-    doc.setFontSize(8);
+    // Trust badges - single line, compact
+    doc.setFontSize(7);
     doc.setTextColor(...THEME.textLight);
-    const badges = "✓ Premium Qualitaet Made in Germany    ✓ 5 Jahre Garantie    ✓ Alles aus einer Hand";
+    const badges = "✓ Premium Qualitaet    ✓ 5 Jahre Garantie    ✓ Alles aus einer Hand";
     doc.text(badges, pageWidth / 2, y, { align: 'center' });
 
-    y += 15;
+    y += 10;
 
-    // Sign lines
+    // Sign lines (compact)
     doc.setDrawColor(...THEME.textLight);
     doc.setLineWidth(0.1);
-    doc.line(MARGIN, y + 10, MARGIN + 60, y + 10);
-    doc.line(pageWidth - MARGIN - 60, y + 10, pageWidth - MARGIN, y + 10);
+    doc.line(MARGIN, y + 5, MARGIN + 55, y + 5);
+    doc.line(pageWidth - MARGIN - 55, y + 5, pageWidth - MARGIN, y + 5);
 
-    doc.setFontSize(7);
-    doc.text(sanitizeText(repName), MARGIN, y + 14);
-    doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 60, y + 14);
+    doc.setFontSize(6);
+    doc.text(sanitizeText(repName), MARGIN, y + 8);
+    doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 55, y + 8);
 
     // Footer Loop
     const pageCount = (doc as any).internal.getNumberOfPages();
