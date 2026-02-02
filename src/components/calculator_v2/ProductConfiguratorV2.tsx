@@ -2404,126 +2404,128 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                                                         {/* PANORAMA */}
                                                         {wallCategory === 'panorama' && (
-                                                            <div className="grid grid-cols-1 gap-3">
-                                                                {PANORAMA_MODELS.map(model => {
-                                                                    const isActive = wallProduct.includes(`Panorama ${model.id}`);
-                                                                    // Show current active variant description if active
-                                                                    const currentVariant = isActive ? wallProduct : getBestPanoramaVariant(model.id, wallWidth);
-                                                                    const variantInfo = PANORAMA_PRODUCTS.find(p => p.id === currentVariant);
+                                                            <>
+                                                                <div className="grid grid-cols-1 gap-3">
+                                                                    {PANORAMA_MODELS.map(model => {
+                                                                        const isActive = wallProduct.includes(`Panorama ${model.id}`);
+                                                                        // Show current active variant description if active
+                                                                        const currentVariant = isActive ? wallProduct : getBestPanoramaVariant(model.id, wallWidth);
+                                                                        const variantInfo = PANORAMA_PRODUCTS.find(p => p.id === currentVariant);
 
-                                                                    return (
-                                                                        <button
-                                                                            key={model.id}
-                                                                            onClick={() => setWallProduct(getBestPanoramaVariant(model.id, wallWidth))}
-                                                                            className={`text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${isActive
-                                                                                ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-200 shadow-sm'
-                                                                                : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-slate-50'}`}
-                                                                        >
-                                                                            <div className="flex items-center gap-3">
-                                                                                <span className="text-2xl bg-white p-1.5 rounded-lg shadow-sm text-purple-600">{model.icon}</span>
-                                                                                <div>
-                                                                                    <div className="font-bold text-slate-700">{model.name}</div>
-                                                                                    <div className="text-xs text-slate-400">{model.description}</div>
-                                                                                    {isActive && (
-                                                                                        <div className="text-xs text-purple-600 font-bold mt-1">
-                                                                                            Wybrano: {variantInfo?.tracks}-tory (Auto)
-                                                                                        </div>
-                                                                                    )}
+                                                                        return (
+                                                                            <button
+                                                                                key={model.id}
+                                                                                onClick={() => setWallProduct(getBestPanoramaVariant(model.id, wallWidth))}
+                                                                                className={`text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${isActive
+                                                                                    ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-200 shadow-sm'
+                                                                                    : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-slate-50'}`}
+                                                                            >
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <span className="text-2xl bg-white p-1.5 rounded-lg shadow-sm text-purple-600">{model.icon}</span>
+                                                                                    <div>
+                                                                                        <div className="font-bold text-slate-700">{model.name}</div>
+                                                                                        <div className="text-xs text-slate-400">{model.description}</div>
+                                                                                        {isActive && (
+                                                                                            <div className="text-xs text-purple-600 font-bold mt-1">
+                                                                                                Wybrano: {variantInfo?.tracks}-tory (Auto)
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
-                                                                            {isActive && <span className="text-purple-600 font-bold">✓</span>}
+                                                                                {isActive && <span className="text-purple-600 font-bold">✓</span>}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+
+                                                                {/* PANORAMA OPTIONS */}
+                                                                <div className="mt-4 bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-4">
+                                                                    <h6 className="text-xs font-bold text-slate-600 uppercase">Opcje Panorama</h6>
+
+                                                                    {/* Opening Direction */}
+                                                                    <div>
+                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Strona otwierania</label>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <button
+                                                                                onClick={() => setPanoramaOpeningType('side')}
+                                                                                className={`p-2 text-sm rounded-lg border transition-all ${panoramaOpeningType === 'side'
+                                                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                            >
+                                                                                ← Boczne
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => setPanoramaOpeningType('center')}
+                                                                                className={`p-2 text-sm rounded-lg border transition-all ${panoramaOpeningType === 'center'
+                                                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                            >
+                                                                                ↔ Środkowe
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Handle Type */}
+                                                                    <div>
+                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Typ uchwytu</label>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <button
+                                                                                onClick={() => setPanoramaHandleType('griff')}
+                                                                                className={`p-2 text-sm rounded-lg border transition-all ${panoramaHandleType === 'griff'
+                                                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                            >
+                                                                                🚪 Griff (14.21 €)
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => setPanoramaHandleType('knauf')}
+                                                                                className={`p-2 text-sm rounded-lg border transition-all ${panoramaHandleType === 'knauf'
+                                                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                            >
+                                                                                🔘 Knauf (36.68 €)
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Glass Type */}
+                                                                    <div>
+                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Typ szkła</label>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <button
+                                                                                onClick={() => setPanoramaGlassType('klar')}
+                                                                                className={`p-2 text-sm rounded-lg border transition-all ${panoramaGlassType === 'klar'
+                                                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                            >
+                                                                                🔳 Klar (Standard)
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => setPanoramaGlassType('planibel_grau')}
+                                                                                className={`p-2 text-sm rounded-lg border transition-all ${panoramaGlassType === 'planibel_grau'
+                                                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                            >
+                                                                                🌫️ Planibel Grau (+47.95 €/m²)
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Steel-Look Toggle */}
+                                                                    <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
+                                                                        <div>
+                                                                            <span className="text-sm font-medium text-slate-700">Steel-Look Profile</span>
+                                                                            <p className="text-xs text-slate-400">RAL 7016 / 9005 (+18.95 € pro Profil)</p>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => setPanoramaSteelLook(!panoramaSteelLook)}
+                                                                            className={`w-12 h-6 rounded-full transition-all ${panoramaSteelLook ? 'bg-purple-500' : 'bg-slate-300'}`}
+                                                                        >
+                                                                            <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-all ${panoramaSteelLook ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                                                         </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-
-                                                            {/* PANORAMA OPTIONS */}
-                                                        <div className="mt-4 bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-4">
-                                                            <h6 className="text-xs font-bold text-slate-600 uppercase">Opcje Panorama</h6>
-
-                                                            {/* Opening Direction */}
-                                                            <div>
-                                                                <label className="text-xs font-medium text-slate-500 mb-2 block">Strona otwierania</label>
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                    <button
-                                                                        onClick={() => setPanoramaOpeningType('side')}
-                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaOpeningType === 'side'
-                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
-                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
-                                                                    >
-                                                                        ← Boczne
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setPanoramaOpeningType('center')}
-                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaOpeningType === 'center'
-                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
-                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
-                                                                    >
-                                                                        ↔ Środkowe
-                                                                    </button>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-
-                                                            {/* Handle Type */}
-                                                            <div>
-                                                                <label className="text-xs font-medium text-slate-500 mb-2 block">Typ uchwytu</label>
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                    <button
-                                                                        onClick={() => setPanoramaHandleType('griff')}
-                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaHandleType === 'griff'
-                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
-                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
-                                                                    >
-                                                                        🚪 Griff (14.21 €)
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setPanoramaHandleType('knauf')}
-                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaHandleType === 'knauf'
-                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
-                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
-                                                                    >
-                                                                        🔘 Knauf (36.68 €)
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Glass Type */}
-                                                            <div>
-                                                                <label className="text-xs font-medium text-slate-500 mb-2 block">Typ szkła</label>
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                    <button
-                                                                        onClick={() => setPanoramaGlassType('klar')}
-                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaGlassType === 'klar'
-                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
-                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
-                                                                    >
-                                                                        🔳 Klar (Standard)
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setPanoramaGlassType('planibel_grau')}
-                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaGlassType === 'planibel_grau'
-                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
-                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
-                                                                    >
-                                                                        🌫️ Planibel Grau (+47.95 €/m²)
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Steel-Look Toggle */}
-                                                            <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
-                                                                <div>
-                                                                    <span className="text-sm font-medium text-slate-700">Steel-Look Profile</span>
-                                                                    <p className="text-xs text-slate-400">RAL 7016 / 9005 (+18.95 € pro Profil)</p>
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => setPanoramaSteelLook(!panoramaSteelLook)}
-                                                                    className={`w-12 h-6 rounded-full transition-all ${panoramaSteelLook ? 'bg-purple-500' : 'bg-slate-300'}`}
-                                                                >
-                                                                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-all ${panoramaSteelLook ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
+                                                            </>
                                                         )}
                                                     </div>
                                                 </div>
