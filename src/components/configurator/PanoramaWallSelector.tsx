@@ -34,6 +34,9 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
 
     // 2. Select Model
     const [selectedModelId, setSelectedModelId] = useState<string>('');
+    const [width, setWidth] = useState(3000);
+    const [height, setHeight] = useState(2500);
+    const [numTracks, setNumTracks] = useState(3);
 
     // Auto-select loop
     useEffect(() => {
@@ -70,6 +73,9 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
 
     const selectedModel = availableModels.find(m => m.id === selectedModelId);
 
+    // Derive system type (e.g. AL23)
+    const systemType = selectedModel ? (selectedModel.addon_name.match(/AL\d+/) || ['AL23'])[0] : 'AL23';
+
     // Parse Tracks from Selected Model Name if possible, else default
     useEffect(() => {
         if (selectedModel) {
@@ -86,6 +92,10 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
     const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
     const [itemLabel, setItemLabel] = useState<string>('');
 
+    // Define available tracks (Standard options)
+    const availableTracks = [3, 4, 5];
+
+    // Calculate Price
     useEffect(() => {
         const calculate = async () => {
             if (!selectedModel) {
@@ -95,11 +105,13 @@ export const PanoramaWallSelector: React.FC<PanoramaWallSelectorProps> = ({
             }
 
             setItemLabel(selectedModel.addon_name);
-            const price = await PricingService.calculateAddonPrice(selectedModel, width, height);
-            setCalculatedPrice(price);
+            const unitPrice = await PricingService.calculateAddonPrice(selectedModel, width, height);
+
+            // Multiply by number of tracks (panels)
+            setCalculatedPrice(unitPrice * numTracks);
         };
         calculate();
-    }, [selectedModel, width, height]);
+    }, [selectedModel, width, height, numTracks]);
 
     const { totalPrice, breakdown } = useMemo(() => {
         if (calculatedPrice <= 0) return { totalPrice: 0, breakdown: [] };

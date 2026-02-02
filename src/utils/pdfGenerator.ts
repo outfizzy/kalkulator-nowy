@@ -264,53 +264,52 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     }
 
     doc.text(greeting, MARGIN, y);
-    y += 6;
+    y += 5;
 
-    const introText = 'vielen Dank fuer Ihr Vertrauen. Wir freuen uns, Ihnen Ihre individuelle massgefertigte Ueberdachung anbieten zu duerfen. ' +
-        'Nachfolgend finden Sie alle Details zu Ihrer Wunschkonfiguration.';
+    const introText = 'vielen Dank fuer Ihr Vertrauen. Nachfolgend finden Sie alle Details zu Ihrer Wunschkonfiguration.';
 
     const lines = doc.splitTextToSize(introText, pageWidth - MARGIN * 2);
     doc.text(lines, MARGIN, y);
-    y += (lines.length * 5) + 12;
+    y += (lines.length * 4) + 8;
 
     // 3. PRODUCT HIGHLIGHTS (The "Selling" part)
     // Dark box with white text for high contrast "Tech Specs"
     doc.setFillColor(...THEME.primary);
-    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 30, 1, 1, 'F');
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 24, 1, 1, 'F');
 
     doc.setTextColor(...THEME.secondary); // Gold Title
     doc.setFont(FONTS.bold, 'bold');
-    doc.setFontSize(9);
-    doc.text('IHRE KONFIGURATION', MARGIN + 8, y + 8);
+    doc.setFontSize(8);
+    doc.text('IHRE KONFIGURATION', MARGIN + 6, y + 6);
 
     // Specs columns (White text)
     doc.setTextColor(...THEME.white);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont(FONTS.normal, 'normal');
 
-    const specsY = y + 16;
+    const specsY = y + 12;
     const colW = (pageWidth - MARGIN * 2) / 3;
 
     // Col 1
-    doc.text('Dimensionen:', MARGIN + 8, specsY);
+    doc.text('Dimensionen:', MARGIN + 6, specsY);
     doc.setFont(FONTS.bold, 'bold');
-    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 8, specsY + 5);
+    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 6, specsY + 5);
 
     // Col 2
     doc.setFont(FONTS.normal, 'normal');
-    doc.text('Farbe / Ausfuehrung:', MARGIN + 8 + colW, specsY);
+    doc.text('Farbe:', MARGIN + 6 + colW, specsY);
     doc.setFont(FONTS.bold, 'bold');
     const color = translateForPDF(offer.product?.color || '', 'colors');
-    doc.text(color, MARGIN + 8 + colW, specsY + 5);
+    doc.text(color, MARGIN + 6 + colW, specsY + 5);
 
     // Col 3
     doc.setFont(FONTS.normal, 'normal');
-    doc.text('Dacheindeckung:', MARGIN + 8 + (colW * 2), specsY);
+    doc.text('Dach:', MARGIN + 6 + (colW * 2), specsY);
     doc.setFont(FONTS.bold, 'bold');
     const roof = translateForPDF(offer.product?.roofType || '', 'roofTypes');
-    doc.text(roof, MARGIN + 8 + (colW * 2), specsY + 5);
+    doc.text(roof, MARGIN + 6 + (colW * 2), specsY + 5);
 
-    y += 40;
+    y += 30;
 
     // 4. PRICING TABLE
     const bodyRows = [];
@@ -357,41 +356,82 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         ]);
     }
 
+    // Check if we have enough space for the table, otherwise start on new page
+    const estimatedTableHeight = bodyRows.length * 15 + 20; // Rough estimate: 15mm per row + header
+    const availableSpace = pageHeight - y - 120; // Reserve 120mm for footer section
+
+    if (estimatedTableHeight > availableSpace && y > 100) {
+        // Not enough space and we're past the intro section - start table on new page
+        doc.addPage();
+        drawHeader();
+        y = 50;
+    }
+
     autoTable(doc, {
         startY: y,
         head: [['Pos.', 'Beschreibung', 'Betrag']],
         body: bodyRows,
-        theme: 'grid', // Cleaner lines
+        theme: 'grid',
         styles: {
             font: 'Helvetica',
             fontSize: 9,
-            cellPadding: 6,
+            cellPadding: 4,
             lineWidth: 0.1,
             lineColor: THEME.line,
-            textColor: THEME.text
+            textColor: THEME.text,
+            minCellHeight: 8,
+            overflow: 'linebreak'
         },
         headStyles: {
-            fillColor: THEME.surface, // Light Header instead of dark
-            textColor: THEME.primary,  // Dark text
+            fillColor: THEME.surface,
+            textColor: THEME.primary,
             fontStyle: 'bold',
             lineWidth: 0.1,
             lineColor: THEME.line
         },
         columnStyles: {
-            0: { cellWidth: 12 },
+            0: { cellWidth: 12, halign: 'center' },
             1: { cellWidth: 'auto' },
-            2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+            2: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
         },
         alternateRowStyles: {
-            fillColor: THEME.white // Clean white
+            fillColor: [252, 252, 252] as [number, number, number]
         },
-        margin: { left: MARGIN, right: MARGIN }
+        margin: { left: MARGIN, right: MARGIN, bottom: 30 }, // Reserve space for footer
+        // Prevent row splitting across pages
+        rowPageBreak: 'avoid',
+        // Show head on each page
+        showHead: 'everyPage',
+        // Hooks for clean multi-page handling
+        didDrawPage: function (data) {
+            // Draw header on all pages
+            drawHeader();
+
+            // If this is a continuation page, add indication
+            if (data.pageNumber > 1) {
+                doc.setFontSize(8);
+                doc.setTextColor(...THEME.textLight);
+                doc.setFont(FONTS.normal, 'normal');
+                doc.text(`Fortsetzung - Seite ${data.pageNumber}`, MARGIN, 45);
+            }
+        },
+        willDrawPage: function (data) {
+            // Before drawing a new page (except first), add continuation note at bottom of prev page
+            if (data.pageNumber > 1) {
+                doc.setPage(data.pageNumber - 1);
+                doc.setFontSize(7);
+                doc.setTextColor(...THEME.secondary);
+                doc.setFont(FONTS.normal, 'italic');
+                doc.text('Fortsetzung auf naechster Seite →', pageWidth - MARGIN, pageHeight - 28, { align: 'right' });
+                doc.setPage(data.pageNumber);
+            }
+        }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 10;
+    y = (doc as any).lastAutoTable.finalY + 8;
 
-    // Check Page Break for Bottom Block
-    if (y > pageHeight - 110) { // Need ~110mm for bottom block
+    // Check Page Break for Bottom Block - reduced from 110 to 100 for tighter fit
+    if (y > pageHeight - 100) {
         doc.addPage();
         drawHeader();
         y = 50;

@@ -103,25 +103,36 @@ const PANORAMA_PRODUCTS = [
     { id: 'Panorama AL22 (5-Tor)', name: 'AL22 5-Tor', description: 'Płaska szyna, 5 torów', icon: '⊟', tracks: 5 },
     // AL23 - high track
     { id: 'Panorama AL23 (3-Tor)', name: 'AL23 3-Tor', description: 'Wysoka szyna, 3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL23 (4-Tor)', name: 'AL23 4-Tor', description: 'Wysoka szyna, 4 tory', icon: '⊞', tracks: 4 },
     { id: 'Panorama AL23 (5-Tor)', name: 'AL23 5-Tor', description: 'Wysoka szyna, 5 torów', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL23 (6-Tor)', name: 'AL23 6-Tor', description: 'Wysoka szyna, 6 torów', icon: '⊟', tracks: 6 },
     { id: 'Panorama AL23 (7-Tor)', name: 'AL23 7-Tor', description: 'Wysoka szyna, 7 torów', icon: '⊞', tracks: 7 },
     // AL24
     { id: 'Panorama AL24 (3-Tor)', name: 'AL24 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL24 (4-Tor)', name: 'AL24 4-Tor', description: '4 tory', icon: '⊞', tracks: 4 },
     { id: 'Panorama AL24 (5-Tor)', name: 'AL24 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL24 (6-Tor)', name: 'AL24 6-Tor', description: '6 torów', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL24 (7-Tor)', name: 'AL24 7-Tor', description: '7 torów', icon: '⊞', tracks: 7 },
     // AL25
     { id: 'Panorama AL25 (3-Tor)', name: 'AL25 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL25 (4-Tor)', name: 'AL25 4-Tor', description: '4 tory', icon: '⊞', tracks: 4 },
     { id: 'Panorama AL25 (5-Tor)', name: 'AL25 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL25 (6-Tor)', name: 'AL25 6-Tor', description: '6 torów', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL25 (7-Tor)', name: 'AL25 7-Tor', description: '7 torów', icon: '⊞', tracks: 7 },
     // AL26
     { id: 'Panorama AL26 (3-Tor)', name: 'AL26 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL26 (4-Tor)', name: 'AL26 4-Tor', description: '4 tory', icon: '⊞', tracks: 4 },
     { id: 'Panorama AL26 (5-Tor)', name: 'AL26 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL26 (6-Tor)', name: 'AL26 6-Tor', description: '6 torów', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL26 (7-Tor)', name: 'AL26 7-Tor', description: '7 torów', icon: '⊞', tracks: 7 },
 ];
 
 const PANORAMA_MODELS = [
     { id: 'AL22', name: 'AL22', description: 'Płaska szyna (Flat Track)', icon: '⊞', validTracks: [3, 5] },
-    { id: 'AL23', name: 'AL23', description: 'Wysoka szyna (High Track)', icon: '⊞', validTracks: [3, 5, 7] },
-    { id: 'AL24', name: 'AL24', description: 'Standard', icon: '⊞', validTracks: [3, 5] },
-    { id: 'AL25', name: 'AL25', description: 'Premium', icon: '⊞', validTracks: [3, 5] },
-    { id: 'AL26', name: 'AL26', description: 'Exclusive', icon: '⊞', validTracks: [3, 5] },
+    { id: 'AL23', name: 'AL23', description: 'Wysoka szyna (High Track)', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
+    { id: 'AL24', name: 'AL24', description: 'Standard', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
+    { id: 'AL25', name: 'AL25', description: 'Premium', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
+    { id: 'AL26', name: 'AL26', description: 'Exclusive', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
 ];
 
 function getBestPanoramaVariant(modelId: string, width: number): string {
@@ -303,6 +314,13 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [wallPriceLoading, setWallPriceLoading] = useState(false);
     const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama'>('fixed');
     const [structuralMetadata, setStructuralMetadata] = useState<{ posts_count: number } | null>(null);
+
+    // === PANORAMA ACCESSORIES ===
+    const [panoramaOpeningType, setPanoramaOpeningType] = useState<'side' | 'center'>('side');
+    const [panoramaHandleType, setPanoramaHandleType] = useState<'griff' | 'knauf'>('griff');
+    const [panoramaSteelLook, setPanoramaSteelLook] = useState<boolean>(false);
+    const [panoramaGlassType, setPanoramaGlassType] = useState<'klar' | 'planibel_grau'>('klar');
+    const [panoramaAccessoriesPrice, setPanoramaAccessoriesPrice] = useState<number>(0);
 
     // === ACCESSORIES ===
     const [accessories, setAccessories] = useState<Accessory[]>([]);
@@ -615,17 +633,51 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         const panelPrice = await PricingService.calculateMatrixPrice(
                             tables[0].id,
-                            850, // Lookup key for panel price
+                            1, // Lookup key for panel price (1mm is standard in new tables, 850mm only in legacy)
                             0
                         );
 
                         console.log(`Panorama pricing: product=${wallProduct}, trackCount=${trackCount}, panelPrice=${panelPrice}, height=${wallHeight}`);
 
                         if (panelPrice !== null) {
-                            // Calculate total price: price_per_panel × number_of_tracks × height_in_meters
-                            const heightInMeters = wallHeight / 1000;
-                            finalPrice = panelPrice * trackCount * heightInMeters;
-                            console.log(`Panorama final price: ${panelPrice} × ${trackCount} × ${heightInMeters}m = ${finalPrice.toFixed(2)}`);
+                            // Calculate total price: price_per_panel × number_of_tracks
+                            // The DB price is "Per Panel" (up to max height), NOT per meter height.
+                            finalPrice = panelPrice * trackCount;
+                            console.log(`Panorama final price: ${panelPrice} × ${trackCount} = ${finalPrice.toFixed(2)}`);
+
+                            // Add accessory prices
+                            let accessoriesTotal = 0;
+
+                            // Lock based on opening type
+                            const lockPrice = panoramaOpeningType === 'center' ? 97.92 : 73.44;
+                            accessoriesTotal += lockPrice;
+
+                            // Handle type
+                            const handlePrice = panoramaHandleType === 'knauf' ? 36.68 : 14.21;
+                            accessoriesTotal += handlePrice;
+
+                            // Verriegelung (always included)
+                            accessoriesTotal += 9.80;
+
+                            // Glass surcharge for Planibel Grau (per m²)
+                            if (panoramaGlassType === 'planibel_grau') {
+                                // Panel area: panel width (max 1100mm) × height
+                                const panelWidthM = Math.min(wallWidth / trackCount, 1100) / 1000;
+                                const panelHeightM = wallHeight / 1000;
+                                const panelArea = panelWidthM * panelHeightM;
+                                const glassSurcharge = 47.95 * panelArea * trackCount;
+                                accessoriesTotal += glassSurcharge;
+                                console.log(`Glass surcharge: 47.95 × ${panelArea.toFixed(2)}m² × ${trackCount} panels = ${glassSurcharge.toFixed(2)}€`);
+                            }
+
+                            // Steel-Look profiles (2 side profiles per system)
+                            if (panoramaSteelLook) {
+                                accessoriesTotal += 18.95 * 2;
+                            }
+
+                            setPanoramaAccessoriesPrice(accessoriesTotal);
+                            finalPrice += accessoriesTotal;
+                            console.log(`Panorama with accessories: base ${(finalPrice - accessoriesTotal).toFixed(2)} + accessories ${accessoriesTotal.toFixed(2)} = ${finalPrice.toFixed(2)}€`);
                         }
                     } else {
                         // Determine correct lookup dimensions based on product type
@@ -703,7 +755,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
         const t = setTimeout(fetchWallPrice, 300);
         return () => clearTimeout(t);
-    }, [wallProduct, wallWidth, wallHeight, projection, wedgeGlassType]);
+    }, [wallProduct, wallWidth, wallHeight, projection, wedgeGlassType, panoramaOpeningType, panoramaHandleType, panoramaGlassType, panoramaSteelLook]);
 
     // === AUTO-CALCULATE PANORAMA TRACKS ===
     useEffect(() => {
@@ -2384,6 +2436,94 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     );
                                                                 })}
                                                             </div>
+
+                                                            {/* PANORAMA OPTIONS */}
+                                                        <div className="mt-4 bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-4">
+                                                            <h6 className="text-xs font-bold text-slate-600 uppercase">Opcje Panorama</h6>
+
+                                                            {/* Opening Direction */}
+                                                            <div>
+                                                                <label className="text-xs font-medium text-slate-500 mb-2 block">Strona otwierania</label>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <button
+                                                                        onClick={() => setPanoramaOpeningType('side')}
+                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaOpeningType === 'side'
+                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                    >
+                                                                        ← Boczne
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setPanoramaOpeningType('center')}
+                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaOpeningType === 'center'
+                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                    >
+                                                                        ↔ Środkowe
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Handle Type */}
+                                                            <div>
+                                                                <label className="text-xs font-medium text-slate-500 mb-2 block">Typ uchwytu</label>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <button
+                                                                        onClick={() => setPanoramaHandleType('griff')}
+                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaHandleType === 'griff'
+                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                    >
+                                                                        🚪 Griff (14.21 €)
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setPanoramaHandleType('knauf')}
+                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaHandleType === 'knauf'
+                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                    >
+                                                                        🔘 Knauf (36.68 €)
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Glass Type */}
+                                                            <div>
+                                                                <label className="text-xs font-medium text-slate-500 mb-2 block">Typ szkła</label>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <button
+                                                                        onClick={() => setPanoramaGlassType('klar')}
+                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaGlassType === 'klar'
+                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                    >
+                                                                        🔳 Klar (Standard)
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setPanoramaGlassType('planibel_grau')}
+                                                                        className={`p-2 text-sm rounded-lg border transition-all ${panoramaGlassType === 'planibel_grau'
+                                                                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
+                                                                    >
+                                                                        🌫️ Planibel Grau (+47.95 €/m²)
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Steel-Look Toggle */}
+                                                            <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-slate-700">Steel-Look Profile</span>
+                                                                    <p className="text-xs text-slate-400">RAL 7016 / 9005 (+18.95 € pro Profil)</p>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => setPanoramaSteelLook(!panoramaSteelLook)}
+                                                                    className={`w-12 h-6 rounded-full transition-all ${panoramaSteelLook ? 'bg-purple-500' : 'bg-slate-300'}`}
+                                                                >
+                                                                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-all ${panoramaSteelLook ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                         )}
                                                     </div>
                                                 </div>
