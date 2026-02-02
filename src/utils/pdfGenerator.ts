@@ -153,11 +153,13 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         doc.rect(0, 35, pageWidth, 1.5, 'F'); // Thinner, sharper line
     };
 
-    const drawFooter = (pageNo: number, pageCount: number) => {
-        const y = pageHeight - 22;
+    const drawFooter = (pageNo: number, pageCount: number, customY?: number) => {
+        // Use custom y position if provided (for inline footer), otherwise use bottom of page
+        const footerY = customY !== undefined ? customY : pageHeight - 22;
+
         doc.setDrawColor(...THEME.line);
         doc.setLineWidth(0.2);
-        doc.line(MARGIN, y, pageWidth - MARGIN, y);
+        doc.line(MARGIN, footerY, pageWidth - MARGIN, footerY);
 
         doc.setFontSize(7);
         doc.setTextColor(...THEME.textLight);
@@ -169,20 +171,22 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         const col3 = MARGIN + 120;
 
         // Col 1: Address
-        doc.text('PolenDach24 S.C.', col1, y + 5);
-        doc.text('Kolonia Wałowice 221/33, 66-620 Gubin', col1, y + 9);
-        doc.text('NIP: PL9261695520', col1, y + 13);
+        doc.text('PolenDach24 S.C.', col1, footerY + 5);
+        doc.text('Kolonia Wałowice 221/33, 66-620 Gubin', col1, footerY + 9);
+        doc.text('NIP: PL9261695520', col1, footerY + 13);
 
         // Col 2: Contact (Office)
-        doc.text('Zentrale: +49 157 5064 6936', col2, y + 5);
-        doc.text('Email: buero@polendach24.de', col2, y + 9);
+        doc.text('Zentrale: +49 157 5064 6936', col2, footerY + 5);
+        doc.text('Email: buero@polendach24.de', col2, footerY + 9);
+        doc.text('Web: www.polendach24.de', col2, footerY + 13);
 
         // Col 3: Bank
-        doc.text('Bank: Sparkasse Spree-Neisse', col3, y + 5);
-        doc.text('IBAN: DE79 1805 0000 0190 1228 89', col3, y + 9);
+        doc.text('Bank: Sparkasse Spree-Neisse', col3, footerY + 5);
+        doc.text('IBAN: DE79 1805 0000 0190 1228 89', col3, footerY + 9);
+        doc.text('BIC: WELADED1CBN', col3, footerY + 13);
 
-        // Page
-        doc.text(`Seite ${pageNo} / ${pageCount}`, pageWidth - MARGIN, y + 13, { align: 'right' });
+        // Page number
+        doc.text(`Seite ${pageNo} / ${pageCount}`, pageWidth - MARGIN, footerY + 17, { align: 'right' });
     };
 
     // --- PAGE 1 START ---
@@ -430,8 +434,10 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     y = (doc as any).lastAutoTable.finalY + 6;
 
-    // Check Page Break for Bottom Block - need ~85mm for bottom content + ~25mm for footer
-    if (y > pageHeight - 85) {
+    // Check Page Break for Bottom Block
+    // Need: card (35mm) + totals (40mm) + signatures (15mm) + footer (25mm) = 115mm
+    const bottomContentHeight = 115;
+    if (y > pageHeight - bottomContentHeight) {
         doc.addPage();
         drawHeader();
         y = 50;
@@ -556,11 +562,23 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     doc.text(sanitizeText(repName), MARGIN, y + 8);
     doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 55, y + 8);
 
-    // Footer Loop
+    // Footer handling - inline on last page if fits, otherwise at bottom
     const pageCount = (doc as any).internal.getNumberOfPages();
+    const currentPage = (doc as any).internal.getCurrentPageInfo().pageNumber;
+
+    // Calculate if footer fits inline (needs ~25mm for footer)
+    const footerStartY = y + 15;  // 15mm after signatures
+    const fitsInline = footerStartY + 25 < pageHeight;
+
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        drawFooter(i, pageCount);
+        if (i === pageCount && pageCount === 1 && fitsInline) {
+            // Single page - draw footer inline after content
+            drawFooter(i, pageCount, footerStartY);
+        } else {
+            // Multi-page or no space - draw footer at bottom
+            drawFooter(i, pageCount);
+        }
     }
 
     return doc;
