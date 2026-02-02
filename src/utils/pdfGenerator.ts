@@ -245,19 +245,8 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     y += 5;
     doc.text(sanitizeText(safeStr(c.country) || 'Deutschland'), MARGIN, y);
 
-    // 2. HERO TITLE
-    y = 90;
-
-    doc.setFont(FONTS.bold, 'bold');
-    doc.setFontSize(24);
-    doc.setTextColor(...THEME.primary);
-    doc.text(model, MARGIN, y); // Clean Model Name
-
-    doc.setFontSize(12);
-    doc.setTextColor(...THEME.secondary);
-    doc.text('Ihr exklusives Angebot', MARGIN + doc.getTextWidth(model) + 5, y); // "Your exclusive offer" next to it or below
-
-    y += 10;
+    // 2. COMPACT GREETING (removed hero title to save space)
+    y += 12;
     doc.setFontSize(10);
     doc.setFont(FONTS.normal, 'normal');
     doc.setTextColor(...THEME.text);
@@ -266,54 +255,38 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     if (c.lastName) {
         greeting = c.salutation === 'Frau' ? `Sehr geehrte Frau ${sanitizeText(c.lastName)},` : `Sehr geehrter Herr ${sanitizeText(c.lastName)},`;
     }
+    doc.text(`${greeting} anbei Ihr Angebot fuer ${model}.`, MARGIN, y);
+    y += 8;
 
-    doc.text(greeting, MARGIN, y);
-    y += 5;
-
-    const introText = 'vielen Dank fuer Ihr Vertrauen. Nachfolgend finden Sie alle Details zu Ihrer Wunschkonfiguration.';
-
-    const lines = doc.splitTextToSize(introText, pageWidth - MARGIN * 2);
-    doc.text(lines, MARGIN, y);
-    y += (lines.length * 4) + 8;
-
-    // 3. PRODUCT HIGHLIGHTS (The "Selling" part)
-    // Dark box with white text for high contrast "Tech Specs"
+    // 3. COMPACT PRODUCT SPECS BOX (20mm height)
     doc.setFillColor(...THEME.primary);
-    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 24, 1, 1, 'F');
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 20, 1, 1, 'F');
 
-    doc.setTextColor(...THEME.secondary); // Gold Title
+    doc.setTextColor(...THEME.secondary);
     doc.setFont(FONTS.bold, 'bold');
-    doc.setFontSize(8);
-    doc.text('IHRE KONFIGURATION', MARGIN + 6, y + 6);
+    doc.setFontSize(7);
+    doc.text('IHRE KONFIGURATION', MARGIN + 5, y + 5);
 
-    // Specs columns (White text)
+    // Specs in single row (White text)
     doc.setTextColor(...THEME.white);
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont(FONTS.normal, 'normal');
 
     const specsY = y + 12;
     const colW = (pageWidth - MARGIN * 2) / 3;
 
-    // Col 1
-    doc.text('Dimensionen:', MARGIN + 6, specsY);
-    doc.setFont(FONTS.bold, 'bold');
-    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 6, specsY + 5);
+    // Col 1: Dimensions
+    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 5, specsY);
 
-    // Col 2
-    doc.setFont(FONTS.normal, 'normal');
-    doc.text('Farbe:', MARGIN + 6 + colW, specsY);
-    doc.setFont(FONTS.bold, 'bold');
+    // Col 2: Color  
     const color = translateForPDF(offer.product?.color || '', 'colors');
-    doc.text(color, MARGIN + 6 + colW, specsY + 5);
+    doc.text(color, MARGIN + 5 + colW, specsY);
 
-    // Col 3
-    doc.setFont(FONTS.normal, 'normal');
-    doc.text('Dach:', MARGIN + 6 + (colW * 2), specsY);
-    doc.setFont(FONTS.bold, 'bold');
+    // Col 3: Roof
     const roof = translateForPDF(offer.product?.roofType || '', 'roofTypes');
-    doc.text(roof, MARGIN + 6 + (colW * 2), specsY + 5);
+    doc.text(roof, MARGIN + 5 + (colW * 2), specsY);
 
-    y += 30;
+    y += 25;
 
     // 4. PRICING TABLE
     const bodyRows = [];
@@ -562,23 +535,11 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     doc.text(sanitizeText(repName), MARGIN, y + 8);
     doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 55, y + 8);
 
-    // Footer handling - inline on last page if fits, otherwise at bottom
+    // Simple footer on all pages at page bottom
     const pageCount = (doc as any).internal.getNumberOfPages();
-    const currentPage = (doc as any).internal.getCurrentPageInfo().pageNumber;
-
-    // Calculate if footer fits inline (needs ~25mm for footer)
-    const footerStartY = y + 15;  // 15mm after signatures
-    const fitsInline = footerStartY + 25 < pageHeight;
-
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        if (i === pageCount && pageCount === 1 && fitsInline) {
-            // Single page - draw footer inline after content
-            drawFooter(i, pageCount, footerStartY);
-        } else {
-            // Multi-page or no space - draw footer at bottom
-            drawFooter(i, pageCount);
-        }
+        drawFooter(i, pageCount);
     }
 
     return doc;
