@@ -153,13 +153,11 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         doc.rect(0, 35, pageWidth, 1.5, 'F'); // Thinner, sharper line
     };
 
-    const drawFooter = (pageNo: number, pageCount: number, customY?: number) => {
-        // Use custom y position if provided (for inline footer), otherwise use bottom of page
-        const footerY = customY !== undefined ? customY : pageHeight - 22;
-
+    const drawFooter = (pageNo: number, pageCount: number) => {
+        const y = pageHeight - 22;
         doc.setDrawColor(...THEME.line);
         doc.setLineWidth(0.2);
-        doc.line(MARGIN, footerY, pageWidth - MARGIN, footerY);
+        doc.line(MARGIN, y, pageWidth - MARGIN, y);
 
         doc.setFontSize(7);
         doc.setTextColor(...THEME.textLight);
@@ -171,22 +169,20 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         const col3 = MARGIN + 120;
 
         // Col 1: Address
-        doc.text('PolenDach24 S.C.', col1, footerY + 5);
-        doc.text('Kolonia Wałowice 221/33, 66-620 Gubin', col1, footerY + 9);
-        doc.text('NIP: PL9261695520', col1, footerY + 13);
+        doc.text('PolenDach24 S.C.', col1, y + 5);
+        doc.text('Kolonia Wałowice 221/33, 66-620 Gubin', col1, y + 9);
+        doc.text('NIP: PL9261695520', col1, y + 13);
 
         // Col 2: Contact (Office)
-        doc.text('Zentrale: +49 157 5064 6936', col2, footerY + 5);
-        doc.text('Email: buero@polendach24.de', col2, footerY + 9);
-        doc.text('Web: www.polendach24.de', col2, footerY + 13);
+        doc.text('Zentrale: +49 157 5064 6936', col2, y + 5);
+        doc.text('Email: buero@polendach24.de', col2, y + 9);
 
         // Col 3: Bank
-        doc.text('Bank: Sparkasse Spree-Neisse', col3, footerY + 5);
-        doc.text('IBAN: DE79 1805 0000 0190 1228 89', col3, footerY + 9);
-        doc.text('BIC: WELADED1CBN', col3, footerY + 13);
+        doc.text('Bank: Sparkasse Spree-Neisse', col3, y + 5);
+        doc.text('IBAN: DE79 1805 0000 0190 1228 89', col3, y + 9);
 
-        // Page number
-        doc.text(`Seite ${pageNo} / ${pageCount}`, pageWidth - MARGIN, footerY + 17, { align: 'right' });
+        // Page
+        doc.text(`Seite ${pageNo} / ${pageCount}`, pageWidth - MARGIN, y + 13, { align: 'right' });
     };
 
     // --- PAGE 1 START ---
@@ -245,8 +241,19 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     y += 5;
     doc.text(sanitizeText(safeStr(c.country) || 'Deutschland'), MARGIN, y);
 
-    // 2. COMPACT GREETING (removed hero title to save space)
-    y += 12;
+    // 2. HERO TITLE
+    y = 90;
+
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(...THEME.primary);
+    doc.text(model, MARGIN, y); // Clean Model Name
+
+    doc.setFontSize(12);
+    doc.setTextColor(...THEME.secondary);
+    doc.text('Ihr exklusives Angebot', MARGIN + doc.getTextWidth(model) + 5, y); // "Your exclusive offer" next to it or below
+
+    y += 10;
     doc.setFontSize(10);
     doc.setFont(FONTS.normal, 'normal');
     doc.setTextColor(...THEME.text);
@@ -255,38 +262,55 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     if (c.lastName) {
         greeting = c.salutation === 'Frau' ? `Sehr geehrte Frau ${sanitizeText(c.lastName)},` : `Sehr geehrter Herr ${sanitizeText(c.lastName)},`;
     }
-    doc.text(`${greeting} anbei Ihr Angebot fuer ${model}.`, MARGIN, y);
-    y += 8;
 
-    // 3. COMPACT PRODUCT SPECS BOX (20mm height)
+    doc.text(greeting, MARGIN, y);
+    y += 6;
+
+    const introText = 'vielen Dank fuer Ihr Vertrauen. Wir freuen uns, Ihnen Ihre individuelle massgefertigte Ueberdachung anbieten zu duerfen. ' +
+        'Nachfolgend finden Sie alle Details zu Ihrer Wunschkonfiguration.';
+
+    const lines = doc.splitTextToSize(introText, pageWidth - MARGIN * 2);
+    doc.text(lines, MARGIN, y);
+    y += (lines.length * 5) + 12;
+
+    // 3. PRODUCT HIGHLIGHTS (The "Selling" part)
+    // Dark box with white text for high contrast "Tech Specs"
     doc.setFillColor(...THEME.primary);
-    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 20, 1, 1, 'F');
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 30, 1, 1, 'F');
 
-    doc.setTextColor(...THEME.secondary);
+    doc.setTextColor(...THEME.secondary); // Gold Title
     doc.setFont(FONTS.bold, 'bold');
-    doc.setFontSize(7);
-    doc.text('IHRE KONFIGURATION', MARGIN + 5, y + 5);
+    doc.setFontSize(9);
+    doc.text('IHRE KONFIGURATION', MARGIN + 8, y + 8);
 
-    // Specs in single row (White text)
+    // Specs columns (White text)
     doc.setTextColor(...THEME.white);
-    doc.setFontSize(8);
+    doc.setFontSize(10);
     doc.setFont(FONTS.normal, 'normal');
 
-    const specsY = y + 12;
+    const specsY = y + 16;
     const colW = (pageWidth - MARGIN * 2) / 3;
 
-    // Col 1: Dimensions
-    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 5, specsY);
+    // Col 1
+    doc.text('Dimensionen:', MARGIN + 8, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 8, specsY + 5);
 
-    // Col 2: Color  
+    // Col 2
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Farbe / Ausfuehrung:', MARGIN + 8 + colW, specsY);
+    doc.setFont(FONTS.bold, 'bold');
     const color = translateForPDF(offer.product?.color || '', 'colors');
-    doc.text(color, MARGIN + 5 + colW, specsY);
+    doc.text(color, MARGIN + 8 + colW, specsY + 5);
 
-    // Col 3: Roof
+    // Col 3
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Dacheindeckung:', MARGIN + 8 + (colW * 2), specsY);
+    doc.setFont(FONTS.bold, 'bold');
     const roof = translateForPDF(offer.product?.roofType || '', 'roofTypes');
-    doc.text(roof, MARGIN + 5 + (colW * 2), specsY);
+    doc.text(roof, MARGIN + 8 + (colW * 2), specsY + 5);
 
-    y += 25;
+    y += 40;
 
     // 4. PRICING TABLE
     const bodyRows = [];
@@ -333,17 +357,6 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         ]);
     }
 
-    // Check if we have enough space for the table, otherwise start on new page
-    const estimatedTableHeight = bodyRows.length * 15 + 20; // Rough estimate: 15mm per row + header
-    const availableSpace = pageHeight - y - 120; // Reserve 120mm for footer section
-
-    if (estimatedTableHeight > availableSpace && y > 100) {
-        // Not enough space and we're past the intro section - start table on new page
-        doc.addPage();
-        drawHeader();
-        y = 50;
-    }
-
     autoTable(doc, {
         startY: y,
         head: [['Pos.', 'Beschreibung', 'Betrag']],
@@ -352,12 +365,10 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         styles: {
             font: 'Helvetica',
             fontSize: 9,
-            cellPadding: 4,
+            cellPadding: 6,
             lineWidth: 0.1,
             lineColor: THEME.line,
-            textColor: THEME.text,
-            minCellHeight: 8,
-            overflow: 'linebreak'
+            textColor: THEME.text
         },
         headStyles: {
             fillColor: THEME.surface,
@@ -367,50 +378,27 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             lineColor: THEME.line
         },
         columnStyles: {
-            0: { cellWidth: 12, halign: 'center' },
+            0: { cellWidth: 12 },
             1: { cellWidth: 'auto' },
-            2: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+            2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
         },
         alternateRowStyles: {
-            fillColor: [252, 252, 252] as [number, number, number]
+            fillColor: THEME.white
         },
-        margin: { left: MARGIN, right: MARGIN, bottom: 30 }, // Reserve space for footer
-        // Prevent row splitting across pages
+        margin: { left: MARGIN, right: MARGIN, bottom: 30 },
+        // Multi-page table handling
         rowPageBreak: 'avoid',
-        // Show head on each page
         showHead: 'everyPage',
-        // Hooks for clean multi-page handling
         didDrawPage: function (data) {
-            // Draw header on all pages
+            // Redraw header on every page
             drawHeader();
-
-            // If this is a continuation page, add indication
-            if (data.pageNumber > 1) {
-                doc.setFontSize(8);
-                doc.setTextColor(...THEME.textLight);
-                doc.setFont(FONTS.normal, 'normal');
-                doc.text(`Fortsetzung - Seite ${data.pageNumber}`, MARGIN, 45);
-            }
-        },
-        willDrawPage: function (data) {
-            // Before drawing a new page (except first), add continuation note at bottom of prev page
-            if (data.pageNumber > 1) {
-                doc.setPage(data.pageNumber - 1);
-                doc.setFontSize(7);
-                doc.setTextColor(...THEME.secondary);
-                doc.setFont(FONTS.normal, 'italic');
-                doc.text('Fortsetzung auf naechster Seite →', pageWidth - MARGIN, pageHeight - 28, { align: 'right' });
-                doc.setPage(data.pageNumber);
-            }
         }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 6;
+    y = (doc as any).lastAutoTable.finalY + 10;
 
     // Check Page Break for Bottom Block
-    // Need: card (35mm) + totals (40mm) + signatures (15mm) + footer (25mm) = 115mm
-    const bottomContentHeight = 115;
-    if (y > pageHeight - bottomContentHeight) {
+    if (y > pageHeight - 110) { // Need ~110mm for bottom block
         doc.addPage();
         drawHeader();
         y = 50;
@@ -419,48 +407,47 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // 5. SPLIT SECTION: CONTACT CARD (Left) vs TOTALS (Right)
     const midPoint = pageWidth / 2;
 
-    // --- LEFT: SALES REP CARD (COMPACT) ---
+    // --- LEFT: SALES REP CARD (IMPROVED) ---
+    // Floating style card
     const cardY = y;
-    const cardHeight = 35;
 
     doc.setDrawColor(...THEME.line);
     doc.setLineWidth(0.1);
-    doc.rect(MARGIN, cardY, 75, cardHeight);
+    doc.rect(MARGIN, cardY, 80, 45); // Border
 
     // Top strip
     doc.setFillColor(...THEME.primary);
-    doc.rect(MARGIN, cardY, 75, 6, 'F');
+    doc.rect(MARGIN, cardY, 80, 8, 'F');
     doc.setTextColor(...THEME.white);
-    doc.setFontSize(6);
+    doc.setFontSize(8);
     doc.setFont(FONTS.bold, 'bold');
-    doc.text('IHR PERSOENLICHER ANSPRECHPARTNER', MARGIN + 3, cardY + 4);
+    doc.text('IHR PERSOENLICHER ANSPRECHPARTNER', MARGIN + 4, cardY + 5);
 
-    // Initials circle
+    // Photo Placeholder (Circle) or just Initials if no photo
     doc.setFillColor(...THEME.surface);
-    doc.circle(MARGIN + 10, cardY + 18, 5, 'F');
+    doc.circle(MARGIN + 12, cardY + 22, 6, 'F');
     doc.setTextColor(...THEME.secondary);
     const initials = repName.split(' ').map(n => n[0]).join('').substring(0, 2);
-    doc.setFontSize(8);
-    doc.text(initials, MARGIN + 10, cardY + 19, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text(initials, MARGIN + 12, cardY + 23, { align: 'center' });
 
     // Info
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setTextColor(...THEME.primary);
-    doc.text(sanitizeText(repName), MARGIN + 18, cardY + 14);
+    doc.text(sanitizeText(repName), MARGIN + 22, cardY + 18);
 
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.setTextColor(...THEME.textLight);
     doc.setFont(FONTS.normal, 'normal');
-    doc.text('Experte fuer Ueberdachungen', MARGIN + 18, cardY + 18);
+    doc.text('Experte fuer Ueberdachungen', MARGIN + 22, cardY + 22);
 
     doc.setTextColor(...THEME.text);
-    doc.text(sanitizeText(repPhone), MARGIN + 18, cardY + 24);
-    doc.text(sanitizeText(repEmail), MARGIN + 18, cardY + 28);
+    doc.text(sanitizeText(repPhone), MARGIN + 22, cardY + 30);
+    doc.text(sanitizeText(repEmail), MARGIN + 22, cardY + 34);
 
     doc.setTextColor(...THEME.secondary);
-    doc.setFontSize(6);
-    doc.text('Fragen Sie mich nach Aktionen!', MARGIN + 3, cardY + 33);
-
+    doc.setFontSize(7);
+    doc.text('Fragen Sie mich nach Aktionen!', MARGIN + 4, cardY + 41);
 
 
     // --- RIGHT: TOTALS BLOCK ---
@@ -514,28 +501,28 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     doc.text('GESAMT BETRAG:', totalBoxX + 5, ty + 9);
     doc.text(formatCurrency(gross), pageWidth - MARGIN - 5, ty + 9, { align: 'right' });
 
-    // 6. CLOSING & SIGNATURES (Compact)
-    y = Math.max(ty + 18, cardY + cardHeight + 5);
+    // 6. CLOSING & SIGNATURES
+    y = Math.max(ty + 25, cardY + 55);
 
-    // Trust badges - single line, compact
-    doc.setFontSize(7);
+    // Trust badges (Text based)
+    doc.setFontSize(8);
     doc.setTextColor(...THEME.textLight);
-    const badges = "✓ Premium Qualitaet    ✓ 5 Jahre Garantie    ✓ Alles aus einer Hand";
+    const badges = "✓ Premium Qualitaet Made in Germany    ✓ 5 Jahre Garantie    ✓ Alles aus einer Hand";
     doc.text(badges, pageWidth / 2, y, { align: 'center' });
 
-    y += 10;
+    y += 15;
 
-    // Sign lines (compact)
+    // Sign lines
     doc.setDrawColor(...THEME.textLight);
     doc.setLineWidth(0.1);
-    doc.line(MARGIN, y + 5, MARGIN + 55, y + 5);
-    doc.line(pageWidth - MARGIN - 55, y + 5, pageWidth - MARGIN, y + 5);
+    doc.line(MARGIN, y + 10, MARGIN + 60, y + 10);
+    doc.line(pageWidth - MARGIN - 60, y + 10, pageWidth - MARGIN, y + 10);
 
-    doc.setFontSize(6);
-    doc.text(sanitizeText(repName), MARGIN, y + 8);
-    doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 55, y + 8);
+    doc.setFontSize(7);
+    doc.text(sanitizeText(repName), MARGIN, y + 14);
+    doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 60, y + 14);
 
-    // Simple footer on all pages at page bottom
+    // Footer Loop
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
