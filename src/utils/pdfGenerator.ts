@@ -385,12 +385,14 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         alternateRowStyles: {
             fillColor: THEME.white
         },
-        margin: { left: MARGIN, right: MARGIN, bottom: 30 },
+        // Reserve 25mm for footer at bottom of each page
+        // Top margin 50 ensures table content starts below header on new pages
+        margin: { left: MARGIN, right: MARGIN, top: 50, bottom: 25 },
         // Multi-page table handling
         rowPageBreak: 'avoid',
         showHead: 'everyPage',
         didDrawPage: function (data) {
-            // Redraw header on every page
+            // Redraw header on every new page
             drawHeader();
         }
     });
