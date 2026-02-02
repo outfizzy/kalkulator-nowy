@@ -98,11 +98,76 @@ export const OfferPrintView: React.FC = () => {
         <div className="bg-slate-100 min-h-screen py-8 print:bg-white print:py-0">
             <style>{`
                 @media print {
-                    @page { margin: 0; }
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    thead { display: table-header-group; }
-                    tr { page-break-inside: avoid; break-inside: avoid; }
-                    .page-break-box { page-break-inside: avoid; break-inside: avoid; display: block; }
+                    @page { 
+                        size: A4;
+                        margin: 10mm 0;
+                    }
+                    html, body {
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    
+                    /* Table specific rules for multi-page */
+                    table { 
+                        page-break-inside: auto !important; 
+                    }
+                    thead { 
+                        display: table-header-group !important; 
+                    }
+                    tbody { 
+                        display: table-row-group !important; 
+                    }
+                    tr { 
+                        page-break-inside: avoid !important; 
+                        break-inside: avoid !important; 
+                    }
+                    
+                    /* Prevent breaking inside important blocks */
+                    .page-break-box { 
+                        page-break-inside: avoid !important; 
+                        break-inside: avoid !important; 
+                    }
+                    
+                    /* Allow page breaks before bottom section if needed */
+                    .page-break-box {
+                        page-break-before: auto;
+                    }
+                    
+                    /* Footer handling - fixed at bottom of each page */
+                    .print-footer {
+                        position: fixed;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        background: white !important;
+                        padding: 8mm 18mm !important;
+                        border-top: 1px solid #e2e8f0 !important;
+                    }
+                    
+                    /* Header handling - fixed at top of each page */
+                    .print-header {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 35mm;
+                        background: #121c2d !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    /* Ensure main content doesn't overlap header or footer */
+                    main {
+                        margin-top: 40mm !important;
+                        margin-bottom: 35mm !important;
+                        padding-top: 5mm !important;
+                    }
                 }
             `}</style>
 
@@ -110,7 +175,7 @@ export const OfferPrintView: React.FC = () => {
             <div className="mx-auto bg-white shadow-2xl print:shadow-none max-w-[210mm] min-h-[297mm] relative text-slate-900 font-sans print:w-full print:max-w-none">
 
                 {/* --- HEADER --- */}
-                <header className="bg-[#121c2d] h-[35mm] relative print:bg-[#121c2d] -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                <header className="print-header bg-[#121c2d] h-[35mm] relative print:bg-[#121c2d] -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                     <div className="px-[18mm] h-full flex items-center justify-between">
                         {/* Logo */}
                         <div className="w-[45mm]">
@@ -350,8 +415,8 @@ export const OfferPrintView: React.FC = () => {
                     </div>
                 </main>
 
-                {/* PAGE FOOTER (Ideally sticky at page bottom, but for web view just regular footer) */}
-                <div className="mt-auto border-t border-slate-200 p-[18mm] bg-white print:fixed print:bottom-0 print:left-0 print:right-0 print:border-t print:border-slate-200">
+                {/* PAGE FOOTER - fixed at bottom on each printed page */}
+                <div className="print-footer mt-auto border-t border-slate-200 p-[18mm] bg-white print:fixed print:bottom-0 print:left-0 print:right-0 print:border-t print:border-slate-200 print:bg-white">
                     <div className="grid grid-cols-3 gap-8 text-[9px] text-slate-500 leading-relaxed">
                         <div>
                             <span className="font-bold block text-slate-700 mb-1">PolenDach24 S.C.</span>
