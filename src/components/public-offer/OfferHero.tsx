@@ -11,14 +11,14 @@ interface OfferHeroProps {
 export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, offerNumber }) => {
     // Select image based on model - use our configured images first
     const getHeroImage = (modelId: string) => {
-        // 1. Check if product has a specific image URL set
-        if (product.imageUrl) return product.imageUrl;
-
-        // 2. Try to get from our configured model images
+        // 1. Try to get from our configured model images (has correct file extensions)
         const configuredImage = getModelImage(modelId);
         if (configuredImage) return configuredImage;
 
-        // 3. Fallback to placeholder
+        // 2. Fallback to product.imageUrl if configured image not found
+        if (product.imageUrl) return product.imageUrl;
+
+        // 3. Final fallback to placeholder
         return '/images/models/trendline.webp';
     };
 
