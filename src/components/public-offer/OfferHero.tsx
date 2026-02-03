@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ProductConfig } from '../../types';
+import { getModelImage } from '../../config/modelImages';
 
 interface OfferHeroProps {
     product: ProductConfig;
@@ -8,15 +9,17 @@ interface OfferHeroProps {
 }
 
 export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, offerNumber }) => {
-    // Select image based on model
+    // Select image based on model - use our configured images first
     const getHeroImage = (modelId: string) => {
+        // 1. Check if product has a specific image URL set
         if (product.imageUrl) return product.imageUrl;
-        const id = modelId.toLowerCase();
-        if (id.includes('skystyle')) return '/images/skystyle-hero.jpg';
-        if (id.includes('trend')) return 'https://images.unsplash.com/photo-1596241913227-23846995662a?auto=format&fit=crop&w=1200&q=80';
-        if (id.includes('premium') || id.includes('prestige')) return 'https://images.unsplash.com/photo-1623157390772-2d334b220c5c?auto=format&fit=crop&w=1200&q=80';
-        if (id.includes('loft')) return 'https://images.unsplash.com/photo-1600607686527-6fb886090705?auto=format&fit=crop&w=1200&q=80';
-        return 'https://images.unsplash.com/photo-1560185007-cde436f6a4d0?auto=format&fit=crop&w=1200&q=80'; // Fallback
+
+        // 2. Try to get from our configured model images
+        const configuredImage = getModelImage(modelId);
+        if (configuredImage) return configuredImage;
+
+        // 3. Fallback to placeholder
+        return '/images/models/trendline.webp';
     };
 
     return (
