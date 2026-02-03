@@ -7,6 +7,7 @@ import { CommunicationTimeline } from '../components/crm/CommunicationTimeline';
 import { VoiceConfirmationButton } from '../components/voice/VoiceConfirmationButton';
 import { CustomerDashboard } from '../components/crm/CustomerDashboard';
 import { supabase } from '../lib/supabase';
+import { getModelDisplayName } from '../config/modelImages';
 
 
 import { TasksList } from '../components/tasks/TasksList';
@@ -445,7 +446,7 @@ export const CustomerDetailsPage: React.FC = () => {
                                                     <span className="text-sm text-slate-500">{offer.createdAt.toLocaleDateString()}</span>
                                                 </div>
                                                 <div className="text-sm text-slate-600 mt-1">
-                                                    {offer.product.modelId}, {offer.product.width}x{offer.product.projection}mm
+                                                    {getModelDisplayName(offer.product.modelId)}, {offer.product.width}x{offer.product.projection}mm
                                                 </div>
                                             </div>
                                             <div className="text-right">

@@ -96,6 +96,7 @@ import { B2BPromotionsAdminPage } from './pages/admin/B2BPromotionsAdminPage';
 import { B2BCreditAdminPage } from './pages/admin/B2BCreditAdminPage';
 import { B2BPartnerAnalyticsPage } from './pages/admin/B2BPartnerAnalyticsPage';
 import { MarketingManagerPage } from './pages/admin/MarketingManagerPage';
+import { ProductImagesPage } from './pages/admin/ProductImagesPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
@@ -204,6 +205,7 @@ function App() {
               {/* Legacy pricing pages - kept for backwards compatibility */}
               <Route path="admin/pricing-old" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />
               <Route path="admin/pricing-v2" element={<ProtectedRoute allowedRoles={['admin']}><PricingV2Page /></ProtectedRoute>} />
+              <Route path="admin/product-images" element={<ProtectedRoute allowedRoles={['admin']}><ProductImagesPage /></ProtectedRoute>} />
               <Route path="admin/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><InventoryDashboard /></ProtectedRoute>} />
               <Route path="admin/logs" element={<ProtectedRoute allowedRoles={['admin']}><ActivityLogsPage /></ProtectedRoute>} />
               <Route path="/admin/profitability" element={<InstallationProfitability />} />

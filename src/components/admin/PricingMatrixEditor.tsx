@@ -51,6 +51,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
     const [isSmartPasteLoading, setIsSmartPasteLoading] = useState(false);
     const [pasteOrigin, setPasteOrigin] = useState<{ width: number, projection: number, targetField?: keyof MatrixEntry } | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups' | 'manual_list'>('list'); // Default to list as requested
+
     const uniqueSurchargeNames = React.useMemo(() => {
         const names = new Set<string>();
         entries.forEach(e => {
@@ -72,7 +73,37 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         });
         return Object.keys(groups).map(name => ({ name, entries: groups[name] }));
     }, [entries]);
+
     const [componentImages, setComponentImages] = useState<Record<string, string>>({}); // name -> url
+    const [mainImage, setMainImage] = useState<string | null>(null);
+
+    const handleMainImageUpload = async (file: File) => {
+        const toastId = toast.loading('Wysyłanie zdjęcia głównego...');
+        try {
+            const ext = file.name.split('.').pop();
+            const fileName = `product_main_${tableId}_${Date.now()}.${ext}`;
+            const { error } = await supabase.storage.from('product-images').upload(fileName, file);
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName);
+
+            setMainImage(publicUrl);
+
+            // Fetch current attributes first to merge
+            const { data: currentTable } = await supabase.from('price_tables').select('attributes').eq('id', tableId).single();
+            const currentAttrs = currentTable?.attributes || {};
+
+            await supabase.from('price_tables').update({
+                attributes: { ...currentAttrs, image_url: publicUrl }
+            }).eq('id', tableId);
+
+            toast.success('Zdjęcie główne ustawione!', { id: toastId });
+        } catch (e: any) {
+            console.error(e);
+            toast.error('Błąd wysyłania: ' + e.message, { id: toastId });
+        }
+    };
 
     const loadMatrix = async () => {
         setLoading(true);
@@ -81,6 +112,7 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         const { data: tableData } = await supabase.from('price_tables').select('attributes, type, product_definition_id, variant_config').eq('id', tableId).single();
         if (tableData?.product_definition_id) setSelectedProductId(tableData.product_definition_id);
         if (tableData?.attributes?.component_images) setComponentImages(tableData.attributes.component_images);
+        if (tableData?.attributes?.image_url) setMainImage(tableData.attributes.image_url);
 
         const { data: manualData } = await supabase
             .from('pricing_base')
@@ -675,6 +707,22 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
 
             <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg shrink-0">
                 <div className="flex items-center gap-4">
+                    {/* Main Image Upload */}
+                    {mainImage ? (
+                        <div className="relative group shrink-0">
+                            <img src={mainImage} className="h-12 w-16 object-cover rounded border border-slate-600 bg-black" alt="Main" />
+                            <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity rounded text-xs text-white">
+                                📷
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleMainImageUpload(e.target.files[0])} />
+                            </label>
+                        </div>
+                    ) : (
+                        <label className="h-12 w-12 flex items-center justify-center bg-slate-800 rounded border border-slate-700 hover:bg-slate-700 cursor-pointer text-white hover:text-blue-400 transition-colors shrink-0" title="Dodaj zdjęcie główne">
+                            📷
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleMainImageUpload(e.target.files[0])} />
+                        </label>
+                    )}
+
                     <div>
                         <h2 className="text-xl font-bold flex items-center gap-2">
                             📏 Edytor Cennika: <span className="text-blue-400">{tableName}</span>

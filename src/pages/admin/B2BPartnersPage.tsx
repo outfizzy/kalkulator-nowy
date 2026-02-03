@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { B2BService, B2BPartner, B2BPartnerUser } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BPartner, B2BPartnerUser } from '../../services/database/b2b.service';
 import { UserService } from '../../services/database/user.service';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';

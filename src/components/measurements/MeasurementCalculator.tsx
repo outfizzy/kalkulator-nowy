@@ -9,19 +9,10 @@ import {
     type DachrechnerResults
 } from '../../services/dachrechner.service';
 import { DachrechnerDiagram } from '../dachrechner/DachrechnerDiagram';
-import { ProjectMeasurement, SiteDetails } from '../../types';
+import { ProjectMeasurement, SiteDetails, DimensionOptions } from '../../types';
 import { Camera, ChevronRight, ClipboardList, PenTool } from 'lucide-react';
 
-// Dimension display options
-interface DimensionOptions {
-    showHeights: boolean;
-    showDepths: boolean;
-    showRafters: boolean;
-    showWindows: boolean;
-    showWedges: boolean;
-    showAngles: boolean;
-    showPostDimensions: boolean;
-}
+// Dimension display options moved to types.ts
 
 interface MeasurementCalculatorProps {
     initialData?: ProjectMeasurement;

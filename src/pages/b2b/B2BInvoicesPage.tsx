@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { B2BService, B2BInvoice } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BInvoice } from '../../services/database/b2b.service';
 import { formatCurrency } from '../../utils/translations';
 import { format, formatDistanceToNow, isPast, parseISO } from 'date-fns';
 import { pl, de } from 'date-fns/locale';
@@ -127,8 +128,8 @@ export function B2BInvoicesPage() {
                         key={f}
                         onClick={() => setFilter(f)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === f
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                     >
                         {f === 'all' && 'Wszystkie'}
@@ -168,7 +169,7 @@ export function B2BInvoicesPage() {
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${status === 'paid' ? 'bg-green-100' :
-                                                    status === 'overdue' ? 'bg-red-100' : 'bg-amber-100'
+                                                status === 'overdue' ? 'bg-red-100' : 'bg-amber-100'
                                                 }`}>
                                                 {statusConfig.icon}
                                             </div>
@@ -247,7 +248,7 @@ export function B2BInvoicesPage() {
                                             <div className="flex justify-between py-2 border-b">
                                                 <span className="text-gray-500">Status</span>
                                                 <span className={`font-medium ${selectedInvoice.paid_at ? 'text-green-600' :
-                                                        (selectedInvoice.due_date && isPast(parseISO(selectedInvoice.due_date))) ? 'text-red-600' : 'text-amber-600'
+                                                    (selectedInvoice.due_date && isPast(parseISO(selectedInvoice.due_date))) ? 'text-red-600' : 'text-amber-600'
                                                     }`}>
                                                     {selectedInvoice.paid_at ? '✅ Opłacona' :
                                                         (selectedInvoice.due_date && isPast(parseISO(selectedInvoice.due_date))) ? '🔴 Po terminie' : '⏳ Oczekuje'}

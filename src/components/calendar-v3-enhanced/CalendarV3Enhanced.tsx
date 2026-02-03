@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent, type DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import toast from 'react-hot-toast';
 import { CalendarHeader } from './CalendarHeader';
 import { SmartSidebar } from './SmartSidebar';

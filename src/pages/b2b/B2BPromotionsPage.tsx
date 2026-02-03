@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { B2BService, B2BPromotion } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BPromotion } from '../../services/database/b2b.service';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
 import { de } from 'date-fns/locale';
 

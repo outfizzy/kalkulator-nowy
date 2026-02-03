@@ -62,3 +62,47 @@ export function hasModelImage(modelName: string): boolean {
 
 // Default placeholder image
 export const PLACEHOLDER_IMAGE = '/images/models/placeholder.jpg';
+
+/**
+ * Model display name mapping
+ * Internal ID → Display name (manufacturer's naming convention)
+ * e.g., "Trendline" → "Trendstyle"
+ */
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+    'Orangeline': 'Orangestyle',
+    'Orangeline+': 'Orangestyle+',
+    'Trendline': 'Trendstyle',
+    'Trendline+': 'Trendstyle+',
+    'Topline': 'Topstyle',
+    'Topline XL': 'Topstyle XL',
+    'Designline': 'Designline',
+    'Ultraline': 'Ultrastyle',
+    'Skyline': 'Skystyle',
+    'Carport': 'Carport',
+};
+
+/**
+ * Get the display name for a model (for UI presentation)
+ * @param modelId - Internal model ID (e.g., "Trendline", "trendline")
+ * @returns Display name (e.g., "Trendstyle") or original name if not mapped
+ */
+export function getModelDisplayName(modelId: string): string {
+    if (!modelId) return '';
+
+    // Try direct match first
+    if (MODEL_DISPLAY_NAMES[modelId]) {
+        return MODEL_DISPLAY_NAMES[modelId];
+    }
+
+    // Try case-insensitive match
+    const key = Object.keys(MODEL_DISPLAY_NAMES).find(
+        k => k.toLowerCase() === modelId.toLowerCase()
+    );
+
+    if (key) {
+        return MODEL_DISPLAY_NAMES[key];
+    }
+
+    // Capitalize first letter as fallback
+    return modelId.charAt(0).toUpperCase() + modelId.slice(1);
+}

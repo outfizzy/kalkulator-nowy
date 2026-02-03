@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { B2BService, B2BCreditApplication, B2BPartner } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BCreditApplication, B2BPartner } from '../../services/database/b2b.service';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import toast from 'react-hot-toast';

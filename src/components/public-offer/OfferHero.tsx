@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ProductConfig } from '../../types';
-import { getModelImage } from '../../config/modelImages';
+import { getModelImage, getModelDisplayName } from '../../config/modelImages';
 
 interface OfferHeroProps {
     product: ProductConfig;
@@ -41,7 +41,7 @@ export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, off
                             Exklusives Angebot für {customerName}
                         </div>
                         <h1 className="text-4xl md:text-5xl font-bold mb-2 shadow-sm text-shadow">
-                            {product.modelId.charAt(0).toUpperCase() + product.modelId.slice(1)} Edition
+                            {getModelDisplayName(product.modelId)} Edition
                         </h1>
                         <p className="text-lg md:text-xl text-slate-200">
                             {product.width}mm x {product.projection}mm | {product.roofType === 'glass' ? 'Sicherheitsglas' : 'Polycarbonat'}

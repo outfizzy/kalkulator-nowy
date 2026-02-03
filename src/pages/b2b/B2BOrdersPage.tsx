@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { B2BService, B2BOrder, B2BOrderStatus } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BOrder, B2BOrderStatus } from '../../services/database/b2b.service';
 import { format } from 'date-fns';
 import { de, pl, enUS } from 'date-fns/locale';
 import { useTranslation } from '../../contexts/TranslationContext';

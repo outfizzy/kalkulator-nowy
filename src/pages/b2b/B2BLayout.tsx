@@ -7,7 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from '../../contexts/TranslationContext';
-import { B2BService, B2BPartner } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BPartner } from '../../services/database/b2b.service';
 
 export function B2BLayout() {
     const { currentUser, logout } = useAuth();

@@ -5,7 +5,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { B2BService, B2BOffer, B2BPartner } from '../../services/database/b2b.service';
+import { B2BService } from '../../services/database/b2b.service';
+import type { B2BOffer, B2BPartner } from '../../services/database/b2b.service';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
