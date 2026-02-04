@@ -117,9 +117,60 @@ const SpecRow = ({ label, value }: { label: string, value: string | number | und
     );
 };
 
-// V2 Item Card with optional image
+// Location translation
+const LOCATION_LABELS: Record<string, string> = {
+    'left': 'links',
+    'right': 'rechts',
+    'front': 'vorne',
+    'linke': 'links',
+    'rechte': 'rechts',
+};
+
+// Parse config string to extract dimensions and location
+function parseItemConfig(config?: string): { location?: string; dimensions?: string; rawConfig?: string } {
+    if (!config) return {};
+
+    // Try to extract location from config (e.g., "left 2000x2500" or "linke Seite")
+    const configLower = config.toLowerCase();
+    let location: string | undefined;
+
+    for (const [key, germanLabel] of Object.entries(LOCATION_LABELS)) {
+        if (configLower.includes(key)) {
+            location = germanLabel;
+            break;
+        }
+    }
+
+    // Try to extract dimensions (e.g., "2000x2500" or "2000 x 2500")
+    const dimMatch = config.match(/(\d{3,5})\s*[xX×]\s*(\d{3,5})/);
+    let dimensions: string | undefined;
+    if (dimMatch) {
+        const width = parseInt(dimMatch[1]);
+        const height = parseInt(dimMatch[2]);
+        dimensions = `${width} × ${height} mm`;
+    }
+
+    return { location, dimensions, rawConfig: config };
+}
+
+// V2 Item Card with position and dimensions
 const V2ItemCard = ({ item }: { item: { name: string; config?: string; price?: number } }) => {
     const info = getGermanInfo(item.name);
+    const parsed = parseItemConfig(item.config);
+
+    // Build display label with position
+    let displayLabel = info.label;
+    if (parsed.location) {
+        // Check if it's a wall type item
+        const isWallType = info.category === 'walls' ||
+            item.name.toLowerCase().includes('wall') ||
+            item.name.toLowerCase().includes('wand') ||
+            item.name.toLowerCase().includes('schiebe');
+        if (isWallType) {
+            displayLabel = `${info.label} (${parsed.location})`;
+        }
+    }
+
     return (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-all">
             {info.image && (
@@ -138,9 +189,14 @@ const V2ItemCard = ({ item }: { item: { name: string; config?: string; price?: n
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-800 text-sm leading-tight">
-                            {info.label}
+                            {displayLabel}
                         </div>
-                        {item.config && (
+                        {parsed.dimensions && (
+                            <div className="text-xs text-blue-600 font-medium mt-0.5">
+                                📐 {parsed.dimensions}
+                            </div>
+                        )}
+                        {!parsed.dimensions && item.config && (
                             <div className="text-xs text-blue-600 font-medium mt-0.5">
                                 {item.config}
                             </div>
