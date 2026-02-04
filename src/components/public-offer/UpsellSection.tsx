@@ -22,21 +22,21 @@ export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
             title: 'LED Beleuchtung',
             price: 'ab 290 €',
             desc: 'Stimmungsvolles Licht für lange Abende.',
-            image: 'https://images.unsplash.com/photo-1565538810643-b5bdb6390360?auto=format&fit=crop&w=300&q=80'
+            image: '/images/models/led.jpg'
         },
         !hasHeater && {
             id: 'heater-upgrade',
             title: 'Infrarot Heizstrahler',
             price: 'ab 199 €',
             desc: 'Wohlige Wärme auf Knopfdruck.',
-            image: 'https://images.unsplash.com/photo-1623157390772-2d334b220c5c?auto=format&fit=crop&w=300&q=80'
+            image: '/images/models/heizstrahler.webp'
         },
         !hasSides && {
             id: 'sides-upgrade',
             title: 'Glasschiebewände',
             price: 'auf Anfrage',
             desc: 'Schutz vor Wind und Wetter.',
-            image: 'https://images.unsplash.com/photo-1600607686527-6fb886090705?auto=format&fit=crop&w=300&q=80'
+            image: '/images/models/schiebewand.jpg'
         }
     ].filter(Boolean) as { id: string; title: string; price: string; desc: string; image: string }[];
 
