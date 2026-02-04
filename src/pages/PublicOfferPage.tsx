@@ -155,7 +155,11 @@ export const PublicOfferPage: React.FC = () => {
 
                         {/* Full Specification */}
                         <div id="details">
-                            <OfferSpecification product={offer.product} />
+                            <OfferSpecification product={{
+                                ...offer.product,
+                                numberOfPosts: offer.pricing?.numberOfPosts,
+                                numberOfFields: offer.pricing?.numberOfFields
+                            }} />
                         </div>
 
                         {/* FAQ Section */}
