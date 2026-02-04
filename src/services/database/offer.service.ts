@@ -760,7 +760,7 @@ export const OfferService = {
      */
     async trackInteraction(
         offerId: string,
-        eventType: 'offer_view' | 'pdf_click' | 'measurement_request' | 'message_sent' | 'addon_inquiry' | 'contact_request',
+        eventType: 'offer_view' | 'pdf_click' | 'measurement_request' | 'message_sent' | 'addon_inquiry' | 'contact_request' | 'offer_accept',
         eventData?: Record<string, any>
     ): Promise<boolean> {
         try {

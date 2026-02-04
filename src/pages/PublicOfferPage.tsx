@@ -73,9 +73,12 @@ export const PublicOfferPage: React.FC = () => {
 
     const handleDownloadPDF = async () => {
         if (!token) return;
-        // Track PDF/Accept click
+        // Track offer acceptance - this links to the lead for CRM visibility
         if (offer?.id) {
-            OfferService.trackInteraction(offer.id, 'pdf_click').catch(err => console.error('Failed to track pdf click', err));
+            OfferService.trackInteraction(offer.id, 'offer_accept', {
+                action: 'pdf_download',
+                timestamp: new Date().toISOString()
+            }).catch(err => console.error('Failed to track offer acceptance', err));
         }
         // Open the beautiful HTML Print View
         window.open(`/print/offer/${token}`, '_blank');

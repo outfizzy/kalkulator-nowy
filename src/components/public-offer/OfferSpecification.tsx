@@ -3,7 +3,7 @@ import type { ProductConfig } from '../../types';
 import { getModelDisplayName } from '../../config/modelImages';
 
 // ===== GERMAN TRANSLATIONS & DESCRIPTIONS =====
-const GERMAN_LABELS: Record<string, { label: string; description?: string; icon?: string; category?: string }> = {
+const GERMAN_LABELS: Record<string, { label: string; description?: string; icon?: string; category?: string; image?: string }> = {
     // Base Construction
     'trendstyle': { label: 'Trendstyle Basiskonstruktion', description: 'Hochwertiges Aluminiumprofilsystem mit Regenrinne, pulverbeschichtet nach GSB-Standard.', icon: '🏗️', category: 'base' },
     'trendstyle+': { label: 'Trendstyle+ Basiskonstruktion', description: 'Premium-Aluminiumsystem mit verstärkten Profilen und integrierter Entwässerung.', icon: '🏗️', category: 'base' },
@@ -28,12 +28,13 @@ const GERMAN_LABELS: Record<string, { label: string; description?: string; icon?
     'klar': { label: 'Klar Polycarbonat', description: 'Transparentes Polycarbonat mit maximaler Lichtdurchlässigkeit.', icon: '🔍', category: 'roof' },
 
     // Walls & Enclosures
-    'seitenwand': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls' },
-    'side wall': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls' },
-    'frontwand': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls' },
-    'front wall': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls' },
-    'sliding door': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls' },
-    'schiebetür': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls' },
+    'seitenwand': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'side wall': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'frontwand': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'front wall': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'sliding door': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'schiebetür': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'schiebewand': { label: 'Glasschiebewand', description: 'Großflächige Glaselemente zum Öffnen - perfekte Verbindung von Innen und Außen.', icon: '🚪', category: 'walls', image: '/images/models/schiebewand.jpg' },
     'keilfenster': { label: 'Keilfenster', description: 'Dreieckiges Festverglasungselement für die Giebelseite.', icon: '📐', category: 'walls' },
     'wedge': { label: 'Keilfenster', description: 'Dreieckiges Festverglasungselement für die Giebelseite.', icon: '📐', category: 'walls' },
 
@@ -41,11 +42,11 @@ const GERMAN_LABELS: Record<string, { label: string; description?: string; icon?
     'markise': { label: 'Unterdachmarkise', description: 'Elektrisch gesteuerte Gelenkarmmarkise für perfekten Sonnenschutz unter dem Dach.', icon: '🌂', category: 'comfort' },
     'awning': { label: 'Unterdachmarkise', description: 'Elektrisch gesteuerte Gelenkarmmarkise für perfekten Sonnenschutz unter dem Dach.', icon: '🌂', category: 'comfort' },
     'zip screen': { label: 'ZIP Screen Senkrechtmarkise', description: 'Windstabile Vertikalmarkise mit seitlicher Führung - ideal als Blend- und Sichtschutz.', icon: '🪟', category: 'comfort' },
-    'led': { label: 'LED-Beleuchtung', description: 'Dimmbare LED-Spots oder Lichtleisten für stimmungsvolle Abendbeleuchtung.', icon: '💡', category: 'comfort' },
-    'led spot': { label: 'LED Spotbeleuchtung', description: 'Einbau-Spots mit warmweißem Licht (3000K) für gezielte Akzentbeleuchtung.', icon: '💡', category: 'comfort' },
-    'led strip': { label: 'LED Lichtleiste', description: 'Indirekte Beleuchtung mit dimmbaren LED-Streifen im Rinnenprofil.', icon: '💡', category: 'comfort' },
+    'led': { label: 'LED-Beleuchtung', description: 'Dimmbare LED-Spots oder Lichtleisten für stimmungsvolle Abendbeleuchtung.', icon: '💡', category: 'comfort', image: '/images/models/led.jpg' },
+    'led spot': { label: 'LED Spotbeleuchtung', description: 'Einbau-Spots mit warmweißem Licht (3000K) für gezielte Akzentbeleuchtung.', icon: '💡', category: 'comfort', image: '/images/models/led.jpg' },
+    'led strip': { label: 'LED Lichtleiste', description: 'Indirekte Beleuchtung mit dimmbaren LED-Streifen im Rinnenprofil.', icon: '💡', category: 'comfort', image: '/images/models/led.jpg' },
     'wpc': { label: 'WPC Terrassendiele', description: 'Premium Wood-Plastic-Composite Bodenbelag - pflegeleicht und witterungsbeständig.', icon: '🪵', category: 'comfort' },
-    'heizstrahler': { label: 'Infrarot-Heizstrahler', description: 'Elektrische Wärmequelle für angenehme Temperaturen auch in kühlen Abenden.', icon: '🔥', category: 'comfort' },
+    'heizstrahler': { label: 'Infrarot-Heizstrahler', description: 'Elektrische Wärmequelle für angenehme Temperaturen auch in kühlen Abenden.', icon: '🔥', category: 'comfort', image: '/images/models/heizstrahler.webp' },
 
     // Construction Options
     'freistehend': { label: 'Freistehende Montage', description: 'Konstruktion ohne Wandanbindung mit vier Stützpfosten.', icon: '🏛️', category: 'base' },
@@ -63,7 +64,7 @@ const CATEGORIES = {
 };
 
 // Helper to find German label for item
-function getGermanInfo(itemName: string): { label: string; description: string; icon: string; category: string } {
+function getGermanInfo(itemName: string): { label: string; description: string; icon: string; category: string; image?: string } {
     const lowerName = itemName.toLowerCase();
 
     // Try exact match first
@@ -73,7 +74,8 @@ function getGermanInfo(itemName: string): { label: string; description: string; 
             label: match.label,
             description: match.description || '',
             icon: match.icon || '📦',
-            category: match.category || 'other'
+            category: match.category || 'other',
+            image: match.image
         };
     }
 
@@ -84,7 +86,8 @@ function getGermanInfo(itemName: string): { label: string; description: string; 
                 label: value.label,
                 description: value.description || '',
                 icon: value.icon || '📦',
-                category: value.category || 'other'
+                category: value.category || 'other',
+                image: value.image
             };
         }
     }
@@ -114,11 +117,20 @@ const SpecRow = ({ label, value }: { label: string, value: string | number | und
     );
 };
 
-// V2 Item Card
+// V2 Item Card with optional image
 const V2ItemCard = ({ item }: { item: { name: string; config?: string; price?: number } }) => {
     const info = getGermanInfo(item.name);
     return (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-all">
+            {info.image && (
+                <div className="aspect-[16/9] bg-slate-100 overflow-hidden">
+                    <img
+                        src={info.image}
+                        alt={info.label}
+                        className="w-full h-full object-cover"
+                    />
+                </div>
+            )}
             <div className="p-4">
                 <div className="flex items-start gap-3">
                     <div className="w-10 h-10 flex items-center justify-center bg-slate-100 rounded-lg text-xl shrink-0">
