@@ -2,20 +2,32 @@ import React, { useState } from 'react';
 
 const faqData = [
     {
-        q: "Wann bezahle ich die Bestellung?",
-        a: "Wir verlangen keine Anzahlung! Die Zahlung erfolgt erst nach Montage und Abnahme der Terrassenüberdachung. Sie können bar oder per Überweisung bezahlen."
+        q: "Wie lange dauert die Realisierung?",
+        a: "Die Produktionszeit beträgt je nach Modell und Konfiguration etwa 3-8 Wochen. Nach der Fertigstellung kontaktieren wir Sie telefonisch, um den genauen Montagetermin zu vereinbaren – in der Regel innerhalb von 7 Tagen."
     },
     {
-        q: "Wie lange dauert die Realisierung?",
-        a: "Die Standard-Produktionszeit beträgt 3-5 Wochen. Nach der Fertigstellung kontaktieren wir Sie telefonisch, um den genauen Montagetermin zu vereinbaren (meist innerhalb von 7 Tagen)."
+        q: "Welche Farben sind verfügbar?",
+        a: "Wir bieten alle RAL-Farben an! Von klassischem Anthrazitgrau (RAL 7016) bis hin zu individuellen Wunschtönen – wir realisieren Ihre persönliche Farbvorstellung. Sprechen Sie uns einfach an."
     },
     {
         q: "Wie bereite ich den Untergrund vor?",
         a: "Ein ebener Untergrund reicht aus (Beton, Pflastersteine oder Punktfundamente). Unser Techniker prüft die Gegebenheiten beim endgültigen Aufmaß genau und berät Sie zur besten Lösung."
     },
     {
+        q: "Wie pflege ich meine Terrassenüberdachung?",
+        a: "Die Pflege ist unkompliziert: Die Glasflächen können Sie mit handelsüblichem Glasreiniger säubern. Die integrierten Regenrinnen sollten 1-2 Mal jährlich von Laub befreit werden – das war's schon!"
+    },
+    {
+        q: "Ist die Montage im Preis enthalten?",
+        a: "Ja, die professionelle Montage durch unser eigenes Montageteam ist in der Regel im Angebotspreis inkludiert. Wir legen großen Wert darauf, alle Projekte mit unseren geschulten Fachkräften zu realisieren."
+    },
+    {
+        q: "Was passiert bei schlechtem Wetter am Montagetag?",
+        a: "Kein Problem! Sollte das Wetter eine sichere Montage nicht zulassen, finden wir gemeinsam einen neuen Termin. Ihr Projekt soll stressfrei und professionell ablaufen – dafür sorgen wir."
+    },
+    {
         q: "Gibt es eine Garantie?",
-        a: "Ja, wir gewähren 10 Jahre Garantie auf die Aluminiumkonstruktion und 10 Jahre Garantie auf Polycarbonat/Glas."
+        a: "Selbstverständlich! Wir gewähren 5 Jahre Garantie auf die Aluminiumkonstruktion sowie auf alle verbauten Materialien. Bei uns sind Sie auf der sicheren Seite."
     }
 ];
 

@@ -28,13 +28,13 @@ const GERMAN_LABELS: Record<string, { label: string; description?: string; icon?
     'klar': { label: 'Klar Polycarbonat', description: 'Transparentes Polycarbonat mit maximaler Lichtdurchlässigkeit.', icon: '🔍', category: 'roof' },
 
     // Walls & Enclosures
-    'seitenwand': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
-    'side wall': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
-    'frontwand': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
-    'front wall': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls', image: '/images/models/schiebewand.jpg' },
-    'sliding door': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls', image: '/images/models/schiebewand.jpg' },
-    'schiebetür': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls', image: '/images/models/schiebewand.jpg' },
-    'schiebewand': { label: 'Glasschiebewand', description: 'Großflächige Glaselemente zum Öffnen - perfekte Verbindung von Innen und Außen.', icon: '🚪', category: 'walls', image: '/images/models/schiebewand.jpg' },
+    'seitenwand': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls' },
+    'side wall': { label: 'Seitenwand', description: 'Fest montierte Seitenwand aus VSG oder Polycarbonat als Wetterschutz.', icon: '🧱', category: 'walls' },
+    'frontwand': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls' },
+    'front wall': { label: 'Frontwand', description: 'Festverglasung für die Frontseite mit Rahmen in Konstruktionsfarbe.', icon: '🧱', category: 'walls' },
+    'sliding door': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls' },
+    'schiebetür': { label: 'Glasschiebetür', description: 'Leichtgängige Schiebetür-Elemente mit Softclose und bodengeführter Laufschiene.', icon: '🚪', category: 'walls' },
+    'schiebewand': { label: 'Glasschiebewand', description: 'Großflächige Glaselemente zum Öffnen - perfekte Verbindung von Innen und Außen.', icon: '🚪', category: 'walls' },
     'keilfenster': { label: 'Keilfenster', description: 'Dreieckiges Festverglasungselement für die Giebelseite.', icon: '📐', category: 'walls' },
     'wedge': { label: 'Keilfenster', description: 'Dreieckiges Festverglasungselement für die Giebelseite.', icon: '📐', category: 'walls' },
 
@@ -42,11 +42,11 @@ const GERMAN_LABELS: Record<string, { label: string; description?: string; icon?
     'markise': { label: 'Unterdachmarkise', description: 'Elektrisch gesteuerte Gelenkarmmarkise für perfekten Sonnenschutz unter dem Dach.', icon: '🌂', category: 'comfort' },
     'awning': { label: 'Unterdachmarkise', description: 'Elektrisch gesteuerte Gelenkarmmarkise für perfekten Sonnenschutz unter dem Dach.', icon: '🌂', category: 'comfort' },
     'zip screen': { label: 'ZIP Screen Senkrechtmarkise', description: 'Windstabile Vertikalmarkise mit seitlicher Führung - ideal als Blend- und Sichtschutz.', icon: '🪟', category: 'comfort' },
-    'led': { label: 'LED-Beleuchtung', description: 'Dimmbare LED-Spots oder Lichtleisten für stimmungsvolle Abendbeleuchtung.', icon: '💡', category: 'comfort', image: '/images/models/led.jpg' },
-    'led spot': { label: 'LED Spotbeleuchtung', description: 'Einbau-Spots mit warmweißem Licht (3000K) für gezielte Akzentbeleuchtung.', icon: '💡', category: 'comfort', image: '/images/models/led.jpg' },
-    'led strip': { label: 'LED Lichtleiste', description: 'Indirekte Beleuchtung mit dimmbaren LED-Streifen im Rinnenprofil.', icon: '💡', category: 'comfort', image: '/images/models/led.jpg' },
+    'led': { label: 'LED-Beleuchtung', description: 'Dimmbare LED-Spots oder Lichtleisten für stimmungsvolle Abendbeleuchtung.', icon: '💡', category: 'comfort' },
+    'led spot': { label: 'LED Spotbeleuchtung', description: 'Einbau-Spots mit warmweißem Licht (3000K) für gezielte Akzentbeleuchtung.', icon: '💡', category: 'comfort' },
+    'led strip': { label: 'LED Lichtleiste', description: 'Indirekte Beleuchtung mit dimmbaren LED-Streifen im Rinnenprofil.', icon: '💡', category: 'comfort' },
     'wpc': { label: 'WPC Terrassendiele', description: 'Premium Wood-Plastic-Composite Bodenbelag - pflegeleicht und witterungsbeständig.', icon: '🪵', category: 'comfort' },
-    'heizstrahler': { label: 'Infrarot-Heizstrahler', description: 'Elektrische Wärmequelle für angenehme Temperaturen auch in kühlen Abenden.', icon: '🔥', category: 'comfort', image: '/images/models/heizstrahler.webp' },
+    'heizstrahler': { label: 'Infrarot-Heizstrahler', description: 'Elektrische Wärmequelle für angenehme Temperaturen auch in kühlen Abenden.', icon: '🔥', category: 'comfort' },
 
     // Construction Options
     'freistehend': { label: 'Freistehende Montage', description: 'Konstruktion ohne Wandanbindung mit vier Stützpfosten.', icon: '🏛️', category: 'base' },
