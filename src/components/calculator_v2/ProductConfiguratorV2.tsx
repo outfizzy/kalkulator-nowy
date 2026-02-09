@@ -1889,11 +1889,9 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
-            {/* LEFT COLUMN: Config */}
-            <div className="col-span-12 lg:col-span-9 space-y-8">
-
-                {/* CUSTOMER VIEW */}
-                {view === 'customer' && (
+            {/* CUSTOMER VIEW — full width centered */}
+            {view === 'customer' && (
+                <div className="col-span-12 max-w-3xl mx-auto">
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
                         <CustomerForm
                             onComplete={handleCustomerComplete}
@@ -1901,312 +1899,315 @@ export const ProductConfiguratorV2: React.FC = () => {
                             initialData={customerState || undefined}
                         />
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* MODE SELECTION VIEW */}
-                {view === 'mode-select' && (
-                    <div className="col-span-12 max-w-3xl mx-auto space-y-8">
-                        <div className="text-center">
-                            <h1 className="text-3xl font-black text-slate-900 mb-2">Angebotsart wählen</h1>
-                            <p className="text-slate-500">Wie möchten Sie das Angebot erstellen?</p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Standard Calculator */}
-                            <button
-                                onClick={() => { setIsManualMode(false); setView('config'); }}
-                                className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-indigo-400 hover:shadow-lg transition-all text-left group"
-                            >
-                                <div className="text-4xl mb-4">🧮</div>
-                                <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">Kalkulator</h2>
-                                <p className="text-sm text-slate-500 leading-relaxed">
-                                    Automatische Preisberechnung basierend auf Modell, Maßen und Konfiguration.
-                                    Ideal für Standardprodukte aus dem Aluxe-Sortiment.
-                                </p>
-                                <div className="mt-4 text-xs text-slate-400">Dach • Wände • Markisen • Zubehör</div>
-                            </button>
+            {/* MODE SELECTION VIEW — full width centered */}
+            {view === 'mode-select' && (
+                <div className="col-span-12 max-w-3xl mx-auto space-y-8">
+                    <div className="text-center">
+                        <h1 className="text-3xl font-black text-slate-900 mb-2">Angebotsart wählen</h1>
+                        <p className="text-slate-500">Wie möchten Sie das Angebot erstellen?</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Standard Calculator */}
+                        <button
+                            onClick={() => { setIsManualMode(false); setView('config'); }}
+                            className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-indigo-400 hover:shadow-lg transition-all text-left group"
+                        >
+                            <div className="text-4xl mb-4">🧮</div>
+                            <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">Kalkulator</h2>
+                            <p className="text-sm text-slate-500 leading-relaxed">
+                                Automatische Preisberechnung basierend auf Modell, Maßen und Konfiguration.
+                                Ideal für Standardprodukte aus dem Aluxe-Sortiment.
+                            </p>
+                            <div className="mt-4 text-xs text-slate-400">Dach • Wände • Markisen • Zubehör</div>
+                        </button>
 
-                            {/* Manual Offer */}
-                            <button
-                                onClick={() => { setIsManualMode(true); setView('manual'); }}
-                                className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-emerald-400 hover:shadow-lg transition-all text-left group"
-                            >
-                                <div className="text-4xl mb-4">✍️</div>
-                                <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">Manuelles Angebot</h2>
-                                <p className="text-sm text-slate-500 leading-relaxed">
-                                    Positionen frei eingeben mit Name und Preis.
-                                    Ideal für individuelle Angebote und Sonderanfertigungen.
-                                </p>
-                                <div className="mt-4 text-xs text-slate-400">Freie Eingabe • Flexibel • Schnell</div>
-                            </button>
+                        {/* Manual Offer */}
+                        <button
+                            onClick={() => { setIsManualMode(true); setView('manual'); }}
+                            className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-emerald-400 hover:shadow-lg transition-all text-left group"
+                        >
+                            <div className="text-4xl mb-4">✍️</div>
+                            <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">Manuelles Angebot</h2>
+                            <p className="text-sm text-slate-500 leading-relaxed">
+                                Positionen frei eingeben mit Name und Preis.
+                                Ideal für individuelle Angebote und Sonderanfertigungen.
+                            </p>
+                            <div className="mt-4 text-xs text-slate-400">Freie Eingabe • Flexibel • Schnell</div>
+                        </button>
+                    </div>
+                    <div className="text-center">
+                        <button
+                            onClick={() => setView('customer')}
+                            className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            ← Zurück zu Kundendaten
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* MANUAL OFFER VIEW — full width centered */}
+            {view === 'manual' && (
+                <div className="col-span-12 max-w-4xl mx-auto space-y-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={() => setView('mode-select')}
+                            className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                        >
+                            ← Zurück zur Auswahl
+                        </button>
+                        <h1 className="text-2xl font-black text-slate-900">✍️ Manuelles Angebot</h1>
+                    </div>
+
+                    {/* Customer compact header */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                <span className="text-xl">👤</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-slate-800 block">
+                                    {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : 'Kein Kunde'}
+                                </span>
+                                <span className="text-xs text-slate-400">{customerState?.email || ''}</span>
+                            </div>
                         </div>
-                        <div className="text-center">
-                            <button
-                                onClick={() => setView('customer')}
-                                className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                                ← Zurück zu Kundendaten
-                            </button>
+                        <button onClick={() => setView('customer')} className="text-xs text-indigo-600 font-bold hover:underline">
+                            Bearbeiten
+                        </button>
+                    </div>
+
+                    {/* Model Selection */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            🏠 Modell auswählen <span className="text-xs text-red-500 font-normal">(erforderlich)</span>
+                        </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            {ROOF_MODELS.map(m => (
+                                <button
+                                    key={m.id}
+                                    onClick={() => setManualModel(m.id)}
+                                    className={`p-3 rounded-xl border-2 text-center transition-all ${manualModel === m.id
+                                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
+                                        }`}
+                                >
+                                    <div className="w-full h-16 rounded-lg overflow-hidden mb-2 bg-slate-100">
+                                        <img
+                                            src={m.image_url}
+                                            alt={m.name}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        />
+                                    </div>
+                                    <p className={`text-xs font-bold ${manualModel === m.id ? 'text-indigo-700' : 'text-slate-700'}`}>{m.name}</p>
+                                </button>
+                            ))}
                         </div>
                     </div>
-                )}
 
-                {/* MANUAL OFFER VIEW */}
-                {view === 'manual' && (
-                    <div className="col-span-12 max-w-4xl mx-auto space-y-6">
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                            <button
-                                onClick={() => setView('mode-select')}
-                                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-                            >
-                                ← Zurück zur Auswahl
-                            </button>
-                            <h1 className="text-2xl font-black text-slate-900">✍️ Manuelles Angebot</h1>
-                        </div>
+                    {/* Line Items */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            📋 Angebotspositionen
+                        </h2>
 
-                        {/* Customer compact header */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                    <span className="text-xl">👤</span>
-                                </div>
-                                <div>
-                                    <span className="font-bold text-slate-800 block">
-                                        {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : 'Kein Kunde'}
-                                    </span>
-                                    <span className="text-xs text-slate-400">{customerState?.email || ''}</span>
-                                </div>
-                            </div>
-                            <button onClick={() => setView('customer')} className="text-xs text-indigo-600 font-bold hover:underline">
-                                Bearbeiten
-                            </button>
-                        </div>
-
-                        {/* Model Selection */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                🏠 Modell auswählen <span className="text-xs text-red-500 font-normal">(erforderlich)</span>
-                            </h2>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                {ROOF_MODELS.map(m => (
-                                    <button
-                                        key={m.id}
-                                        onClick={() => setManualModel(m.id)}
-                                        className={`p-3 rounded-xl border-2 text-center transition-all ${manualModel === m.id
-                                                ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                                                : 'border-slate-200 bg-white hover:border-slate-300'
-                                            }`}
-                                    >
-                                        <div className="w-full h-16 rounded-lg overflow-hidden mb-2 bg-slate-100">
-                                            <img
-                                                src={m.image_url}
-                                                alt={m.name}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                            />
-                                        </div>
-                                        <p className={`text-xs font-bold ${manualModel === m.id ? 'text-indigo-700' : 'text-slate-700'}`}>{m.name}</p>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Line Items */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                📋 Angebotspositionen
-                            </h2>
-
-                            {customItems.length > 0 && (
-                                <table className="w-full text-sm mb-4">
-                                    <thead>
-                                        <tr className="border-b border-slate-100">
-                                            <th className="text-left py-2 text-slate-500 w-8">#</th>
-                                            <th className="text-left py-2 text-slate-500">Bezeichnung</th>
-                                            <th className="text-right py-2 text-slate-500">Preis (netto)</th>
-                                            <th className="w-10"></th>
+                        {customItems.length > 0 && (
+                            <table className="w-full text-sm mb-4">
+                                <thead>
+                                    <tr className="border-b border-slate-100">
+                                        <th className="text-left py-2 text-slate-500 w-8">#</th>
+                                        <th className="text-left py-2 text-slate-500">Bezeichnung</th>
+                                        <th className="text-right py-2 text-slate-500">Preis (netto)</th>
+                                        <th className="w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customItems.map((item, index) => (
+                                        <tr key={item.id} className="border-b border-slate-50 last:border-0">
+                                            <td className="py-3 text-slate-400 text-xs">{index + 1}</td>
+                                            <td className="py-3 font-medium text-slate-800">{item.name}</td>
+                                            <td className="py-3 text-right font-bold text-slate-800">{formatCurrency(item.price)}</td>
+                                            <td className="py-3 text-center">
+                                                <button
+                                                    onClick={() => setCustomItems(prev => prev.filter(i => i.id !== item.id))}
+                                                    className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {customItems.map((item, index) => (
-                                            <tr key={item.id} className="border-b border-slate-50 last:border-0">
-                                                <td className="py-3 text-slate-400 text-xs">{index + 1}</td>
-                                                <td className="py-3 font-medium text-slate-800">{item.name}</td>
-                                                <td className="py-3 text-right font-bold text-slate-800">{formatCurrency(item.price)}</td>
-                                                <td className="py-3 text-center">
-                                                    <button
-                                                        onClick={() => setCustomItems(prev => prev.filter(i => i.id !== item.id))}
-                                                        className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr className="border-t-2 border-slate-200">
-                                            <td colSpan={2} className="py-3 font-bold text-slate-800">Summe</td>
-                                            <td className="py-3 text-right font-black text-indigo-600">{formatCurrency(customItemsTotal)}</td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            )}
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 border-slate-200">
+                                        <td colSpan={2} className="py-3 font-bold text-slate-800">Summe</td>
+                                        <td className="py-3 text-right font-black text-indigo-600">{formatCurrency(customItemsTotal)}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        )}
 
-                            {customItems.length === 0 && (
-                                <div className="text-center py-8 text-slate-400">
-                                    <p className="text-3xl mb-2">📝</p>
-                                    <p className="text-sm">Noch keine Positionen. Fügen Sie Ihre erste Position hinzu.</p>
-                                </div>
-                            )}
+                        {customItems.length === 0 && (
+                            <div className="text-center py-8 text-slate-400">
+                                <p className="text-3xl mb-2">📝</p>
+                                <p className="text-sm">Noch keine Positionen. Fügen Sie Ihre erste Position hinzu.</p>
+                            </div>
+                        )}
 
-                            {/* Add Item */}
-                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Neue Position hinzufügen</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newItemName}
-                                        onChange={e => setNewItemName(e.target.value)}
-                                        placeholder="Positionsbezeichnung..."
-                                        className="flex-1 p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter' && newItemName.trim()) {
-                                                const price = parseFloat(newItemPrice) || 0;
-                                                setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
-                                                setNewItemName('');
-                                                setNewItemPrice('');
-                                            }
-                                        }}
-                                    />
-                                    <input
-                                        type="number"
-                                        value={newItemPrice}
-                                        onChange={e => setNewItemPrice(e.target.value)}
-                                        placeholder="Preis €"
-                                        className="w-36 p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter' && newItemName.trim()) {
-                                                const price = parseFloat(newItemPrice) || 0;
-                                                setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
-                                                setNewItemName('');
-                                                setNewItemPrice('');
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            if (!newItemName.trim()) return;
+                        {/* Add Item */}
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Neue Position hinzufügen</p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newItemName}
+                                    onChange={e => setNewItemName(e.target.value)}
+                                    placeholder="Positionsbezeichnung..."
+                                    className="flex-1 p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && newItemName.trim()) {
                                             const price = parseFloat(newItemPrice) || 0;
                                             setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
                                             setNewItemName('');
                                             setNewItemPrice('');
-                                        }}
-                                        disabled={!newItemName.trim()}
-                                        className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50 transition-all"
-                                    >
-                                        + Hinzufügen
-                                    </button>
-                                </div>
+                                        }
+                                    }}
+                                />
+                                <input
+                                    type="number"
+                                    value={newItemPrice}
+                                    onChange={e => setNewItemPrice(e.target.value)}
+                                    placeholder="Preis €"
+                                    className="w-36 p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && newItemName.trim()) {
+                                            const price = parseFloat(newItemPrice) || 0;
+                                            setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
+                                            setNewItemName('');
+                                            setNewItemPrice('');
+                                        }
+                                    }}
+                                />
+                                <button
+                                    onClick={() => {
+                                        if (!newItemName.trim()) return;
+                                        const price = parseFloat(newItemPrice) || 0;
+                                        setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
+                                        setNewItemName('');
+                                        setNewItemPrice('');
+                                    }}
+                                    disabled={!newItemName.trim()}
+                                    className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50 transition-all"
+                                >
+                                    + Hinzufügen
+                                </button>
                             </div>
                         </div>
-
-                        {/* Margin & Discount */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4">💰 Marża & Rabat</h2>
-
-                            {purchaseDiscount > 0 && (
-                                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
-                                        <span className="font-bold text-green-800">{purchaseDiscount}%</span>
-                                    </div>
-                                    <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                        <span>Cena zakupu:</span>
-                                        <span className="font-bold">{formatCurrency(purchasePrice)}</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
-                                    <input
-                                        type="number"
-                                        value={margin}
-                                        onChange={e => setMargin(parseFloat(e.target.value) || 0)}
-                                        min={0}
-                                        max={100}
-                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                    />
-                                    <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabatt (%)</label>
-                                    <input
-                                        type="number"
-                                        value={discount}
-                                        onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                                        min={0}
-                                        max={100}
-                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                    />
-                                    <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
-                                </div>
-                            </div>
-
-                            {/* Montage Price */}
-                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="number"
-                                        value={montagePrice || ''}
-                                        onChange={e => setMontagePrice(parseFloat(e.target.value) || 0)}
-                                        min={0}
-                                        step={100}
-                                        placeholder="0.00"
-                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                    />
-                                    <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Final Price Preview */}
-                        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl shadow-lg p-6 text-white">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-emerald-200 text-sm">Endpreis (netto)</p>
-                                    <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                    {montagePrice > 0 && <p className="text-emerald-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
-                                    <p className="text-emerald-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-emerald-200 text-xs">Positionen</p>
-                                    <p className="text-2xl font-bold">{customItems.length}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Action Button */}
-                        <button
-                            onClick={() => setView('summary')}
-                            disabled={customItems.length === 0}
-                            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${customItems.length === 0
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
-                                }`}
-                        >
-                            Weiter zur Zusammenfassung →
-                        </button>
                     </div>
-                )}
 
-                {/* CONFIG/SUMMARY VIEW */}
-                {(view === 'config') && (
-                    <>
+                    {/* Margin & Discount */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="font-bold text-slate-800 mb-4">💰 Marża & Rabat</h2>
+
+                        {purchaseDiscount > 0 && (
+                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
+                                    <span className="font-bold text-green-800">{purchaseDiscount}%</span>
+                                </div>
+                                <div className="flex justify-between items-center mt-1 text-xs text-green-600">
+                                    <span>Cena zakupu:</span>
+                                    <span className="font-bold">{formatCurrency(purchasePrice)}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
+                                <input
+                                    type="number"
+                                    value={margin}
+                                    onChange={e => setMargin(parseFloat(e.target.value) || 0)}
+                                    min={0}
+                                    max={100}
+                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                />
+                                <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabatt (%)</label>
+                                <input
+                                    type="number"
+                                    value={discount}
+                                    onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+                                    min={0}
+                                    max={100}
+                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                />
+                                <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
+                            </div>
+                        </div>
+
+                        {/* Montage Price */}
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={montagePrice || ''}
+                                    onChange={e => setMontagePrice(parseFloat(e.target.value) || 0)}
+                                    min={0}
+                                    step={100}
+                                    placeholder="0.00"
+                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                />
+                                <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Final Price Preview */}
+                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl shadow-lg p-6 text-white">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-emerald-200 text-sm">Endpreis (netto)</p>
+                                <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
+                                {montagePrice > 0 && <p className="text-emerald-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
+                                <p className="text-emerald-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-emerald-200 text-xs">Positionen</p>
+                                <p className="text-2xl font-bold">{customItems.length}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <button
+                        onClick={() => setView('summary')}
+                        disabled={customItems.length === 0}
+                        className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${customItems.length === 0
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
+                            }`}
+                    >
+                        Weiter zur Zusammenfassung →
+                    </button>
+                </div>
+            )}
+
+            {/* CONFIG/SUMMARY VIEW */}
+            {(view === 'config') && (
+                <>
+                    {/* LEFT COLUMN: Config */}
+                    <div className="col-span-12 lg:col-span-9 space-y-8">
                         {/* Compact Customer Header (replacing the old expandable card) */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-8 flex justify-between items-center">
                             <div className="flex items-center gap-3">
@@ -3680,169 +3681,169 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 Dalej →
                             </button>
                         </div>
-                    </>
-                )}
-            </div>
+                    </div>
 
-            {/* RIGHT COLUMN: Summary (Always visible in Config/Summary view) */}
-            {
-                (view === 'config') && (
-                    <div className="col-span-12 lg:col-span-3 space-y-4 lg:sticky lg:top-4">
-                        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h3>
+                    {/* RIGHT COLUMN: Summary (Always visible in Config/Summary view) */}
+                    {
+                        (view === 'config') && (
+                            <div className="col-span-12 lg:col-span-3 space-y-4 lg:sticky lg:top-4">
+                                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h3>
 
-                            {/* Main Config Summary */}
-                            <div className="mb-6 space-y-2">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">Model</span>
-                                    <span className="font-bold text-slate-800">{model}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">Wymiar</span>
-                                    <span className="font-bold text-slate-800">{width} × {projection}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">Montaż</span>
-                                    <span className={`font-bold ${construction === 'freestanding' ? 'text-amber-600' : 'text-slate-800'}`}>
-                                        {construction === 'wall' ? 'Przyścienny' : `Wolnostojący ${freestandingSurchargePrice > 0 ? '(+' + formatCurrency(freestandingSurchargePrice) + ')' : ''}`}
-                                    </span>
-                                </div>
-                                {model === 'Designline' && schiebeeinheitCount > 0 && (
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-slate-500">Schiebeeinheit</span>
-                                        <span className="font-bold text-indigo-600">
-                                            {schiebeeinheitCount}× (+{formatCurrency(schiebeeinheitTotalPrice)})
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="h-px bg-slate-100 my-2" />
-
-                                {/* Price Display */}
-                                <div className="text-center py-2">
-                                    {price ? (
-                                        <>
-                                            <div className="text-3xl font-black text-slate-900">{formatCurrency(totalPrice || 0)}</div>
-                                            <div className="text-[10px] text-slate-400 font-medium mt-1">Cena netto (bez VAT)</div>
-                                            {structureCount > 1 && (
-                                                <div className="text-xs text-amber-600 font-medium mt-2 bg-amber-50 rounded-lg py-1.5 px-3 inline-block">
-                                                    🔗 {structureCount}× konstrukcja łączona
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="text-slate-400 italic text-sm">{error || 'Obliczam...'}</div>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={handleAddRoofToBasket}
-                                    disabled={!totalPrice}
-                                    className={`w-full py-3 rounded-xl font-bold transition-all ${totalPrice
-                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md transform hover:-translate-y-0.5'
-                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                        }`}
-                                >
-                                    Dodaj Zadaszenie +
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Basket Preview */}
-                        <div className="bg-white rounded-2xl shadow border border-slate-200 p-4">
-                            <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowBasket(!showBasket)}>
-                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                    🛒 Koszyk <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
-                                </h3>
-                                <span className="text-slate-400 text-sm">{showBasket ? '▼' : '▲'}</span>
-                            </div>
-
-                            {showBasket && (
-                                <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
-                                    {basket.map((item, i) => (
-                                        <div key={item.id} className="text-sm border-b border-slate-50 last:border-0 pb-2 group">
-                                            <div className="flex justify-between font-bold text-slate-700">
-                                                <span>{item.name}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span>{formatCurrency(item.price)}</span>
-                                                    <button
-                                                        onClick={() => removeFromBasket(item.id)}
-                                                        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 text-xs transition-opacity"
-                                                        title="Usuń"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div className="text-xs text-slate-400 truncate pr-4">{item.config}</div>
+                                    {/* Main Config Summary */}
+                                    <div className="mb-6 space-y-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500">Model</span>
+                                            <span className="font-bold text-slate-800">{model}</span>
                                         </div>
-                                    ))}
-                                    {basket.length === 0 && <p className="text-center text-slate-400 text-xs py-2">Pusty koszyk</p>}
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500">Wymiar</span>
+                                            <span className="font-bold text-slate-800">{width} × {projection}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500">Montaż</span>
+                                            <span className={`font-bold ${construction === 'freestanding' ? 'text-amber-600' : 'text-slate-800'}`}>
+                                                {construction === 'wall' ? 'Przyścienny' : `Wolnostojący ${freestandingSurchargePrice > 0 ? '(+' + formatCurrency(freestandingSurchargePrice) + ')' : ''}`}
+                                            </span>
+                                        </div>
+                                        {model === 'Designline' && schiebeeinheitCount > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-500">Schiebeeinheit</span>
+                                                <span className="font-bold text-indigo-600">
+                                                    {schiebeeinheitCount}× (+{formatCurrency(schiebeeinheitTotalPrice)})
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="h-px bg-slate-100 my-2" />
+
+                                        {/* Price Display */}
+                                        <div className="text-center py-2">
+                                            {price ? (
+                                                <>
+                                                    <div className="text-3xl font-black text-slate-900">{formatCurrency(totalPrice || 0)}</div>
+                                                    <div className="text-[10px] text-slate-400 font-medium mt-1">Cena netto (bez VAT)</div>
+                                                    {structureCount > 1 && (
+                                                        <div className="text-xs text-amber-600 font-medium mt-2 bg-amber-50 rounded-lg py-1.5 px-3 inline-block">
+                                                            🔗 {structureCount}× konstrukcja łączona
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="text-slate-400 italic text-sm">{error || 'Obliczam...'}</div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={handleAddRoofToBasket}
+                                            disabled={!totalPrice}
+                                            className={`w-full py-3 rounded-xl font-bold transition-all ${totalPrice
+                                                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md transform hover:-translate-y-0.5'
+                                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            Dodaj Zadaszenie +
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
 
-                            <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                                <span className="text-sm font-medium text-slate-500">Razem:</span>
-                                <span className="font-black text-lg text-indigo-600">{formatCurrency(basketTotal)}</span>
+                                {/* Basket Preview */}
+                                <div className="bg-white rounded-2xl shadow border border-slate-200 p-4">
+                                    <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowBasket(!showBasket)}>
+                                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                            🛒 Koszyk <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
+                                        </h3>
+                                        <span className="text-slate-400 text-sm">{showBasket ? '▼' : '▲'}</span>
+                                    </div>
+
+                                    {showBasket && (
+                                        <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
+                                            {basket.map((item, i) => (
+                                                <div key={item.id} className="text-sm border-b border-slate-50 last:border-0 pb-2 group">
+                                                    <div className="flex justify-between font-bold text-slate-700">
+                                                        <span>{item.name}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{formatCurrency(item.price)}</span>
+                                                            <button
+                                                                onClick={() => removeFromBasket(item.id)}
+                                                                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 text-xs transition-opacity"
+                                                                title="Usuń"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs text-slate-400 truncate pr-4">{item.config}</div>
+                                                </div>
+                                            ))}
+                                            {basket.length === 0 && <p className="text-center text-slate-400 text-xs py-2">Pusty koszyk</p>}
+                                        </div>
+                                    )}
+
+                                    <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                                        <span className="text-sm font-medium text-slate-500">Razem:</span>
+                                        <span className="font-black text-lg text-indigo-600">{formatCurrency(basketTotal)}</span>
+                                    </div>
+
+                                    <button
+                                        onClick={() => basket.length > 0 ? setView('summary') : toast.error('Dodaj coś do koszyka')}
+                                        className={`w-full mt-3 py-2 rounded-lg font-bold text-sm ${basket.length > 0
+                                            ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        Przejdź do oferty →
+                                    </button>
+                                </div>
                             </div>
+                        )
+                    }
+                    {/* Email Modal */}
+                    {
+                        showEmailModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                                <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                        <h3 className="text-xl font-bold text-slate-800">Wygenerowana Treść Maila</h3>
+                                        <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                    </div>
 
-                            <button
-                                onClick={() => basket.length > 0 ? setView('summary') : toast.error('Dodaj coś do koszyka')}
-                                className={`w-full mt-3 py-2 rounded-lg font-bold text-sm ${basket.length > 0
-                                    ? 'bg-slate-900 text-white hover:bg-slate-800'
-                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    }`}
-                            >
-                                Przejdź do oferty →
-                            </button>
-                        </div>
-                    </div>
-                )
-            }
-            {/* Email Modal */}
-            {
-                showEmailModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
-                            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                <h3 className="text-xl font-bold text-slate-800">Wygenerowana Treść Maila</h3>
-                                <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 mb-2">
+                                        💡 Ta treść została wygenerowana automatycznie. Możesz ją edytować przed wysłaniem.
+                                    </div>
+
+                                    <textarea
+                                        value={emailBody}
+                                        onChange={(e) => setEmailBody(e.target.value)}
+                                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-mono leading-relaxed"
+                                        rows={12}
+                                    />
+
+                                    <div className="flex justify-end gap-3 pt-2">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(emailBody);
+                                                toast.success('Skopiowano do schowka');
+                                            }}
+                                            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm"
+                                        >
+                                            Kopiuj
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const subject = `Angebot ${savedOffer?.offerNumber || savedOfferId || 'V2'} - PolenDach24`;
+                                                window.open(`mailto:${customerState?.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`);
+                                            }}
+                                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-lg shadow-blue-200 flex items-center gap-2"
+                                        >
+                                            ↗️ Otwórz w Poczcie
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-
-                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 mb-2">
-                                💡 Ta treść została wygenerowana automatycznie. Możesz ją edytować przed wysłaniem.
-                            </div>
-
-                            <textarea
-                                value={emailBody}
-                                onChange={(e) => setEmailBody(e.target.value)}
-                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-mono leading-relaxed"
-                                rows={12}
-                            />
-
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(emailBody);
-                                        toast.success('Skopiowano do schowka');
-                                    }}
-                                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm"
-                                >
-                                    Kopiuj
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const subject = `Angebot ${savedOffer?.offerNumber || savedOfferId || 'V2'} - PolenDach24`;
-                                        window.open(`mailto:${customerState?.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`);
-                                    }}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-lg shadow-blue-200 flex items-center gap-2"
-                                >
-                                    ↗️ Otwórz w Poczcie
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+                        )
+                    }
+                </>
+            )}
         </div >
     );
 };
