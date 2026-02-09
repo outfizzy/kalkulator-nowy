@@ -596,8 +596,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                 // Keilfenster is always Glass (per pricelist), even if roof is Poly
                 tableName = `Aluxe V2 - Wedge (Glass)`;
             } else if (wallProduct.includes('Schiebetür')) {
-                // Use exact product ID for sliding doors
-                tableName = `Aluxe V2 - ${wallProduct}`;
+                // All Schiebetür glass variants use the same base table (VSG klar)
+                // Surcharges for matt/iso are applied separately after base lookup
+                tableName = 'Aluxe V2 - Sliding Door';
             } else if (wallProduct.includes('Panorama')) {
                 // Handle Panorama systems (AL22-AL26)
                 tableName = `Aluxe V2 - ${wallProduct}`;
@@ -683,6 +684,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         // Determine correct lookup dimensions based on product type
                         const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
                         const isSideWall = wallProduct.includes('Side');
+                        const isSchiebetur = wallProduct.includes('Schiebetür');
 
                         let lookupWidth: number;
                         let lookupProjection: number;
@@ -739,6 +741,38 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 }
                             }
                             finalPrice += surcharge;
+                        }
+
+                        // SCHIEBETÜR SURCHARGES (Matt / Isolierglas)
+                        // Base price is VSG klar; matt and iso are additive surcharges
+                        if (isSchiebetur && finalPrice !== null) {
+                            let surcharge = 0;
+                            if (wallProduct.includes('VSG matt')) {
+                                const { data: mattTables } = await supabase
+                                    .from('price_tables')
+                                    .select('id')
+                                    .eq('name', 'Aluxe V2 - Sliding Door Surcharge Matt')
+                                    .limit(1);
+                                if (mattTables?.[0]) {
+                                    const mattPrice = await PricingService.calculateMatrixPrice(mattTables[0].id, lookupWidth, 0);
+                                    if (mattPrice) surcharge += mattPrice;
+                                }
+                            }
+                            if (wallProduct.includes('Isolierglas')) {
+                                const { data: isoTables } = await supabase
+                                    .from('price_tables')
+                                    .select('id')
+                                    .eq('name', 'Aluxe V2 - Sliding Door Surcharge Iso')
+                                    .limit(1);
+                                if (isoTables?.[0]) {
+                                    const isoPrice = await PricingService.calculateMatrixPrice(isoTables[0].id, lookupWidth, 0);
+                                    if (isoPrice) surcharge += isoPrice;
+                                }
+                            }
+                            if (surcharge > 0) {
+                                console.log(`Schiebetür surcharge: base=${finalPrice.toFixed(2)}, surcharge=${surcharge.toFixed(2)}, total=${(finalPrice + surcharge).toFixed(2)}`);
+                                finalPrice += surcharge;
+                            }
                         }
                     }
 
