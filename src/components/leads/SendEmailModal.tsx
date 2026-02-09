@@ -205,7 +205,8 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     const token = await OfferService.ensurePublicToken(selectedOffer.id);
                     const link = `${window.location.origin}/p/offer/${token}`;
 
-                    finalBody = getOfferEmailHtml([{ number: selectedOffer.offerNumber || selectedOffer.id.substring(0, 8), url: link }]);
+                    const customerFullName = [leadData?.firstName, leadData?.lastName].filter(Boolean).join(' ') || undefined;
+                    finalBody = getOfferEmailHtml([{ number: selectedOffer.offerNumber || selectedOffer.id.substring(0, 8), url: link }], customerFullName);
                     toast.dismiss('pdf-gen');
                 } catch (err: any) {
                     console.error('Token Gen Error', err);

@@ -1,4 +1,4 @@
-export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[]) => {
+export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[], customerName?: string) => {
     const isMultiple = offerLinks.length > 1;
     const title = isMultiple ? 'Ihre Angebote von PolenDach24' : 'Ihr Angebot von PolenDach24';
     const numbersString = offerLinks.map(o => o.number).join(', ');
@@ -81,7 +81,7 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
                         ${isMultiple ? 'Ihre persönlichen Angebote sind fertig' : 'Ihr persönliches Angebot ist fertig'}
                     </h1>
                     <p style="margin: 0 0 30px; font-size: 16px; line-height: 1.6; color: #4b5563;">
-                        Sehr geehrte Damen und Herren,<br><br>
+                        ${customerName ? `Sehr geehrte/r ${customerName},` : 'Sehr geehrte Damen und Herren,'}<br><br>
                         vielen Dank für Ihr Interesse an unseren Produkten. Basierend auf Ihren Wünschen haben wir ${isMultiple ? 'individuelle Kalkulationen' : 'eine individuelle Kalkulation'} <strong>(Nr. ${numbersString})</strong> für Ihre neue Terrassenüberdachung erstellt. <br><br>
                         Wir setzen auf höchste Qualität, modernes Design und Langlebigkeit – damit Sie viele Jahre Freude an Ihrem Garten haben.
                     </p>
@@ -134,11 +134,11 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                         <tr>
                             <td class="two-column" width="50%" style="padding: 0 8px 15px 8px; vertical-align: top;">
-                                <img src="https://polendach24.de/wp-content/uploads/2025/06/trendstyle-1024x682.webp" alt="Trendstyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height:auto; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <img src="https://polendach24.de/wp-content/uploads/2025/06/trendstyle-1024x682.webp" alt="Trendstyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height: 180px; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <p style="text-align: center; font-size: 13px; font-weight: bold; color: #374151; margin: 8px 0 0;">Trendstyle</p>
                             </td>
                             <td class="two-column" width="50%" style="padding: 0 8px 15px 8px; vertical-align: top;">
-                                <img src="https://polendach24.de/wp-content/uploads/2025/06/ultrastyle-1-1024x683.webp" alt="Ultrastyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height:auto; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <img src="https://polendach24.de/wp-content/uploads/2025/06/ultrastyle-1-1024x683.webp" alt="Ultrastyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height: 180px; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <p style="text-align: center; font-size: 13px; font-weight: bold; color: #374151; margin: 8px 0 0;">Ultrastyle</p>
                             </td>
                         </tr>
@@ -148,11 +148,11 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                         <tr>
                             <td class="two-column" width="50%" style="padding: 0 8px 15px 8px; vertical-align: top;">
-                                <img src="https://polendach24.de/wp-content/uploads/2025/06/designstyle-1024x682.webp" alt="Designstyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height:auto; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <img src="https://polendach24.de/wp-content/uploads/2025/06/designstyle-1024x682.webp" alt="Designstyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height: 180px; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <p style="text-align: center; font-size: 13px; font-weight: bold; color: #374151; margin: 8px 0 0;">Designstyle</p>
                             </td>
                             <td class="two-column" width="50%" style="padding: 0 8px 15px 8px; vertical-align: top;">
-                                <img src="https://polendach24.de/wp-content/uploads/2025/06/topstyle-1024x751.webp" alt="Topstyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height:auto; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <img src="https://polendach24.de/wp-content/uploads/2025/06/topstyle-1024x751.webp" alt="Topstyle Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height: 180px; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <p style="text-align: center; font-size: 13px; font-weight: bold; color: #374151; margin: 8px 0 0;">Topstyle</p>
                             </td>
                         </tr>
@@ -162,11 +162,11 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                         <tr>
                             <td class="two-column" width="50%" style="padding: 0 8px 15px 8px; vertical-align: top;">
-                                <img src="https://polendach24.de/wp-content/uploads/2025/06/pergola-1024x682.webp" alt="Pergola Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height:auto; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <img src="https://polendach24.de/wp-content/uploads/2025/06/pergola-1024x682.webp" alt="Pergola Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height: 180px; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <p style="text-align: center; font-size: 13px; font-weight: bold; color: #374151; margin: 8px 0 0;">Pergola</p>
                             </td>
                             <td class="two-column" width="50%" style="padding: 0 8px 15px 8px; vertical-align: top;">
-                                <img src="https://polendach24.de/wp-content/uploads/2025/06/pergola-deluxe-1024x768.webp" alt="Pergola Deluxe Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height:auto; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <img src="https://polendach24.de/wp-content/uploads/2025/06/pergola-deluxe-1024x768.webp" alt="Pergola Deluxe Terrassenüberdachung" width="268" class="img-max" style="width: 100%; max-width: 268px; height: 180px; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <p style="text-align: center; font-size: 13px; font-weight: bold; color: #374151; margin: 8px 0 0;">Pergola Deluxe</p>
                             </td>
                         </tr>
@@ -289,7 +289,6 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
             <!-- FOOTER -->
             <tr>
                 <td style="padding: 40px 30px; text-align: center; font-size: 12px; color: #6b7280; background-color: #f3f4f6; border-top: 1px solid #e5e7eb;">
-                    <img src="https://polendach24.de/wp-content/uploads/2025/06/logo-1024x197.png" alt="PolenDach24" width="150" style="display: block; margin: 0 auto 20px; max-width: 150px; height: auto;">
                     <p style="margin: 0 0 15px; font-weight: bold; color: #374151; font-size: 14px;">
                         Polendach24 s.c.
                     </p>
@@ -304,27 +303,6 @@ export const getOfferEmailHtml = (offerLinks: { number: string, url: string }[])
                     <p style="margin: 0;">
                         Web: <a href="https://polendach24.de" style="color: #3b82f6; text-decoration: none;">polendach24.de</a>
                     </p>
-                    
-                    <!-- Partnerzy -->
-                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0 0 10px; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">Unsere Partner</p>
-                        <table border="0" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
-                            <tr>
-                                <td style="padding: 0 12px;">
-                                    <img src="https://polendach24.de/wp-content/uploads/2025/06/1.1.svg" alt="Fischer" width="50" style="max-width: 50px; height: auto; opacity: 0.5;">
-                                </td>
-                                <td style="padding: 0 12px;">
-                                    <img src="https://polendach24.de/wp-content/uploads/2025/06/2.1.svg" alt="Somfy" width="50" style="max-width: 50px; height: auto; opacity: 0.5;">
-                                </td>
-                                <td style="padding: 0 12px;">
-                                    <img src="https://polendach24.de/wp-content/uploads/2025/06/3.1.svg" alt="EXLABESA" width="50" style="max-width: 50px; height: auto; opacity: 0.5;">
-                                </td>
-                                <td style="padding: 0 12px;">
-                                    <img src="https://polendach24.de/wp-content/uploads/2025/06/4.1.svg" alt="Würth" width="50" style="max-width: 50px; height: auto; opacity: 0.5;">
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
 
                     <p style="margin-top: 20px; font-size: 11px; color: #9ca3af;">
                         &copy; ${new Date().getFullYear()} PolenDach24. Alle Rechte vorbehalten.
