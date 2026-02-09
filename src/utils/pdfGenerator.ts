@@ -83,7 +83,11 @@ export async function generateOfferPDF(offer: Offer) {
 
 export async function generateOfferPDFData(offer: Offer): Promise<string> {
     const doc = await createDocument(offer);
-    return doc.output('datauristring');
+    // Return raw base64 only — datauristring includes "data:application/pdf;..." prefix
+    // which breaks Buffer.from(content, 'base64') in the email API
+    const dataUri = doc.output('datauristring');
+    const base64 = dataUri.split(',')[1];
+    return base64;
 }
 
 async function createDocument(offer: Offer): Promise<jsPDF> {
