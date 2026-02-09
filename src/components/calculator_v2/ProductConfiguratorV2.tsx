@@ -14,7 +14,7 @@ import { CustomerForm } from '../CustomerForm';
 // ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
 type ConstructionType = 'wall' | 'freestanding';
-type ViewState = 'customer' | 'config' | 'summary';
+type ViewState = 'customer' | 'mode-select' | 'config' | 'manual' | 'summary';
 
 import { AiService } from '../../services/ai';
 
@@ -91,10 +91,36 @@ const KEILFENSTER_ACCESSORIES = [
 
 // Schiebetür - framed sliding doors
 const SCHIEBETUR_PRODUCTS = [
-    { id: 'Schiebetür (VSG klar)', name: 'Drzwi VSG klar', icon: '🚪', description: 'Szkło hartowane czyste' },
-    { id: 'Schiebetür (VSG matt)', name: 'Drzwi VSG matt', icon: '🚪', description: 'Szkło matowe' },
-    { id: 'Schiebetür (Isolierglas)', name: 'Drzwi Izolacyjne', icon: '🚪', description: 'Szkło termoizolacyjne' },
+    { id: 'Schiebetür (VSG klar)', name: 'Szkło przezroczyste (VSG klar)', icon: '🚪', description: 'Drzwi przesuwne aluminiowe – szkło hartowane czyste' },
+    { id: 'Schiebetür (VSG matt)', name: 'Szkło matowe (VSG matt)', icon: '🚪', description: 'Drzwi przesuwne aluminiowe – szkło matowe' },
+    { id: 'Schiebetür (Isolierglas)', name: 'Szkło izolacyjne (Isolierglas)', icon: '🚪', description: 'Drzwi przesuwne aluminiowe – szkło termoizolacyjne' },
 ];
+
+// Schiebetür handle types (from Aluxe ACSL catalog)
+const SCHIEBETUR_HANDLES = [
+    { id: 'ACSL2042', name: 'Uchwyt płaski (wewnętrzny)', description: 'Handgriff flach (innen)', icon: '🔲' },
+    { id: 'ACSL2046', name: 'Uchwyt stały (zewnętrzny)', description: 'Handgriff fest (außen)', icon: '🔳' },
+    { id: 'ACSL2044', name: 'Uchwyt stały (wewnętrzny)', description: 'Handgriff fest (innen)', icon: '🔳' },
+    { id: 'ACSL2047', name: 'Uchwyt z zamkiem (zewnętrzny)', description: 'Handgriff mit Zylinder (außen)', icon: '🔐' },
+];
+
+// Schiebetür opening directions
+const SCHIEBETUR_OPENING = [
+    { id: 'left', name: 'Lewo otwierające', description: 'Links öffnend', icon: '◀️' },
+    { id: 'right', name: 'Prawo otwierające', description: 'Rechts öffnend', icon: '▶️' },
+    { id: 'center', name: 'Środkowo otwierające', description: 'Mittig öffnend/schließend', icon: '↔️' },
+];
+
+// Auto-calculate panel count from width (from Aluxe pricelist, Feldbreite max 1500mm)
+function getSchiebetuerPanelCount(widthMm: number): { count: string; maxWidth: number } {
+    if (widthMm <= 2500) return { count: '2-skrzydłowe', maxWidth: 2620 };
+    if (widthMm <= 3000) return { count: '2-3 skrzydłowe', maxWidth: 2620 };
+    if (widthMm <= 3500) return { count: '3-skrzydłowe', maxWidth: 2620 };
+    if (widthMm <= 4500) return { count: '3-4 skrzydłowe', maxWidth: 2620 };
+    if (widthMm <= 5000) return { count: '4-skrzydłowe', maxWidth: 2620 };
+    if (widthMm <= 6000) return { count: '4-6 skrzydłowe', maxWidth: 2620 };
+    return { count: '6+ skrzydłowe', maxWidth: 2620 };
+}
 
 // Panorama - frameless sliding glass systems
 const PANORAMA_PRODUCTS = [
@@ -315,6 +341,10 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama'>('fixed');
     const [structuralMetadata, setStructuralMetadata] = useState<{ posts_count: number } | null>(null);
 
+    // === SCHIEBETÜR OPTIONS ===
+    const [schiebetuerHandle, setSchiebetuerHandle] = useState<string>('ACSL2042');
+    const [schiebetuerOpening, setSchiebetuerOpening] = useState<string>('left');
+
     // === PANORAMA ACCESSORIES ===
     const [panoramaOpeningType, setPanoramaOpeningType] = useState<'side' | 'center'>('side');
     const [panoramaHandleType, setPanoramaHandleType] = useState<'griff' | 'knauf'>('griff');
@@ -405,6 +435,13 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [customItems, setCustomItems] = useState<{ id: string; name: string; price: number }[]>([]);
     const [newItemName, setNewItemName] = useState('');
     const [newItemPrice, setNewItemPrice] = useState('');
+
+    // === MANUAL OFFER MODE ===
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [manualModel, setManualModel] = useState<string>('Trendline');
+
+    // === MONTAGE (INSTALLATION) ===
+    const [montagePrice, setMontagePrice] = useState<number>(0);
 
     // === CALCULATED VALUES ===
     const areaM2 = (width * projection) / 1_000_000; // Convert mm² to m²
@@ -596,9 +633,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                 // Keilfenster is always Glass (per pricelist), even if roof is Poly
                 tableName = `Aluxe V2 - Wedge (Glass)`;
             } else if (wallProduct.includes('Schiebetür')) {
-                // All Schiebetür glass variants use the same base table (VSG klar)
-                // Surcharges for matt/iso are applied separately after base lookup
-                tableName = 'Aluxe V2 - Sliding Door';
+                // Each glass variant has its own full-price table in the database
+                tableName = `Aluxe V2 - ${wallProduct}`;
             } else if (wallProduct.includes('Panorama')) {
                 // Handle Panorama systems (AL22-AL26)
                 tableName = `Aluxe V2 - ${wallProduct}`;
@@ -701,9 +737,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                             lookupWidth = 0;
                             lookupProjection = wallHeight;
                         } else {
-                            // Front Wall / Schiebetür: price by width
+                            // Front Wall: price by width, projection = 0
+                            // Schiebetür: price by width, projection = 2200 (fixed height in pricelist)
                             lookupWidth = wallWidth;
-                            lookupProjection = 0;
+                            lookupProjection = isSchiebetur ? 2200 : 0;
                         }
 
 
@@ -743,37 +780,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             finalPrice += surcharge;
                         }
 
-                        // SCHIEBETÜR SURCHARGES (Matt / Isolierglas)
-                        // Base price is VSG klar; matt and iso are additive surcharges
-                        if (isSchiebetur && finalPrice !== null) {
-                            let surcharge = 0;
-                            if (wallProduct.includes('VSG matt')) {
-                                const { data: mattTables } = await supabase
-                                    .from('price_tables')
-                                    .select('id')
-                                    .eq('name', 'Aluxe V2 - Sliding Door Surcharge Matt')
-                                    .limit(1);
-                                if (mattTables?.[0]) {
-                                    const mattPrice = await PricingService.calculateMatrixPrice(mattTables[0].id, lookupWidth, 0);
-                                    if (mattPrice) surcharge += mattPrice;
-                                }
-                            }
-                            if (wallProduct.includes('Isolierglas')) {
-                                const { data: isoTables } = await supabase
-                                    .from('price_tables')
-                                    .select('id')
-                                    .eq('name', 'Aluxe V2 - Sliding Door Surcharge Iso')
-                                    .limit(1);
-                                if (isoTables?.[0]) {
-                                    const isoPrice = await PricingService.calculateMatrixPrice(isoTables[0].id, lookupWidth, 0);
-                                    if (isoPrice) surcharge += isoPrice;
-                                }
-                            }
-                            if (surcharge > 0) {
-                                console.log(`Schiebetür surcharge: base=${finalPrice.toFixed(2)}, surcharge=${surcharge.toFixed(2)}, total=${(finalPrice + surcharge).toFixed(2)}`);
-                                finalPrice += surcharge;
-                            }
-                        }
+                        // Schiebetür: full price already included in per-glass-type table, no surcharge needed
                     }
 
                     if (finalPrice !== null) setWallPrice(finalPrice);
@@ -1319,20 +1326,15 @@ export const ProductConfiguratorV2: React.FC = () => {
     const handleCustomerComplete = (data: Customer, snowZoneData: any) => {
         setCustomerState(data);
 
-
-
         // Map snow zone if provided
         if (snowZoneData && snowZoneData.value) {
-            // Note: snowZone in V2 is currently just a number 'zone'. 
-            // If snowZoneData is { id: '2', value: 0.85 }, we might need mapping logic
-            // For now, let's try to parse the ID if it's numeric, or default to 1
             const zoneId = parseInt(snowZoneData.id);
             if (!isNaN(zoneId)) {
                 setZone(zoneId);
             }
         }
 
-        setView('config'); // Proceed to configuration
+        setView('mode-select'); // Go to mode selection (calculator vs manual)
     };
 
 
@@ -1351,17 +1353,24 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     // Step 3: Apply customer discount (manual discount given to customer)
     const discountValue = priceAfterMargin * (discount / 100);
-    const finalPrice = priceAfterMargin - discountValue;
+    const priceAfterDiscount = priceAfterMargin - discountValue;
 
-    // === SAVE OFFER HANDLER ===
+    // Step 4: Add montage price (netto, not affected by margin/discount)
+    const finalPrice = priceAfterDiscount + montagePrice;
+
     // === SAVE OFFER HANDLER ===
     const handleSaveOffer = async () => {
         if (!currentUser) {
             toast.error('Musisz być zalogowany');
             return;
         }
-        if (basket.length === 0) {
+        // In manual mode, check customItems instead of basket
+        if (!isManualMode && basket.length === 0) {
             toast.error('Koszyk jest pusty');
+            return;
+        }
+        if (isManualMode && customItems.length === 0) {
+            toast.error('Dodaj co najmniej jedną pozycję');
             return;
         }
         // Validation using customerState
@@ -1399,25 +1408,29 @@ export const ProductConfiguratorV2: React.FC = () => {
                 notes: `Konfiguracja V2: ${basket.map(b => b.name).join(', ')}`
             });
 
+            const selectedModel = isManualMode ? manualModel : model;
+            const selectedModelConfig = ROOF_MODELS.find(m => m.id === selectedModel);
+
             const productConfig = {
-                modelId: model,
-                width: width,
-                projection: projection,
-                roofType: cover.toLowerCase() as any,
-                construction: construction,
-                color: color,
-                variant: cover === 'Glass' ? glassVariant : polyVariant,
+                modelId: selectedModel,
+                isManual: isManualMode,
+                width: isManualMode ? 0 : width,
+                projection: isManualMode ? 0 : projection,
+                roofType: isManualMode ? 'manual' as any : cover.toLowerCase() as any,
+                construction: isManualMode ? 'wall' as any : construction,
+                color: isManualMode ? '' : color,
+                variant: isManualMode ? '' : (cover === 'Glass' ? glassVariant : polyVariant),
                 // Include model image URL for interactive offer
-                imageUrl: currentModel?.image_url || `/images/models/${model.toLowerCase().replace(/\s+/g, '-').replace(/\+/g, '-plus')}.jpg`,
-                // Main items from V2 basket
-                items: basket.map(b => ({ name: b.name, config: b.config, price: b.price })),
-                // New Custom items for V2 (mapped to match ProductConfig type)
+                imageUrl: selectedModelConfig?.image_url || `/images/models/${selectedModel.toLowerCase().replace(/\s+/g, '-').replace(/\+/g, '-plus')}.jpg`,
+                // Main items from V2 basket (empty in manual mode)
+                items: isManualMode ? [] : basket.map(b => ({ name: b.name, config: b.config, price: b.price })),
+                // Custom items — primary content in manual mode, supplementary in standard mode
                 customItems: customItems.map(item => ({
                     id: item.id,
                     name: item.name,
                     price: item.price,
                     quantity: 1,
-                    description: 'Manuelle Position',
+                    description: isManualMode ? 'Manuelle Angebotsposition' : 'Manuelle Position',
                 }))
             };
 
@@ -1508,43 +1521,66 @@ export const ProductConfiguratorV2: React.FC = () => {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <button
-                            onClick={() => setView('config')}
+                            onClick={() => setView(isManualMode ? 'manual' : 'config')}
                             className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
                         >
-                            ← Zurück zur Konfiguration
+                            ← {isManualMode ? 'Zurück zur manuellen Eingabe' : 'Zurück zur Konfiguration'}
                         </button>
                         <h1 className="text-2xl font-black text-slate-900">Angebotszusammenfassung</h1>
                     </div>
 
-                    {/* Technical Specs */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            📐 Technische Daten
-                        </h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                <p className="text-slate-500 text-xs uppercase">Breite</p>
-                                <p className="font-bold text-lg">{(width / 1000).toFixed(2)} m</p>
+                    {/* Technical Specs — hidden in manual mode */}
+                    {!isManualMode ? (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                📐 Technische Daten
+                            </h2>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div className="bg-slate-50 p-3 rounded-lg text-center">
+                                    <p className="text-slate-500 text-xs uppercase">Breite</p>
+                                    <p className="font-bold text-lg">{(width / 1000).toFixed(2)} m</p>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded-lg text-center">
+                                    <p className="text-slate-500 text-xs uppercase">Tiefe</p>
+                                    <p className="font-bold text-lg">{(projection / 1000).toFixed(2)} m</p>
+                                </div>
+                                <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-200">
+                                    <p className="text-indigo-600 text-xs uppercase font-bold">Fläche</p>
+                                    <p className="font-black text-xl text-indigo-700">{areaM2.toFixed(2)} m²</p>
+                                </div>
+                                <div className="bg-amber-50 p-3 rounded-lg text-center border border-amber-200">
+                                    <p className="text-amber-600 text-xs uppercase font-bold">Pfosten</p>
+                                    <p className="font-black text-xl text-amber-700">{structuralMetadata?.posts_count || '-'}</p>
+                                </div>
                             </div>
-                            <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                <p className="text-slate-500 text-xs uppercase">Tiefe</p>
-                                <p className="font-bold text-lg">{(projection / 1000).toFixed(2)} m</p>
-                            </div>
-                            <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-200">
-                                <p className="text-indigo-600 text-xs uppercase font-bold">Fläche</p>
-                                <p className="font-black text-xl text-indigo-700">{areaM2.toFixed(2)} m²</p>
-                            </div>
-                            <div className="bg-amber-50 p-3 rounded-lg text-center border border-amber-200">
-                                <p className="text-amber-600 text-xs uppercase font-bold">Pfosten</p>
-                                <p className="font-black text-xl text-amber-700">{structuralMetadata?.posts_count || '-'}</p>
+                            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                                <div><span className="text-slate-500">Modell:</span> <strong>{model}</strong></div>
+                                <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
+                                <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
                             </div>
                         </div>
-                        <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                            <div><span className="text-slate-500">Modell:</span> <strong>{model}</strong></div>
-                            <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
-                            <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
+                    ) : (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                ✍️ Manuelles Angebot
+                            </h2>
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden border border-indigo-100">
+                                    <img
+                                        src={ROOF_MODELS.find(m => m.id === manualModel)?.image_url || '/images/models/trendline.jpg'}
+                                        alt={manualModel}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-slate-500 text-xs uppercase">Ausgewähltes Modell</p>
+                                    <p className="font-bold text-xl text-slate-800">{manualModel}</p>
+                                    <p className="text-xs text-slate-400">{ROOF_MODELS.find(m => m.id === manualModel)?.description || ''}</p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Customer Info (REFRESHED) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
@@ -1616,7 +1652,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {customItems.map((item) => (
                                     <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
                                         <td className="py-3 font-medium text-blue-700">📝 {item.name}</td>
-                                        <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
+                                        <td className="py-3 text-slate-600 text-xs">Dodano ręcznie</td>
                                         <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
                                         <td className="py-3 text-center">
                                             <button
@@ -1631,7 +1667,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 border-slate-200">
-                                    <td colSpan={2} className="py-3 font-bold">Zwischensumme</td>
+                                    <td colSpan={2} className="py-3 font-bold">Suma częściowa</td>
                                     <td className="py-3 text-right font-bold">{formatCurrency(subtotal)}</td>
                                     <td></td>
                                 </tr>
@@ -1640,20 +1676,20 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {/* Add Custom Item */}
                         <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Position hinzufügen</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Dodaj pozycję</p>
                             <div className="flex gap-2">
                                 <input
                                     type="text"
                                     value={newItemName}
                                     onChange={e => setNewItemName(e.target.value)}
-                                    placeholder="Beschreibung..."
+                                    placeholder="Opis pozycji..."
                                     className="flex-1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
                                 />
                                 <input
                                     type="number"
                                     value={newItemPrice}
                                     onChange={e => setNewItemPrice(e.target.value)}
-                                    placeholder="Preis €"
+                                    placeholder="Cena €"
                                     className="w-32 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
                                 />
                                 <button
@@ -1661,7 +1697,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     disabled={!newItemName.trim()}
                                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50"
                                 >
-                                    + Hinzufügen
+                                    + Dodaj
                                 </button>
                             </div>
                         </div>
@@ -1669,7 +1705,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                     {/* Margin & Discount */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
+                        <h2 className="font-bold text-slate-800 mb-4">💰 Marża & Rabat</h2>
 
                         {/* Purchase Discount Info (from Admin) */}
                         {purchaseDiscount > 0 && (
@@ -1687,7 +1723,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-6">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marża (%)</label>
                                 <input
                                     type="number"
                                     value={margin}
@@ -1699,7 +1735,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabatt (%)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabat (%)</label>
                                 <input
                                     type="number"
                                     value={discount}
@@ -1711,20 +1747,41 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
                             </div>
                         </div>
+
+                        {/* MONTAGE PRICE */}
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montaż (netto)</label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={montagePrice || ''}
+                                    onChange={e => setMontagePrice(parseFloat(e.target.value) || 0)}
+                                    min={0}
+                                    step={100}
+                                    placeholder="0.00"
+                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                />
+                                <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Kwota dodawana do ceny końcowej (nie podlega marży ani rabatowi)</p>
+                        </div>
                     </div>
 
                     {/* Final Price */}
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
                         <div className="flex justify-between items-center">
                             <div>
-                                <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
+                                <p className="text-indigo-200 text-sm">Cena końcowa (netto)</p>
                                 <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                <p className="text-indigo-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
+                                {montagePrice > 0 && <p className="text-indigo-200 text-xs">w tym montaż: {formatCurrency(montagePrice)}</p>}
+                                <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
                             </div>
-                            <div className="text-right">
-                                <p className="text-indigo-200 text-xs">Fläche</p>
-                                <p className="text-2xl font-bold">{areaM2.toFixed(2)} m²</p>
-                            </div>
+                            {!isManualMode && (
+                                <div className="text-right">
+                                    <p className="text-indigo-200 text-xs">Powierzchnia</p>
+                                    <p className="text-2xl font-bold">{areaM2.toFixed(2)} m²</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1734,7 +1791,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             <div className="flex items-center gap-3 text-green-700">
                                 <span className="text-2xl">✅</span>
                                 <div>
-                                    <p className="font-bold">Angebot erfolgreich gespeichert!</p>
+                                    <p className="font-bold">Oferta zapisana pomyślnie!</p>
                                     <p className="text-xs text-green-600">ID: {savedOfferId}</p>
                                 </div>
                             </div>
@@ -1816,8 +1873,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                     ) : (
                         <button
                             onClick={handleSaveOffer}
-                            disabled={savingOffer || basket.length === 0}
-                            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || basket.length === 0
+                            disabled={savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
+                            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                 : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
                                 }`}
@@ -1840,14 +1897,315 @@ export const ProductConfiguratorV2: React.FC = () => {
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
                         <CustomerForm
                             onComplete={handleCustomerComplete}
-                            submitLabel="Weiter zur Konfiguration"
+                            submitLabel="Weiter"
                             initialData={customerState || undefined}
                         />
                     </div>
                 )}
 
+                {/* MODE SELECTION VIEW */}
+                {view === 'mode-select' && (
+                    <div className="col-span-12 max-w-3xl mx-auto space-y-8">
+                        <div className="text-center">
+                            <h1 className="text-3xl font-black text-slate-900 mb-2">Angebotsart wählen</h1>
+                            <p className="text-slate-500">Wie möchten Sie das Angebot erstellen?</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Standard Calculator */}
+                            <button
+                                onClick={() => { setIsManualMode(false); setView('config'); }}
+                                className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-indigo-400 hover:shadow-lg transition-all text-left group"
+                            >
+                                <div className="text-4xl mb-4">🧮</div>
+                                <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">Kalkulator</h2>
+                                <p className="text-sm text-slate-500 leading-relaxed">
+                                    Automatische Preisberechnung basierend auf Modell, Maßen und Konfiguration.
+                                    Ideal für Standardprodukte aus dem Aluxe-Sortiment.
+                                </p>
+                                <div className="mt-4 text-xs text-slate-400">Dach • Wände • Markisen • Zubehör</div>
+                            </button>
+
+                            {/* Manual Offer */}
+                            <button
+                                onClick={() => { setIsManualMode(true); setView('manual'); }}
+                                className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-emerald-400 hover:shadow-lg transition-all text-left group"
+                            >
+                                <div className="text-4xl mb-4">✍️</div>
+                                <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">Manuelles Angebot</h2>
+                                <p className="text-sm text-slate-500 leading-relaxed">
+                                    Positionen frei eingeben mit Name und Preis.
+                                    Ideal für individuelle Angebote und Sonderanfertigungen.
+                                </p>
+                                <div className="mt-4 text-xs text-slate-400">Freie Eingabe • Flexibel • Schnell</div>
+                            </button>
+                        </div>
+                        <div className="text-center">
+                            <button
+                                onClick={() => setView('customer')}
+                                className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                ← Zurück zu Kundendaten
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* MANUAL OFFER VIEW */}
+                {view === 'manual' && (
+                    <div className="col-span-12 max-w-4xl mx-auto space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={() => setView('mode-select')}
+                                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                            >
+                                ← Zurück zur Auswahl
+                            </button>
+                            <h1 className="text-2xl font-black text-slate-900">✍️ Manuelles Angebot</h1>
+                        </div>
+
+                        {/* Customer compact header */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                    <span className="text-xl">👤</span>
+                                </div>
+                                <div>
+                                    <span className="font-bold text-slate-800 block">
+                                        {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : 'Kein Kunde'}
+                                    </span>
+                                    <span className="text-xs text-slate-400">{customerState?.email || ''}</span>
+                                </div>
+                            </div>
+                            <button onClick={() => setView('customer')} className="text-xs text-indigo-600 font-bold hover:underline">
+                                Bearbeiten
+                            </button>
+                        </div>
+
+                        {/* Model Selection */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                🏠 Modell auswählen <span className="text-xs text-red-500 font-normal">(erforderlich)</span>
+                            </h2>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                {ROOF_MODELS.map(m => (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => setManualModel(m.id)}
+                                        className={`p-3 rounded-xl border-2 text-center transition-all ${manualModel === m.id
+                                                ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                                                : 'border-slate-200 bg-white hover:border-slate-300'
+                                            }`}
+                                    >
+                                        <div className="w-full h-16 rounded-lg overflow-hidden mb-2 bg-slate-100">
+                                            <img
+                                                src={m.image_url}
+                                                alt={m.name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                            />
+                                        </div>
+                                        <p className={`text-xs font-bold ${manualModel === m.id ? 'text-indigo-700' : 'text-slate-700'}`}>{m.name}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Line Items */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                📋 Angebotspositionen
+                            </h2>
+
+                            {customItems.length > 0 && (
+                                <table className="w-full text-sm mb-4">
+                                    <thead>
+                                        <tr className="border-b border-slate-100">
+                                            <th className="text-left py-2 text-slate-500 w-8">#</th>
+                                            <th className="text-left py-2 text-slate-500">Bezeichnung</th>
+                                            <th className="text-right py-2 text-slate-500">Preis (netto)</th>
+                                            <th className="w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {customItems.map((item, index) => (
+                                            <tr key={item.id} className="border-b border-slate-50 last:border-0">
+                                                <td className="py-3 text-slate-400 text-xs">{index + 1}</td>
+                                                <td className="py-3 font-medium text-slate-800">{item.name}</td>
+                                                <td className="py-3 text-right font-bold text-slate-800">{formatCurrency(item.price)}</td>
+                                                <td className="py-3 text-center">
+                                                    <button
+                                                        onClick={() => setCustomItems(prev => prev.filter(i => i.id !== item.id))}
+                                                        className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="border-t-2 border-slate-200">
+                                            <td colSpan={2} className="py-3 font-bold text-slate-800">Summe</td>
+                                            <td className="py-3 text-right font-black text-indigo-600">{formatCurrency(customItemsTotal)}</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            )}
+
+                            {customItems.length === 0 && (
+                                <div className="text-center py-8 text-slate-400">
+                                    <p className="text-3xl mb-2">📝</p>
+                                    <p className="text-sm">Noch keine Positionen. Fügen Sie Ihre erste Position hinzu.</p>
+                                </div>
+                            )}
+
+                            {/* Add Item */}
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Neue Position hinzufügen</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newItemName}
+                                        onChange={e => setNewItemName(e.target.value)}
+                                        placeholder="Positionsbezeichnung..."
+                                        className="flex-1 p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newItemName.trim()) {
+                                                const price = parseFloat(newItemPrice) || 0;
+                                                setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
+                                                setNewItemName('');
+                                                setNewItemPrice('');
+                                            }
+                                        }}
+                                    />
+                                    <input
+                                        type="number"
+                                        value={newItemPrice}
+                                        onChange={e => setNewItemPrice(e.target.value)}
+                                        placeholder="Preis €"
+                                        className="w-36 p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newItemName.trim()) {
+                                                const price = parseFloat(newItemPrice) || 0;
+                                                setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
+                                                setNewItemName('');
+                                                setNewItemPrice('');
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (!newItemName.trim()) return;
+                                            const price = parseFloat(newItemPrice) || 0;
+                                            setCustomItems(prev => [...prev, { id: `manual-${Date.now()}`, name: newItemName.trim(), price }]);
+                                            setNewItemName('');
+                                            setNewItemPrice('');
+                                        }}
+                                        disabled={!newItemName.trim()}
+                                        className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50 transition-all"
+                                    >
+                                        + Hinzufügen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Margin & Discount */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4">💰 Marża & Rabat</h2>
+
+                            {purchaseDiscount > 0 && (
+                                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
+                                        <span className="font-bold text-green-800">{purchaseDiscount}%</span>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-1 text-xs text-green-600">
+                                        <span>Cena zakupu:</span>
+                                        <span className="font-bold">{formatCurrency(purchasePrice)}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
+                                    <input
+                                        type="number"
+                                        value={margin}
+                                        onChange={e => setMargin(parseFloat(e.target.value) || 0)}
+                                        min={0}
+                                        max={100}
+                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabatt (%)</label>
+                                    <input
+                                        type="number"
+                                        value={discount}
+                                        onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+                                        min={0}
+                                        max={100}
+                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
+                                </div>
+                            </div>
+
+                            {/* Montage Price */}
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="number"
+                                        value={montagePrice || ''}
+                                        onChange={e => setMontagePrice(parseFloat(e.target.value) || 0)}
+                                        min={0}
+                                        step={100}
+                                        placeholder="0.00"
+                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                    />
+                                    <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Final Price Preview */}
+                        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl shadow-lg p-6 text-white">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-emerald-200 text-sm">Endpreis (netto)</p>
+                                    <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
+                                    {montagePrice > 0 && <p className="text-emerald-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
+                                    <p className="text-emerald-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-emerald-200 text-xs">Positionen</p>
+                                    <p className="text-2xl font-bold">{customItems.length}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Button */}
+                        <button
+                            onClick={() => setView('summary')}
+                            disabled={customItems.length === 0}
+                            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${customItems.length === 0
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
+                                }`}
+                        >
+                            Weiter zur Zusammenfassung →
+                        </button>
+                    </div>
+                )}
+
                 {/* CONFIG/SUMMARY VIEW */}
-                {(view === 'config' || view === 'summary') && (
+                {(view === 'config') && (
                     <>
                         {/* Compact Customer Header (replacing the old expandable card) */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-8 flex justify-between items-center">
@@ -2417,23 +2775,102 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                                                         {/* SLIDING DOORS */}
                                                         {wallCategory === 'sliding' && (
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                                {SCHIEBETUR_PRODUCTS.map(p => (
-                                                                    <button
-                                                                        key={p.id}
-                                                                        onClick={() => setWallProduct(p.id)}
-                                                                        className={`text-left p-4 rounded-xl border transition-all flex items-center gap-3 ${wallProduct === p.id
-                                                                            ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200 shadow-sm'
-                                                                            : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'}`}
-                                                                    >
-                                                                        <span className="text-3xl bg-white p-2 rounded-lg shadow-sm">{p.icon}</span>
-                                                                        <div>
-                                                                            <div className="font-bold text-slate-700">{p.name}</div>
-                                                                            <div className="text-xs text-slate-400 mt-1">{p.description}</div>
+                                                            <>
+                                                                <div className="space-y-2">
+                                                                    {SCHIEBETUR_PRODUCTS.map(p => (
+                                                                        <button
+                                                                            key={p.id}
+                                                                            onClick={() => setWallProduct(p.id)}
+                                                                            className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${wallProduct === p.id
+                                                                                ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200 shadow-sm'
+                                                                                : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'}`}
+                                                                        >
+                                                                            <span className="text-2xl bg-white p-2 rounded-lg shadow-sm flex-shrink-0">{p.icon}</span>
+                                                                            <div className="min-w-0">
+                                                                                <div className="font-bold text-slate-700 text-sm">{p.name}</div>
+                                                                                <div className="text-xs text-slate-400 mt-0.5 truncate">{p.description}</div>
+                                                                            </div>
+                                                                            {wallProduct === p.id && <span className="ml-auto text-indigo-500 flex-shrink-0">✓</span>}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+
+                                                                {/* PANEL COUNT INFO */}
+                                                                {wallProduct.includes('Schiebetür') && (
+                                                                    <div className="mt-4 p-3 bg-indigo-50 rounded-xl border border-indigo-200">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-lg">📐</span>
+                                                                                <span className="text-sm font-bold text-indigo-800">Ilość skrzydeł</span>
+                                                                            </div>
+                                                                            <span className="text-sm font-black text-indigo-700 bg-white px-3 py-1 rounded-lg shadow-sm">
+                                                                                {getSchiebetuerPanelCount(wallWidth).count}
+                                                                            </span>
                                                                         </div>
-                                                                    </button>
-                                                                ))}
-                                                            </div>
+                                                                        <p className="text-[10px] text-indigo-500 mt-1">Automatycznie na podstawie szerokości (maks. szerokość skrzydła: 1500mm)</p>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* OPENING DIRECTION */}
+                                                                {wallProduct.includes('Schiebetür') && (
+                                                                    <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                                                        <h4 className="text-sm font-bold text-slate-700 mb-3">Kierunek otwierania</h4>
+                                                                        <div className="grid grid-cols-3 gap-2">
+                                                                            {SCHIEBETUR_OPENING.map(o => (
+                                                                                <button
+                                                                                    key={o.id}
+                                                                                    onClick={() => setSchiebetuerOpening(o.id)}
+                                                                                    className={`p-3 rounded-lg border-2 text-center transition-all ${schiebetuerOpening === o.id
+                                                                                        ? 'border-indigo-500 bg-white shadow-sm ring-1 ring-indigo-300'
+                                                                                        : 'border-slate-100 bg-white/50 hover:border-indigo-300'
+                                                                                        }`}
+                                                                                >
+                                                                                    <div className="text-lg mb-1">{o.icon}</div>
+                                                                                    <div className="font-bold text-xs text-slate-800">{o.name}</div>
+                                                                                    <div className="text-[9px] text-slate-400 mt-0.5">{o.description}</div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* HANDLE TYPE */}
+                                                                {wallProduct.includes('Schiebetür') && (
+                                                                    <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                                                        <h4 className="text-sm font-bold text-slate-700 mb-3">Typ uchwytu (Griff)</h4>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            {SCHIEBETUR_HANDLES.map(h => (
+                                                                                <button
+                                                                                    key={h.id}
+                                                                                    onClick={() => setSchiebetuerHandle(h.id)}
+                                                                                    className={`text-left p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${schiebetuerHandle === h.id
+                                                                                        ? 'border-indigo-500 bg-white shadow-sm ring-1 ring-indigo-300'
+                                                                                        : 'border-slate-100 bg-white/50 hover:border-indigo-300'
+                                                                                        }`}
+                                                                                >
+                                                                                    <span className="text-lg">{h.icon}</span>
+                                                                                    <div>
+                                                                                        <div className="font-bold text-xs text-slate-800">{h.name}</div>
+                                                                                        <div className="text-[9px] text-slate-400">{h.id}</div>
+                                                                                    </div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* INCLUDED INFO */}
+                                                                {wallProduct.includes('Schiebetür') && (
+                                                                    <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-200 text-xs text-green-700">
+                                                                        <strong className="block mb-1">✅ W cenie zawarte:</strong>
+                                                                        <ul className="list-disc list-inside space-y-0.5">
+                                                                            <li>Uszczelki (Dichtung) 44.2 VSG klar</li>
+                                                                            <li>Nakładki odwadniające (Entwässerungskappen)</li>
+                                                                            <li>Kolor standardowy: RAL 7016 / 9007 / 9010 / 9016 / 9005 / DB703</li>
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                            </>
                                                         )}
 
                                                         {/* PANORAMA */}
@@ -2653,6 +3090,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                             onClick={() => {
                                                                 if (!wallPrice) return;
                                                                 const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
+                                                                const isSchiebetur = wallProduct.includes('Schiebetür');
 
                                                                 // Calculate accessories total for Keilfenster
                                                                 let accessoriesTotal = 0;
@@ -2667,11 +3105,24 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 }
 
                                                                 const totalWithAccessories = wallPrice + accessoriesTotal;
-                                                                const configStr = isWedge && accessoriesNames.length > 0
-                                                                    ? `${wallProduct} + ${accessoriesNames.join(', ')}`
-                                                                    : wallProduct;
 
-                                                                addToBasket(wallProduct, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
+                                                                // Build display-friendly name
+                                                                let displayName = wallProduct;
+                                                                let configStr = '';
+                                                                if (isSchiebetur) {
+                                                                    const schiebaturProduct = SCHIEBETUR_PRODUCTS.find(p => p.id === wallProduct);
+                                                                    const handleInfo = SCHIEBETUR_HANDLES.find(h => h.id === schiebetuerHandle);
+                                                                    const openingInfo = SCHIEBETUR_OPENING.find(o => o.id === schiebetuerOpening);
+                                                                    const panelInfo = getSchiebetuerPanelCount(wallWidth);
+                                                                    displayName = schiebaturProduct ? `Drzwi przesuwne – ${schiebaturProduct.name}` : wallProduct;
+                                                                    configStr = `${displayName} | ${panelInfo.count} | ${openingInfo?.name || ''} | ${handleInfo?.name || ''} (${schiebetuerHandle})`;
+                                                                } else {
+                                                                    configStr = isWedge && accessoriesNames.length > 0
+                                                                        ? `${displayName} + ${accessoriesNames.join(', ')}`
+                                                                        : displayName;
+                                                                }
+
+                                                                addToBasket(displayName, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
 
                                                                 // Reset accessories after adding
                                                                 if (isWedge) {
@@ -3235,7 +3686,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
             {/* RIGHT COLUMN: Summary (Always visible in Config/Summary view) */}
             {
-                (view === 'config' || view === 'summary') && (
+                (view === 'config') && (
                     <div className="col-span-12 lg:col-span-3 space-y-4 lg:sticky lg:top-4">
                         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
                             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h3>
