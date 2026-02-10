@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { RouteCalculationService } from '../../services/route-calculation.service';
-import { DatabaseService } from '../../services/database';
+import { supabase } from '../../lib/supabase';
 import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,7 +13,7 @@ export const RecalculateRoutesButton: React.FC = () => {
 
         try {
             // Get all measurements without routes from today onwards
-            const { data: measurements, error } = await DatabaseService.supabase
+            const { data: measurements, error } = await supabase
                 .from('measurements')
                 .select('*')
                 .is('route_id', null)
