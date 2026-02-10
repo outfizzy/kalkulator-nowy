@@ -34,7 +34,7 @@ export interface MeasurementCost {
 export class RouteCalculationService {
     private static readonly ORIGIN = 'Gubin 66-620, Poland';
     private static readonly FUEL_CONSUMPTION_RATE = 0.08; // 8L per 100km
-    private static readonly GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    private static readonly GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCbhKLr6dhJCDpo-YeWSPh32UQvGLf48_E';
 
     /**
      * Calculate route from Gubin to destination using Google Maps Directions API
