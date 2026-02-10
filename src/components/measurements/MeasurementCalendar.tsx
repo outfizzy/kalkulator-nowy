@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Measurement, MeasurementReport } from '../../types';
 import { MeasurementReportModal } from './MeasurementReportModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
-import { FileText, PlusSquare } from 'lucide-react';
+import { RouteCalculationService, type MeasurementRoute } from '../../services/route-calculation.service';
+import { FileText, PlusSquare, MapPin, Fuel } from 'lucide-react';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -20,6 +22,7 @@ function getStartOfWeek(date: Date): Date {
 
 export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measurements, onEdit, onDragDrop }) => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
         return getStartOfWeek(today);
@@ -33,13 +36,16 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
     const [selectedReportDate, setSelectedReportDate] = useState<Date>(new Date());
     const [selectedReport, setSelectedReport] = useState<MeasurementReport | undefined>(undefined);
 
+    // Routes Integration
+    const [routes, setRoutes] = useState<Record<string, MeasurementRoute>>({});
+
     const weekDays = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(currentWeekStart);
         date.setDate(date.getDate() + i);
         return date;
     });
 
-    React.useEffect(() => {
+    useEffect(() => {
         const fetchReports = async () => {
             if (!currentUser?.id) return;
             try {
@@ -57,6 +63,27 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
         };
         fetchReports();
     }, [currentWeekStart, currentUser?.id]);
+
+    // Fetch routes for measurements
+    useEffect(() => {
+        const fetchRoutes = async () => {
+            const routesMap: Record<string, MeasurementRoute> = {};
+            for (const measurement of measurements) {
+                try {
+                    const route = await RouteCalculationService.getRouteForMeasurement(measurement.id);
+                    if (route) {
+                        routesMap[measurement.id] = route;
+                    }
+                } catch (e) {
+                    console.error(`Error fetching route for measurement ${measurement.id}:`, e);
+                }
+            }
+            setRoutes(routesMap);
+        };
+        if (measurements.length > 0) {
+            fetchRoutes();
+        }
+    }, [measurements]);
 
     const handlePrevWeek = () => {
         const newStart = new Date(currentWeekStart);
@@ -199,37 +226,65 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                             </div>
 
                             <div className="space-y-2">
-                                {dayMeasurements.map((measurement) => (
-                                    <div
-                                        key={measurement.id}
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, measurement.id)}
-                                        onClick={() => onEdit(measurement)}
-                                        className={`
-                                            p-3 rounded-lg border cursor-pointer transition-all shadow-sm
-                                            ${getStatusBadgeColor(measurement.status)}
-                                            hover:shadow-md active:scale-95
-                                            ${draggedItemId === measurement.id ? 'opacity-50' : ''}
-                                        `}
-                                    >
-                                        <div className="text-xs font-bold mb-1 text-slate-800">
-                                            {measurement.customerName}
+                                {dayMeasurements.map((measurement) => {
+                                    const route = routes[measurement.id];
+                                    return (
+                                        <div
+                                            key={measurement.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, measurement.id)}
+                                            onClick={(e) => {
+                                                // If has lead_id, navigate to lead details
+                                                if (measurement.leadId && e.ctrlKey) {
+                                                    e.stopPropagation();
+                                                    navigate(`/leads/${measurement.leadId}`);
+                                                } else {
+                                                    onEdit(measurement);
+                                                }
+                                            }}
+                                            className={`
+                                                p-3 rounded-lg border cursor-pointer transition-all shadow-sm
+                                                ${getStatusBadgeColor(measurement.status)}
+                                                hover:shadow-md active:scale-95
+                                                ${draggedItemId === measurement.id ? 'opacity-50' : ''}
+                                            `}
+                                            title={measurement.leadId ? 'Ctrl+Click aby zobaczyć lead' : ''}
+                                        >
+                                            <div className="text-xs font-bold mb-1 text-slate-800">
+                                                {measurement.customerName}
+                                            </div>
+                                            <div className="text-xs text-slate-500 flex items-center gap-1">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                {measurement.salesRepName}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <span className="truncate">{measurement.customerAddress}</span>
+                                            </div>
+
+                                            {/* Route info */}
+                                            {route && (
+                                                <div className="mt-2 pt-2 border-t border-slate-200/50 flex items-center justify-between text-xs">
+                                                    <div className="flex items-center gap-1 text-blue-600">
+                                                        <MapPin size={12} />
+                                                        <span className="font-medium">{route.distance_km.toFixed(0)}km</span>
+                                                    </div>
+                                                    {route.fuel_cost && (
+                                                        <div className="flex items-center gap-1 text-green-600">
+                                                            <Fuel size={12} />
+                                                            <span className="font-medium">{route.fuel_cost.toFixed(2)}zł</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="text-xs text-slate-500 flex items-center gap-1">
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                            </svg>
-                                            {measurement.salesRepName}
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                            <span className="truncate">{measurement.customerAddress}</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     );
