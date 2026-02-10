@@ -103,61 +103,7 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
             return;
         }
 
-        // Add numbered markers for each measurement
-        measurementsWithGPS.forEach((measurement, idx) => {
-            const route = routes[measurement.id];
-            const color = selectedSalesRep
-                ? COLORS[salesReps.indexOf(selectedSalesRep) % COLORS.length]
-                : COLORS[salesReps.indexOf(measurement.salesRepId) % COLORS.length];
-
-            const marker = new google.maps.Marker({
-                position: { lat: measurement.locationLat!, lng: measurement.locationLng! },
-                map,
-                label: {
-                    text: `${idx + 1}`,
-                    color: 'white',
-                    fontWeight: 'bold',
-                },
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 12,
-                    fillColor: color,
-                    fillOpacity: 1,
-                    strokeColor: 'white',
-                    strokeWeight: 2,
-                },
-                title: measurement.customerName,
-                zIndex: 10,
-            });
-
-            const infoWindow = new google.maps.InfoWindow({
-                content: `
-                    <div style="padding: 8px; max-width: 220px;">
-                        <div style="font-weight: bold; font-size: 14px;">${idx + 1}. ${measurement.customerName}</div>
-                        <div style="font-size: 12px; color: #666; margin-top: 4px;">${measurement.customerAddress}</div>
-                        <div style="font-size: 12px; color: #888; margin-top: 4px;">
-                            <strong>Handlowiec:</strong> ${measurement.salesRepName}
-                        </div>
-                        ${route?.distance_km ? `
-                            <div style="font-size: 12px; color: #3B82F6; margin-top: 4px;">
-                                📍 ${route.distance_km.toFixed(0)} km z Gubina
-                            </div>
-                        ` : ''}
-                        ${route?.fuel_cost ? `
-                            <div style="font-size: 12px; color: #10B981;">
-                                ⛽ ${route.fuel_cost.toFixed(2)} zł
-                            </div>
-                        ` : ''}
-                    </div>
-                `,
-            });
-
-            marker.addListener('click', () => {
-                infoWindow.open(map, marker);
-            });
-        });
-
-        // Draw ONE connected route per sales rep: Gubin → Client 1 → Client 2 → ... → Gubin
+        // Process each sales rep individually: markers numbered per rep + connected route
         const repsToRender = selectedSalesRep
             ? [selectedSalesRep]
             : salesReps;
@@ -172,7 +118,60 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
 
             const color = COLORS[salesReps.indexOf(repId) % COLORS.length];
 
-            // Build waypoints from customer GPS coordinates
+            // Add numbered markers PER REP (each rep starts from 1)
+            repMeasurements.forEach((measurement, repIdx) => {
+                const route = routes[measurement.id];
+                const repNumber = repIdx + 1; // Each rep starts from 1
+
+                const marker = new google.maps.Marker({
+                    position: { lat: measurement.locationLat!, lng: measurement.locationLng! },
+                    map,
+                    label: {
+                        text: `${repNumber}`,
+                        color: 'white',
+                        fontWeight: 'bold',
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: color,
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 2,
+                    },
+                    title: `${measurement.salesRepName} - ${repNumber}. ${measurement.customerName}`,
+                    zIndex: 10,
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px; max-width: 220px;">
+                            <div style="font-weight: bold; font-size: 14px;">${repNumber}. ${measurement.customerName}</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 4px;">${measurement.customerAddress}</div>
+                            <div style="font-size: 12px; margin-top: 4px;">
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;"></span>
+                                <strong>${measurement.salesRepName}</strong>
+                            </div>
+                            ${route?.distance_km ? `
+                                <div style="font-size: 12px; color: #3B82F6; margin-top: 4px;">
+                                    📍 ${route.distance_km.toFixed(0)} km z Gubina
+                                </div>
+                            ` : ''}
+                            ${route?.fuel_cost ? `
+                                <div style="font-size: 12px; color: #10B981;">
+                                    ⛽ ${route.fuel_cost.toFixed(2)} zł
+                                </div>
+                            ` : ''}
+                        </div>
+                    `,
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+            });
+
+            // Draw ONE connected route for this rep: Gubin → Client 1 → Client 2 → ... → Gubin
             const waypoints = repMeasurements.map(m => ({
                 location: new google.maps.LatLng(m.locationLat!, m.locationLng!),
                 stopover: true,
@@ -182,9 +181,9 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
             directionsService.route(
                 {
                     origin: GUBIN_COORDS,
-                    destination: GUBIN_COORDS, // Return to Gubin!
+                    destination: GUBIN_COORDS,
                     waypoints: waypoints,
-                    optimizeWaypoints: false, // Keep order as planned
+                    optimizeWaypoints: false,
                     travelMode: google.maps.TravelMode.DRIVING,
                 },
                 (result, status) => {
@@ -192,7 +191,7 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                         const renderer = new google.maps.DirectionsRenderer({
                             map: map,
                             directions: result,
-                            suppressMarkers: true, // We have custom numbered markers
+                            suppressMarkers: true,
                             polylineOptions: {
                                 strokeColor: color,
                                 strokeOpacity: 0.7,
@@ -200,9 +199,9 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                             },
                         });
                         renderersRef.current.push(renderer);
-                        console.log(`Connected route drawn for rep: ${repMeasurements.length} stops`);
+                        console.log(`Route for ${repMeasurements[0]?.salesRepName}: ${repMeasurements.length} stops`);
                     } else {
-                        console.error('Failed to calculate connected route:', status);
+                        console.error('Failed to calculate route:', status);
                     }
                 }
             );
