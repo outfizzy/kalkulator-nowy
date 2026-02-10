@@ -5,6 +5,8 @@ export interface RouteData {
     duration_minutes: number;
     polyline: string;
     destination_address: string;
+    destination_lat: number;
+    destination_lng: number;
 }
 
 export interface MeasurementRoute {
@@ -70,7 +72,9 @@ export class RouteCalculationService {
                 distance_km: leg.distance.value / 1000, // Convert meters to km
                 duration_minutes: Math.round(leg.duration.value / 60), // Convert seconds to minutes
                 polyline: route.overview_polyline.points,
-                destination_address: leg.end_address
+                destination_address: leg.end_address,
+                destination_lat: leg.end_location.lat,
+                destination_lng: leg.end_location.lng
             };
         } catch (error) {
             console.error('Error calculating route:', error);
@@ -131,10 +135,14 @@ export class RouteCalculationService {
 
             if (error) throw error;
 
-            // 4. Update measurement with route_id
+            // 4. Update measurement with route_id and GPS coordinates
             await supabase
                 .from('measurements')
-                .update({ route_id: data.id })
+                .update({
+                    route_id: data.id,
+                    location_lat: routeData.destination_lat,
+                    location_lng: routeData.destination_lng
+                })
                 .eq('id', measurementId);
 
             return data;

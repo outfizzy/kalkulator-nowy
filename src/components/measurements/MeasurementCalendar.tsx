@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import type { Measurement, MeasurementReport } from '../../types';
 import { MeasurementReportModal } from './MeasurementReportModal';
 import { MeasurementOutcomeModal } from './MeasurementOutcomeModal';
+import { DailyRouteMap } from './DailyRouteMap';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { RouteCalculationService, type MeasurementRoute } from '../../services/route-calculation.service';
-import { FileText, PlusSquare, MapPin, Fuel, CheckCircle } from 'lucide-react';
+import { FileText, PlusSquare, MapPin, Fuel, CheckCircle, Map } from 'lucide-react';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -43,6 +44,10 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
     // Outcome Modal
     const [showOutcomeModal, setShowOutcomeModal] = useState(false);
     const [selectedMeasurement, setSelectedMeasurement] = useState<Measurement | null>(null);
+
+    // Route Map Modal
+    const [showMapModal, setShowMapModal] = useState(false);
+    const [selectedMapDate, setSelectedMapDate] = useState<Date>(new Date());
 
     const weekDays = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(currentWeekStart);
@@ -209,23 +214,39 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                     const report = reports.find(r => r.date === dateStr);
 
                                     return (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Avoid triggering other clicks
-                                                setSelectedReportDate(date);
-                                                setSelectedReport(report);
-                                                setShowReportModal(true);
-                                            }}
-                                            className={`
-                                                p-1 rounded transition-colors
-                                                ${report
-                                                    ? 'text-green-600 hover:bg-green-50'
-                                                    : 'text-slate-300 hover:text-accent hover:bg-slate-50'}
-                                            `}
-                                            title={report ? 'Edytuj Raport' : 'Utwórz Raport'}
-                                        >
-                                            {report ? <FileText size={16} /> : <PlusSquare size={16} />}
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            {/* Map Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedMapDate(date);
+                                                    setShowMapModal(true);
+                                                }}
+                                                className="p-1 rounded transition-colors text-purple-600 hover:bg-purple-50"
+                                                title="Pokaż mapę tras"
+                                            >
+                                                <Map size={16} />
+                                            </button>
+
+                                            {/* Report Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedReportDate(date);
+                                                    setSelectedReport(report);
+                                                    setShowReportModal(true);
+                                                }}
+                                                className={`
+                                                    p-1 rounded transition-colors
+                                                    ${report
+                                                        ? 'text-green-600 hover:bg-green-50'
+                                                        : 'text-slate-300 hover:text-accent hover:bg-slate-50'}
+                                                `}
+                                                title={report ? 'Edytuj Raport' : 'Utwórz Raport'}
+                                            >
+                                                {report ? <FileText size={16} /> : <PlusSquare size={16} />}
+                                            </button>
+                                        </div>
                                     );
                                 })()}
                             </div>
@@ -380,6 +401,16 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                         // Refresh measurements list
                         window.location.reload(); // Simple refresh for now
                     }}
+                />
+            )}
+
+            {/* Route Map Modal */}
+            {showMapModal && (
+                <DailyRouteMap
+                    date={selectedMapDate}
+                    measurements={getMeasurementsForDate(selectedMapDate)}
+                    routes={routes}
+                    onClose={() => setShowMapModal(false)}
                 />
             )}
         </div>
