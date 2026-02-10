@@ -4,6 +4,7 @@ import type { Measurement, MeasurementReport } from '../../types';
 import { MeasurementReportModal } from './MeasurementReportModal';
 import { MeasurementOutcomeModal } from './MeasurementOutcomeModal';
 import { DailyRouteMap } from './DailyRouteMap';
+import { RecalculateRoutesButton } from './RecalculateRoutesButton';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { RouteCalculationService, type MeasurementRoute } from '../../services/route-calculation.service';
@@ -171,8 +172,11 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                     Poprzedni tydzień
                 </button>
 
-                <div className="text-lg font-bold text-slate-800">
-                    {formatDate(weekDays[0])} - {formatDate(weekDays[6])}
+                <div className="flex items-center gap-3">
+                    <div className="text-lg font-bold text-slate-800">
+                        {formatDate(weekDays[0])} - {formatDate(weekDays[6])}
+                    </div>
+                    <RecalculateRoutesButton />
                 </div>
 
                 <button
