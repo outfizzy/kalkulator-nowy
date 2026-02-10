@@ -121,10 +121,40 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
             ? measurementsBySalesRep[selectedSalesRep] || []
             : measurements;
 
+        // Sort by orderInRoute if available
+        const sortedMeasurements = [...filteredMeasurements].sort((a, b) => {
+            const orderA = a.orderInRoute || 999;
+            const orderB = b.orderInRoute || 999;
+            return orderA - orderB;
+        });
+
+        // Debug logging
+        console.log('DailyRouteMap - Measurements:', sortedMeasurements.length);
+        console.log('DailyRouteMap - Routes:', Object.keys(routes).length);
+        sortedMeasurements.forEach((m, idx) => {
+            const route = routes[m.id];
+            console.log(`Measurement ${idx + 1}:`, {
+                customer: m.customerName,
+                hasRoute: !!route,
+                hasPolyline: !!route?.route_polyline,
+                hasGPS: !!(m.locationLat && m.locationLng),
+                lat: m.locationLat,
+                lng: m.locationLng
+            });
+        });
+
         // Draw routes and markers for each measurement
-        filteredMeasurements.forEach((measurement, idx) => {
+        let lastPosition = GUBIN_COORDS;
+
+        sortedMeasurements.forEach((measurement, idx) => {
             const route = routes[measurement.id];
-            if (!route) return;
+
+            console.log(`Drawing measurement ${idx + 1}:`, measurement.customerName, route ? 'has route' : 'NO ROUTE');
+
+            if (!route) {
+                console.warn(`No route found for measurement ${measurement.id}`);
+                return;
+            }
 
             const color = selectedSalesRep
                 ? COLORS[salesReps.indexOf(selectedSalesRep) % COLORS.length]
@@ -134,6 +164,7 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
             if (route.route_polyline) {
                 try {
                     const path = decodePolyline(route.route_polyline);
+                    console.log(`Drawing polyline for ${measurement.customerName}, points:`, path.length);
                     new google.maps.Polyline({
                         path,
                         geodesic: true,
@@ -142,14 +173,19 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                         strokeWeight: 3,
                         map,
                     });
+
+                    // Update last position for return trip
+                    if (path.length > 0) {
+                        lastPosition = path[path.length - 1];
+                    }
                 } catch (error) {
-                    console.error('Error decoding polyline:', error);
+                    console.error('Error decoding polyline:', error, route.route_polyline);
                 }
+            } else {
+                console.warn(`No polyline for ${measurement.customerName}`);
             }
 
             // Add numbered marker for measurement
-            // We need to geocode the address to get coordinates
-            // For now, use a placeholder or skip if no coordinates
             if (measurement.locationLat && measurement.locationLng) {
                 const marker = new google.maps.Marker({
                     position: { lat: measurement.locationLat, lng: measurement.locationLng },
@@ -196,8 +232,35 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                 marker.addListener('click', () => {
                     infoWindow.open(map, marker);
                 });
+
+                // Update last position
+                lastPosition = { lat: measurement.locationLat, lng: measurement.locationLng };
+            } else {
+                console.warn(`No GPS coordinates for ${measurement.customerName}`);
             }
         });
+
+        // Add return trip to Gubin (dashed line)
+        if (sortedMeasurements.length > 0 && lastPosition.lat !== GUBIN_COORDS.lat) {
+            console.log('Drawing return trip from', lastPosition, 'to Gubin');
+            new google.maps.Polyline({
+                path: [lastPosition, GUBIN_COORDS],
+                geodesic: true,
+                strokeColor: '#94A3B8', // gray
+                strokeOpacity: 0.6,
+                strokeWeight: 2,
+                map,
+                icons: [{
+                    icon: {
+                        path: 'M 0,-1 0,1',
+                        strokeOpacity: 1,
+                        scale: 3
+                    },
+                    offset: '0',
+                    repeat: '10px'
+                }]
+            });
+        }
 
         // Fit bounds to show all markers
         if (filteredMeasurements.length > 0) {
@@ -263,8 +326,8 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                     <button
                         onClick={() => setSelectedSalesRep(null)}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${selectedSalesRep === null
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                     >
                         Wszyscy ({measurements.length})
@@ -279,8 +342,8 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                                 key={salesRepId}
                                 onClick={() => setSelectedSalesRep(salesRepId)}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${selectedSalesRep === salesRepId
-                                        ? 'text-white'
-                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    ? 'text-white'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                     }`}
                                 style={{
                                     backgroundColor: selectedSalesRep === salesRepId ? color : undefined,
