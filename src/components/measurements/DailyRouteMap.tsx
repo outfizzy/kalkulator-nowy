@@ -240,26 +240,64 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
             }
         });
 
-        // Add return trip to Gubin (dashed line)
+        // Calculate and draw return trip to Gubin using actual route
         if (sortedMeasurements.length > 0 && lastPosition.lat !== GUBIN_COORDS.lat) {
-            console.log('Drawing return trip from', lastPosition, 'to Gubin');
-            new google.maps.Polyline({
-                path: [lastPosition, GUBIN_COORDS],
-                geodesic: true,
-                strokeColor: '#94A3B8', // gray
-                strokeOpacity: 0.6,
-                strokeWeight: 2,
-                map,
-                icons: [{
-                    icon: {
-                        path: 'M 0,-1 0,1',
-                        strokeOpacity: 1,
-                        scale: 3
-                    },
-                    offset: '0',
-                    repeat: '10px'
-                }]
-            });
+            console.log('Calculating return trip from', lastPosition, 'to Gubin');
+
+            // Use Google Directions API to get actual return route
+            const directionsService = new google.maps.DirectionsService();
+            directionsService.route(
+                {
+                    origin: lastPosition,
+                    destination: GUBIN_COORDS,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                },
+                (result, status) => {
+                    if (status === 'OK' && result) {
+                        // Draw the return route with dashed gray line
+                        new google.maps.DirectionsRenderer({
+                            map: map,
+                            directions: result,
+                            suppressMarkers: true, // Don't show A/B markers
+                            polylineOptions: {
+                                strokeColor: '#94A3B8', // gray
+                                strokeOpacity: 0.6,
+                                strokeWeight: 2,
+                                icons: [{
+                                    icon: {
+                                        path: 'M 0,-1 0,1',
+                                        strokeOpacity: 1,
+                                        scale: 3
+                                    },
+                                    offset: '0',
+                                    repeat: '10px'
+                                }]
+                            }
+                        });
+                        console.log('Return trip route drawn successfully');
+                    } else {
+                        console.error('Failed to calculate return route:', status);
+                        // Fallback to straight line if API fails
+                        new google.maps.Polyline({
+                            path: [lastPosition, GUBIN_COORDS],
+                            geodesic: true,
+                            strokeColor: '#94A3B8',
+                            strokeOpacity: 0.6,
+                            strokeWeight: 2,
+                            map,
+                            icons: [{
+                                icon: {
+                                    path: 'M 0,-1 0,1',
+                                    strokeOpacity: 1,
+                                    scale: 3
+                                },
+                                offset: '0',
+                                repeat: '10px'
+                            }]
+                        });
+                    }
+                }
+            );
         }
 
         // Fit bounds to show all markers
