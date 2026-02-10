@@ -212,7 +212,29 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                                     {comm.content || ''}
                                 </div>
 
-                                {!!comm.metadata?.recordingUrl && (
+                                {/* Ringostat call metadata */}
+                                {comm.type === 'call' && comm.metadata?.source === 'ringostat_sync' && (
+                                    <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
+                                        {comm.metadata?.duration != null && Number(comm.metadata.duration) > 0 && (
+                                            <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full">
+                                                ⏱ {Math.floor(Number(comm.metadata.duration) / 60)}m {Number(comm.metadata.duration) % 60}s
+                                            </span>
+                                        )}
+                                        {comm.metadata?.rep_name && (
+                                            <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                                                👤 {String(comm.metadata.rep_name)}
+                                            </span>
+                                        )}
+                                        {comm.metadata?.disposition && comm.metadata.disposition !== 'ANSWERED' && (
+                                            <span className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+                                                {String(comm.metadata.disposition)}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Recording player - support both recordingUrl and recording_url */}
+                                {(comm.metadata?.recordingUrl || comm.metadata?.recording_url) && (
                                     <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
                                         <div className="text-xs font-semibold text-slate-500 mb-1 uppercase flex items-center gap-1">
                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,7 +242,7 @@ export const CommunicationTimeline: React.FC<CommunicationTimelineProps> = ({ co
                                             </svg>
                                             Nagranie rozmowy
                                         </div>
-                                        <audio controls src={comm.metadata.recordingUrl as string} className="w-full h-8" />
+                                        <audio controls src={(comm.metadata.recordingUrl || comm.metadata.recording_url) as string} className="w-full h-8" />
                                     </div>
                                 )}
 

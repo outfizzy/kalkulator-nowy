@@ -63,6 +63,19 @@ export const ProjectMeasurementsList: React.FC<ProjectMeasurementsListProps> = (
         }
     };
 
+    const handleToggleStatus = async (measurement: ProjectMeasurement, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newStatus = measurement.status === 'final' ? 'draft' : 'final';
+        try {
+            await ProjectMeasurementService.updateMeasurement(measurement.id, { status: newStatus });
+            toast.success(newStatus === 'final' ? 'Pomiar zatwierdzony' : 'Pomiar cofnięty do szkicu');
+            loadMeasurements();
+        } catch (error) {
+            console.error('Error toggling status:', error);
+            toast.error('Błąd zmiany statusu');
+        }
+    };
+
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (!confirm('Czy na pewno chcesz usunąć ten pomiar?')) return;
@@ -143,13 +156,21 @@ export const ProjectMeasurementsList: React.FC<ProjectMeasurementsListProps> = (
                         <div
                             key={m.id}
                             onClick={() => setViewingMeasurement(m)}
-                            className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer relative group"
+                            className={`bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow cursor-pointer relative group ${m.status === 'final' ? 'border-green-300 ring-1 ring-green-100' : 'border-slate-200'
+                                }`}
                         >
                             <div className="flex justify-between items-start mb-2">
                                 <h4 className="font-bold text-slate-800">{m.name}</h4>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${m.status === 'final' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                    {m.status === 'final' ? 'Zatwierdzony' : 'Szkic'}
-                                </span>
+                                <button
+                                    onClick={(e) => handleToggleStatus(m, e)}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${m.status === 'final'
+                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                        }`}
+                                    title={m.status === 'final' ? 'Kliknij aby cofnąć do szkicu' : 'Kliknij aby zatwierdzić'}
+                                >
+                                    {m.status === 'final' ? '✓ Zatwierdzony' : 'Szkic'}
+                                </button>
                             </div>
 
                             <div className="text-sm text-slate-600 space-y-1 mb-3">
@@ -172,15 +193,30 @@ export const ProjectMeasurementsList: React.FC<ProjectMeasurementsListProps> = (
                                 <span className="text-slate-300">{m.creator?.firstName} {m.creator?.lastName}</span>
                             </div>
 
-                            <button
-                                onClick={(e) => handleDelete(m.id, e)}
-                                className="absolute top-2 right-2 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-500 shadow-sm"
-                                title="Usuń pomiar"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
+                            {/* Action buttons - visible on hover */}
+                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={(e) => handleToggleStatus(m, e)}
+                                    className={`p-1.5 rounded-lg shadow-sm transition-colors ${m.status === 'final' ? 'bg-white text-yellow-500 hover:text-yellow-600' : 'bg-white text-green-500 hover:text-green-600'}`}
+                                    title={m.status === 'final' ? 'Cofnij do szkicu' : 'Zatwierdź pomiar'}
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        {m.status === 'final'
+                                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        }
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={(e) => handleDelete(m.id, e)}
+                                    className="p-1.5 bg-white rounded-lg shadow-sm text-slate-300 hover:text-red-500 transition-colors"
+                                    title="Usuń pomiar"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>

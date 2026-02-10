@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AIService, type ChatMessage, type ChatSession } from '../../services/ai.service';
 import { toast } from 'react-hot-toast';
+import { PresetPromptsPanel } from '../PresetPromptsPanel';
 
 export const AIAssistantPage: React.FC = () => {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -10,6 +11,7 @@ export const AIAssistantPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSessionsLoading, setIsSessionsLoading] = useState(true);
     const [attachedImage, setAttachedImage] = useState<string | null>(null);
+    const [showPresets, setShowPresets] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -203,13 +205,22 @@ export const AIAssistantPage: React.FC = () => {
         <div className="flex h-[calc(100vh-100px)] gap-6">
             {/* Sidebar History */}
             <div className="w-80 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100">
+                <div className="p-4 border-b border-slate-100 space-y-2">
                     <button
                         onClick={handleNewChat}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors font-medium"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                         Nowa rozmowa
+                    </button>
+                    <button
+                        onClick={() => setShowPresets(!showPresets)}
+                        className={`w-full py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors font-medium ${showPresets ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                        Gotowe Prompty
                     </button>
                 </div>
 
@@ -246,7 +257,15 @@ export const AIAssistantPage: React.FC = () => {
 
             {/* Chat Area */}
             <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                {!currentSessionId ? (
+                {showPresets ? (
+                    <PresetPromptsPanel
+                        onSelectPrompt={(prompt) => {
+                            setInputValue(prompt);
+                            setShowPresets(false);
+                        }}
+                        onClose={() => setShowPresets(false)}
+                    />
+                ) : !currentSessionId ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
                         <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                             <svg className="w-12 h-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
@@ -279,8 +298,8 @@ export const AIAssistantPage: React.FC = () => {
                                         </div>
                                         {/* Bubble */}
                                         <div className={`rounded-2xl p-4 shadow-sm text-sm leading-relaxed overflow-hidden ${msg.role === 'user'
-                                                ? 'bg-blue-600 text-white rounded-tr-none'
-                                                : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
+                                            ? 'bg-blue-600 text-white rounded-tr-none'
+                                            : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
                                             }`}>
                                             {/* Handle specific image rendering from markdown if we stick to that hack */}
                                             {msg.content.includes('![User Image](data:image') ? (

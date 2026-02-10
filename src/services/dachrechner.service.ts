@@ -38,6 +38,7 @@ export const ROOF_MODELS = {
         category: 'fixed_angle',
         fixedAngle: 8,
         constants: { keilhoehe: 39 },
+        postWidth: 110,
         inputs: ['h3', 'depth'],
     },
     'orangeline+': {
@@ -46,6 +47,7 @@ export const ROOF_MODELS = {
         category: 'fixed_angle_plus',
         fixedAngle: 8,
         constants: { keilhoehe: 34 },
+        postWidth: 110,
         inputs: ['h3', 'depth'],
     },
     trendline: {
@@ -53,6 +55,7 @@ export const ROOF_MODELS = {
         name: 'Trendline',
         category: 'calculated_angle',
         constants: { profileHeight: 47.5, keilhoehe: 39 },
+        postWidth: 110,
         inputs: ['h3', 'depth', 'h1'],
     },
     'trendline+': {
@@ -60,6 +63,7 @@ export const ROOF_MODELS = {
         name: 'Trendline+',
         category: 'calculated_angle',
         constants: { profileHeight: 57.5, keilhoehe: 50.1 },
+        postWidth: 110,
         inputs: ['h3', 'depth', 'h1'],
     },
     topline: {
@@ -67,6 +71,7 @@ export const ROOF_MODELS = {
         name: 'Topline',
         category: 'calculated_angle',
         constants: { profileHeight: 93.2, depthOffset: 155, keilhoehe: 84 },
+        postWidth: 149,
         inputs: ['h3', 'depth', 'h1'],
     },
     'topline_xl': {
@@ -74,6 +79,7 @@ export const ROOF_MODELS = {
         name: 'Topline XL',
         category: 'calculated_angle',
         constants: { profileHeight: 117, depthOffset: 155, keilhoehe: 106 },
+        postWidth: 196,
         inputs: ['h3', 'depth', 'h1'],
     },
     designline: {
@@ -81,12 +87,14 @@ export const ROOF_MODELS = {
         name: 'Designline',
         category: 'designline',
         constants: { keilhoehe: 93 },
+        postWidth: 196,
         inputs: ['h3', 'depth', 'h1'],
     },
     'ultraline_classic': {
         id: 'ultraline_classic',
         name: 'Ultraline Classic',
         category: 'ultraline',
+        postWidth: 196,
         inputs: ['depth', 'h1', 'overhang'],
     },
     'ultraline_style': {
@@ -94,12 +102,14 @@ export const ROOF_MODELS = {
         name: 'Ultraline Style',
         category: 'ultraline',
         constants: { fixedOverhang: 120 },
+        postWidth: 196,
         inputs: ['depth', 'h1'],
     },
     'ultraline_compact': {
         id: 'ultraline_compact',
         name: 'Ultraline Compact',
         category: 'ultraline_compact',
+        postWidth: 196,
         inputs: ['depth', 'h1'],
     },
     skyline: {
@@ -107,6 +117,7 @@ export const ROOF_MODELS = {
         name: 'Skyline',
         category: 'flat',
         constants: { glassAngleHeight: 95 },
+        postWidth: 160,
         inputs: ['h3', 'depth'],
     },
     'skyline_freistand': {
@@ -114,6 +125,7 @@ export const ROOF_MODELS = {
         name: 'Skyline Freistand',
         category: 'flat_freestanding',
         constants: { glassAngleHeight: 95 },
+        postWidth: 160,
         inputs: ['h3', 'depth'],
     },
     carport: {
@@ -121,6 +133,7 @@ export const ROOF_MODELS = {
         name: 'Carport',
         category: 'carport',
         constants: { glassAngleHeight: 28 },
+        postWidth: 160,
         inputs: ['h3', 'depth'],
     },
     'carport_freistand': {
@@ -128,6 +141,7 @@ export const ROOF_MODELS = {
         name: 'Carport Freistand',
         category: 'carport_freestanding',
         constants: { glassAngleHeight: 28 },
+        postWidth: 160,
         inputs: ['h3', 'depth'],
     },
 } as const;
@@ -227,28 +241,50 @@ export function calculateDachrechner(
 
     switch (model.category) {
         case 'fixed_angle':
-            return calcOrangeline(inputs, results);
+            calcOrangeline(inputs, results);
+            break;
         case 'fixed_angle_plus':
-            return calcOrangelinePlus(inputs, results);
+            calcOrangelinePlus(inputs, results);
+            break;
         case 'calculated_angle':
-            return calcTrendlineFamily(modelId, inputs, results);
+            calcTrendlineFamily(modelId, inputs, results);
+            break;
         case 'designline':
-            return calcDesignline(inputs, results);
+            calcDesignline(inputs, results);
+            break;
         case 'ultraline':
-            return calcUltraline(modelId, inputs, results);
+            calcUltraline(modelId, inputs, results);
+            break;
         case 'ultraline_compact':
-            return calcUltralineCompact(inputs, results);
+            calcUltralineCompact(inputs, results);
+            break;
         case 'flat':
-            return calcSkyline(inputs, results);
+            calcSkyline(inputs, results);
+            break;
         case 'flat_freestanding':
-            return calcSkylineFreistand(inputs, results);
+            calcSkylineFreistand(inputs, results);
+            break;
         case 'carport':
-            return calcCarport(inputs, results);
+            calcCarport(inputs, results);
+            break;
         case 'carport_freestanding':
-            return calcCarportFreistand(inputs, results);
-        default:
-            return results;
+            calcCarportFreistand(inputs, results);
+            break;
     }
+
+    // Universal: Inner width calculation (applies to ALL models)
+    // Uses model-specific post widths from dachrechner.xlsx
+    if (inputs.width) {
+        const posts = inputs.postCount || 2;
+        const postWidth = model.postWidth; // Model-specific post width
+        if (posts > 1) {
+            results.innerWidth = (inputs.width - (posts * postWidth)) / (posts - 1);
+        } else {
+            results.innerWidth = inputs.width - postWidth;
+        }
+    }
+
+    return results;
 }
 
 // ===================== ORANGELINE =====================
@@ -726,21 +762,6 @@ function calcCarport(inputs: DachrechnerInputs, r: DachrechnerResults): Dachrech
     r.fensterF2 = r.depthD2alt;
     // W = S
     r.fensterF3 = r.fensterF1;
-
-    // Width Calculation (Standard 110mm Post)
-    if (inputs.width) {
-        const posts = inputs.postCount || 2;
-        const postWidth = 110; // Standard 110mm
-        // Inner Width = (Total - (Posts * PostWidth)) / (Posts - 1) gives spacing
-        // But usually user wants "Total Clearance" or "Spacing between posts"?
-        // "Szerokość w świetle" usually means spacing between two posts.
-        // If 3 posts, it's spacing between 1 and 2 (assuming equal).
-        if (posts > 1) {
-            r.innerWidth = (inputs.width - (posts * postWidth)) / (posts - 1);
-        } else {
-            r.innerWidth = inputs.width - postWidth; // Single post? Weird.
-        }
-    }
 
     return r;
 }

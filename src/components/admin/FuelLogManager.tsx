@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../../services/database';
+import { supabase } from '../../lib/supabase';
 import type { FuelLog } from '../../types';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 
 export const FuelLogManager: React.FC = () => {
     const [logs, setLogs] = useState<FuelLog[]>([]);
@@ -28,6 +31,27 @@ export const FuelLogManager: React.FC = () => {
         return log.type === filter;
     });
 
+    const handleDelete = async (logId: string) => {
+        if (!confirm('Czy na pewno chcesz usunąć ten wpis?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('fuel_logs')
+                .delete()
+                .eq('id', logId);
+
+            if (error) throw error;
+
+            toast.success('Wpis usunięty');
+            // Reload logs
+            const data = await DatabaseService.getFuelLogs();
+            setLogs(data);
+        } catch (error) {
+            console.error('Error deleting log:', error);
+            toast.error('Błąd usuwania wpisu');
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -44,6 +68,15 @@ export const FuelLogManager: React.FC = () => {
                     <p className="text-slate-500 text-sm">Przegląd zużycia paliwa przez pracowników</p>
                 </div>
                 <div className="flex items-center gap-4">
+                    <Link
+                        to="/admin/fuel-prices"
+                        className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Zarządzaj cenami
+                    </Link>
                     <select
                         value={filter}
                         onChange={(e) => setFilter(e.target.value as 'all' | 'installer' | 'sales_rep')}
@@ -70,6 +103,7 @@ export const FuelLogManager: React.FC = () => {
                                 <th className="px-4 py-3">Paliwo</th>
                                 <th className="px-4 py-3">Koszt</th>
                                 <th className="px-4 py-3">Zdjęcia</th>
+                                <th className="px-4 py-3">Akcje</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -128,6 +162,14 @@ export const FuelLogManager: React.FC = () => {
                                                 Paragon
                                             </a>
                                         </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <button
+                                            onClick={() => handleDelete(log.id)}
+                                            className="text-red-600 hover:text-red-800 font-medium text-sm"
+                                        >
+                                            Usuń
+                                        </button>
                                     </td>
                                 </tr>
                             ))}

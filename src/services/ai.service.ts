@@ -156,5 +156,34 @@ export const AIService = {
             console.error('Session Message Error:', error);
             throw error;
         }
+    },
+
+    /**
+     * Enrich prompt with real product data from database
+     */
+    async enrichPromptWithData(prompt: string): Promise<string> {
+        try {
+            // Import dynamically to avoid circular dependencies
+            const { AIProductDataService } = await import('./ai-product-data.service');
+
+            // Get product context
+            const productContext = await AIProductDataService.generateProductContext();
+
+            // Combine prompt with real data
+            const enrichedPrompt = `${prompt}
+
+---
+WAŻNE: Użyj poniższych RZECZYWISTYCH danych produktowych z bazy danych do odpowiedzi:
+
+${productContext}
+
+Wszystkie ceny i wymiary podaj na podstawie powyższych danych. Jeśli klient pyta o konkretny model lub rozmiar, sprawdź czy jest dostępny w powyższej liście.`;
+
+            return enrichedPrompt;
+        } catch (error) {
+            console.error('Error enriching prompt with data:', error);
+            // Return original prompt if enrichment fails
+            return prompt;
+        }
     }
 };

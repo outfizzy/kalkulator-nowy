@@ -70,36 +70,6 @@ export interface DimensionOptions {
     showPostDimensions: boolean;
 }
 
-export interface SiteDetails {
-    groundType?: 'concrete' | 'paving_stones' | 'grass' | 'terrace' | 'other';
-    groundTypeOther?: string;
-    hasFoundation?: 'yes' | 'no' | 'to_do';
-    slopeLeftRight?: number;
-    slopeFrontBack?: number;
-    wallType?: 'concrete' | 'brick' | 'porotherm' | 'ytong' | 'wood' | 'other';
-    insulationType?: 'none' | 'styrofoam' | 'wool';
-    insulationThickness?: number;
-    wallObstacles?: string;
-    accessType?: 'free' | 'house' | 'narrow' | 'stairs' | 'elevator';
-    installationFloor?: 'ground' | 'balcony' | 'roof';
-    hasPower?: boolean;
-    cablesLengthIfNeeded?: number;
-}
-
-// We need to import or redefine Dachrechner types if we want strict typing here, 
-// using 'any' for now to avoid circular dependencies with dachrechner.service
-export interface ProjectMeasurement {
-    id?: string;
-    name: string;
-    modelId: string;
-    inputs: any; // DachrechnerInputs
-    results: any; // DachrechnerResults
-    dimensionOptions: DimensionOptions;
-    siteDetails: SiteDetails;
-    notes?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-}
 
 export interface Customer {
     id?: string; // Optional for backward compatibility with offers that embed customer data without ID

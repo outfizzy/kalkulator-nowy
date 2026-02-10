@@ -16,6 +16,7 @@ import { ManagerDashboard } from './components/admin/ManagerDashboard';
 import { InstallerManagementPanel } from './components/admin/InstallerManagementPanel';
 import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
 import { FuelLogManager } from './components/admin/FuelLogManager';
+import { FuelPriceManager } from './components/admin/FuelPriceManager';
 import { FailureReportManager } from './components/admin/FailureReportManager';
 import { PricingPage } from './components/admin/PricingPage';
 import { InstallationProfitability } from './components/admin/InstallationProfitability';
@@ -202,6 +203,7 @@ function App() {
               <Route path="/dachrechner" element={<DachrechnerPage />} />
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
+              <Route path="/admin/fuel-prices" element={<FuelPriceManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
               <Route path="admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PriceTableBrowserPage /></ProtectedRoute>} />
               {/* Legacy pricing pages - kept for backwards compatibility */}

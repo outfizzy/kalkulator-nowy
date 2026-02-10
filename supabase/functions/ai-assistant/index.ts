@@ -11,33 +11,136 @@ Jesteś **Ekspertem Wsparcia Sprzedaży (World-Class Sales Assistant)** w wiodą
 Twoim celem jest nie tylko odpowiadanie na pytania, ale **aktywne wspieranie handlowców** w zamykaniu sprzedaży, optymalizacji ofert i obsłudze klienta.
 
 ### Twoja Rola i Osobowość:
-- **Ekspert Techniczny**: Znasz detale konstrukcyjne (profile, szkło, silniki Somfy).
-- **Strateg Sprzedaży**: Sugerujesz "cross-selling" (np. "Do tej pergoli warto dodać promiennik").
-- **Proaktywny**: Jeśli widzisz ofertę, sprawdź czy marża jest OK (typowo >25%). Jeśli widzisz klienta, przypomnij o follow-upie.
-- **Ton**: Profesjonalny, zwięzły, pewny siebie (Business Professional).
+- **Ekspert Techniczny**: Znasz wszystkie produkty i ich specyfikacje techniczne
+- **Strateg Sprzedaży**: Sugerujesz cross-selling i upselling (np. "Do tej pergoli warto dodać promiennik")
+- **Proaktywny**: Sprawdzasz marże (optymalna >25%), przypominasz o follow-upach
+- **Ton**: Profesjonalny, zwięzły, pewny siebie, ale przyjazny
 
-### Twoje Kompetencje (Narzędzia):
-1. **BAZA WIEDZY (CRM / Oferty / Umowy / Kalendarz)**:
-   - Użyj 'search_knowledge' aby znaleźć klienta, ofertę czy termin montażu.
-2. **STANY MAGAZYNOWE (Inventory)**:
-   - Użyj 'check_inventory' aby sprawdzić dostępność silników, tkanin, profili.
-   - Zawsze sprawdzaj dostępność przy dużych zamówieniach.
-3. **KALKULACJE**:
-   - 'calculate_glass' dla szkła.
-4. **WIZUALIZACJE**:
-   - 'generate_visualization' (NanoBanana) do generowania inspiracji dla klienta.
+### Katalog Produktów:
 
-### Zasady Komunikacji:
-- **Kontekst**: Jeśli użytkownik przesyła kontekst (np. "Widzę ofertę #1024"), odwołuj się do niego bezpośrednio. Nie pytaj "o jaką ofertę chodzi".
-- **Formatowanie**: Używaj pogrubień dla kluczowych liczb (kwoty, daty). Używaj tabel dla zestawień.
-- **Sugestie**: Zawszę kończ wypowiedź (jeśli to zasadne) sugestią kolejnego kroku (np. "Czy przygotować draft maila do klienta?").
+**PERGOLE BIOKLIMATYCZNE:**
+- **TopLine** - Premium, aluminiowa, lamele obrotowe 90°, silniki Somfy
+- **TrendLine** - Standard, solidna konstrukcja, dobry stosunek ceny do jakości
+- **SkyLine** - Luksusowa, najwyższa jakość, dodatkowe opcje
+- **UltraStyle** - Nowoczesny design, minimalistyczna
 
-### Baza Wiedzy (Kontekst Firmowy):
-- Oferujemy: Pergole Bioklimatyczne, Zadaszenia Szklane (Trendstyle, Skystyle), Carporty, Ogrody Zimowe.
-- Silniki: Somfy (IO / RTS).
-- Dostawy: Standardowo 4-6 tygodni.
+**ZADASZENIA SZKLANE:**
+- **TrendStyle** - Klasyczne zadaszenie szklane
+- **SkyStyle** - Premium szklane z dodatkowymi opcjami
+- **OrangeStyle** - Ogród zimowy, pełne przeszklenie
 
-Działaj w interesie firmy, maksymalizując jakość obsługi i zysk.
+**OGRODZENIA:**
+- **WPC** - Kompozyt drewna, dostępne wysokości: 1.65m, 1.80m, 1.95m
+- **Panele aluminiowe** - Nowoczesne, różne wzory (Moderne, Plasma, Classic)
+- **Bramy przesuwne** - Automatyczne, różne wzory
+
+**DODATKI:**
+- Markizy (Komfort)
+- Oświetlenie LED
+- Promienniki podczerwieni
+- Rolety ZIP Screen
+- Ścianki boczne i frontowe
+- Drzwi przesuwne (Schiebetür)
+
+### Twoje Narzędzia:
+1. **search_knowledge** - Szukaj w CRM, ofertach, umowach, kalendarzach
+2. **check_inventory** - Sprawdź stany magazynowe
+3. **calculate_glass** - Oblicz wymiary szkła
+4. **generate_visualization** - Generuj wizualizacje (DALL-E 3)
+5. **draft_email** - Napisz profesjonalny email do klienta
+6. **calculate_margin** - Oblicz marżę na ofercie
+7. **suggest_upsell** - Zaproponuj dodatkowe produkty
+
+### Zasady Formatowania Odpowiedzi:
+
+**Używaj Markdown:**
+- **Pogrubienia** dla kluczowych liczb, kwot, dat
+- *Kursywa* dla uwag i notatek
+- Listy numerowane dla kroków/instrukcji
+- Listy punktowane dla opcji/wyborów
+- Tabele dla porównań produktów
+- Bloki kodu dla danych technicznych
+
+**Przykład dobrej odpowiedzi:**
+
+> Dla pergoli TopLine 4x3m w kolorze antracyt:
+> 
+> **Cena:** 28 500 PLN netto (35 055 PLN brutto)
+> **Termin:** 4-6 tygodni
+> 
+> **Polecam dodać:**
+> - Oświetlenie LED (1 200 PLN)
+> - Promiennik (2 800 PLN)
+> 
+> | Produkt | Cena netto | Marża |
+> |---------|-----------|-------|
+> | TopLine 4x3m | 28 500 PLN | 32% |
+> | + LED | 1 200 PLN | 40% |
+> | + Promiennik | 2 800 PLN | 35% |
+> 
+> **Następny krok:** Czy przygotować ofertę dla klienta?
+
+### Pisanie Maili:
+
+Kiedy piszesz email, użyj tego formatu:
+
+**Temat:** [Zwięzły, konkretny]
+
+**Treść:**
+- Rozpocznij od imienia klienta
+- Krótkie wprowadzenie (1-2 zdania)
+- Konkretne informacje (ceny, terminy, specyfikacja)
+- Call to action (co klient ma zrobić)
+- Profesjonalne zakończenie
+
+**Przykład:**
+
+> Temat: Oferta pergoli TopLine 4x3m - Pan Kowalski
+> 
+> Dzień dobry Panie Janie,
+> 
+> Dziękuję za zainteresowanie naszymi pergolami. Zgodnie z naszą rozmową, przesyłam szczegóły oferty:
+> 
+> **Pergola TopLine 4x3m**
+> - Kolor: Antracyt (RAL 7016)
+> - Silnik: Somfy IO
+> - Cena: 28 500 PLN netto (35 055 PLN brutto)
+> - Termin realizacji: 4-6 tygodni
+> 
+> W cenie:
+> ✓ Montaż
+> ✓ Transport
+> ✓ Gwarancja 5 lat
+> 
+> Czy mogę umówić się na pomiar w przyszłym tygodniu?
+> 
+> Pozdrawiam,
+> [Imię Handlowca]
+
+### Obliczanie Marży:
+
+Optymalna marża: **25-35%**
+- Poniżej 20% - za nisko, negocjuj
+- 20-25% - akceptowalne dla dużych zamówień
+- 25-35% - optymalne
+- Powyżej 35% - świetnie!
+
+Formula: Margin = ((Sale Price - Cost) / Sale Price) * 100
+
+### Kontekst Firmowy:
+- Firma: TGA Metal / Polendach24
+- Rynek: Polska (głównie południe)
+- Silniki: Somfy (IO / RTS)
+- Dostawy: 4-6 tygodni standardowo
+- Gwarancja: 5 lat na konstrukcję
+- Montaż: W cenie (w promieniu 100km)
+
+**ZAWSZE:**
+1. Sprawdź kontekst użytkownika (jaka strona, jaki klient)
+2. Formatuj odpowiedzi w markdown
+3. Podawaj konkretne liczby i daty
+4. Sugeruj kolejne kroki
+5. Maksymalizuj wartość dla klienta i firmy
 `;
 
 // Tools Schema
@@ -62,7 +165,7 @@ const tools = [
         type: "function",
         function: {
             name: "generate_visualization",
-            description: "Wygeneruj wizualizację (NanoBanana) zadaszenia na podstawie opisu.",
+            description: "Wygeneruj wizualizację (DALL-E 3) zadaszenia na podstawie opisu.",
             parameters: {
                 type: "object",
                 properties: {
@@ -104,6 +207,56 @@ const tools = [
                 required: ["query"]
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "draft_email",
+            description: "Wygeneruj profesjonalny email do klienta na podstawie kontekstu.",
+            parameters: {
+                type: "object",
+                properties: {
+                    purpose: {
+                        type: "string",
+                        enum: ["followup", "offer", "reminder", "thank_you", "technical"],
+                        description: "Cel emaila"
+                    },
+                    customerName: { type: "string", description: "Imię i nazwisko klienta" },
+                    context: { type: "string", description: "Dodatkowy kontekst (np. numer oferty, produkt, szczegóły)" }
+                },
+                required: ["purpose", "customerName"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "calculate_margin",
+            description: "Oblicz marżę na podstawie ceny sprzedaży i kosztu.",
+            parameters: {
+                type: "object",
+                properties: {
+                    salePrice: { type: "number", description: "Cena sprzedaży (netto)" },
+                    cost: { type: "number", description: "Koszt zakupu/produkcji (netto)" }
+                },
+                required: ["salePrice", "cost"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "suggest_upsell",
+            description: "Zaproponuj dodatkowe produkty/usługi do sprzedaży krzyżowej.",
+            parameters: {
+                type: "object",
+                properties: {
+                    mainProduct: { type: "string", description: "Główny produkt (np. 'TopLine 4x3m')" },
+                    budget: { type: "number", description: "Budżet klienta (opcjonalnie)" }
+                },
+                required: ["mainProduct"]
+            }
+        }
     }
 ];
 
@@ -118,6 +271,129 @@ function calculateGlass(args: any) {
         approxPanelWidth: Math.floor((roofWidth - (actualRafterCount * 60)) / divisions),
         length: roofProjection - 50,
         note: "Wymiary orientacyjne. Sprawdź specyfikację."
+    });
+}
+
+function draftEmail(args: any) {
+    const { purpose, customerName, context } = args;
+
+    const templates = {
+        followup: {
+            subject: `Follow-up - ${customerName}`,
+            body: `Dzień dobry ${customerName},\n\nDziękuję za wczorajszą rozmowę. Chciałem się upewnić, czy ma Pan/Pani jakieś dodatkowe pytania dotyczące naszej oferty?\n\n${context || 'Jestem do dyspozycji w razie jakichkolwiek wątpliwości.'}\n\nPozdrawiam,\n[Imię Handlowca]\nTGA Metal / Polendach24`
+        },
+        offer: {
+            subject: `Oferta - ${customerName}`,
+            body: `Dzień dobry ${customerName},\n\nPrzesyłam szczegóły oferty zgodnie z naszą rozmową:\n\n${context || '[Szczegóły oferty]'}\n\n**W cenie:**\n✓ Montaż\n✓ Transport\n✓ Gwarancja 5 lat\n\nOferta ważna 30 dni. Czy mogę umówić się na pomiar?\n\nPozdrawiam,\n[Imię Handlowca]`
+        },
+        reminder: {
+            subject: `Przypomnienie - ${customerName}`,
+            body: `Dzień dobry ${customerName},\n\nPrzypominam o naszej ofercie z dnia [data]. ${context || 'Oferta ważna jeszcze przez [X] dni.'}\n\nCzy mogę w czymś pomóc w podjęciu decyzji?\n\nPozdrawiam,\n[Imię Handlowca]`
+        },
+        thank_you: {
+            subject: `Dziękujemy - ${customerName}`,
+            body: `Dzień dobry ${customerName},\n\nDziękujemy za wybor naszej firmy! ${context || 'Cieszymy się, że możemy zrealizować Twoją inwestycję.'}\n\nW razie jakichkolwiek pytań, jestem do dyspozycji.\n\nPozdrawiam,\n[Imię Handlowca]`
+        },
+        technical: {
+            subject: `Informacje techniczne - ${customerName}`,
+            body: `Dzień dobry ${customerName},\n\nW odpowiedzi na Pana/Pani pytanie:\n\n${context || '[Szczegóły techniczne]'}\n\nCzy to wyjaśnia wątpliwości?\n\nPozdrawiam,\n[Imię Handlowca]`
+        }
+    };
+
+    const template = templates[purpose as keyof typeof templates] || templates.followup;
+
+    return JSON.stringify({
+        subject: template.subject,
+        body: template.body,
+        note: "Szablon emaila - dostosuj według potrzeb przed wysłaniem."
+    });
+}
+
+function calculateMargin(args: any) {
+    const { salePrice, cost } = args;
+
+    if (salePrice <= 0 || cost < 0) {
+        return JSON.stringify({ error: "Nieprawidłowe wartości. Cena sprzedaży musi być > 0, koszt >= 0." });
+    }
+
+    const marginPercent = ((salePrice - cost) / salePrice) * 100;
+    const profit = salePrice - cost;
+
+    let recommendation = "";
+    if (marginPercent < 20) {
+        recommendation = "⚠️ **Za niska marża!** Rozważ renegocjację ceny lub kosztów.";
+    } else if (marginPercent < 25) {
+        recommendation = "🟡 **Akceptowalna** - OK dla dużych zamówień.";
+    } else if (marginPercent <= 35) {
+        recommendation = "✅ **Optymalna marża** - świetnie!";
+    } else {
+        recommendation = "🎉 **Wyjątkowa marża** - doskonały wynik!";
+    }
+
+    return JSON.stringify({
+        marginPercent: marginPercent.toFixed(2) + "%",
+        profit: profit.toFixed(2) + " PLN",
+        recommendation: recommendation,
+        breakdown: {
+            salePrice: salePrice + " PLN",
+            cost: cost + " PLN",
+            profit: profit + " PLN"
+        }
+    });
+}
+
+function suggestUpsell(args: any) {
+    const { mainProduct, budget } = args;
+
+    const suggestions: any = {
+        "TopLine": [
+            { product: "Oświetlenie LED", price: "1 200 PLN", reason: "Wydłuża użytkowanie pergoli wieczorami" },
+            { product: "Promiennik podczerwieni", price: "2 800 PLN", reason: "Umożliwia korzystanie wiosną/jesienią" },
+            { product: "Ścianki boczne", price: "3 500 PLN", reason: "Ochrona przed wiatrem i deszczem" },
+            { product: "Rolety ZIP Screen", price: "4 200 PLN", reason: "Ochrona przed słońcem i owadami" }
+        ],
+        "TrendLine": [
+            { product: "Oświetlenie LED", price: "1 000 PLN", reason: "Podstawowe oświetlenie" },
+            { product: "Promiennik", price: "2 500 PLN", reason: "Komfort w chłodniejsze dni" },
+            { product: "Markiza", price: "2 200 PLN", reason: "Dodatkowa ochrona przed słońcem" }
+        ],
+        "SkyLine": [
+            { product: "System audio", price: "3 500 PLN", reason: "Premium experience" },
+            { product: "Inteligentne sterowanie", price: "2 000 PLN", reason: "Automatyzacja przez aplikację" },
+            { product: "Promienniki premium", price: "4 500 PLN", reason: "Najwyższa jakość ogrzewania" }
+        ],
+        "WPC": [
+            { product: "Brama przesuwna", price: "8 500 PLN", reason: "Kompletne ogrodzenie" },
+            { product: "Furtka", price: "2 200 PLN", reason: "Wygodne wejście" },
+            { product: "Oświetlenie ogrodzenia", price: "1 500 PLN", reason: "Bezpieczeństwo i estetyka" }
+        ],
+        "default": [
+            { product: "Oświetlenie LED", price: "1 200 PLN", reason: "Uniwersalny dodatek" },
+            { product: "Gwarancja rozszerzona", price: "800 PLN", reason: "Dodatkowy spokój" }
+        ]
+    };
+
+    // Find matching product category
+    let productSuggestions = suggestions.default;
+    for (const key in suggestions) {
+        if (mainProduct.toLowerCase().includes(key.toLowerCase())) {
+            productSuggestions = suggestions[key];
+            break;
+        }
+    }
+
+    // Filter by budget if provided
+    if (budget) {
+        productSuggestions = productSuggestions.filter((s: any) => {
+            const price = parseFloat(s.price.replace(/[^0-9]/g, ''));
+            return price <= budget * 0.3; // Max 30% of budget
+        });
+    }
+
+    return JSON.stringify({
+        mainProduct: mainProduct,
+        suggestions: productSuggestions.slice(0, 3), // Top 3
+        note: "Zaproponuj te dodatki klientowi aby zwiększyć wartość zamówienia."
     });
 }
 
@@ -377,6 +653,12 @@ Deno.serve(async (req) => {
                     result = await generateVisualization(args, apiKey);
                 } else if (toolCall.function.name === 'check_inventory') {
                     result = await checkInventory(args, supabaseClient);
+                } else if (toolCall.function.name === 'draft_email') {
+                    result = draftEmail(args);
+                } else if (toolCall.function.name === 'calculate_margin') {
+                    result = calculateMargin(args);
+                } else if (toolCall.function.name === 'suggest_upsell') {
+                    result = suggestUpsell(args);
                 }
 
                 functionResponses.push({

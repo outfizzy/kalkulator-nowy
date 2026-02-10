@@ -65,7 +65,20 @@ export const Layout: React.FC = () => {
                             {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" />}
                             {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />}
                             {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" />}
-                            {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
+                            {hasPermission('ai_assistant') && (
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setAiSidebarOpen(true);
+                                    }}
+                                    className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-slate-400 hover:bg-slate-800 hover:text-white w-full text-left"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                    </svg>
+                                    Asystent AI
+                                </button>
+                            )}
                             {/* Visualizer? */}
                             {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
                             <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" />

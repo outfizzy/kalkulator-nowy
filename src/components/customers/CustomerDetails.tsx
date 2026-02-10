@@ -365,28 +365,52 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                 <div>
                                     <h3 className="font-bold text-slate-800 mb-4">Ostatnie Aktywności</h3>
                                     <div className="space-y-3">
-                                        {contracts.length === 0 && calls.length === 0 && <span className="text-slate-400 text-sm">Brak aktywności</span>}
-                                        {contracts.slice(0, 3).map(c => (
-                                            <div key={c.id} className="flex gap-3 text-sm">
+                                        {contracts.length === 0 && calls.length === 0 && leads.length === 0 && <span className="text-slate-400 text-sm">Brak aktywności</span>}
+
+                                        {/* Leads */}
+                                        {leads.slice(0, 2).map(lead => (
+                                            <Link key={lead.id} to={`/leads/${lead.id}`} className="flex gap-3 text-sm hover:bg-slate-50 p-2 rounded-lg transition-colors -mx-2">
+                                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-slate-800">Lead z {lead.source}</div>
+                                                    <div className="text-slate-500">{formatDate(lead.createdAt)} • {lead.status}</div>
+                                                </div>
+                                                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                            </Link>
+                                        ))}
+
+                                        {/* Contracts */}
+                                        {contracts.slice(0, 2).map(c => (
+                                            <Link key={c.id} to={`/contracts/${c.id}`} className="flex gap-3 text-sm hover:bg-slate-50 p-2 rounded-lg transition-colors -mx-2">
                                                 <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0">
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                                 </div>
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="font-medium text-slate-800">Umowa {c.contractNumber}</div>
                                                     <div className="text-slate-500">{formatDate(c.createdAt)} • {c.status}</div>
                                                 </div>
-                                            </div>
+                                                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                            </Link>
                                         ))}
-                                        {calls.slice(0, 3).map(call => (
-                                            <div key={call.id} className="flex gap-3 text-sm">
+
+                                        {/* Ringostat Calls */}
+                                        {calls.slice(0, 2).map(call => (
+                                            <button
+                                                key={call.id}
+                                                onClick={() => setActiveTab('communication')}
+                                                className="w-full flex gap-3 text-sm hover:bg-slate-50 p-2 rounded-lg transition-colors -mx-2 text-left"
+                                            >
                                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                                                 </div>
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="font-medium text-slate-800">Rozmowa ({call.direction === 'incoming' ? 'przych.' : 'wych.'})</div>
-                                                    <div className="text-slate-500">{formatDate(call.date)} • {Math.round(call.duration / 60)} min</div>
+                                                    <div className="text-slate-500">{formatDate(call.date)} • {Math.round(call.duration / 60)} min • {call.status === 'answered' ? 'Odebrane' : 'Nieodebrane'}</div>
                                                 </div>
-                                            </div>
+                                                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
@@ -888,15 +912,19 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                             </div>
                             <div className="space-y-4">
                                 {leads.length > 0 ? leads.map(lead => (
-                                    <div key={lead.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start">
-                                        <div>
+                                    <Link
+                                        key={lead.id}
+                                        to={`/leads/${lead.id}`}
+                                        className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start hover:border-blue-300 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <span className={`w-2 h-2 rounded-full ${lead.status === 'new' ? 'bg-blue-500' :
                                                     lead.status === 'contacted' ? 'bg-yellow-500' :
                                                         lead.status === 'offer_sent' ? 'bg-purple-500' :
                                                             lead.status === 'won' ? 'bg-green-500' : 'bg-slate-300'
                                                     }`} />
-                                                <span className="font-bold text-slate-800">Lead z {lead.source}</span>
+                                                <span className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">Lead z {lead.source}</span>
                                                 <span className="text-xs text-slate-400 ml-2">{formatDate(lead.createdAt)}</span>
                                             </div>
                                             {lead.notes && (
@@ -908,15 +936,18 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                 Ostatni kontakt: {lead.lastContactDate ? formatDate(lead.lastContactDate) : 'Brak'}
                                             </div>
                                         </div>
-                                        <div>
+                                        <div className="flex items-center gap-2">
                                             <span className={`px-2 py-1 rounded text-xs font-bold ${lead.status === 'new' ? 'bg-blue-100 text-blue-700' :
                                                 lead.status === 'won' ? 'bg-green-100 text-green-700' :
                                                     'bg-slate-100 text-slate-600'
                                                 }`}>
                                                 {lead.status}
                                             </span>
+                                            <svg className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
                                         </div>
-                                    </div>
+                                    </Link>
                                 )) : (
                                     <div className="text-center p-8 text-slate-400">Brak aktywnych leadów dla tego klienta</div>
                                 )}

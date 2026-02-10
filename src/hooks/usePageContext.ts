@@ -1,72 +1,72 @@
-import { useLocation, matchPath } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { DatabaseService } from '../services/database';
+import { useLocation } from 'react-router-dom';
 
 export interface PageContext {
-    type: 'lead' | 'offer' | 'contract' | 'customer' | 'general';
+    type: 'general' | 'lead' | 'customer' | 'offer' | 'calculator' | 'service';
+    name?: string;
     id?: string;
-    data?: any;
     summary?: string;
 }
 
-export const usePageContext = () => {
+export const usePageContext = (): { context: PageContext } => {
     const location = useLocation();
-    const [context, setContext] = useState<PageContext>({ type: 'general' });
-    const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const fetchContext = async () => {
-            setLoading(true);
-            try {
-                // Match Routes
-                const leadMatch = matchPath('/leads/:id', location.pathname);
-                // const offerMatch = matchPath('/offers/:id', location.pathname); 
+    // Parse URL and state to determine context
+    const getContext = (): PageContext => {
+        const path = location.pathname;
+        const state = location.state as any;
 
-                const customerMatch = matchPath('/customers/:id', location.pathname);
+        // Lead context
+        if (path.includes('/leads/') || path.includes('/lead/')) {
+            return {
+                type: 'lead',
+                name: state?.leadName || 'Lead',
+                id: state?.leadId,
+                summary: `Przeglądasz lead: ${state?.leadName || 'nieznany'}`
+            };
+        }
 
-                if (leadMatch?.params.id) {
-                    const id = leadMatch.params.id;
-                    if (id === 'new') return;
-                    const lead = await DatabaseService.getLead(id);
-                    if (lead) {
-                        setContext({
-                            type: 'lead',
-                            id,
-                            data: lead,
-                            summary: `Lead: ${lead.customerData.firstName || ''} ${lead.customerData.lastName || ''}, Status: ${lead.status}`
-                        });
-                        return;
-                    }
-                }
+        // Customer context
+        if (path.includes('/customers/') || path.includes('/customer/')) {
+            return {
+                type: 'customer',
+                name: state?.customerName || 'Klient',
+                id: state?.customerId,
+                summary: `Przeglądasz profil klienta: ${state?.customerName || 'nieznany'}`
+            };
+        }
 
-                if (customerMatch?.params.id) {
-                    const id = customerMatch.params.id;
-                    if (id === 'new') return;
-                    const customer = await DatabaseService.getCustomer(id);
-                    if (customer) {
-                        setContext({
-                            type: 'customer',
-                            id,
-                            data: customer,
-                            summary: `Klient: ${customer.firstName} ${customer.lastName}, Miasto: ${customer.city}`
-                        });
-                        return;
-                    }
-                }
+        // Offer context
+        if (path.includes('/offers/') || path.includes('/offer/') || path.includes('/konfigurator')) {
+            return {
+                type: 'offer',
+                name: state?.offerName || 'Oferta',
+                id: state?.offerId,
+                summary: `Pracujesz nad ofertą: ${state?.offerName || 'nowa oferta'}`
+            };
+        }
 
-                // If no specific match
-                setContext({ type: 'general' });
+        // Calculator context
+        if (path.includes('/calculator') || path.includes('/kalkulator')) {
+            return {
+                type: 'calculator',
+                summary: 'Używasz kalkulatora - mogę pomóc w wycenach i porównaniach'
+            };
+        }
 
-            } catch (error) {
-                console.error("Error fetching context:", error);
-                setContext({ type: 'general' });
-            } finally {
-                setLoading(false);
-            }
+        // Service context
+        if (path.includes('/service') || path.includes('/serwis')) {
+            return {
+                type: 'service',
+                summary: 'Przeglądasz moduł serwisu'
+            };
+        }
+
+        // General context
+        return {
+            type: 'general',
+            summary: 'Jestem gotowy aby pomóc!'
         };
+    };
 
-        fetchContext();
-    }, [location.pathname]);
-
-    return { context, loading };
+    return { context: getContext() };
 };

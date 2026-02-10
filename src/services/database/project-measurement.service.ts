@@ -73,15 +73,15 @@ export const ProjectMeasurementService = {
 
     async updateMeasurement(id: string, updates: Partial<ProjectMeasurement>): Promise<ProjectMeasurement> {
         const dbUpdates: any = {};
-        if (updates.name) dbUpdates.name = updates.name;
-        if (updates.status) dbUpdates.status = updates.status;
-        if (updates.modelId) dbUpdates.model_id = updates.modelId;
-        if (updates.inputs) dbUpdates.inputs = updates.inputs;
-        if (updates.results) dbUpdates.results = updates.results;
+        if (updates.name !== undefined) dbUpdates.name = updates.name;
+        if (updates.status !== undefined) dbUpdates.status = updates.status;
+        if (updates.modelId !== undefined) dbUpdates.model_id = updates.modelId;
+        if (updates.inputs !== undefined) dbUpdates.inputs = updates.inputs;
+        if (updates.results !== undefined) dbUpdates.results = updates.results;
 
-        if (updates.dimensionOptions) dbUpdates.dimension_options = updates.dimensionOptions;
-        if (updates.siteDetails) dbUpdates.site_details = updates.siteDetails;
-        if (updates.images) dbUpdates.images = updates.images;
+        if (updates.dimensionOptions !== undefined) dbUpdates.dimension_options = updates.dimensionOptions;
+        if (updates.siteDetails !== undefined) dbUpdates.site_details = updates.siteDetails;
+        if (updates.images !== undefined) dbUpdates.images = updates.images;
         if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
 
         dbUpdates.updated_at = new Date().toISOString();

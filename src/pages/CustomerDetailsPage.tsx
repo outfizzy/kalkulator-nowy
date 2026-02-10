@@ -367,10 +367,13 @@ export const CustomerDetailsPage: React.FC = () => {
                                         <div className="md:col-span-2">
                                             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Adres</label>
                                             <p className="text-slate-800 font-medium mt-0.5">
-                                                {customer.street || ''} {customer.houseNumber || ''}{(customer.street || customer.houseNumber) ? ', ' : ''}
-                                                {customer.postalCode || ''} {customer.city || ''}
-                                                {customer.country && customer.country !== 'Deutschland' ? `, ${customer.country}` : ''}
-                                                {!customer.street && !customer.city && '—'}
+                                                {(() => {
+                                                    const streetPart = [customer.street, customer.houseNumber].filter(Boolean).join(' ');
+                                                    const cityPart = [customer.postalCode, customer.city].filter(Boolean).join(' ');
+                                                    const countryPart = customer.country && customer.country !== 'Deutschland' ? customer.country : '';
+                                                    const parts = [streetPart, cityPart, countryPart].filter(Boolean);
+                                                    return parts.length > 0 ? parts.join(', ') : '—';
+                                                })()}
                                             </p>
                                         </div>
                                         <div>
@@ -511,12 +514,12 @@ export const CustomerDetailsPage: React.FC = () => {
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead.status === 'new' ? 'bg-blue-100 text-blue-700' :
-                                                            lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' :
-                                                                lead.status === 'qualified' ? 'bg-green-100 text-green-700' :
-                                                                    lead.status === 'offer_sent' ? 'bg-purple-100 text-purple-700' :
-                                                                        lead.status === 'sold' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            lead.status === 'lost' ? 'bg-red-100 text-red-700' :
-                                                                                'bg-slate-100 text-slate-700'
+                                                        lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' :
+                                                            lead.status === 'qualified' ? 'bg-green-100 text-green-700' :
+                                                                lead.status === 'offer_sent' ? 'bg-purple-100 text-purple-700' :
+                                                                    lead.status === 'sold' ? 'bg-emerald-100 text-emerald-700' :
+                                                                        lead.status === 'lost' ? 'bg-red-100 text-red-700' :
+                                                                            'bg-slate-100 text-slate-700'
                                                         }`}>{lead.status}</span>
                                                     <span className="text-sm text-slate-500">{new Date(lead.createdAt).toLocaleDateString('pl-PL')}</span>
                                                 </div>
