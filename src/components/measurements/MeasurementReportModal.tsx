@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../../services/database';
 import type { Measurement, MeasurementReport, Visit } from '../../types';
+import type { MeasurementRoute } from '../../services/route-calculation.service';
 import { toast } from 'react-hot-toast';
-import { FileText, Car, User, MapPin, CheckCircle, XCircle, Clock, Star, ChevronDown, ChevronUp, Phone, Sparkles } from 'lucide-react';
+import { FileText, Car, User, MapPin, CheckCircle, XCircle, Clock, Star, ChevronDown, ChevronUp, Phone, Sparkles, Route } from 'lucide-react';
 
 interface MeasurementReportModalProps {
     date: Date;
@@ -11,6 +12,7 @@ interface MeasurementReportModalProps {
     onSave: () => void;
     currentUserId: string;
     report?: MeasurementReport;
+    routes?: Record<string, MeasurementRoute>;
 }
 
 const OUTCOME_OPTIONS = [
@@ -35,7 +37,8 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
     onClose,
     onSave,
     currentUserId,
-    report
+    report,
+    routes = {}
 }) => {
     const [loading, setLoading] = useState(false);
     const [expandedVisitId, setExpandedVisitId] = useState<string | null>(null);
@@ -71,8 +74,16 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
         }));
     });
 
-    // Auto-calculate total km
+    // Auto-calculate total km from odometer
     const totalKm = Math.max(0, formData.odometerEnd - formData.odometerStart);
+
+    // Calculate total route distance from GPS routes (round trip sum)
+    const calculatedRouteKm = measurements.reduce((sum, m) => {
+        const route = routes[m.id];
+        return sum + (route?.distance_km || 0);
+    }, 0);
+    // Multiply by 2 for round trip (Gubin → all clients → Gubin ≈ 2x one-way distances)
+    const calculatedRoundTripKm = Math.round(calculatedRouteKm * 2);
 
     const updateVisit = (visitId: string, updates: Partial<Visit>) => {
         setVisits(prev => prev.map(v =>
@@ -262,8 +273,8 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                                                         type="button"
                                                                         onClick={() => updateVisit(visit.id, { outcome: option.value as Visit['outcome'] })}
                                                                         className={`p-3 rounded-lg border-2 transition-all text-center ${isSelected
-                                                                                ? 'border-accent bg-accent/10'
-                                                                                : 'border-slate-200 hover:border-slate-300'
+                                                                            ? 'border-accent bg-accent/10'
+                                                                            : 'border-slate-200 hover:border-slate-300'
                                                                             }`}
                                                                     >
                                                                         <Icon className={`w-5 h-5 mx-auto mb-1 ${isSelected ? 'text-accent' : 'text-slate-400'}`} />
@@ -290,8 +301,8 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                                                         type="button"
                                                                         onClick={() => updateVisit(visit.id, { salesPotential: rating as 1 | 2 | 3 | 4 | 5 })}
                                                                         className={`p-2 rounded-lg transition-all flex flex-col items-center ${visit.salesPotential === rating
-                                                                                ? 'bg-amber-200 scale-110'
-                                                                                : 'bg-white hover:bg-amber-100'
+                                                                            ? 'bg-amber-200 scale-110'
+                                                                            : 'bg-white hover:bg-amber-100'
                                                                             }`}
                                                                     >
                                                                         <div className="flex">
@@ -360,6 +371,25 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                 <Car className="w-4 h-4" />
                                 Dane pojazdu i przebieg
                             </h4>
+
+                            {/* Calculated route distance hint */}
+                            {calculatedRouteKm > 0 && (
+                                <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-sm text-emerald-700">
+                                        <Route className="w-4 h-4" />
+                                        <span>
+                                            <strong>Obliczona trasa:</strong> ~{calculatedRoundTripKm} km
+                                            <span className="text-emerald-500 text-xs ml-1">(Gubin → klienci → Gubin)</span>
+                                        </span>
+                                    </div>
+                                    {totalKm > 0 && Math.abs(totalKm - calculatedRoundTripKm) > 20 && (
+                                        <span className="text-xs text-amber-600 font-medium">
+                                            Δ {Math.abs(totalKm - calculatedRoundTripKm)} km różnicy
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-blue-700 mb-1">Nr Rejestracyjny</label>
@@ -395,7 +425,7 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-blue-700 mb-1">Dystans</label>
+                                    <label className="block text-xs font-medium text-blue-700 mb-1">Dystans (licznik)</label>
                                     <div className="w-full px-3 py-2 bg-blue-100 border border-blue-200 rounded-lg text-blue-800 font-bold text-sm">
                                         {totalKm} km
                                     </div>

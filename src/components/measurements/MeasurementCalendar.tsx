@@ -422,6 +422,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                     date={selectedReportDate}
                     measurements={getMeasurementsForDate(selectedReportDate)}
                     report={selectedReport}
+                    routes={routes}
                     onClose={() => {
                         setShowReportModal(false);
                         setSelectedReport(undefined);
