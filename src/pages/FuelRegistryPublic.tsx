@@ -40,6 +40,7 @@ export const FuelRegistryPublic: React.FC = () => {
                     liters: litersNum,
                     vehicle_plate: formData.vehiclePlate || null,
                     entry_source: 'qr_public',
+                    type: 'installer',
                     user_id: null,
                     log_date: new Date().toISOString()
                 });
