@@ -82,8 +82,8 @@ export const FuelLogManager: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded-full text-xs ${log.type === 'installer'
-                                                ? 'bg-purple-100 text-purple-800'
-                                                : 'bg-blue-100 text-blue-800'
+                                            ? 'bg-purple-100 text-purple-800'
+                                            : 'bg-blue-100 text-blue-800'
                                             }`}>
                                             {log.type === 'installer' ? 'Montażysta' : 'Sprzedawca'}
                                         </span>
@@ -92,13 +92,13 @@ export const FuelLogManager: React.FC = () => {
                                         {log.vehiclePlate || '-'}
                                     </td>
                                     <td className="px-4 py-3 font-mono">
-                                        {log.odometerReading} km
+                                        {log.odometerReading ? `${log.odometerReading} km` : '-'}
                                     </td>
                                     <td className="px-4 py-3">
                                         {log.liters} L
                                     </td>
                                     <td className="px-4 py-3 font-medium text-emerald-600">
-                                        {log.cost.toFixed(2)} PLN
+                                        {log.cost != null ? `${log.cost.toFixed(2)} PLN` : '-'}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex gap-2">
