@@ -76,23 +76,24 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
     }, [currentWeekStart, currentUser?.id]);
 
     // Fetch routes for measurements
-    useEffect(() => {
-        const fetchRoutes = async () => {
-            const routesMap: Record<string, MeasurementRoute> = {};
-            for (const measurement of measurements) {
-                try {
-                    const route = await RouteCalculationService.getRouteForMeasurement(measurement.id);
-                    if (route) {
-                        routesMap[measurement.id] = route;
-                    }
-                } catch (e) {
-                    console.error(`Error fetching route for measurement ${measurement.id}:`, e);
+    const fetchRoutesData = async () => {
+        const routesMap: Record<string, MeasurementRoute> = {};
+        for (const measurement of measurements) {
+            try {
+                const route = await RouteCalculationService.getRouteForMeasurement(measurement.id);
+                if (route) {
+                    routesMap[measurement.id] = route;
                 }
+            } catch (e) {
+                console.error(`Error fetching route for measurement ${measurement.id}:`, e);
             }
-            setRoutes(routesMap);
-        };
+        }
+        setRoutes(routesMap);
+    };
+
+    useEffect(() => {
         if (measurements.length > 0) {
-            fetchRoutes();
+            fetchRoutesData();
         }
     }, [measurements]);
 
@@ -222,7 +223,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                                     date={date}
                                                     onComplete={() => {
                                                         // Refresh routes after recalculation
-                                                        fetchRoutes();
+                                                        fetchRoutesData();
                                                     }}
                                                 />
                                             )}
