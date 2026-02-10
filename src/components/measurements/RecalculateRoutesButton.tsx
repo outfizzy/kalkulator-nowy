@@ -55,11 +55,18 @@ export const RecalculateRoutesButton: React.FC<RecalculateRoutesButtonProps> = (
                 setProgress({ current: i + 1, total: measurements.length });
 
                 try {
-                    await RouteCalculationService.calculateAndSaveRoute(
-                        measurement.id,
-                        measurement.customer_address,
-                        measurement.scheduled_date
-                    );
+                    // Call server-side Edge Function instead of client-side calculation
+                    const { data, error } = await supabase.functions.invoke('calculate-route', {
+                        body: {
+                            measurementId: measurement.id,
+                            destinationAddress: measurement.customer_address,
+                            measurementDate: measurement.scheduled_date,
+                        },
+                    });
+
+                    if (error) throw error;
+                    if (!data.success) throw new Error(data.error);
+
                     success++;
                 } catch (error) {
                     console.error(`Failed to calculate route for ${measurement.customer_name}:`, error);
