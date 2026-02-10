@@ -42,6 +42,8 @@ export const FuelRegistryPublic: React.FC = () => {
                     entry_source: 'qr_public',
                     type: 'installer',
                     user_id: null,
+                    cost: 0, // Default value for QR entries
+                    odometer_reading: 0, // Default value for QR entries
                     log_date: new Date().toISOString()
                 });
 
