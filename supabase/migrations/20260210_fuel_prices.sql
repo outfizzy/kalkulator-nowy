@@ -20,17 +20,11 @@ EXCLUDE USING gist (
 -- Enable RLS
 ALTER TABLE fuel_prices ENABLE ROW LEVEL SECURITY;
 
--- Admin and managers can manage fuel prices
-CREATE POLICY "Admin and managers can manage fuel prices" ON fuel_prices
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM user_roles 
-            WHERE user_id = auth.uid() 
-            AND role IN ('admin', 'manager')
-        )
-    );
+-- Authenticated users can manage fuel prices (admin/manager check done in frontend)
+CREATE POLICY "Authenticated users can manage fuel prices" ON fuel_prices
+    FOR ALL USING (auth.uid() IS NOT NULL);
 
--- Everyone can read prices (needed for auto-calculation)
+-- Everyone can read prices (needed for auto-calculation trigger)
 CREATE POLICY "Everyone can read fuel prices" ON fuel_prices
     FOR SELECT USING (true);
 
