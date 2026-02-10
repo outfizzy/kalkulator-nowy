@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { RouteCalculationService } from '../../services/route-calculation.service';
 import { supabase } from '../../lib/supabase';
-import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export const RecalculateRoutesButton: React.FC = () => {
+interface RecalculateRoutesButtonProps {
+    date?: Date; // Optional: if provided, only recalculate for this date
+    onComplete?: () => void; // Callback after recalculation
+}
+
+export const RecalculateRoutesButton: React.FC<RecalculateRoutesButtonProps> = ({ date, onComplete }) => {
     const [isRecalculating, setIsRecalculating] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
 
@@ -12,13 +17,24 @@ export const RecalculateRoutesButton: React.FC = () => {
         setIsRecalculating(true);
 
         try {
-            // Get all measurements without routes from today onwards
-            const { data: measurements, error } = await supabase
+            // Build query based on whether date is provided
+            let query = supabase
                 .from('measurements')
                 .select('*')
-                .is('route_id', null)
-                .gte('scheduled_date', new Date().toISOString().split('T')[0])
-                .order('scheduled_date', { ascending: true });
+                .is('route_id', null);
+
+            if (date) {
+                // Filter for specific date
+                const dateStr = date.toISOString().split('T')[0];
+                query = query
+                    .gte('scheduled_date', `${dateStr}T00:00:00`)
+                    .lt('scheduled_date', `${dateStr}T23:59:59`);
+            } else {
+                // All future measurements
+                query = query.gte('scheduled_date', new Date().toISOString().split('T')[0]);
+            }
+
+            const { data: measurements, error } = await query.order('scheduled_date', { ascending: true });
 
             if (error) throw error;
 
@@ -55,9 +71,15 @@ export const RecalculateRoutesButton: React.FC = () => {
             }
 
             if (failed === 0) {
-                toast.success(`✅ Przeliczono ${success} tras!`);
+                const dateStr = date ? date.toLocaleDateString('pl-PL') : 'wszystkich';
+                toast.success(`✅ Przeliczono ${success} tras (${dateStr})!`);
             } else {
                 toast.error(`⚠️ Sukces: ${success}, Błędy: ${failed}`);
+            }
+
+            // Call onComplete callback if provided
+            if (onComplete) {
+                onComplete();
             }
 
         } catch (error) {

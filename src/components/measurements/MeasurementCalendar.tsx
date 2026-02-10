@@ -172,11 +172,8 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                     Poprzedni tydzień
                 </button>
 
-                <div className="flex items-center gap-3">
-                    <div className="text-lg font-bold text-slate-800">
-                        {formatDate(weekDays[0])} - {formatDate(weekDays[6])}
-                    </div>
-                    <RecalculateRoutesButton />
+                <div className="text-lg font-bold text-slate-800">
+                    {formatDate(weekDays[0])} - {formatDate(weekDays[6])}
                 </div>
 
                 <button
@@ -219,6 +216,17 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
 
                                     return (
                                         <div className="flex items-center gap-1">
+                                            {/* Recalculate Routes Button */}
+                                            {dayMeasurements.length > 0 && (
+                                                <RecalculateRoutesButton
+                                                    date={date}
+                                                    onComplete={() => {
+                                                        // Refresh routes after recalculation
+                                                        fetchRoutes();
+                                                    }}
+                                                />
+                                            )}
+
                                             {/* Map Button */}
                                             <button
                                                 onClick={(e) => {
