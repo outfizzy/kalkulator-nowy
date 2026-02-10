@@ -8,7 +8,7 @@ import { RecalculateRoutesButton } from './RecalculateRoutesButton';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { RouteCalculationService, type MeasurementRoute } from '../../services/route-calculation.service';
-import { FileText, PlusSquare, MapPin, Fuel, CheckCircle, Map } from 'lucide-react';
+import { FileText, PlusSquare, CheckCircle, Map, Route, AlertTriangle } from 'lucide-react';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -159,6 +159,27 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
         return date.toDateString() === today.toDateString();
     };
 
+    // Get day route summary
+    const getDayRouteSummary = (dayMeasurements: Measurement[]) => {
+        if (dayMeasurements.length === 0) return null;
+
+        const withRoutes = dayMeasurements.filter(m => routes[m.id]);
+        const withoutRoutes = dayMeasurements.filter(m => !routes[m.id]);
+
+        const totalDistance = withRoutes.reduce((sum, m) => sum + (routes[m.id]?.distance_km || 0), 0);
+        const totalCost = withRoutes.reduce((sum, m) => sum + (routes[m.id]?.fuel_cost || 0), 0);
+
+        return {
+            totalDistance,
+            totalCost,
+            routeCount: withRoutes.length,
+            measurementCount: dayMeasurements.length,
+            isComplete: withoutRoutes.length === 0 && withRoutes.length > 0,
+            isOutdated: withoutRoutes.length > 0 && withRoutes.length > 0,
+            hasNoRoutes: withRoutes.length === 0,
+        };
+    };
+
     return (
         <div className="space-y-4">
             {/* Header with week navigation */}
@@ -193,53 +214,54 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                 {weekDays.map((date, index) => {
                     const dayMeasurements = getMeasurementsForDate(date);
                     const isTargetDate = dropTarget && dropTarget.date.toDateString() === date.toDateString();
+                    const routeSummary = getDayRouteSummary(dayMeasurements);
 
                     return (
                         <div
                             key={index}
                             className={`
-                                min-h-[200px] bg-white rounded-xl border-2 p-3 transition-all shadow-sm
+                                min-h-[200px] bg-white rounded-xl border-2 p-3 transition-all shadow-sm flex flex-col
                                 ${isToday(date) ? 'border-accent ring-2 ring-accent/10' : 'border-slate-100'}
                                 ${isTargetDate ? 'border-blue-400 bg-blue-50' : ''}
                             `}
                             onDragOver={(e) => handleDragOver(e, date)}
                             onDrop={(e) => handleDrop(e, date)}
                         >
+                            {/* Day Header */}
                             <div className="mb-3 pb-2 border-b border-slate-50 flex justify-between items-start">
                                 <div className={`text-sm font-bold ${isToday(date) ? 'text-accent' : 'text-slate-600'}`}>
                                     {formatDate(date)}
                                 </div>
 
-                                {/* Report Action */}
+                                {/* Action Icons */}
                                 {(() => {
                                     const dateStr = date.toISOString().split('T')[0];
                                     const report = reports.find(r => r.date === dateStr);
 
                                     return (
-                                        <div className="flex items-center gap-1">
-                                            {/* Recalculate Routes Button */}
+                                        <div className="flex items-center gap-0.5">
+                                            {/* Recalculate Routes */}
                                             {dayMeasurements.length > 0 && (
                                                 <RecalculateRoutesButton
                                                     date={date}
-                                                    onComplete={() => {
-                                                        // Refresh routes after recalculation
-                                                        fetchRoutesData();
-                                                    }}
+                                                    onComplete={() => fetchRoutesData()}
                                                 />
                                             )}
 
                                             {/* Map Button */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedMapDate(date);
-                                                    setShowMapModal(true);
-                                                }}
-                                                className="p-1 rounded transition-colors text-purple-600 hover:bg-purple-50"
-                                                title="Pokaż mapę tras"
-                                            >
-                                                <Map size={16} />
-                                            </button>
+                                            {dayMeasurements.length > 0 && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedMapDate(date);
+                                                        setShowMapModal(true);
+                                                    }}
+                                                    className="p-1 rounded transition-colors text-purple-600 hover:bg-purple-50"
+                                                    title="Pokaż mapę tras"
+                                                >
+                                                    <Map size={16} />
+                                                </button>
+                                            )}
 
                                             {/* Report Button */}
                                             <button
@@ -264,82 +286,104 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                 })()}
                             </div>
 
-                            <div className="space-y-2">
-                                {dayMeasurements.map((measurement) => {
-                                    const route = routes[measurement.id];
-                                    return (
-                                        <div
-                                            key={measurement.id}
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, measurement.id)}
-                                            onClick={(e) => {
-                                                // If has lead_id, navigate to lead details
-                                                if (measurement.leadId && e.ctrlKey) {
-                                                    e.stopPropagation();
-                                                    navigate(`/leads/${measurement.leadId}`);
-                                                } else {
-                                                    onEdit(measurement);
-                                                }
-                                            }}
-                                            className={`
-                                                p-3 rounded-lg border cursor-pointer transition-all shadow-sm
-                                                ${getStatusBadgeColor(measurement.status)}
-                                                hover:shadow-md active:scale-95
-                                                ${draggedItemId === measurement.id ? 'opacity-50' : ''}
-                                            `}
-                                            title={measurement.leadId ? 'Ctrl+Click aby zobaczyć lead' : ''}
-                                        >
-                                            <div className="text-xs font-bold mb-1 text-slate-800">
-                                                {measurement.customerName}
-                                            </div>
-                                            <div className="text-xs text-slate-500 flex items-center gap-1">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                </svg>
-                                                {measurement.salesRepName}
-                                            </div>
-                                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                </svg>
-                                                <span className="truncate">{measurement.customerAddress}</span>
-                                            </div>
-
-                                            {/* Route info */}
-                                            {route && (
-                                                <div className="mt-2 pt-2 border-t border-slate-200/50 flex items-center justify-between text-xs">
-                                                    <div className="flex items-center gap-1 text-blue-600">
-                                                        <MapPin size={12} />
-                                                        <span className="font-medium">{route.distance_km.toFixed(0)}km</span>
-                                                    </div>
-                                                    {route.fuel_cost && (
-                                                        <div className="flex items-center gap-1 text-green-600">
-                                                            <Fuel size={12} />
-                                                            <span className="font-medium">{route.fuel_cost.toFixed(2)}zł</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Outcome completion button for past measurements */}
-                                            {!measurement.outcome && new Date(measurement.scheduledDate) < new Date() && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedMeasurement(measurement);
-                                                        setShowOutcomeModal(true);
-                                                    }}
-                                                    className="mt-2 w-full py-1.5 px-2 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
-                                                >
-                                                    <CheckCircle size={12} />
-                                                    Uzupełnij wynik
-                                                </button>
-                                            )}
+                            {/* Measurements */}
+                            <div className="space-y-2 flex-1">
+                                {dayMeasurements.map((measurement, idx) => (
+                                    <div
+                                        key={measurement.id}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, measurement.id)}
+                                        onClick={(e) => {
+                                            if (measurement.leadId && e.ctrlKey) {
+                                                e.stopPropagation();
+                                                navigate(`/leads/${measurement.leadId}`);
+                                            } else {
+                                                onEdit(measurement);
+                                            }
+                                        }}
+                                        className={`
+                                            p-2 rounded-lg border cursor-pointer transition-all shadow-sm
+                                            ${getStatusBadgeColor(measurement.status)}
+                                            hover:shadow-md active:scale-95
+                                            ${draggedItemId === measurement.id ? 'opacity-50' : ''}
+                                        `}
+                                        title={measurement.leadId ? 'Ctrl+Click aby zobaczyć lead' : ''}
+                                    >
+                                        <div className="text-xs font-bold text-slate-800 truncate">
+                                            {measurement.customerName}
                                         </div>
-                                    );
-                                })}
+                                        <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                            <span className="truncate">{measurement.salesRepName}</span>
+                                        </div>
+                                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                                            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            <span className="truncate">{measurement.customerAddress}</span>
+                                        </div>
+
+                                        {/* Outcome button for past measurements */}
+                                        {!measurement.outcome && new Date(measurement.scheduledDate) < new Date() && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedMeasurement(measurement);
+                                                    setShowOutcomeModal(true);
+                                                }}
+                                                className="mt-1.5 w-full py-1 px-2 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <CheckCircle size={11} />
+                                                Uzupełnij wynik
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
+
+                            {/* Day Route Summary (bottom of column) */}
+                            {routeSummary && (
+                                <div className="mt-2 pt-2 border-t border-slate-100">
+                                    {routeSummary.isComplete && (
+                                        <div
+                                            className="flex items-center gap-1.5 text-[11px] bg-emerald-50 text-emerald-700 rounded-md px-2 py-1.5 cursor-pointer hover:bg-emerald-100 transition-colors"
+                                            onClick={() => {
+                                                setSelectedMapDate(date);
+                                                setShowMapModal(true);
+                                            }}
+                                        >
+                                            <Route size={12} className="flex-shrink-0" />
+                                            <span className="font-semibold">{routeSummary.totalDistance.toFixed(0)} km</span>
+                                            <span className="text-emerald-500">·</span>
+                                            <span className="font-semibold">{routeSummary.totalCost.toFixed(0)} zł</span>
+                                        </div>
+                                    )}
+
+                                    {routeSummary.isOutdated && (
+                                        <div
+                                            className="flex items-center gap-1.5 text-[11px] bg-amber-50 text-amber-700 rounded-md px-2 py-1.5 cursor-pointer hover:bg-amber-100 transition-colors"
+                                            onClick={() => {
+                                                setSelectedMapDate(date);
+                                                setShowMapModal(true);
+                                            }}
+                                        >
+                                            <AlertTriangle size={12} className="flex-shrink-0" />
+                                            <span className="font-medium">Trasa nieaktualna</span>
+                                            <span className="text-amber-500">·</span>
+                                            <span>{routeSummary.totalDistance.toFixed(0)} km</span>
+                                        </div>
+                                    )}
+
+                                    {routeSummary.hasNoRoutes && dayMeasurements.length > 0 && (
+                                        <div className="text-[11px] text-slate-400 text-center py-1">
+                                            Kliknij 🔄 aby obliczyć trasę
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -385,8 +429,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                     onSave={() => {
                         setShowReportModal(false);
                         setSelectedReport(undefined);
-                        // Trigger refresh logic if needed, e.g. refetch reports
-                        const startStr = weekDays[0].toISOString().split('T')[0]; // Quick refetch hack
+                        const startStr = weekDays[0].toISOString().split('T')[0];
                         const endStr = weekDays[6].toISOString().split('T')[0];
                         if (currentUser?.id) {
                             DatabaseService.getMeasurementReports({
@@ -411,8 +454,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                         setSelectedMeasurement(null);
                     }}
                     onSave={() => {
-                        // Refresh measurements list
-                        window.location.reload(); // Simple refresh for now
+                        window.location.reload();
                     }}
                 />
             )}

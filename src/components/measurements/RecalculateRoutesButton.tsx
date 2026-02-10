@@ -1,61 +1,63 @@
 import React, { useState } from 'react';
-import { RouteCalculationService } from '../../services/route-calculation.service';
 import { supabase } from '../../lib/supabase';
 import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface RecalculateRoutesButtonProps {
-    date?: Date; // Optional: if provided, only recalculate for this date
-    onComplete?: () => void; // Callback after recalculation
+    date: Date;
+    onComplete?: () => void;
 }
 
 export const RecalculateRoutesButton: React.FC<RecalculateRoutesButtonProps> = ({ date, onComplete }) => {
     const [isRecalculating, setIsRecalculating] = useState(false);
-    const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-    const recalculateRoutes = async () => {
+    const recalculateRoutes = async (e: React.MouseEvent) => {
+        e.stopPropagation();
         setIsRecalculating(true);
 
         try {
-            // Build query based on whether date is provided
-            let query = supabase
+            const dateStr = date.toISOString().split('T')[0];
+
+            // Get all measurements for this date (with or without route)
+            const { data: measurements, error } = await supabase
                 .from('measurements')
                 .select('*')
-                .is('route_id', null);
-
-            if (date) {
-                // Filter for specific date
-                const dateStr = date.toISOString().split('T')[0];
-                query = query
-                    .gte('scheduled_date', `${dateStr}T00:00:00`)
-                    .lt('scheduled_date', `${dateStr}T23:59:59`);
-            } else {
-                // All future measurements
-                query = query.gte('scheduled_date', new Date().toISOString().split('T')[0]);
-            }
-
-            const { data: measurements, error } = await query.order('scheduled_date', { ascending: true });
+                .gte('scheduled_date', `${dateStr}T00:00:00`)
+                .lt('scheduled_date', `${dateStr}T23:59:59`)
+                .order('scheduled_date', { ascending: true });
 
             if (error) throw error;
 
             if (!measurements || measurements.length === 0) {
-                toast.success('Wszystkie pomiary mają już obliczone trasy!');
+                toast.success('Brak pomiarów do przeliczenia');
                 setIsRecalculating(false);
                 return;
             }
 
-            setProgress({ current: 0, total: measurements.length });
-            toast.success(`Znaleziono ${measurements.length} pomiarów do przeliczenia`);
+            // Delete existing routes for this day's measurements (full recalculation)
+            const measurementIds = measurements.map(m => m.id);
+            await supabase
+                .from('measurement_routes')
+                .delete()
+                .in('measurement_id', measurementIds);
+
+            // Reset route_id on measurements
+            await supabase
+                .from('measurements')
+                .update({ route_id: null })
+                .in('id', measurementIds);
+
+            const toastId = toast.loading(`Przeliczanie tras: 0/${measurements.length}`);
 
             let success = 0;
             let failed = 0;
 
             for (let i = 0; i < measurements.length; i++) {
                 const measurement = measurements[i];
-                setProgress({ current: i + 1, total: measurements.length });
+
+                toast.loading(`Przeliczanie tras: ${i + 1}/${measurements.length}`, { id: toastId });
 
                 try {
-                    // Call server-side Edge Function instead of client-side calculation
                     const { data, error } = await supabase.functions.invoke('calculate-route', {
                         body: {
                             measurementId: measurement.id,
@@ -69,32 +71,28 @@ export const RecalculateRoutesButton: React.FC<RecalculateRoutesButtonProps> = (
 
                     success++;
                 } catch (error) {
-                    console.error(`Failed to calculate route for ${measurement.customer_name}:`, error);
+                    console.error(`Failed: ${measurement.customer_name}:`, error);
                     failed++;
                 }
 
-                // Wait to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
 
+            toast.dismiss(toastId);
+
             if (failed === 0) {
-                const dateStr = date ? date.toLocaleDateString('pl-PL') : 'wszystkich';
-                toast.success(`✅ Przeliczono ${success} tras (${dateStr})!`);
+                toast.success(`✅ Przeliczono ${success} tras!`);
             } else {
                 toast.error(`⚠️ Sukces: ${success}, Błędy: ${failed}`);
             }
 
-            // Call onComplete callback if provided
-            if (onComplete) {
-                onComplete();
-            }
+            if (onComplete) onComplete();
 
         } catch (error) {
             console.error('Error recalculating routes:', error);
             toast.error('Błąd podczas przeliczania tras');
         } finally {
             setIsRecalculating(false);
-            setProgress({ current: 0, total: 0 });
         }
     };
 
@@ -102,19 +100,13 @@ export const RecalculateRoutesButton: React.FC<RecalculateRoutesButtonProps> = (
         <button
             onClick={recalculateRoutes}
             disabled={isRecalculating}
-            className={`
-                px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2
-                ${isRecalculating
-                    ? 'bg-blue-100 text-blue-600 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-                }
-            `}
+            className={`p-1 rounded transition-colors ${isRecalculating
+                    ? 'text-blue-400 cursor-not-allowed'
+                    : 'text-blue-600 hover:bg-blue-50'
+                }`}
+            title={isRecalculating ? 'Przeliczanie...' : 'Przelicz trasy'}
         >
-            <RefreshCw className={`w-4 h-4 ${isRecalculating ? 'animate-spin' : ''}`} />
-            {isRecalculating
-                ? `Przeliczanie... ${progress.current}/${progress.total}`
-                : 'Przelicz Trasy'
-            }
+            <RefreshCw size={16} className={isRecalculating ? 'animate-spin' : ''} />
         </button>
     );
 };
