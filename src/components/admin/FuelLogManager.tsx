@@ -64,6 +64,7 @@ export const FuelLogManager: React.FC = () => {
                                 <th className="px-4 py-3">Data</th>
                                 <th className="px-4 py-3">Pracownik</th>
                                 <th className="px-4 py-3">Rola</th>
+                                <th className="px-4 py-3">Rodzaj</th>
                                 <th className="px-4 py-3">Pojazd</th>
                                 <th className="px-4 py-3">Licznik</th>
                                 <th className="px-4 py-3">Paliwo</th>
@@ -87,6 +88,13 @@ export const FuelLogManager: React.FC = () => {
                                             }`}>
                                             {log.type === 'installer' ? 'Montażysta' : 'Sprzedawca'}
                                         </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {(log as any).trip_type ? (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                                {(log as any).trip_type}
+                                            </span>
+                                        ) : '-'}
                                     </td>
                                     <td className="px-4 py-3">
                                         {log.vehiclePlate || '-'}

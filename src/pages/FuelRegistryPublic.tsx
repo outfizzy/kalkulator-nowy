@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -7,10 +7,47 @@ export const FuelRegistryPublic: React.FC = () => {
         firstName: '',
         lastName: '',
         liters: '',
-        vehiclePlate: ''
+        vehiclePlate: '',
+        tripType: 'montaż' as 'montaż' | 'pomiar' | 'prywatne'
     });
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [availablePlates, setAvailablePlates] = useState<string[]>([]);
+
+    // Load saved name and vehicle plates on mount
+    useEffect(() => {
+        // Load saved name from localStorage
+        const savedName = localStorage.getItem('fuel_registry_name');
+        if (savedName) {
+            try {
+                const { firstName, lastName } = JSON.parse(savedName);
+                setFormData(prev => ({ ...prev, firstName, lastName }));
+            } catch (error) {
+                console.error('Error loading saved name:', error);
+            }
+        }
+
+        // Load all vehicle plates
+        loadVehiclePlates();
+    }, []);
+
+    const loadVehiclePlates = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('fuel_logs')
+                .select('vehicle_plate')
+                .not('vehicle_plate', 'is', null)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Get unique plates
+            const uniquePlates = [...new Set(data.map(item => item.vehicle_plate))];
+            setAvailablePlates(uniquePlates);
+        } catch (error) {
+            console.error('Error loading vehicle plates:', error);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,7 +55,7 @@ export const FuelRegistryPublic: React.FC = () => {
 
         try {
             // Validate
-            if (!formData.firstName || !formData.lastName || !formData.liters) {
+            if (!formData.firstName || !formData.lastName || !formData.liters || !formData.tripType) {
                 toast.error('Wypełnij wszystkie wymagane pola');
                 setLoading(false);
                 return;
@@ -39,23 +76,38 @@ export const FuelRegistryPublic: React.FC = () => {
                     last_name: formData.lastName,
                     liters: litersNum,
                     vehicle_plate: formData.vehiclePlate || null,
+                    trip_type: formData.tripType,
                     entry_source: 'qr_public',
                     type: 'installer',
                     user_id: null,
-                    cost: 0, // Default value for QR entries
-                    odometer_reading: 0, // Default value for QR entries
+                    cost: 0,
+                    odometer_reading: 0,
                     log_date: new Date().toISOString()
                 });
 
             if (error) throw error;
 
+            // Save name to localStorage for next time
+            localStorage.setItem('fuel_registry_name', JSON.stringify({
+                firstName: formData.firstName,
+                lastName: formData.lastName
+            }));
+
             // Success
             setSubmitted(true);
             toast.success('Wpis został zapisany!');
 
+            // Reload vehicle plates (in case new one was added)
+            loadVehiclePlates();
+
             // Reset form after 3 seconds
             setTimeout(() => {
-                setFormData({ firstName: '', lastName: '', liters: '', vehiclePlate: '' });
+                setFormData(prev => ({
+                    ...prev,
+                    liters: '',
+                    vehiclePlate: '',
+                    tripType: 'montaż'
+                }));
                 setSubmitted(false);
             }, 3000);
 
@@ -130,6 +182,28 @@ export const FuelRegistryPublic: React.FC = () => {
                         />
                     </div>
 
+                    {/* Trip Type */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                            Rodzaj wyjazdu <span className="text-red-500">*</span>
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {(['montaż', 'pomiar', 'prywatne'] as const).map((type) => (
+                                <button
+                                    key={type}
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, tripType: type })}
+                                    className={`py-3 px-4 rounded-xl font-medium transition-all ${formData.tripType === type
+                                            ? 'bg-blue-600 text-white shadow-lg'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Liters */}
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -146,18 +220,29 @@ export const FuelRegistryPublic: React.FC = () => {
                         />
                     </div>
 
-                    {/* Vehicle Plate (Optional) */}
+                    {/* Vehicle Plate with Datalist */}
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                             Tablica rejestracyjna <span className="text-gray-400 text-xs">(opcjonalnie)</span>
                         </label>
                         <input
                             type="text"
+                            list="vehicle-plates"
                             value={formData.vehiclePlate}
                             onChange={(e) => setFormData({ ...formData, vehiclePlate: e.target.value.toUpperCase() })}
                             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-lg uppercase"
                             placeholder="ABC 1234"
                         />
+                        <datalist id="vehicle-plates">
+                            {availablePlates.map((plate) => (
+                                <option key={plate} value={plate} />
+                            ))}
+                        </datalist>
+                        {availablePlates.length > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                                💡 Wybierz z listy lub wpisz nowy numer
+                            </p>
+                        )}
                     </div>
 
                     {/* Submit Button */}
