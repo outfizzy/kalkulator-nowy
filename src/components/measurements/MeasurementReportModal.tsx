@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../../services/database';
+import { MeasurementReminderService, type MeasurementOutcome } from '../../services/measurement-reminder.service';
 import type { Measurement, MeasurementReport, Visit } from '../../types';
 import type { MeasurementRoute } from '../../services/route-calculation.service';
 import { toast } from 'react-hot-toast';
@@ -108,19 +109,40 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
 
         setLoading(true);
         try {
-            // Sync sales potential to leads
+            // Map report outcomes to measurement outcomes for kanban sync
+            const outcomeToMeasurementOutcome: Record<string, MeasurementOutcome | null> = {
+                'signed': 'signed',        // → Wygrane
+                'measured': 'considering',  // → Pomiar odbył się
+                'postponed': 'considering', // → Pomiar odbył się
+                'rejected': 'rejected',     // → Utracone
+                'pending': null,            // no change
+            };
+
+            // Sync visit outcomes to leads (kanban) and sales potential
             for (const visit of visits) {
-                if (visit.leadId && visit.outcome !== 'signed' && visit.salesPotential) {
+                if (visit.leadId) {
                     try {
-                        // Update lead with AI score based on sales potential
-                        const aiScore = visit.salesPotential * 20; // 1-5 → 20-100
-                        await DatabaseService.updateLead(visit.leadId, {
-                            aiScore,
-                            aiSummary: `Potencjał sprzedaży: ${POTENTIAL_LABELS[visit.salesPotential].label}. ${visit.salesPotentialNote || ''}`,
-                            notes: visit.visitNotes ? `[Pomiar ${date.toLocaleDateString('pl-PL')}] ${visit.visitNotes}` : undefined
-                        });
+                        // 1. Move lead in kanban based on outcome
+                        const measurementOutcome = outcomeToMeasurementOutcome[visit.outcome];
+                        if (measurementOutcome) {
+                            await MeasurementReminderService.updateMeasurementOutcome(
+                                visit.id,
+                                measurementOutcome,
+                                visit.visitNotes || visit.notes
+                            );
+                        }
+
+                        // 2. Sync sales potential if applicable
+                        if (visit.outcome !== 'signed' && visit.salesPotential) {
+                            const aiScore = visit.salesPotential * 20; // 1-5 → 20-100
+                            await DatabaseService.updateLead(visit.leadId, {
+                                aiScore,
+                                aiSummary: `Potencjał sprzedaży: ${POTENTIAL_LABELS[visit.salesPotential].label}. ${visit.salesPotentialNote || ''}`,
+                                notes: visit.visitNotes ? `[Pomiar ${date.toLocaleDateString('pl-PL')}] ${visit.visitNotes}` : undefined
+                            });
+                        }
                     } catch (err) {
-                        console.warn('Could not update lead:', visit.leadId, err);
+                        console.warn('Could not sync lead:', visit.leadId, err);
                     }
                 }
             }

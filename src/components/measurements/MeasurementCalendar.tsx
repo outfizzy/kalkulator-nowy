@@ -8,7 +8,7 @@ import { RecalculateRoutesButton } from './RecalculateRoutesButton';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { RouteCalculationService, type MeasurementRoute } from '../../services/route-calculation.service';
-import { FileText, PlusSquare, CheckCircle, Map, Route, AlertTriangle } from 'lucide-react';
+import { FileText, PlusSquare, CheckCircle, Map, Route, AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -209,6 +209,45 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                 </button>
             </div>
 
+            {/* Unfilled Reports Banner */}
+            {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const daysNeedingReport = weekDays.filter(date => {
+                    const d = new Date(date);
+                    d.setHours(0, 0, 0, 0);
+                    if (d >= today) return false; // Only past days
+                    const dayMeasurements = getMeasurementsForDate(date);
+                    if (dayMeasurements.length === 0) return false; // No measurements = no report needed
+                    const dateStr = date.toISOString().split('T')[0];
+                    const hasReport = reports.find(r => r.date === dateStr);
+                    return !hasReport;
+                });
+                if (daysNeedingReport.length === 0) return null;
+                return (
+                    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                        <div className="flex-1 text-sm text-amber-800">
+                            <strong>Uzupełnij raporty!</strong> Masz <strong>{daysNeedingReport.length}</strong> {daysNeedingReport.length === 1 ? 'dzień' : 'dni'} bez raportu:
+                            {' '}
+                            {daysNeedingReport.map((d, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => {
+                                        setSelectedReportDate(d);
+                                        setSelectedReport(undefined);
+                                        setShowReportModal(true);
+                                    }}
+                                    className="inline-flex items-center px-2 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-amber-900 font-semibold transition-colors mx-0.5"
+                                >
+                                    {d.toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-2">
                 {weekDays.map((date, index) => {
@@ -272,7 +311,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                                     setShowReportModal(true);
                                                 }}
                                                 className={`
-                                                    p-1 rounded transition-colors
+                                                    p-1 rounded transition-colors relative
                                                     ${report
                                                         ? 'text-green-600 hover:bg-green-50'
                                                         : 'text-slate-300 hover:text-accent hover:bg-slate-50'}
@@ -280,6 +319,16 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                                 title={report ? 'Edytuj Raport' : 'Utwórz Raport'}
                                             >
                                                 {report ? <FileText size={16} /> : <PlusSquare size={16} />}
+                                                {/* Pulsing dot for past days without report */}
+                                                {!report && (() => {
+                                                    const today = new Date();
+                                                    today.setHours(0, 0, 0, 0);
+                                                    const d = new Date(date);
+                                                    d.setHours(0, 0, 0, 0);
+                                                    return d < today && dayMeasurements.length > 0;
+                                                })() && (
+                                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                                    )}
                                             </button>
                                         </div>
                                     );
