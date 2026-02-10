@@ -78,6 +78,7 @@ import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
 import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
 import { PartnerLayout } from './components/partner/PartnerLayout';
 import { ScrollToTop } from './components/ScrollToTop';
+import { FuelRegistryPublic } from './pages/FuelRegistryPublic';
 
 // B2B Partner Portal
 import { B2BLayout } from './pages/b2b/B2BLayout';
@@ -162,6 +163,7 @@ function App() {
             <Route path="/b2b/login" element={<B2BLoginPage />} />
             <Route path="/b2b/register" element={<PartnerRegisterPage />} />
             <Route path="/print/offer/:token" element={<OfferPrintView />} />
+            <Route path="/fuel-registry" element={<FuelRegistryPublic />} />
 
             {/* Sales Rep / Admin Routes */}
             <Route element={
