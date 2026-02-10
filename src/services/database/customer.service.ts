@@ -113,8 +113,20 @@ export const CustomerService = {
         const rep = customer.representative_id ? profilesMap.get(customer.representative_id) : undefined;
         const signer = customer.contract_signer_id ? profilesMap.get(customer.contract_signer_id) : undefined;
 
-        // Cast to any to assume base properties match
-        const c = customer as unknown as Customer;
+        // Normalize snake_case DB columns to camelCase (same as getCustomers)
+        const raw = customer as any;
+        const c: Customer = {
+            ...raw,
+            firstName: raw.firstName || raw.first_name || '',
+            lastName: raw.lastName || raw.last_name || '',
+            companyName: raw.companyName || raw.company_name,
+            postalCode: raw.postalCode || raw.postal_code || raw['postal-code'] || '',
+            houseNumber: raw.houseNumber || raw.house_number || '',
+            street: raw.street || '',
+            email: raw.email || '',
+            phone: raw.phone || raw.phone_number || '',
+            city: raw.city || '',
+        };
 
         return {
             ...c,

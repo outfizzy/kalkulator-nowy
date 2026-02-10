@@ -178,11 +178,21 @@ export const CustomerDetailsPage: React.FC = () => {
                                 {(customer.firstName || '')[0]}{(customer.lastName || '')[0]}
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-slate-900">{customer.firstName} {customer.lastName}</h1>
-                                <div className="flex items-center gap-3 text-sm text-slate-500">
-                                    <span>{customer.city}</span>
-                                    <span>•</span>
-                                    <span>{customer.phone}</span>
+                                <h1 className="text-2xl font-bold text-slate-900">
+                                    {customer.firstName} {customer.lastName}
+                                    {customer.companyName && <span className="text-slate-400 font-normal text-lg ml-2">({customer.companyName})</span>}
+                                </h1>
+                                <div className="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
+                                    {customer.street && (
+                                        <span>{customer.street} {customer.houseNumber}</span>
+                                    )}
+                                    {customer.street && customer.city && <span>•</span>}
+                                    {(customer.postalCode || customer.city) && (
+                                        <span>{customer.postalCode} {customer.city}</span>
+                                    )}
+                                    {(customer.city || customer.street) && customer.phone && <span>•</span>}
+                                    {customer.phone && <span>📞 {customer.phone}</span>}
+                                    {customer.email && <><span>•</span><span>✉️ {customer.email}</span></>}
                                 </div>
                             </div>
                         </div>
@@ -330,11 +340,97 @@ export const CustomerDetailsPage: React.FC = () => {
                 <div className="flex-1 overflow-auto bg-slate-50 p-8">
                     <div className="max-w-6xl mx-auto">
                         {activeTab === 'edit' && (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <CustomerEditForm
-                                    customer={customer}
-                                    onSave={() => { /* Consider refreshing logic */ }}
-                                />
+                            <div className="space-y-6">
+                                {/* Read-only Customer Info Card */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                        Informacje o kliencie
+                                    </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Zwrot</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">{customer.salutation || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Firma</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">{customer.companyName || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Imię</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">{customer.firstName || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nazwisko</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">{customer.lastName || '—'}</p>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Adres</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">
+                                                {customer.street || ''} {customer.houseNumber || ''}{(customer.street || customer.houseNumber) ? ', ' : ''}
+                                                {customer.postalCode || ''} {customer.city || ''}
+                                                {customer.country && customer.country !== 'Deutschland' ? `, ${customer.country}` : ''}
+                                                {!customer.street && !customer.city && '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Telefon</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">
+                                                {customer.phone ? <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">{customer.phone}</a> : '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Email</label>
+                                            <p className="text-slate-800 font-medium mt-0.5">
+                                                {customer.email ? <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">{customer.email}</a> : '—'}
+                                            </p>
+                                        </div>
+                                        {customer.representative && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Przedstawiciel</label>
+                                                <p className="text-slate-800 font-medium mt-0.5">{customer.representative.firstName} {customer.representative.lastName}</p>
+                                            </div>
+                                        )}
+                                        {customer.contractSigner && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Podpisujący umowę</label>
+                                                <p className="text-slate-800 font-medium mt-0.5">{customer.contractSigner.firstName} {customer.contractSigner.lastName}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Quick Stats */}
+                                    <div className="mt-6 pt-4 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="text-center p-3 bg-slate-50 rounded-lg">
+                                            <p className="text-2xl font-bold text-blue-600">{clientLeads.length}</p>
+                                            <p className="text-xs text-slate-500 mt-1">Leady</p>
+                                        </div>
+                                        <div className="text-center p-3 bg-slate-50 rounded-lg">
+                                            <p className="text-2xl font-bold text-purple-600">{clientOffers.length}</p>
+                                            <p className="text-xs text-slate-500 mt-1">Oferty</p>
+                                        </div>
+                                        <div className="text-center p-3 bg-slate-50 rounded-lg">
+                                            <p className="text-2xl font-bold text-emerald-600">{clientContracts.length}</p>
+                                            <p className="text-xs text-slate-500 mt-1">Umowy</p>
+                                        </div>
+                                        <div className="text-center p-3 bg-slate-50 rounded-lg">
+                                            <p className="text-2xl font-bold text-orange-600">{clientInstallations.length}</p>
+                                            <p className="text-xs text-slate-500 mt-1">Montaże</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Edit Form */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                        Edytuj dane
+                                    </h2>
+                                    <CustomerEditForm
+                                        customer={customer}
+                                        onSave={() => { fetchData(); }}
+                                    />
+                                </div>
                             </div>
                         )}
 
@@ -407,27 +503,43 @@ export const CustomerDetailsPage: React.FC = () => {
                                     <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed text-slate-500">Brak leadów dla tego klienta</div>
                                 ) : (
                                     clientLeads.map(lead => (
-                                        <div key={lead.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center hover:shadow-md transition-shadow">
+                                        <div
+                                            key={lead.id}
+                                            onClick={() => navigate(`/leads?leadId=${lead.id}`)}
+                                            className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
+                                        >
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-slate-800">Status: {lead.status}</span>
-                                                    <span className="text-sm text-slate-500">{new Date(lead.createdAt).toLocaleDateString()}</span>
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead.status === 'new' ? 'bg-blue-100 text-blue-700' :
+                                                            lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' :
+                                                                lead.status === 'qualified' ? 'bg-green-100 text-green-700' :
+                                                                    lead.status === 'offer_sent' ? 'bg-purple-100 text-purple-700' :
+                                                                        lead.status === 'sold' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            lead.status === 'lost' ? 'bg-red-100 text-red-700' :
+                                                                                'bg-slate-100 text-slate-700'
+                                                        }`}>{lead.status}</span>
+                                                    <span className="text-sm text-slate-500">{new Date(lead.createdAt).toLocaleDateString('pl-PL')}</span>
                                                 </div>
                                                 {lead.source && (
                                                     <div className="text-sm text-slate-600 mt-1">
-                                                        Źródło: {lead.source}
+                                                        Źródło: <span className="font-medium">{lead.source}</span>
                                                     </div>
                                                 )}
                                                 {lead.notes && (
-                                                    <div className="text-sm text-slate-500 mt-2 bg-slate-50 p-2 rounded">
+                                                    <div className="text-sm text-slate-500 mt-2 bg-slate-50 p-2 rounded line-clamp-2">
                                                         {lead.notes}
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="text-right">
-                                                <div className="text-sm text-slate-500">
-                                                    Przypisany: {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '-'}
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-right">
+                                                    <div className="text-sm text-slate-500">
+                                                        {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '-'}
+                                                    </div>
                                                 </div>
+                                                <svg className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                </svg>
                                             </div>
                                         </div>
                                     ))
