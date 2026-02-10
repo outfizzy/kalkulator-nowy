@@ -764,6 +764,12 @@ export interface Measurement {
     locationLat?: number;
     locationLng?: number;
     distanceFromPrevious?: number; // in kilometers
+    // Outcome tracking
+    outcome?: 'signed' | 'considering' | 'rejected' | 'no_show';
+    outcomeNotes?: string;
+    completedAt?: Date;
+    reminderSent?: boolean;
+    routeId?: string; // Link to measurement_routes
 }
 
 // --- Virtual Wallet Types ---

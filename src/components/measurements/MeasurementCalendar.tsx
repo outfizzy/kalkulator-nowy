@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Measurement, MeasurementReport } from '../../types';
 import { MeasurementReportModal } from './MeasurementReportModal';
+import { MeasurementOutcomeModal } from './MeasurementOutcomeModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { RouteCalculationService, type MeasurementRoute } from '../../services/route-calculation.service';
-import { FileText, PlusSquare, MapPin, Fuel } from 'lucide-react';
+import { FileText, PlusSquare, MapPin, Fuel, CheckCircle } from 'lucide-react';
 
 interface MeasurementCalendarProps {
     measurements: Measurement[];
@@ -38,6 +39,10 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
 
     // Routes Integration
     const [routes, setRoutes] = useState<Record<string, MeasurementRoute>>({});
+
+    // Outcome Modal
+    const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+    const [selectedMeasurement, setSelectedMeasurement] = useState<Measurement | null>(null);
 
     const weekDays = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(currentWeekStart);
@@ -282,6 +287,21 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                                     )}
                                                 </div>
                                             )}
+
+                                            {/* Outcome completion button for past measurements */}
+                                            {!measurement.outcome && new Date(measurement.scheduledDate) < new Date() && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedMeasurement(measurement);
+                                                        setShowOutcomeModal(true);
+                                                    }}
+                                                    className="mt-2 w-full py-1.5 px-2 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                                                >
+                                                    <CheckCircle size={12} />
+                                                    Uzupełnij wynik
+                                                </button>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -343,6 +363,23 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                         }
                     }}
                     currentUserId={currentUser?.id || ''}
+                />
+            )}
+
+            {/* Outcome Modal */}
+            {showOutcomeModal && selectedMeasurement && (
+                <MeasurementOutcomeModal
+                    measurementId={selectedMeasurement.id}
+                    customerName={selectedMeasurement.customerName}
+                    scheduledDate={selectedMeasurement.scheduledDate}
+                    onClose={() => {
+                        setShowOutcomeModal(false);
+                        setSelectedMeasurement(null);
+                    }}
+                    onSave={() => {
+                        // Refresh measurements list
+                        window.location.reload(); // Simple refresh for now
+                    }}
                 />
             )}
         </div>
