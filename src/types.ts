@@ -184,6 +184,7 @@ export interface Lead {
     fairMessage?: string; // Optional contextual message (e.g. "Targi: BAU 2026")
     aiScore?: number;
     aiSummary?: string;
+    lostReason?: string;
     attachments?: { name: string; url: string; type: string; size: number }[];
 }
 

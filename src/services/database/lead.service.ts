@@ -127,6 +127,7 @@ export const LeadService = {
         // AI Score from measurements or scorer
         if (updates.aiScore !== undefined) dbUpdates.ai_score = updates.aiScore;
         if (updates.aiSummary !== undefined) dbUpdates.ai_summary = updates.aiSummary;
+        if (updates.lostReason !== undefined) dbUpdates.lost_reason = updates.lostReason;
 
         const { error } = await supabase
             .from('leads')
@@ -267,6 +268,7 @@ export const LeadService = {
                 lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
                 clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
                 customerData: lead.customer_data,
+                lostReason: lead.lost_reason,
                 salesRep: undefined,
                 assignee: assigneeProfile ? {
                     firstName: assigneeProfile.first_name || '',
@@ -324,6 +326,7 @@ export const LeadService = {
                 clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined,
                 createdAt: new Date(row.created_at),
                 updatedAt: new Date(row.updated_at),
+                lostReason: row.lost_reason,
                 assignee: assigneeProfile ? {
                     firstName: assigneeProfile.first_name || '',
                     lastName: assigneeProfile.last_name || ''
@@ -352,6 +355,7 @@ export const LeadService = {
             lastContactDate: data.last_contact_date ? new Date(data.last_contact_date) : undefined,
             clientWillContactAt: data.client_will_contact_at ? new Date(data.client_will_contact_at) : undefined,
             customerData: data.customer_data,
+            lostReason: data.lost_reason,
             // Fair Module Data Mapping
             fairId: data.fair_id,
             fairPhotos: data.fair_photos || [],
@@ -453,6 +457,7 @@ export const LeadService = {
             lastContactDate: lead.last_contact_date ? new Date(lead.last_contact_date) : undefined,
             clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
             customerData: lead.customer_data,
+            lostReason: lead.lost_reason,
             salesRep: undefined,
             aiScore: lead.ai_score,
             aiSummary: lead.ai_summary

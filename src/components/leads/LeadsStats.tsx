@@ -119,6 +119,21 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         // Re-sort by Total for the table display (usually expected)
         const tableData = [...sortedAssignees].sort((a, b) => b.total - a.total);
 
+        // --- Lost Reason Stats ---
+        const lostLeads = leads.filter(l => l.status === 'lost');
+        const lostReasonMap: Record<string, number> = {};
+        lostLeads.forEach(lead => {
+            const reason = lead.lostReason || 'Nie podano powodu';
+            lostReasonMap[reason] = (lostReasonMap[reason] || 0) + 1;
+        });
+        const lostReasonStats = Object.entries(lostReasonMap)
+            .map(([reason, count]) => ({
+                reason,
+                count,
+                percentage: lostLeads.length > 0 ? ((count / lostLeads.length) * 100).toFixed(1) : '0.0'
+            }))
+            .sort((a, b) => b.count - a.count);
+
         return {
             total,
             won,
@@ -128,7 +143,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             topPerformer, // Best by WON count
             uniqueAssignees: Object.keys(assigneeStats).length,
             detailedStats: tableData,
-            sourceStats // New
+            sourceStats, // New
+            lostReasonStats // Lost reasons breakdown
         };
     }, [leads, fairs]);
 
@@ -317,6 +333,76 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                     </div>
                 </div>
             </div>
+
+            {/* Lost Reasons Breakdown */}
+            {stats.lostReasonStats.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Lost Summary Card */}
+                    <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-red-100 bg-red-50">
+                            <h3 className="font-bold text-red-800 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Utracone Szanse
+                            </h3>
+                            <p className="text-xs text-red-600 mt-0.5">Analiza powodów utraty</p>
+                        </div>
+                        <div className="p-6 flex flex-col items-center justify-center">
+                            <div className="text-5xl font-bold text-red-600">{stats.lost}</div>
+                            <div className="text-sm text-slate-500 mt-2">utraconych leadów</div>
+                            <div className="text-xs text-slate-400 mt-1">
+                                ({stats.total > 0 ? ((stats.lost / stats.total) * 100).toFixed(1) : '0.0'}% wszystkich)
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Lost Reasons Table */}
+                    <div className="lg:col-span-2 bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-red-100 bg-red-50 flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-red-800">Powody Utraty</h3>
+                                <p className="text-xs text-red-600 mt-0.5">Dlaczego tracimy klientów?</p>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-slate-500 font-medium bg-red-50/50 border-b border-red-100">
+                                    <tr>
+                                        <th className="px-6 py-3">Powód</th>
+                                        <th className="px-6 py-3 text-right">Ilość</th>
+                                        <th className="px-6 py-3 text-right">Udział</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {stats.lostReasonStats.map((item) => (
+                                        <tr key={item.reason} className="hover:bg-red-50/30">
+                                            <td className="px-6 py-3 font-medium text-slate-900">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                                                    {item.reason}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-right font-bold text-red-600">{item.count}</td>
+                                            <td className="px-6 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <span>{item.percentage}%</span>
+                                                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-red-500 rounded-full"
+                                                            style={{ width: `${Math.min(parseFloat(item.percentage), 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
