@@ -3,6 +3,25 @@ import * as THREE from 'three';
 import type { ProductConfig } from '../../types';
 import { getGutterProfile, getPostProfile, getRafterProfile, getWallProfileShape } from './profiles';
 import { getStructureSpecs } from './structureUtils';
+import {
+    createAluminumMaterial,
+    createGlassWallMaterial,
+    createGlassRoofMaterial,
+    createPolycarbonateRoofMaterial,
+    createWPCFloorMaterial,
+    createWPCBaseMaterial,
+    createGresTileMaterial,
+    createGresBaseMaterial,
+    createDarkMetalMaterial,
+    createHeaterGlowMaterial,
+    createHeaterBodyMaterial,
+    createLEDEmitterMaterial,
+    createLEDFixtureMaterial,
+    createFabricMaterial,
+    createScreenMeshMaterial,
+    createFrameMaterial,
+    createGuideMaterial,
+} from './materials';
 
 interface PatioCoverModelProps {
     config: ProductConfig;
@@ -87,35 +106,18 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
     const hasLeftSlidingGlass = slidingWallAddons.some(a => a.location === 'left');
     const hasRightSlidingGlass = slidingWallAddons.some(a => a.location === 'right');
 
-    // ... Materials ...
-    const glassWallMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-        transmission: 0.99, opacity: 1, metalness: 0, roughness: 0,
-        ior: 1.5, thickness: 0.01, color: '#eef2ff', transparent: true,
-        envMapIntensity: 1.5, clearcoat: 1
-    }), []);
+    // ... Materials (PBR) ...
+    const glassWallMaterial = useMemo(() => createGlassWallMaterial(), []);
 
-    // ... default materials ...
-    const structureMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-        color: config.color === 'RAL 9006' ? '#A5A5A5' :
-            config.color === 'RAL 9010' ? '#FFFFFF' :
-                config.color === 'RAL 9007' ? '#8F8F8F' :
-                    config.color === 'RAL 8014' ? '#4E3B31' : '#373F43',
-        roughness: 0.7,
-        metalness: 0.1,
-    }), [config.color]);
+    const structureMaterial = useMemo(() => createAluminumMaterial(config.color || 'RAL 7016'), [config.color]);
 
     const activeRoofMat = useMemo(() => {
         if (config.roofType === 'glass') {
-            return new THREE.MeshPhysicalMaterial({
-                transmission: 0.98, opacity: 1, metalness: 0, roughness: 0,
-                ior: 1.5, thickness: 0.01, color: '#ffffff', transparent: true, envMapIntensity: 1
-            });
+            return createGlassRoofMaterial();
         }
-        return new THREE.MeshPhysicalMaterial({
-            transmission: 0.6, opacity: 0.9, metalness: 0, roughness: 0.2,
-            ior: 1.5, thickness: 0.016, color: config.polycarbonateType === 'ir-gold' ? '#dbeafe' : '#ffffff',
-            transparent: true
-        });
+        return createPolycarbonateRoofMaterial(
+            config.polycarbonateType === 'ir-gold' ? 'ir-gold' : 'opal'
+        );
     }, [config.roofType, config.polycarbonateType]);
 
     const extrudeSettings = (depth: number) => ({
@@ -241,7 +243,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                     scale={[postScale, postScale, 1]}
                 >
                     <extrudeGeometry args={[postShape, extrudeSettings(p.height)]} />
-                    <meshStandardMaterial color={structureMaterial.color} roughness={0.7} metalness={0.1} />
+                    <meshStandardMaterial color={structureMaterial.color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                 </mesh>
             ))}
 
@@ -427,7 +429,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                                     {/* Fixture */}
                                     <mesh rotation={[Math.PI / 2, 0, 0]}>
                                         <cylinderGeometry args={[0.03, 0.03, 0.02, 16]} />
-                                        <meshStandardMaterial color="#333" />
+                                        <meshStandardMaterial color="#222" roughness={0.3} metalness={0.9} />
                                     </mesh>
                                     {/* Light Emitter */}
                                     <pointLight
@@ -545,15 +547,17 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
             {/* HEATER (Promiennik) */}
             {config.addons.some(a => a.type === 'heater') && (
                 <group position={[0, heightM - 0.4, -depthM / 2 + 0.3]}>
-                    <mesh position={[0, 0.1, 0]} material={new THREE.MeshStandardMaterial({ color: '#111' })}>
+                    <mesh position={[0, 0.1, 0]}>
                         <boxGeometry args={[0.2, 0.1, 0.05]} />
+                        <meshStandardMaterial color="#1a1a1a" roughness={0.35} metalness={0.9} />
                     </mesh>
-                    <mesh rotation={[0.4, 0, 0]} material={new THREE.MeshStandardMaterial({ color: '#222', roughness: 0.2, metalness: 0.8 })}>
+                    <mesh rotation={[0.4, 0, 0]}>
                         <capsuleGeometry args={[0.06, 0.8, 4, 16]} />
+                        <meshStandardMaterial color="#222" roughness={0.2} metalness={0.85} envMapIntensity={1.0} />
                     </mesh>
                     <mesh rotation={[0.4, 0, 0]} position={[0, -0.01, 0.04]}>
                         <capsuleGeometry args={[0.02, 0.6, 4, 16]} />
-                        <meshStandardMaterial color="#ffaa00" emissive="#ff4400" emissiveIntensity={2} toneMapped={false} />
+                        <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={2.5} roughness={0.3} metalness={0.7} toneMapped={false} />
                     </mesh>
                 </group>
             )}
@@ -564,7 +568,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                     {/* Base Layer */}
                     <mesh position={[0, 0, -0.01]}>
                         <planeGeometry args={[widthM, depthM]} />
-                        <meshStandardMaterial color="#3e2723" roughness={1} />
+                        <meshStandardMaterial color="#3e2723" roughness={1} metalness={0} />
                     </mesh>
                     {/* Planks: 14cm width, 5mm gap */}
                     {Array.from({ length: Math.ceil(widthM / 0.145) }).map((_, i) => {
@@ -577,7 +581,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                         return (
                             <mesh key={`plank-${i}`} position={[xPos, 0, 0]} receiveShadow>
                                 <boxGeometry args={[plankW, depthM, 0.02]} /> {/* Depth is Y here due to rotation */}
-                                <meshStandardMaterial color="#5D4037" roughness={0.8} />
+                                <meshStandardMaterial color="#6D4C3D" roughness={0.85} metalness={0} envMapIntensity={0.3} />
                             </mesh>
                         )
                     })}
@@ -590,7 +594,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                     {/* Base Layer */}
                     <mesh position={[0, 0, -0.01]}>
                         <planeGeometry args={[widthM, depthM]} />
-                        <meshStandardMaterial color="#757575" roughness={1} />
+                        <meshStandardMaterial color="#9E9E9E" roughness={1} metalness={0} />
                     </mesh>
                     {/* Tiles: 60x60cm, 4mm gap */}
                     {Array.from({ length: Math.ceil(widthM / 0.604) }).map((_, i) => {
@@ -607,7 +611,7 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                             return (
                                 <mesh key={`tile-${i}-${j}`} position={[xPos, yPos, 0]} receiveShadow>
                                     <boxGeometry args={[tileS, tileS, 0.02]} />
-                                    <meshStandardMaterial color="#BDBDBD" roughness={0.6} metalness={0.1} />
+                                    <meshStandardMaterial color="#C8C8C8" roughness={0.4} metalness={0.05} envMapIntensity={0.6} />
                                 </mesh>
                             )
                         })
@@ -729,8 +733,8 @@ interface GlassWallPanelProps {
 
 const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height, material, isFrameless }) => {
     // Frame Color
-    const frameMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#333', roughness: 0.5 }), []);
-    const guideMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#aaa', roughness: 0.5 }), []);
+    const frameMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#2a2a2a', roughness: 0.4, metalness: 0.7, envMapIntensity: 0.6 }), []);
+    const guideMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#999', roughness: 0.4, metalness: 0.5 }), []);
 
     return (
         <group position={position}>
@@ -773,10 +777,10 @@ const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height
 const Awning: React.FC<{ width: number; depth: number; position: [number, number, number]; pitchAngle: number }> = ({ width, depth, position, pitchAngle }) => {
     // Fabric Material
     const fabricMat = useMemo(() => new THREE.MeshStandardMaterial({
-        color: '#e5e7eb', // Light gray fabric
-        roughness: 1,
+        color: '#e5e7eb',
+        roughness: 0.95,
+        metalness: 0,
         side: THREE.DoubleSide,
-        map: null // Could add texture here
     }), []);
 
     const length = depth / Math.cos(pitchAngle);
@@ -788,8 +792,9 @@ const Awning: React.FC<{ width: number; depth: number; position: [number, number
                 <boxGeometry args={[width - 0.2, 0.02, length - 0.2]} />
             </mesh>
             {/* Box/Cassette at top (back) */}
-            <mesh position={[0, 0, -length / 2]} rotation={[-pitchAngle, 0, 0]} material={new THREE.MeshStandardMaterial({ color: '#555' })}>
+            <mesh position={[0, 0, -length / 2]} rotation={[-pitchAngle, 0, 0]}>
                 <boxGeometry args={[width, 0.15, 0.15]} />
+                <meshStandardMaterial color="#444" roughness={0.4} metalness={0.7} />
             </mesh>
         </group>
     );
@@ -798,13 +803,15 @@ const Awning: React.FC<{ width: number; depth: number; position: [number, number
 const ZipScreen: React.FC<{ width: number; height: number; position: [number, number, number]; rotation: [number, number, number] }> = ({ width, height, position, rotation }) => {
     // Screen Material (Mesh-like)
     const screenMat = useMemo(() => new THREE.MeshStandardMaterial({
-        color: '#333',
+        color: '#2a2a2a',
         transparent: true,
-        opacity: 0.7,
-        roughness: 0.8
+        opacity: 0.75,
+        roughness: 0.9,
+        metalness: 0,
+        side: THREE.DoubleSide,
     }), []);
 
-    const boxMat = new THREE.MeshStandardMaterial({ color: '#333' });
+    const boxMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.35, metalness: 0.9 }), []);
 
     return (
         <group position={position} rotation={rotation}>

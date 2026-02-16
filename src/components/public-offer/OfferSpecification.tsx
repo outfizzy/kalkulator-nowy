@@ -223,18 +223,74 @@ interface OfferSpecificationProps {
 export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product }) => {
     // === MANUAL OFFER MODE ===
     if (product.isManual) {
+        const hasCustomItems = product.customItems && product.customItems.length > 0;
+        const hasDescription = product.manualDescription && product.manualDescription.trim().length > 0;
+
         return (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                    <span className="text-3xl">📝</span> Technische Spezifikation (Individuell)
-                </h3>
-                <div className="prose prose-slate max-w-none">
-                    <div className="whitespace-pre-wrap text-slate-700 leading-relaxed font-medium">
-                        {product.manualDescription || "Keine Beschreibung verfügbar."}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Header */}
+                <div className="bg-slate-900 p-6 text-white">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-bold">Technische Spezifikation</h2>
+                        <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-mono opacity-70">
+                            Individuelles Angebot
+                        </span>
                     </div>
+                    <p className="text-slate-400 text-sm mt-1">Ihre maßgeschneiderte Konfiguration im Detail</p>
                 </div>
-                <div className="mt-8 pt-6 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-400">
-                    ℹ️ Angebot individuell von Ihrem Berater erstellt.
+
+                <div className="p-6">
+                    {/* Manual Description */}
+                    {hasDescription && (
+                        <>
+                            <SectionHeader title="Beschreibung" icon="📝" />
+                            <div className="bg-white border-x border-b border-slate-200 rounded-b-xl mb-6 p-4">
+                                <div className="whitespace-pre-wrap text-slate-700 leading-relaxed font-medium text-sm">
+                                    {product.manualDescription}
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Custom Items (Manual Positions) */}
+                    {hasCustomItems && (
+                        <>
+                            <SectionHeader title="Leistungsumfang" icon="🛠️" />
+                            <div className="bg-white border-x border-b border-slate-200 rounded-b-xl mb-6">
+                                {product.customItems!.map((item, idx) => (
+                                    <div
+                                        key={`manual-item-${idx}`}
+                                        className="flex items-center justify-between py-3 px-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-lg text-sm font-bold text-slate-500 shrink-0">
+                                                {idx + 1}
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold text-slate-800 text-sm">{item.name}</div>
+                                                {item.description && item.description !== 'Manuelle Angebotsposition' && item.description !== 'Manuelle Position' && (
+                                                    <div className="text-xs text-slate-500 mt-0.5">{item.description}</div>
+                                                )}
+                                                {item.quantity > 1 && (
+                                                    <div className="text-xs text-blue-600 font-medium mt-0.5">Menge: {item.quantity} Stk.</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <span className="text-xs font-semibold text-green-600 shrink-0">✓ Inklusive</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Quality Badges */}
+                    <div className="mt-8 pt-6 border-t border-slate-200">
+                        <div className="flex flex-wrap justify-center gap-6 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <span className="flex items-center gap-1.5"><span className="text-green-500">✓</span> 5 Jahre Garantie</span>
+                            <span className="flex items-center gap-1.5"><span className="text-green-500">✓</span> GSB-Zertifiziert</span>
+                            <span className="flex items-center gap-1.5"><span className="text-green-500">✓</span> Made in EU</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         );

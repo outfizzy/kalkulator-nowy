@@ -698,6 +698,12 @@ export const MailPage: React.FC = () => {
             console.log('AI Extracted Data:', extracted);
 
             if (extracted) {
+                // Upload attachments from the email
+                const uploadedAttachments = await uploadAttachments(selectedEmail);
+                console.log('[AI Lead] Email attachments count:', selectedEmail.attachments?.length || 0);
+                console.log('[AI Lead] Uploaded attachments count:', uploadedAttachments.length);
+                console.log('[AI Lead] Uploaded attachments:', uploadedAttachments);
+
                 setLeadInitialData({
                     customerData: {
                         firstName: extracted.firstName || '',
@@ -712,9 +718,17 @@ export const MailPage: React.FC = () => {
                     source: 'email',
                     emailMessageId: selectedEmail.id,
                     notes: extracted.notes || `Utworzono z wiadomości e-mail: "${selectedEmail.subject}"`,
-                    attachments: await uploadAttachments(selectedEmail)
+                    attachments: uploadedAttachments
                 });
                 setShowLeadForm(true);
+
+                // Dismiss loading toast with success message
+                const attMsg = uploadedAttachments.length > 0
+                    ? ` + ${uploadedAttachments.length} załącznik(ów)`
+                    : '';
+                toast.success(`AI wypełniło formularz${attMsg}`, { id: toastId });
+            } else {
+                toast.error('AI nie mogło wyodrębnić danych z tej wiadomości.', { id: toastId });
             }
         } catch (e: any) {
             console.error(e);

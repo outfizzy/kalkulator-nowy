@@ -14,6 +14,7 @@ interface MeasurementCalendarProps {
     measurements: Measurement[];
     onEdit: (measurement: Measurement) => void;
     onDragDrop?: (measurementId: string, newDate: string) => Promise<void>;
+    viewingUserId?: string; // For admin/manager: the selected sales rep's ID. For sales rep: their own ID.
 }
 
 function getStartOfWeek(date: Date): Date {
@@ -23,7 +24,7 @@ function getStartOfWeek(date: Date): Date {
     return new Date(d.setDate(diff));
 }
 
-export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measurements, onEdit, onDragDrop }) => {
+export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measurements, onEdit, onDragDrop, viewingUserId }) => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -56,14 +57,21 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
         return date;
     });
 
+    // Determine which user's reports to fetch:
+    // - If viewingUserId is provided (admin viewing specific rep), use that
+    // - Otherwise use the current user's own ID
+    const effectiveUserId = viewingUserId || currentUser?.id;
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+
     useEffect(() => {
         const fetchReports = async () => {
-            if (!currentUser?.id) return;
+            if (!effectiveUserId) return;
             try {
                 const startStr = weekDays[0].toISOString().split('T')[0];
                 const endStr = weekDays[6].toISOString().split('T')[0];
+                // Admin viewing 'all' → fetch all reports; otherwise scopeto specific user
                 const data = await DatabaseService.getMeasurementReports({
-                    userId: currentUser.id,
+                    userId: (isAdmin && !viewingUserId) ? undefined : effectiveUserId,
                     dateFrom: startStr,
                     dateTo: endStr
                 });
@@ -73,7 +81,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
             }
         };
         fetchReports();
-    }, [currentWeekStart, currentUser?.id]);
+    }, [currentWeekStart, effectiveUserId, viewingUserId, isAdmin]);
 
     // Fetch routes for measurements
     const fetchRoutesData = async () => {
@@ -481,15 +489,13 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                         setSelectedReport(undefined);
                         const startStr = weekDays[0].toISOString().split('T')[0];
                         const endStr = weekDays[6].toISOString().split('T')[0];
-                        if (currentUser?.id) {
-                            DatabaseService.getMeasurementReports({
-                                userId: currentUser.id,
-                                dateFrom: startStr,
-                                dateTo: endStr
-                            }).then(setReports);
-                        }
+                        DatabaseService.getMeasurementReports({
+                            userId: (isAdmin && !viewingUserId) ? undefined : effectiveUserId,
+                            dateFrom: startStr,
+                            dateTo: endStr
+                        }).then(setReports);
                     }}
-                    currentUserId={currentUser?.id || ''}
+                    currentUserId={effectiveUserId || currentUser?.id || ''}
                 />
             )}
 

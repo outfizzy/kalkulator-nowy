@@ -39,10 +39,10 @@ export const HouseFacade: React.FC<HouseFacadeProps> = ({ width, height, depth, 
     if (!hasWall) return null;
 
     // Materials
-    const wallMaterial = <meshStandardMaterial color={color} roughness={0.9} />;
-    const floorMaterial = <meshStandardMaterial color="#e5e5e5" roughness={0.8} />;
-    const glassMaterial = <meshPhysicalMaterial color="#skyblue" transmission={0.6} roughness={0.1} metalness={0.1} />;
-    const frameMaterial = <meshStandardMaterial color="#333" roughness={0.5} />;
+    const wallMaterial = <meshStandardMaterial color={color} roughness={0.92} metalness={0} envMapIntensity={0.2} />;
+    const floorMaterial = <meshStandardMaterial color="#ddd" roughness={0.7} metalness={0} />;
+    const glassMaterial = <meshPhysicalMaterial color="#87CEEB" transmission={0.55} roughness={0.08} metalness={0.05} ior={1.52} thickness={0.01} envMapIntensity={0.8} />;
+    const frameMaterial = <meshStandardMaterial color="#2a2a2a" roughness={0.4} metalness={0.6} />;
 
     // Wall Geometry Construction
     // Since we have complex holes (Door + 2nd Floor Windows), let's stick to "Blocking" method for simplicity and robustness.

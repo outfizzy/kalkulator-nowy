@@ -4,7 +4,7 @@ import { MeasurementReminderService, type MeasurementOutcome } from '../../servi
 import type { Measurement, MeasurementReport, Visit } from '../../types';
 import type { MeasurementRoute } from '../../services/route-calculation.service';
 import { toast } from 'react-hot-toast';
-import { FileText, Car, User, MapPin, CheckCircle, XCircle, Clock, Star, ChevronDown, ChevronUp, Phone, Sparkles, Route } from 'lucide-react';
+import { FileText, Car, User, MapPin, CheckCircle, XCircle, Clock, Star, ChevronDown, ChevronUp, Phone, Sparkles, Route, Calculator } from 'lucide-react';
 
 interface MeasurementReportModalProps {
     date: Date;
@@ -44,14 +44,54 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
     const [loading, setLoading] = useState(false);
     const [expandedVisitId, setExpandedVisitId] = useState<string | null>(null);
 
+    // Calculate GPS route distance
+    const calculatedRouteKm = measurements.reduce((sum, m) => {
+        const route = routes[m.id];
+        return sum + (route?.distance_km || 0);
+    }, 0);
+    const calculatedRoundTripKm = Math.round(calculatedRouteKm * 2);
+
+    const DRIVER_SURCHARGE = 430; // PLN
+    const DEFAULT_COST_PER_KM = 1.50; // PLN
+
     const [formData, setFormData] = useState({
         carPlate: report?.carPlate || '',
         odometerStart: report?.odometerStart || 0,
         odometerEnd: report?.odometerEnd || 0,
+        totalKm: report?.totalKm || 0,
+        costPerKm: report?.costPerKm || DEFAULT_COST_PER_KM,
         withDriver: report?.withDriver || false,
         carIssues: report?.carIssues || '',
         reportDescription: report?.reportDescription || ''
     });
+
+    // Estimated cost calculation
+    const fuelCost = Math.round(formData.totalKm * formData.costPerKm * 100) / 100;
+    const driverCost = formData.withDriver ? DRIVER_SURCHARGE : 0;
+    const estimatedTotalCost = fuelCost + driverCost;
+
+    // Auto-populate totalKm from GPS calculation when no report exists yet
+    useEffect(() => {
+        if (!report && calculatedRoundTripKm > 0 && formData.totalKm === 0) {
+            setFormData(prev => ({ ...prev, totalKm: calculatedRoundTripKm }));
+        }
+    }, [calculatedRoundTripKm, report, formData.totalKm]);
+
+    // Map DB measurement outcomes to report visit outcomes
+    const mapMeasurementOutcome = (m: Measurement): Visit['outcome'] => {
+        // If measurement already has an outcome from DB, map it
+        if (m.outcome) {
+            const outcomeMap: Record<string, Visit['outcome']> = {
+                'signed': 'signed',
+                'considering': 'measured',
+                'rejected': 'rejected',
+                'no_show': 'pending', // no_show maps to pending for user to decide
+            };
+            return outcomeMap[m.outcome] || 'pending';
+        }
+        // Fallback to status-based mapping
+        return m.status === 'completed' ? 'measured' : 'pending';
+    };
 
     // Initialize visits from measurements or existing report
     const [visits, setVisits] = useState<Visit[]>(() => {
@@ -67,7 +107,7 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
             customerPhone: m.customerPhone,
             productSummary: 'N/A',
             price: 0,
-            outcome: m.status === 'completed' ? 'measured' : 'pending',
+            outcome: mapMeasurementOutcome(m),
             notes: m.notes || '',
             visitNotes: '',
             salesPotential: undefined,
@@ -75,16 +115,8 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
         }));
     });
 
-    // Auto-calculate total km from odometer
-    const totalKm = Math.max(0, formData.odometerEnd - formData.odometerStart);
-
-    // Calculate total route distance from GPS routes (round trip sum)
-    const calculatedRouteKm = measurements.reduce((sum, m) => {
-        const route = routes[m.id];
-        return sum + (route?.distance_km || 0);
-    }, 0);
-    // Multiply by 2 for round trip (Gubin → all clients → Gubin ≈ 2x one-way distances)
-    const calculatedRoundTripKm = Math.round(calculatedRouteKm * 2);
+    // Use the editable totalKm from formData (pre-filled from GPS or manual)
+    const totalKm = formData.totalKm;
 
     const updateVisit = (visitId: string, updates: Partial<Visit>) => {
         setVisits(prev => prev.map(v =>
@@ -95,16 +127,18 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (formData.odometerEnd < formData.odometerStart) {
+        if (formData.odometerEnd < formData.odometerStart && formData.odometerEnd > 0) {
             toast.error('Licznik końcowy nie może być mniejszy od początkowego');
             return;
         }
 
-        // Validate all visits have outcomes
+        // Warn about pending visits but allow saving
         const pendingVisits = visits.filter(v => v.outcome === 'pending');
         if (pendingVisits.length > 0) {
-            toast.error(`Uzupełnij wynik dla wszystkich klientów (${pendingVisits.length} pozostało)`);
-            return;
+            toast(`${pendingVisits.length} klient(ów) bez uzupełnionego wyniku — raport zapisano jako wersja robocza`, {
+                icon: '⚠️',
+                duration: 4000
+            });
         }
 
         setLoading(true);
@@ -118,9 +152,9 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                 'pending': null,            // no change
             };
 
-            // Sync visit outcomes to leads (kanban) and sales potential
+            // Sync visit outcomes to leads (kanban) and sales potential — skip pending visits
             for (const visit of visits) {
-                if (visit.leadId) {
+                if (visit.leadId && visit.outcome !== 'pending') {
                     try {
                         // 1. Move lead in kanban based on outcome
                         const measurementOutcome = outcomeToMeasurementOutcome[visit.outcome];
@@ -154,6 +188,8 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                     odometerStart: formData.odometerStart,
                     odometerEnd: formData.odometerEnd,
                     totalKm,
+                    tripCost: estimatedTotalCost,
+                    costPerKm: formData.costPerKm,
                     withDriver: formData.withDriver,
                     carIssues: formData.carIssues,
                     reportDescription: formData.reportDescription,
@@ -169,6 +205,8 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                     odometerStart: formData.odometerStart,
                     odometerEnd: formData.odometerEnd,
                     totalKm,
+                    tripCost: estimatedTotalCost,
+                    costPerKm: formData.costPerKm,
                     withDriver: formData.withDriver,
                     carIssues: formData.carIssues,
                     reportDescription: formData.reportDescription,
@@ -394,65 +432,87 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                 Dane pojazdu i przebieg
                             </h4>
 
-                            {/* Calculated route distance hint */}
-                            {calculatedRouteKm > 0 && (
-                                <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm text-emerald-700">
-                                        <Route className="w-4 h-4" />
-                                        <span>
-                                            <strong>Obliczona trasa:</strong> ~{calculatedRoundTripKm} km
-                                            <span className="text-emerald-500 text-xs ml-1">(Gubin → klienci → Gubin)</span>
-                                        </span>
+                            {/* Editable total km with GPS suggestion */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-blue-700 mb-1 flex items-center gap-1">
+                                        <Route className="w-3.5 h-3.5" />
+                                        Przejechane kilometry (edytowalne)
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={formData.totalKm}
+                                            onChange={e => setFormData({ ...formData, totalKm: parseInt(e.target.value) || 0 })}
+                                            className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm font-bold"
+                                            placeholder="km"
+                                        />
+                                        <span className="text-sm text-blue-700 font-medium whitespace-nowrap">km</span>
                                     </div>
-                                    {totalKm > 0 && Math.abs(totalKm - calculatedRoundTripKm) > 20 && (
-                                        <span className="text-xs text-amber-600 font-medium">
-                                            Δ {Math.abs(totalKm - calculatedRoundTripKm)} km różnicy
-                                        </span>
+                                    {calculatedRoundTripKm > 0 && (
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <span className="text-xs text-emerald-600">
+                                                📍 GPS: ~{calculatedRoundTripKm} km
+                                            </span>
+                                            {formData.totalKm !== calculatedRoundTripKm && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, totalKm: calculatedRoundTripKm })}
+                                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                                >
+                                                    Ustaw z GPS
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-blue-700 mb-1">Nr Rejestracyjny</label>
                                     <input
                                         type="text"
-                                        required
                                         value={formData.carPlate}
                                         onChange={e => setFormData({ ...formData, carPlate: e.target.value })}
                                         className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
                                         placeholder="np. DW 12345"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-blue-700 mb-1">Licznik Start (km)</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        min="0"
-                                        value={formData.odometerStart}
-                                        onChange={e => setFormData({ ...formData, odometerStart: parseInt(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-blue-700 mb-1">Licznik Koniec (km)</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        min={formData.odometerStart}
-                                        value={formData.odometerEnd}
-                                        onChange={e => setFormData({ ...formData, odometerEnd: parseInt(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-blue-700 mb-1">Dystans (licznik)</label>
-                                    <div className="w-full px-3 py-2 bg-blue-100 border border-blue-200 rounded-lg text-blue-800 font-bold text-sm">
-                                        {totalKm} km
+                            </div>
+
+                            {/* Optional odometer readings */}
+                            <details className="group">
+                                <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800 mb-2">
+                                    ▸ Stan licznika (opcjonalnie)
+                                </summary>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-blue-700 mb-1">Licznik Start (km)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={formData.odometerStart}
+                                            onChange={e => setFormData({ ...formData, odometerStart: parseInt(e.target.value) || 0 })}
+                                            className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-blue-700 mb-1">Licznik Koniec (km)</label>
+                                        <input
+                                            type="number"
+                                            min={formData.odometerStart}
+                                            value={formData.odometerEnd}
+                                            onChange={e => setFormData({ ...formData, odometerEnd: parseInt(e.target.value) || 0 })}
+                                            className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-blue-700 mb-1">Dystans (licznik)</label>
+                                        <div className="w-full px-3 py-2 bg-blue-100 border border-blue-200 rounded-lg text-blue-800 font-bold text-sm">
+                                            {Math.max(0, formData.odometerEnd - formData.odometerStart)} km
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </details>
                             <div className="mt-3 flex items-center gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
@@ -462,6 +522,9 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                         className="w-4 h-4 text-blue-600 rounded border-blue-300 focus:ring-blue-500"
                                     />
                                     <span className="text-sm font-medium text-blue-700">Jazda z kierowcą</span>
+                                    {formData.withDriver && (
+                                        <span className="text-xs text-amber-600 font-medium">(+{DRIVER_SURCHARGE} zł)</span>
+                                    )}
                                 </label>
                             </div>
                             {/* Car Issues */}
@@ -474,6 +537,43 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                     className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
                                     placeholder="Zgłoszone usterki, uwagi..."
                                 />
+                            </div>
+
+                            {/* Estimated Cost Summary */}
+                            <div className="mt-4 p-4 bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl">
+                                <h5 className="text-sm font-bold text-violet-800 mb-3 flex items-center gap-2">
+                                    <Calculator className="w-4 h-4" />
+                                    Szacunkowy koszt wyjazdu
+                                </h5>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-violet-600 mb-1">Stawka za km (PLN)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={formData.costPerKm}
+                                            onChange={e => setFormData({ ...formData, costPerKm: parseFloat(e.target.value) || 0 })}
+                                            className="w-full px-3 py-2 border border-violet-200 rounded-lg focus:ring-2 focus:ring-violet-300 outline-none bg-white text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <div className="flex justify-between text-xs text-violet-600">
+                                            <span>Paliwo ({formData.totalKm} km × {formData.costPerKm.toFixed(2)} zł)</span>
+                                            <span className="font-medium">{fuelCost.toFixed(2)} zł</span>
+                                        </div>
+                                        {formData.withDriver && (
+                                            <div className="flex justify-between text-xs text-violet-600">
+                                                <span>Kierowca</span>
+                                                <span className="font-medium">+{DRIVER_SURCHARGE.toFixed(2)} zł</span>
+                                            </div>
+                                        )}
+                                        <div className="border-t border-violet-200 pt-1.5 flex justify-between text-sm font-bold text-violet-900">
+                                            <span>Razem</span>
+                                            <span>{estimatedTotalCost.toFixed(2)} zł</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

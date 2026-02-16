@@ -101,7 +101,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                         {/* Z-oriented bars (Standard Bio Geometry) */}
                         <mesh rotation={[0, 0, THREE.MathUtils.degToRad(effectiveAngle) * -1]}>
                             <boxGeometry args={[lamellaWidth, 0.04, depth - (2 * beamWidth) - 0.05]} />
-                            <meshStandardMaterial color={color} />
+                            <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                         </mesh>
                     </group>
                 );
@@ -117,7 +117,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                     <group key={`lamella-${i}`} position={[x, height - (beamHeight / 2), 0]}>
                         <mesh rotation={[0, 0, THREE.MathUtils.degToRad(config.lamellaAngle || 0) * -1]}>
                             <boxGeometry args={[lamellaWidth, 0.04, depth - (2 * beamWidth) - 0.05]} />
-                            <meshStandardMaterial color={color} />
+                            <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                         </mesh>
                     </group>
                 );
@@ -131,8 +131,8 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
 
     // Materials
     const glassMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-        color: '#eef2ff', transmission: 0.9, opacity: 1, metalness: 0, roughness: 0,
-        thickness: 0.01, transparent: true
+        color: '#eef2ff', transmission: 0.97, opacity: 1, metalness: 0, roughness: 0.01,
+        thickness: 0.01, transparent: true, ior: 1.52, envMapIntensity: 1.8, clearcoat: 1, clearcoatRoughness: 0.02
     }), []);
 
     // Flooring Check
@@ -154,28 +154,28 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
             {/* 1. FRONT BEAM */}
             <mesh position={[0, height - beamHeight / 2, depth / 2 - beamWidth / 2]}>
                 <boxGeometry args={[width, beamHeight, beamWidth]} />
-                <meshStandardMaterial color={color} />
+                <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
             </mesh>
             {/* Rear Beam */}
             <mesh position={[0, height - beamHeight / 2, -depth / 2 + beamWidth / 2]}>
                 <boxGeometry args={[width, beamHeight, beamWidth]} />
-                <meshStandardMaterial color={color} />
+                <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
             </mesh>
             {/* Left Beam */}
             <mesh position={[-width / 2 + beamWidth / 2, height - beamHeight / 2, 0]}>
                 <boxGeometry args={[beamWidth, beamHeight, depth - 2 * beamWidth]} />
-                <meshStandardMaterial color={color} />
+                <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
             </mesh>
             {/* Right Beam */}
             <mesh position={[width / 2 - beamWidth / 2, height - beamHeight / 2, 0]}>
                 <boxGeometry args={[beamWidth, beamHeight, depth - 2 * beamWidth]} />
-                <meshStandardMaterial color={color} />
+                <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
             </mesh>
             {/* Middle Beams */}
             {calculatedModules > 1 && Array.from({ length: calculatedModules - 1 }).map((_, i) => (
                 <mesh key={`mid-beam-${i}`} position={[-width / 2 + ((i + 1) * moduleWidth), height - beamHeight / 2, 0]}>
                     <boxGeometry args={[beamWidth, beamHeight, depth - 2 * beamWidth]} />
-                    <meshStandardMaterial color={color} />
+                    <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                 </mesh>
             ))}
 
@@ -183,18 +183,18 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
             {/* Front Left */}
             <mesh position={[-width / 2 + postSize / 2, height / 2, depth / 2 - postSize / 2]}>
                 <boxGeometry args={[postSize, height, postSize]} />
-                <meshStandardMaterial color={color} />
+                <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
             </mesh>
             {/* Front Right */}
             <mesh position={[width / 2 - postSize / 2, height / 2, depth / 2 - postSize / 2]}>
                 <boxGeometry args={[postSize, height, postSize]} />
-                <meshStandardMaterial color={color} />
+                <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
             </mesh>
             {/* Middle Posts Front */}
             {calculatedModules > 1 && Array.from({ length: calculatedModules - 1 }).map((_, i) => (
                 <mesh key={`mid-post-front-${i}`} position={[-width / 2 + ((i + 1) * moduleWidth), height / 2, depth / 2 - postSize / 2]}>
                     <boxGeometry args={[postSize, height, postSize]} />
-                    <meshStandardMaterial color={color} />
+                    <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                 </mesh>
             ))}
 
@@ -203,16 +203,16 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                 <>
                     <mesh position={[-width / 2 + postSize / 2, height / 2, -depth / 2 + postSize / 2]}>
                         <boxGeometry args={[postSize, height, postSize]} />
-                        <meshStandardMaterial color={color} />
+                        <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                     </mesh>
                     <mesh position={[width / 2 - postSize / 2, height / 2, -depth / 2 + postSize / 2]}>
                         <boxGeometry args={[postSize, height, postSize]} />
-                        <meshStandardMaterial color={color} />
+                        <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                     </mesh>
                     {calculatedModules > 1 && Array.from({ length: calculatedModules - 1 }).map((_, i) => (
                         <mesh key={`mid-post-rear-${i}`} position={[-width / 2 + ((i + 1) * moduleWidth), height / 2, -depth / 2 + postSize / 2]}>
                             <boxGeometry args={[postSize, height, postSize]} />
-                            <meshStandardMaterial color={color} />
+                            <meshStandardMaterial color={color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
                         </mesh>
                     ))}
                 </>
@@ -229,7 +229,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                     {/* Base */}
                     <mesh position={[0, 0, -0.01]}>
                         <planeGeometry args={[width, depth]} />
-                        <meshStandardMaterial color="#3e2723" roughness={1} />
+                        <meshStandardMaterial color="#3e2723" roughness={1} metalness={0} />
                     </mesh>
                     {/* Planks */}
                     {Array.from({ length: Math.ceil(width / 0.145) }).map((_, i) => {
@@ -242,7 +242,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                         return (
                             <mesh key={`plank-${i}`} position={[xPos, 0, 0]} receiveShadow>
                                 <boxGeometry args={[plankW, depth, 0.02]} />
-                                <meshStandardMaterial color="#5D4037" roughness={0.8} />
+                                <meshStandardMaterial color="#6D4C3D" roughness={0.85} metalness={0} envMapIntensity={0.3} />
                             </mesh>
                         )
                     })}
@@ -255,7 +255,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                     {/* Base */}
                     <mesh position={[0, 0, -0.01]}>
                         <planeGeometry args={[width, depth]} />
-                        <meshStandardMaterial color="#757575" roughness={1} />
+                        <meshStandardMaterial color="#9E9E9E" roughness={1} metalness={0} />
                     </mesh>
                     {/* Tiles */}
                     {Array.from({ length: Math.ceil(width / 0.604) }).map((_, i) => {
@@ -271,7 +271,7 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
                             return (
                                 <mesh key={`tile-${i}-${j}`} position={[xPos, yPos, 0]} receiveShadow>
                                     <boxGeometry args={[tileS, tileS, 0.02]} />
-                                    <meshStandardMaterial color="#BDBDBD" roughness={0.6} metalness={0.1} />
+                                    <meshStandardMaterial color="#C8C8C8" roughness={0.4} metalness={0.05} envMapIntensity={0.6} />
                                 </mesh>
                             )
                         })
@@ -362,8 +362,8 @@ interface GlassWallPanelProps {
 }
 
 const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height, material }) => {
-    const frameMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#333', roughness: 0.5 }), []);
-    const guideMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#aaa', roughness: 0.5 }), []);
+    const frameMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#2a2a2a', roughness: 0.4, metalness: 0.7, envMapIntensity: 0.6 }), []);
+    const guideMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#999', roughness: 0.4, metalness: 0.5 }), []);
 
     if (width <= 0 || height <= 0) return null;
 
@@ -399,14 +399,15 @@ const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height
 
 const ZipScreen: React.FC<{ width: number; height: number; position: [number, number, number]; rotation?: [number, number, number] }> = ({ width, height, position, rotation = [0, 0, 0] }) => {
     const screenMat = useMemo(() => new THREE.MeshStandardMaterial({
-        color: '#333',
+        color: '#2a2a2a',
         transparent: true,
-        opacity: 0.7,
-        roughness: 0.8,
+        opacity: 0.75,
+        roughness: 0.9,
+        metalness: 0,
         side: THREE.DoubleSide
     }), []);
 
-    const boxMat = new THREE.MeshStandardMaterial({ color: '#333' });
+    const boxMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.35, metalness: 0.9 }), []);
 
     if (width <= 0 || height <= 0) return null;
 

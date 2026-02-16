@@ -315,6 +315,11 @@ export const MeasurementDashboard: React.FC = () => {
                         measurements={measurements}
                         onEdit={setEditingMeasurement}
                         onDragDrop={handleDragDrop}
+                        viewingUserId={
+                            (currentUser?.role === 'admin' || currentUser?.role === 'manager')
+                                ? (selectedSalesRepId !== 'all' ? selectedSalesRepId : undefined)
+                                : currentUser?.id
+                        }
                     />
                 ) : (
                     <div className="space-y-4">

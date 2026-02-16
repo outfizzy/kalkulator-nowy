@@ -2,10 +2,10 @@ import React, { useMemo } from 'react';
 
 export const DecorSet = () => {
     // Materials
-    const woodMaterial = <meshStandardMaterial color="#8b5a2b" roughness={0.9} />;
-    const metalMaterial = <meshStandardMaterial color="#333333" roughness={0.4} metalness={0.6} />;
-    const rugMaterial = <meshStandardMaterial color="#e0e0e0" roughness={1} />;
-    const plateMaterial = <meshStandardMaterial color="#ffffff" roughness={0.2} />;
+    const woodMaterial = <meshStandardMaterial color="#8b5a2b" roughness={0.85} metalness={0} envMapIntensity={0.2} />;
+    const metalMaterial = <meshStandardMaterial color="#2d2d2d" roughness={0.3} metalness={0.8} envMapIntensity={0.7} />;
+    const rugMaterial = <meshStandardMaterial color="#e8e4df" roughness={1} metalness={0} />;
+    const plateMaterial = <meshStandardMaterial color="#f8f8f8" roughness={0.15} metalness={0.05} envMapIntensity={0.4} />;
 
     // Scale: Meters.
     // Table: 1.6m x 0.9m. Height 0.75m.

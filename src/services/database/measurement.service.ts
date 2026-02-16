@@ -57,6 +57,8 @@ export const MeasurementService = {
                 with_driver: report.withDriver,
                 car_issues: report.carIssues,
                 report_description: report.reportDescription,
+                trip_cost: report.tripCost || null,
+                cost_per_km: report.costPerKm || null,
                 measurements_snapshot: report.visits // JSONB
             })
             .select()
@@ -94,6 +96,8 @@ export const MeasurementService = {
         if (updates.carIssues !== undefined) dbUpdates.car_issues = updates.carIssues;
         if (updates.reportDescription !== undefined) dbUpdates.report_description = updates.reportDescription;
         if (updates.visits) dbUpdates.measurements_snapshot = updates.visits;
+        if (updates.tripCost !== undefined) dbUpdates.trip_cost = updates.tripCost;
+        if (updates.costPerKm !== undefined) dbUpdates.cost_per_km = updates.costPerKm;
 
         const { error } = await supabase
             .from('measurement_reports')

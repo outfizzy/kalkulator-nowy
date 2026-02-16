@@ -110,7 +110,8 @@ export const OfferPrintView: React.FC = () => {
     }
 
     const c = offer.customer || {} as any;
-    const model = translateForView(offer.product?.modelId || '', 'models');
+    const isManual = !!(offer.product as any)?.isManual;
+    const model = isManual ? 'Individuelles Angebot' : translateForView(offer.product?.modelId || '', 'models');
 
     // Calculations
     const net = offer.pricing?.sellingPriceNet || 0;
@@ -289,26 +290,45 @@ export const OfferPrintView: React.FC = () => {
 
                                     {/* HIGHLIGHT BOX */}
                                     <div className="bg-[#121c2d] text-white p-8 rounded-sm shadow-sm mb-auto">
-                                        <h3 className="text-[#c5a065] text-xs font-bold uppercase tracking-widest mb-6 border-b border-white/10 pb-2">Ihre Konfiguration im Überblick</h3>
+                                        <h3 className="text-[#c5a065] text-xs font-bold uppercase tracking-widest mb-6 border-b border-white/10 pb-2">
+                                            {isManual ? 'Ihr individuelles Angebot' : 'Ihre Konfiguration im Überblick'}
+                                        </h3>
 
-                                        <div className="grid grid-cols-2 gap-y-6 gap-x-12">
+                                        {isManual ? (
                                             <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Modellinie</span>
-                                                <span className="font-bold text-xl block tracking-tight">{model}</span>
+                                                {(offer.product as any).manualDescription ? (
+                                                    <div className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
+                                                        {(offer.product as any).manualDescription}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-slate-400 text-sm italic">Detaillierte Positionen finden Sie auf der nächsten Seite.</div>
+                                                )}
+                                                {((offer.product as any).customItems || []).length > 0 && (
+                                                    <div className="mt-4 pt-4 border-t border-white/10 text-slate-400 text-xs">
+                                                        {((offer.product as any).customItems || []).length} Position(en) im Leistungsumfang
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Abmessungen (B x T)</span>
-                                                <span className="font-bold text-xl block tracking-tight">{offer.product?.width} mm x {offer.product?.projection} mm</span>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-y-6 gap-x-12">
+                                                <div>
+                                                    <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Modellinie</span>
+                                                    <span className="font-bold text-xl block tracking-tight">{model}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Abmessungen (B x T)</span>
+                                                    <span className="font-bold text-xl block tracking-tight">{offer.product?.width} mm x {offer.product?.projection} mm</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Farbgebung</span>
+                                                    <span className="font-bold text-lg block">{translateForView(offer.product?.color || '', 'colors')}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Dacheindeckung</span>
+                                                    <span className="font-bold text-lg block">{translateForView(offer.product?.roofType || '', 'roofTypes')}</span>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Farbgebung</span>
-                                                <span className="font-bold text-lg block">{translateForView(offer.product?.color || '', 'colors')}</span>
-                                            </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Dacheindeckung</span>
-                                                <span className="font-bold text-lg block">{translateForView(offer.product?.roofType || '', 'roofTypes')}</span>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
 
                                     {/* FOOTER NOTE PAGE 1 */}
@@ -334,17 +354,19 @@ export const OfferPrintView: React.FC = () => {
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {/* Base */}
-                                            <tr className="print:bg-white break-inside-avoid">
-                                                <td className="py-3 px-3 text-center align-top text-slate-400">1</td>
-                                                <td className="py-3 px-3 align-top">
-                                                    <div className="font-bold text-slate-900 mb-0.5">{model} Basiskonstruktion</div>
-                                                    <div className="text-xs text-slate-500 leading-snug">
-                                                        Hochwertiges Aluminiumprofilsystem, pulverbeschichtet. <br />
-                                                        Inklusive Pfosten, Rinnenprofil und Wandanschluss.
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-3 text-right align-top font-medium">{formatCurrency(offer.pricing?.basePrice || 0)}</td>
-                                            </tr>
+                                            {!isManual && (
+                                                <tr className="print:bg-white break-inside-avoid">
+                                                    <td className="py-3 px-3 text-center align-top text-slate-400">1</td>
+                                                    <td className="py-3 px-3 align-top">
+                                                        <div className="font-bold text-slate-900 mb-0.5">{model} Basiskonstruktion</div>
+                                                        <div className="text-xs text-slate-500 leading-snug">
+                                                            Hochwertiges Aluminiumprofilsystem, pulverbeschichtet. <br />
+                                                            Inklusive Pfosten, Rinnenprofil und Wandanschluss.
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right align-top font-medium">{formatCurrency(offer.pricing?.basePrice || 0)}</td>
+                                                </tr>
+                                            )}
                                             {/* Addons */}
                                             {(offer.product?.addons || []).map((addon, idx) => (
                                                 <tr key={idx} className="print:bg-white break-inside-avoid">
@@ -367,6 +389,30 @@ export const OfferPrintView: React.FC = () => {
                                                     <td className="py-2 px-3 text-right align-top text-slate-800">{formatCurrency(item.price)}</td>
                                                 </tr>
                                             ))}
+                                            {/* Custom Items (Manual Positions) */}
+                                            {((offer.product as any).customItems || []).map((item: any, idx: number) => {
+                                                const baseOffset = isManual ? 0 : 1; // No base row in manual mode
+                                                const addonsCount = offer.product.addons?.length || 0;
+                                                const v2ItemsCount = ((offer.product as any).items || []).filter((i: any) => !i.name.toLowerCase().includes(offer.product.modelId?.toLowerCase() || '')).length;
+                                                const posNum = baseOffset + addonsCount + v2ItemsCount + 1 + idx;
+                                                return (
+                                                    <tr key={`custom-${idx}`} className="print:bg-white break-inside-avoid">
+                                                        <td className="py-2 px-3 text-center align-top text-slate-400">
+                                                            {posNum}
+                                                        </td>
+                                                        <td className="py-2 px-3 align-top">
+                                                            <div className="text-slate-800">{item.name}</div>
+                                                            {item.description && item.description !== 'Manuelle Angebotsposition' && item.description !== 'Manuelle Position' && (
+                                                                <div className="text-[11px] text-slate-500">{item.description}</div>
+                                                            )}
+                                                            {item.quantity > 1 && (
+                                                                <div className="text-[11px] text-slate-500">Menge: {item.quantity} Stk.</div>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2 px-3 text-right align-top text-slate-800">{formatCurrency(item.price * (item.quantity || 1))}</td>
+                                                    </tr>
+                                                );
+                                            })}
                                             {/* Installation */}
                                             {offer.pricing?.installationCosts && (
                                                 <tr className="bg-slate-50 print:bg-slate-50 break-inside-avoid">
