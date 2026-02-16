@@ -1,13 +1,9 @@
-// Follows Deno standard for Supabase Edge Functions
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 Deno.serve(async (req) => {
-    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
@@ -15,7 +11,6 @@ Deno.serve(async (req) => {
     try {
         const { text, apiKey: userKey } = await req.json()
 
-        // Use provided key or fallback to env var
         const apiKey = userKey || Deno.env.get('OPENAI_API_KEY');
 
         if (!text || !apiKey) {
@@ -85,7 +80,7 @@ Dla adresu: oddziel ulicę od miasta. Kod pocztowy zawsze osobno.`;
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Edge Function Error:', error)
         return new Response(
             JSON.stringify({ error: error.message }),

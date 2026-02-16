@@ -54,15 +54,14 @@ export const CallManager: React.FC = () => {
                     }
                 });
 
-                if (error || !data.token) {
-                    console.error('Failed to get voice token:', error);
+                if (error || !data?.token) {
+                    // Silently skip - Twilio not configured on this project
                     return;
                 }
 
                 initializeDevice(data.token);
-            } catch (err) {
-                // Silently fail if not configured, just log warning
-                console.warn('Voice token fetch skipped (likely missing secrets):', err);
+            } catch {
+                // Silently fail if not configured (missing Twilio secrets)
             }
         };
 
