@@ -374,7 +374,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         const lead = leads.find(l => l.id === leadId);
         const updates: Partial<Lead> = { status, ...extraUpdates };
 
-        if (currentUser && status !== 'new' && lead?.assignedTo !== currentUser.id) {
+        if (currentUser && status !== 'new' && !lead?.assignedTo) {
             updates.assignedTo = currentUser.id;
             toast.success('Przejąłeś opiekę nad tym leadem');
         }

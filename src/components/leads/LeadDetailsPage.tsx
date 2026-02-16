@@ -179,7 +179,7 @@ export const LeadDetailsPage: React.FC = () => {
                                         const updates: Partial<Lead> = { status: 'contacted' };
                                         let successMessage = 'Oznaczono jako skontaktowano';
 
-                                        if (currentUser && lead.assignedTo !== currentUser.id) {
+                                        if (currentUser && !lead.assignedTo) {
                                             updates.assignedTo = currentUser.id;
                                             successMessage += ' i przypisano opiekuna';
                                         }

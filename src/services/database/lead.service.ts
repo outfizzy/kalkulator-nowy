@@ -119,7 +119,7 @@ export const LeadService = {
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.source) dbUpdates.source = updates.source;
         if (updates.customerData) dbUpdates.customer_data = updates.customerData;
-        if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
+        if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo;
         if (updates.emailMessageId) dbUpdates.email_message_id = updates.emailMessageId;
         if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
         if (updates.lastContactDate) dbUpdates.last_contact_date = updates.lastContactDate.toISOString();
