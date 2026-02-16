@@ -9,31 +9,23 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { text, apiKey: userKey } = await req.json()
+        const body = await req.json()
+        const { text, apiKey: userKey } = body;
 
-        const apiKey = userKey || Deno.env.get('OPENAI_API_KEY');
+        // Always prefer the server-side key; user key is only a fallback
+        const apiKey = Deno.env.get('OPENAI_API_KEY') || userKey;
 
         if (!text || !apiKey) {
+            const missing = [];
+            if (!text) missing.push('text');
+            if (!apiKey) missing.push('API Key');
             return new Response(
-                JSON.stringify({ error: 'Missing text or API Key (User or System)' }),
+                JSON.stringify({ error: `Missing: ${missing.join(', ')}` }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
-        const systemPrompt = `Jesteś asystentem handlowym. Twoim zadaniem jest wyciągnięcie danych klienta z treści wiadomości e-mail.
-Zwróć TYLKO czysty obiekt JSON (bez znaczników markdown \`\`\`json) z następującymi polami:
-- firstName (string, imię, zgadnij jeśli nie ma wprost)
-- lastName (string, nazwisko)
-- companyName (string, nazwa firmy)
-- phone (string, numer telefonu)
-- email (string, adres email, jeśli jest w treści - inny niż nadawca)
-- address (string, sama ulica i numer domu - BEZ kodu pocztowego i miasta)
-- postalCode (string, kod pocztowy, np. 12-345 lub 12345)
-- city (string, miasto)
-- notes (string, krótkie podsumowanie o co chodzi w mailu w 1-2 zdaniach)
-
-Jeśli jakiegoś pola nie możesz znaleźć, zostaw pusty string "". Nie zmyślaj danych.
-Dla adresu: oddziel ulicę od miasta. Kod pocztowy zawsze osobno.`;
+        const systemPrompt = 'Jestes asystentem handlowym. Twoim zadaniem jest wyciagniecie danych klienta z tresci wiadomosci e-mail.\nZwroc TYLKO czysty obiekt JSON (bez znacznikow markdown ```json) z nastepujacymi polami:\n- firstName (string, imie, zgadnij jesli nie ma wprost)\n- lastName (string, nazwisko)\n- companyName (string, nazwa firmy)\n- phone (string, numer telefonu)\n- email (string, adres email, jesli jest w tresci - inny niz nadawca)\n- address (string, sama ulica i numer domu - BEZ kodu pocztowego i miasta)\n- postalCode (string, kod pocztowy, np. 12-345 lub 12345)\n- city (string, miasto)\n- notes (string, krotkie podsumowanie o co chodzi w mailu w 1-2 zdaniach)\n\nJesli jakiegos pola nie mozesz znalezc, zostaw pusty string "". Nie zmyslaj danych.\nDla adresu: oddziel ulice od miasta. Kod pocztowy zawsze osobno.';
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -45,7 +37,7 @@ Dla adresu: oddziel ulicę od miasta. Kod pocztowy zawsze osobno.`;
                 model: 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Treść maila:\n${text}` }
+                    { role: 'user', content: `Tresc maila:\n${text}` }
                 ],
                 temperature: 0.3
             })
@@ -53,9 +45,9 @@ Dla adresu: oddziel ulicę od miasta. Kod pocztowy zawsze osobno.`;
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('OpenAI API Error:', errorText);
+            console.error('OpenAI API Error:', response.status, errorText);
             return new Response(
-                JSON.stringify({ error: 'OpenAI API Error', details: errorText }),
+                JSON.stringify({ error: `OpenAI API Error (${response.status})`, details: errorText }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
@@ -80,10 +72,10 @@ Dla adresu: oddziel ulicę od miasta. Kod pocztowy zawsze osobno.`;
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
 
-    } catch (error: any) {
-        console.error('Edge Function Error:', error)
+    } catch (error) {
+        console.error('Edge Function Error:', error);
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: error.message || 'Unknown error' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
