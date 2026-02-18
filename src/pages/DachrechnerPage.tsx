@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MeasurementCalculator } from '../components/measurements/MeasurementCalculator';
+import { LedCalculator } from '../components/led-calculator';
 import { ProjectMeasurementService } from '../services/database/project-measurement.service';
 import { DatabaseService } from '../services/database';
 import { supabase } from '../lib/supabase';
@@ -14,6 +15,7 @@ export const DachrechnerPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loadingCustomers, setLoadingCustomers] = useState(true);
     const [showSearch, setShowSearch] = useState(false);
+    const [activeTab, setActiveTab] = useState<'dachrechner' | 'led'>('dachrechner');
 
     // Load customers on mount
     useEffect(() => {
@@ -211,7 +213,38 @@ export const DachrechnerPage: React.FC = () => {
                     </div>
                 </div>
 
-                <MeasurementCalculator onSave={selectedCustomer ? handleSave : undefined} />
+                {/* Tab Switcher */}
+                <div className="flex gap-1 bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5">
+                    <button
+                        onClick={() => setActiveTab('dachrechner')}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === 'dachrechner'
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-200/50'
+                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                            }`}
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        Dachrechner
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('led')}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === 'led'
+                                ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-lg shadow-amber-200/50'
+                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                            }`}
+                    >
+                        <span className="text-lg">💡</span>
+                        LED Rechner
+                    </button>
+                </div>
+
+                {/* Tab Content */}
+                {activeTab === 'dachrechner' ? (
+                    <MeasurementCalculator onSave={selectedCustomer ? handleSave : undefined} />
+                ) : (
+                    <LedCalculator />
+                )}
             </div>
         </div>
     );
