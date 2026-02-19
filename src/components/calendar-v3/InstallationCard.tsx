@@ -1,103 +1,170 @@
 import React from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type { Installation, InstallationTeam } from '../../types';
-import { format } from 'date-fns';
-import { pl } from 'date-fns/locale';
 
 interface InstallationCardProps {
     installation: Installation;
     teams: InstallationTeam[];
     isDragging?: boolean;
+    compact?: boolean;
+    onClick?: () => void;
 }
 
 export const InstallationCard: React.FC<InstallationCardProps> = ({
     installation,
     teams,
-    isDragging = false
+    isDragging = false,
+    compact = false,
+    onClick
 }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-    } = useSortable({
-        id: installation.id,
-        data: { type: 'installation', installation }
-    });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-
     const team = teams.find(t => t.id === installation.teamId);
-    const teamColor = team?.color || '#6366f1';
+    const teamColor = team?.color || '#94a3b8';
 
-    // Calculate duration in days
-    const startDate = new Date(installation.startDate);
-    const endDate = new Date(installation.endDate);
-    const durationDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // Build display name from firstName + lastName
+    const clientName = [
+        installation.client?.firstName,
+        installation.client?.lastName
+    ].filter(Boolean).join(' ') || installation.title || 'Brak nazwy';
 
+    // Status config
+    const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+        completed: { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Ukończono' },
+        in_progress: { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500', label: 'W trakcie' },
+        scheduled: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500', label: 'Zaplanowano' },
+        confirmed: { bg: 'bg-teal-100', text: 'text-teal-700', dot: 'bg-teal-500', label: 'Potwierdzone' },
+        pending: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400', label: 'Oczekuje' },
+        verification: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', label: 'Weryfikacja' },
+        cancelled: { bg: 'bg-red-100', text: 'text-red-600', dot: 'bg-red-500', label: 'Anulowane' },
+    };
+    const status = statusConfig[installation.status] || statusConfig.pending;
+
+    // Address
+    const address = [installation.client?.address, installation.client?.city]
+        .filter(Boolean).join(', ');
+
+    // Duration
+    const duration = installation.expectedDuration || 1;
+
+    // Compact mode for grid cells
+    if (compact) {
+        return (
+            <div
+                className={`rounded-md shadow-sm cursor-pointer hover:shadow-md transition-all border border-slate-200 overflow-hidden ${isDragging ? 'opacity-50 rotate-1' : ''
+                    }`}
+                onClick={onClick}
+            >
+                <div className="flex">
+                    <div className="w-1 shrink-0" style={{ backgroundColor: teamColor }} />
+                    <div className="flex-1 p-1.5 min-w-0">
+                        {/* Name + status dot */}
+                        <div className="flex items-center gap-1 mb-0.5">
+                            <div
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: status.dot }}
+                            />
+                            <span className="font-semibold text-[11px] text-slate-800 truncate">
+                                {clientName}
+                            </span>
+                        </div>
+
+                        {/* City + Contract Number */}
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                            {installation.client?.city && (
+                                <span className="truncate">📍 {installation.client.city}</span>
+                            )}
+                            {installation.contractNumber && (
+                                <span className="font-mono bg-slate-100 px-1 rounded flex-shrink-0">
+                                    {installation.contractNumber}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Product summary (compact) */}
+                        {installation.productSummary && (
+                            <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                                {installation.productSummary}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Full card mode
     return (
         <div
-            ref={setNodeRef}
-            style={{ ...style, borderLeftColor: teamColor }}
-            {...attributes}
-            {...listeners}
-            className="bg-white border-l-4 rounded-lg shadow-sm p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+            className={`group rounded-lg shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all border border-slate-200 overflow-hidden ${isDragging ? 'opacity-50 rotate-2' : ''
+                }`}
+            onClick={onClick}
         >
-            {/* Customer Name */}
-            <div className="font-semibold text-sm text-slate-900 mb-1 truncate">
-                {installation.client?.name || 'Brak nazwy'}
-            </div>
+            <div className="flex">
+                {/* Team color bar */}
+                <div className="w-1.5 shrink-0" style={{ backgroundColor: teamColor }} />
 
-            {/* Contract Number */}
-            {installation.contractNumber && (
-                <div className="text-xs text-slate-500 mb-2">
-                    #{installation.contractNumber}
+                <div className="flex-1 p-2 min-w-0">
+                    {/* Row 1: Customer name + status */}
+                    <div className="flex items-start gap-1.5 mb-1">
+                        <div
+                            className="w-2 h-2 rounded-full mt-1 shrink-0"
+                            style={{ backgroundColor: status.dot }}
+                            title={status.label}
+                        />
+                        <div className="font-semibold text-[13px] leading-tight text-slate-900 break-words min-w-0 flex-1">
+                            {clientName}
+                        </div>
+                    </div>
+
+                    {/* Row 2: Contract + duration + status */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        {installation.contractNumber && (
+                            <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {installation.contractNumber}
+                            </span>
+                        )}
+                        {duration > 1 && (
+                            <span className="text-[11px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                {duration}d
+                            </span>
+                        )}
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${status.bg} ${status.text}`}>
+                            {status.label}
+                        </span>
+                    </div>
+
+                    {/* Row 3: Product summary */}
+                    {installation.productSummary && (
+                        <div className="text-[11px] text-slate-600 leading-snug mb-1 line-clamp-2">
+                            📦 {installation.productSummary}
+                        </div>
+                    )}
+
+                    {/* Row 4: Address */}
+                    {address && (
+                        <div className="text-[11px] text-slate-400 leading-snug truncate" title={address}>
+                            📍 {address}
+                        </div>
+                    )}
+
+                    {/* Row 5: Team name */}
+                    {team && (
+                        <div className="flex items-center gap-1 mt-1">
+                            <div
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: teamColor }}
+                            />
+                            <span className="text-[11px] font-medium text-slate-600 truncate">
+                                {team.name}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* No team assigned */}
+                    {!team && (
+                        <div className="flex items-center gap-1 mt-1 text-[10px] text-orange-500 italic">
+                            ⚠️ Brak ekipy
+                        </div>
+                    )}
                 </div>
-            )}
-
-            {/* Product Summary */}
-            {installation.productSummary && (
-                <div className="text-xs text-slate-600 mb-2 line-clamp-2">
-                    {installation.productSummary}
-                </div>
-            )}
-
-            {/* Team Badge */}
-            {team && (
-                <div className="flex items-center gap-1.5 mb-2">
-                    <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: teamColor }}
-                    />
-                    <span className="text-xs font-medium text-slate-700">
-                        {team.name}
-                    </span>
-                </div>
-            )}
-
-            {/* Duration & Status */}
-            <div className="flex items-center justify-between text-xs">
-                {durationDays > 1 && (
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
-                        {durationDays} dni
-                    </span>
-                )}
-
-                <span className={`px-2 py-0.5 rounded font-medium ${installation.status === 'completed'
-                        ? 'bg-green-100 text-green-700'
-                        : installation.status === 'in_progress'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-slate-100 text-slate-700'
-                    }`}>
-                    {installation.status === 'completed' ? 'Ukończono' :
-                        installation.status === 'in_progress' ? 'W trakcie' : 'Zaplanowano'}
-                </span>
             </div>
         </div>
     );
