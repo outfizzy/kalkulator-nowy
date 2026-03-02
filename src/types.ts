@@ -134,7 +134,7 @@ export interface Communication {
     };
 }
 
-export type InstallationType = 'wall-mounted' | 'freestanding';
+export type InstallationType = 'wall-mounted' | 'freestanding' | 'corner-left' | 'corner-right';
 export type RoofType = 'polycarbonate' | 'glass' | 'tin';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
@@ -284,6 +284,12 @@ export interface ProductConfig {
 
     // Flooring
     floorType?: 'wpc' | 'gres'; // wpc = 14cm planks, gres = 60x60 tiles
+
+    // Corner-Mount Configuration (Zadaszenie Narożne)
+    cornerConfig?: {
+        secondaryWidth: number;      // mm — width of the second wing
+        secondaryProjection: number; // mm — depth of the second wing
+    };
 
     // Post Positioning
     postOffsets?: number[]; // Manual offset (mm) for each post from its default equidistant position.
@@ -505,10 +511,10 @@ export interface MeasurementReport {
     salesRepId: string; // User ID of sales rep who created the report
     salesRepName?: string; // Joined from profiles
 
-    // Car Details
+    // Car & Trip Details
     carPlate: string;
-    odometerStart: number;
-    odometerEnd: number;
+    odometerStart?: number; // Legacy — no longer used in UI
+    odometerEnd?: number;   // Legacy — no longer used in UI
     totalKm: number;
     is_active: boolean;
     currency: string;
@@ -531,8 +537,8 @@ export interface MeasurementReport {
     createdAt: Date;
 
     // Trip Cost Tracking (Admin/Manager editable)
-    tripCost?: number;        // Koszt wyjazdu w EUR
-    costPerKm?: number;       // Stawka za km
+    tripCost?: number;        // Koszt wyjazdu w PLN
+    costPerKm?: number;       // Stawka za km (PLN)
     tripCostUpdatedBy?: string;
     tripCostUpdatedAt?: Date;
 }

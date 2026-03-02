@@ -26,13 +26,19 @@ export const generateMeasurementReportPDF = (report: MeasurementReport, userName
     doc.text('Dane Trasy', 15, 45);
 
     const tripData = [
-        ['Nr Rejestracyjny:', report.carPlate],
-        ['Licznik Start:', `${report.odometerStart} km`],
-        ['Licznik Stop:', `${report.odometerEnd} km`],
-        ['Dystans Całkowity:', `${report.totalKm} km`],
+        ['Nr Rejestracyjny:', report.carPlate || '-'],
+        ['Dystans (GPS):', `${report.totalKm} km`],
         ['Jazda z kierowcą:', report.withDriver ? 'TAK' : 'NIE'],
-        ['Uwagi do auta:', report.carIssues || 'Brak']
+        ['Uwagi do trasy:', report.carIssues || 'Brak'],
     ];
+
+    // Add cost info if available
+    if (report.tripCost && report.tripCost > 0) {
+        tripData.push(['Koszt wyjazdu:', `${report.tripCost.toFixed(2)} zł`]);
+    }
+    if (report.costPerKm) {
+        tripData.push(['Stawka za km:', `${report.costPerKm.toFixed(2)} zł/km`]);
+    }
 
     autoTable(doc, {
         startY: 50,
@@ -70,25 +76,26 @@ export const generateMeasurementReportPDF = (report: MeasurementReport, userName
         index + 1,
         v.customerName,
         v.address,
-        v.productSummary,
+        v.customerPhone || '-',
         v.outcome === 'signed' ? 'UMOWA' :
             v.outcome === 'measured' ? 'Pomiar' :
-                v.outcome === 'rejected' ? 'Odrzucone' : 'Decyzja',
-        v.notes || '-'
+                v.outcome === 'postponed' ? 'Decyzja' :
+                    v.outcome === 'rejected' ? 'Odrzucone' : 'Oczekuje',
+        v.visitNotes || v.notes || '-'
     ]);
 
     autoTable(doc, {
         startY: visitsY + 5,
-        head: [['Lp.', 'Klient', 'Adres', 'Produkt', 'Wynik', 'Notatki']],
+        head: [['Lp.', 'Klient', 'Adres', 'Telefon', 'Wynik', 'Notatki']],
         body: visitsData,
         theme: 'grid',
         headStyles: { fillColor: [66, 66, 66], textColor: 255 },
         styles: { fontSize: 9, cellPadding: 3 },
         columnStyles: {
             0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 35 },
-            2: { cellWidth: 45 },
-            3: { cellWidth: 30 },
+            1: { cellWidth: 32 },
+            2: { cellWidth: 40 },
+            3: { cellWidth: 25 },
             4: { cellWidth: 20, halign: 'center' },
             5: { cellWidth: 'auto' }
         }
@@ -100,6 +107,10 @@ export const generateMeasurementReportPDF = (report: MeasurementReport, userName
     doc.setFontSize(10);
     doc.text(`Podpisane umowy: ${report.signedContractsCount}`, 15, summaryY);
     doc.text(`Liczba wizyt: ${report.visits.length}`, 15, summaryY + 5);
+    doc.text(`Dystans: ${report.totalKm} km`, 15, summaryY + 10);
+    if (report.tripCost && report.tripCost > 0) {
+        doc.text(`Koszt wyjazdu: ${report.tripCost.toFixed(2)} zł`, 15, summaryY + 15);
+    }
 
     // Footer
     const pageCount = doc.getNumberOfPages();

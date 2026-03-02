@@ -7,9 +7,11 @@ interface HouseFacadeProps {
     color: string;
     doorPosition: number; // mm offset from center
     hasWall: boolean;
+    cornerSide?: 'left' | 'right'; // Which side the corner extends to
+    secondaryDepth?: number; // mm — depth of the secondary wing (for corner facade)
 }
 
-export const HouseFacade: React.FC<HouseFacadeProps> = ({ width, height, depth, color, doorPosition, hasWall }) => {
+export const HouseFacade: React.FC<HouseFacadeProps> = ({ width, height, depth, color, doorPosition, hasWall, cornerSide, secondaryDepth }) => {
     // Convert to meters
     const widthM = width / 1000;
     // const heightM = height / 1000; // Unused for wall height now
@@ -147,6 +149,44 @@ export const HouseFacade: React.FC<HouseFacadeProps> = ({ width, height, depth, 
                 <boxGeometry args={[houseWidth, 0.1, terraceDepth]} />
                 {floorMaterial}
             </mesh>
+
+            {/* ═══════ CORNER PERPENDICULAR WALL ═══════ */}
+            {cornerSide && (() => {
+                const secDepthM = (secondaryDepth || 2000) / 1000;
+                const perpWallLength = secDepthM + 6.0; // Extend beyond patio
+                const perpWallX = cornerSide === 'left'
+                    ? -houseWidth / 2 + 0.15 // Slightly inside corner
+                    : houseWidth / 2 - 0.15;
+                const perpWallZ = -perpWallLength / 2;
+
+                return (
+                    <group position={[perpWallX, 0, perpWallZ]}>
+                        {/* Perpendicular wall — full height */}
+                        <mesh receiveShadow castShadow>
+                            <boxGeometry args={[houseDepth, houseHeight, perpWallLength]} />
+                            {wallMaterial}
+                        </mesh>
+
+                        {/* Window on perpendicular wall */}
+                        <group position={[
+                            cornerSide === 'left' ? -houseDepth / 2 - 0.01 : houseDepth / 2 + 0.01,
+                            windowElevation + windowHeight / 2,
+                            0
+                        ]}>
+                            <mesh position={[0, 0, 0]}>
+                                <boxGeometry args={[0.1, windowHeight, windowWidth]} />
+                                {frameMaterial}
+                            </mesh>
+                            <mesh position={[
+                                cornerSide === 'left' ? -0.05 : 0.05, 0, 0
+                            ]}>
+                                <boxGeometry args={[0.05, windowHeight - 0.2, windowWidth - 0.2]} />
+                                {glassMaterial}
+                            </mesh>
+                        </group>
+                    </group>
+                );
+            })()}
         </group>
     );
 };

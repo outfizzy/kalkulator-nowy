@@ -7,6 +7,7 @@ import { CalendarTimeline } from '../calendar-v2/CalendarTimeline';
 import { CalendarMap } from '../calendar-v2/CalendarMap';
 import { InstallationService } from '../../services/database/installation.service';
 import type { Installation, InstallationTeam, TeamUnavailability } from '../../types';
+import type { LocationForecast } from '../../services/weather.service';
 import toast from 'react-hot-toast';
 
 interface CalendarGridEnhancedProps {
@@ -17,6 +18,7 @@ interface CalendarGridEnhancedProps {
     unavailability: TeamUnavailability[];
     onRefresh: () => void;
     onEditInstallation?: (installation: Installation) => void;
+    weatherData?: Map<string, LocationForecast>;
 }
 
 export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
@@ -26,7 +28,8 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
     teams,
     unavailability,
     onRefresh,
-    onEditInstallation
+    onEditInstallation,
+    weatherData
 }) => {
     return (
         <div className="h-full bg-white">
@@ -37,6 +40,7 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
                     teams={teams}
                     unavailability={unavailability}
                     onEditInstallation={onEditInstallation}
+                    weatherData={weatherData}
                 />
             )}
             {viewMode === 'month' && (

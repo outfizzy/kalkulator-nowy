@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { InstallationCardEnhanced } from '../InstallationCardEnhanced';
 import type { Installation, InstallationTeam, TeamUnavailability } from '../../../types';
+import type { LocationForecast } from '../../../services/weather.service';
 
 interface WeekViewEnhancedProps {
     currentDate: Date;
@@ -12,6 +13,7 @@ interface WeekViewEnhancedProps {
     teams: InstallationTeam[];
     unavailability: TeamUnavailability[];
     onEditInstallation?: (installation: Installation) => void;
+    weatherData?: Map<string, LocationForecast>;
 }
 
 interface DroppableDayProps {
@@ -21,6 +23,7 @@ interface DroppableDayProps {
     team: InstallationTeam;
     isUnavailable: boolean;
     onEditInstallation?: (installation: Installation) => void;
+    weatherData?: Map<string, LocationForecast>;
 }
 
 const DroppableDay: React.FC<DroppableDayProps> = ({
@@ -29,7 +32,8 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
     installations,
     team,
     isUnavailable,
-    onEditInstallation
+    onEditInstallation,
+    weatherData
 }) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const { setNodeRef, isOver } = useDroppable({
@@ -44,20 +48,20 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
         i => i.teamId === teamId && i.scheduledDate && isSameDay(new Date(i.scheduledDate), date)
     );
 
-    const totalHours = dayInstallations.reduce((sum, inst) => sum + (inst.estimatedDuration || 8), 0);
+    const totalHours = dayInstallations.reduce((sum, inst) => sum + (inst.expectedDuration || 8), 0);
     const isOverloaded = totalHours > 8;
     const isWeekendDay = isWeekend(date);
 
     return (
         <div
             ref={setNodeRef}
-            className={`min-h-[120px] border-r border-b border-slate-200 p-2 transition-colors ${isOver
-                    ? 'bg-accent/10 ring-2 ring-accent ring-inset'
-                    : isUnavailable
-                        ? 'bg-gray-100'
-                        : isWeekendDay
-                            ? 'bg-slate-50'
-                            : 'bg-white hover:bg-slate-50'
+            className={`min-h-[160px] border-r border-b border-slate-200 p-2 transition-colors ${isOver
+                ? 'bg-accent/10 ring-2 ring-accent ring-inset'
+                : isUnavailable
+                    ? 'bg-gray-100'
+                    : isWeekendDay
+                        ? 'bg-slate-50'
+                        : 'bg-white hover:bg-slate-50'
                 }`}
         >
             <SortableContext
@@ -73,14 +77,21 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
                             Niedostępna
                         </div>
                     )}
-                    {dayInstallations.map(installation => (
-                        <InstallationCardEnhanced
-                            key={installation.id}
-                            installation={installation}
-                            team={team}
-                            onEdit={onEditInstallation}
-                        />
-                    ))}
+                    {dayInstallations.map(installation => {
+                        // Get weather for this installation's city
+                        const cityKey = installation.client?.city?.trim().toLowerCase();
+                        const forecast = cityKey && weatherData?.get(cityKey);
+                        const dayWeather = forecast ? forecast.forecasts[dateStr] : undefined;
+                        return (
+                            <InstallationCardEnhanced
+                                key={installation.id}
+                                installation={installation}
+                                team={team}
+                                onEdit={onEditInstallation}
+                                weather={dayWeather}
+                            />
+                        );
+                    })}
                     {isOverloaded && (
                         <div className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -100,7 +111,8 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
     installations,
     teams,
     unavailability,
-    onEditInstallation
+    onEditInstallation,
+    weatherData
 }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekDays = useMemo(() => {
@@ -123,10 +135,10 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                         <div
                             key={day.toISOString()}
                             className={`p-3 border-r border-slate-300 text-center ${isToday
-                                    ? 'bg-accent text-white font-bold'
-                                    : isWeekendDay
-                                        ? 'bg-slate-200 text-slate-600'
-                                        : 'text-slate-700'
+                                ? 'bg-accent text-white font-bold'
+                                : isWeekendDay
+                                    ? 'bg-slate-200 text-slate-600'
+                                    : 'text-slate-700'
                                 }`}
                         >
                             <div className="text-xs uppercase">
@@ -181,6 +193,7 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                                     team={team}
                                     isUnavailable={isUnavailable}
                                     onEditInstallation={onEditInstallation}
+                                    weatherData={weatherData}
                                 />
                             );
                         })}

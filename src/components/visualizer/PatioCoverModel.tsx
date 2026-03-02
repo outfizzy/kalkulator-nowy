@@ -619,6 +619,257 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                 </group>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                CORNER WING — matching real-world L-shaped patio cover
+                • Secondary gutter runs along the SIDE (Z axis)
+                • Secondary rafters run PERPENDICULAR to primary (along X)
+                • Diagonal valley rafter at 45° from outer corner to building corner
+                • Primary gutter extended to reach the junction
+            ═══════════════════════════════════════════════════════════════ */}
+            {(config.installationType === 'corner-left' || config.installationType === 'corner-right') && config.cornerConfig && (() => {
+                const isLeft = config.installationType === 'corner-left';
+                const sign = isLeft ? -1 : 1;
+
+                // Secondary dimensions
+                const secWidthM = Math.max(1.0, (config.cornerConfig.secondaryWidth || 3000) / 1000);
+                const secProjM = Math.max(1.0, (config.cornerConfig.secondaryProjection || depthM * 1000) / 1000);
+
+                // ── KEY POINTS (world coordinates, top view) ──
+                // Building corner (where two walls meet):
+                const bcX = sign * widthM / 2;
+                const bcZ = -depthM / 2;
+
+                // Outer junction (where both gutters meet):
+                const jnX = bcX + sign * secProjM;
+                const jnZ = depthM / 2;
+
+                // Heights at key points
+                const gutterY = heightM - BEAM_HEIGHT;
+                const wallY = heightM + depthM * Math.tan(structurePitch) - BEAM_HEIGHT;
+
+                // ── DIAGONAL valley rafter from junction to building corner ──
+                const diagDx = bcX - jnX;
+                const diagDz = bcZ - jnZ;
+                const diagHoriz = Math.sqrt(diagDx * diagDx + diagDz * diagDz);
+                const diagDy = wallY - gutterY;
+                const diagLength = Math.sqrt(diagHoriz * diagHoriz + diagDy * diagDy);
+                const diagPitch = Math.atan2(diagDy, diagHoriz);
+                const diagYaw = Math.atan2(diagDx, diagDz);
+                const diagMidX = (jnX + bcX) / 2;
+                const diagMidZ = (jnZ + bcZ) / 2;
+                const diagMidY = (gutterY + wallY) / 2;
+
+                // ── PRIMARY GUTTER EXTENSION ──
+                // Extend the primary gutter from its corner edge to the junction X
+                const extGutterLen = secProjM; // extension length
+
+                // ── SECONDARY GUTTER ──
+                // Runs along Z axis (from junction forward toward building corner)
+                // at X = jnX (the outermost edge of the L)
+                const secGutterLen = secWidthM + depthM; // from jnZ backward
+
+                // ── SECONDARY WALL PROFILE ──
+                // Along wall 2 (at X = bcX), from building corner backward
+                // Wall 2 goes from bcZ to bcZ - secWidthM
+
+                // ── UNIFIED SECONDARY-SIDE RAFTER SYSTEM ──
+                // Two zones: 
+                // A) Overlap zone (bcZ < z < jnZ): jack rafters from diagonal to gutter
+                // B) Behind corner (z <= bcZ): full rafters from wall 2 to gutter
+
+                // Build unified rafter array with per-rafter lengths
+                type SecRafter = { z: number; horizLen: number; midX: number; midY: number; rafterLen: number };
+                const allSecRafters: SecRafter[] = [];
+
+                // A) Jack rafters in overlap zone (from diagonal to secondary gutter)
+                const overlapDist = depthM; // Z distance from bcZ to jnZ
+                const jackCount = Math.max(1, Math.ceil(overlapDist / 0.9) - 1);
+                for (let i = 1; i <= jackCount; i++) {
+                    const z = bcZ + overlapDist * i / (jackCount + 1);
+                    // X position of diagonal at this z
+                    const tDiag = (z - jnZ) / (bcZ - jnZ); // 0 at junction, 1 at corner
+                    const xDiag = jnX + tDiag * (bcX - jnX);
+                    const horizLen = Math.abs(xDiag - jnX);
+                    if (horizLen < 0.15) continue;
+                    const rafterLen = horizLen / Math.cos(pitchAngle);
+                    const midX = (xDiag + jnX) / 2;
+                    const midY = heightM + (horizLen / 2) * Math.tan(structurePitch) - BEAM_HEIGHT / 2;
+                    allSecRafters.push({ z, horizLen, midX, midY, rafterLen });
+                }
+
+                // B) Regular secondary rafters behind corner (wall 2 to gutter)
+                const secRafterCount = Math.ceil(secWidthM / 0.9) + 1;
+                const secRafterLen = secProjM / Math.cos(pitchAngle);
+                const secRafterMidY = heightM + (secProjM / 2) * Math.tan(structurePitch) - BEAM_HEIGHT / 2;
+                for (let i = 0; i < secRafterCount; i++) {
+                    const t = secRafterCount > 1 ? i / (secRafterCount - 1) : 0;
+                    const z = bcZ - secWidthM * t;
+                    allSecRafters.push({
+                        z, horizLen: secProjM,
+                        midX: (bcX + jnX) / 2,
+                        midY: secRafterMidY,
+                        rafterLen: secRafterLen
+                    });
+                }
+
+                // Sort by Z descending (from junction side toward back)
+                allSecRafters.sort((a, b) => b.z - a.z);
+
+                // ── SECONDARY POSTS ──
+                const secGutterFullSpan = secWidthM + depthM;
+                const secPostCount = Math.max(2, Math.ceil(secGutterFullSpan / 3) + 1);
+                const secPostEls: { z: number }[] = [];
+                for (let i = 0; i < secPostCount; i++) {
+                    const t = secPostCount > 1 ? i / (secPostCount - 1) : 0;
+                    const z = jnZ - secGutterFullSpan * t;
+                    if (i === 0) continue; // skip junction corner post
+                    secPostEls.push({ z });
+                }
+
+                return (
+                    <group>
+                        {/* ── PRIMARY GUTTER EXTENSION (to reach junction) ── */}
+                        <group
+                            position={[
+                                isLeft ? jnX : bcX,
+                                gutterY,
+                                depthM / 2 + GUTTER_DEPTH / 2
+                            ]}
+                            rotation={[0, Math.PI / 2, 0]}
+                        >
+                            <mesh castShadow receiveShadow material={structureMaterial}>
+                                <extrudeGeometry args={[gutterProfileShape, extrudeSettings(extGutterLen)]} />
+                            </mesh>
+                        </group>
+
+                        {/* ── SECONDARY GUTTER (along the SIDE, Z axis) ── */}
+                        <group
+                            position={[jnX, gutterY, jnZ + GUTTER_DEPTH / 2]}
+                            rotation={[0, Math.PI, 0]}
+                        >
+                            <mesh castShadow receiveShadow material={structureMaterial}>
+                                <extrudeGeometry args={[gutterProfileShape, extrudeSettings(secGutterLen)]} />
+                            </mesh>
+                            {/* End cap at far end */}
+                            <mesh position={[0, 0, secGutterLen]} material={structureMaterial}>
+                                <extrudeGeometry args={[gutterProfileShape, { depth: 0.005, bevelEnabled: false }]} />
+                            </mesh>
+                        </group>
+
+                        {/* ── SECONDARY WALL PROFILE (along wall 2, Z axis) ── */}
+                        <group
+                            position={[bcX, wallY, bcZ]}
+                            rotation={[0, Math.PI, 0]}
+                        >
+                            <mesh
+                                castShadow receiveShadow
+                                material={structureMaterial}
+                                scale={[postScale, postScale, 1]}
+                            >
+                                <extrudeGeometry args={[wallProfileShape, extrudeSettings(secWidthM)]} />
+                            </mesh>
+                        </group>
+
+                        {/* ── ALL SECONDARY-SIDE RAFTERS (jack + regular) ── */}
+                        {allSecRafters.map((r, i) => (
+                            <group
+                                key={`sec-rafter-${i}`}
+                                position={[r.midX, r.midY, r.z]}
+                                rotation={[0, sign * Math.PI / 2, 0]}
+                            >
+                                <group rotation={[structurePitch, 0, 0]}>
+                                    <mesh
+                                        position={[0, 0, -r.rafterLen / 2]}
+                                        castShadow receiveShadow
+                                        material={structureMaterial}
+                                    >
+                                        <extrudeGeometry args={[rafterShape, extrudeSettings(r.rafterLen)]} />
+                                    </mesh>
+                                </group>
+                            </group>
+                        ))}
+
+                        {/* ── SECONDARY-SIDE ROOF PANELS ── */}
+                        {allSecRafters.map((r, i) => {
+                            if (i >= allSecRafters.length - 1) return null;
+                            const next = allSecRafters[i + 1];
+                            const panelW = Math.abs(r.z - next.z) - 0.005;
+                            const midZ = (r.z + next.z) / 2;
+                            // Use average rafter length for this panel section
+                            const avgHorizLen = (r.horizLen + next.horizLen) / 2;
+                            const panelDepth = avgHorizLen / Math.cos(glassPitch) + 0.05;
+                            const panelMidX = (r.midX + next.midX) / 2;
+                            const panelMidY = heightM + (avgHorizLen / 2) * Math.tan(structurePitch) - BEAM_HEIGHT / 2 + 0.034;
+
+                            return (
+                                <group
+                                    key={`sec-panel-${i}`}
+                                    position={[panelMidX, panelMidY, midZ]}
+                                    rotation={[0, sign * Math.PI / 2, 0]}
+                                >
+                                    <mesh
+                                        rotation={[glassPitch, 0, 0]}
+                                        material={activeRoofMat}
+                                        castShadow={config.roofType !== 'glass'} receiveShadow
+                                    >
+                                        <boxGeometry args={[panelW, 0.016, panelDepth]} />
+                                    </mesh>
+                                </group>
+                            );
+                        })}
+
+                        {/* ── DIAGONAL VALLEY RAFTER (from junction to building corner) ── */}
+                        <group
+                            position={[diagMidX, diagMidY, diagMidZ]}
+                            rotation={[0, diagYaw, 0]}
+                        >
+                            <group rotation={[diagPitch, 0, 0]}>
+                                <mesh castShadow receiveShadow material={structureMaterial}>
+                                    <boxGeometry args={[POST_SIZE, BEAM_HEIGHT * 0.8, diagLength]} />
+                                </mesh>
+                            </group>
+                        </group>
+
+                        {/* ── SECONDARY POSTS (along secondary gutter) ── */}
+                        {secPostEls.map((p, i) => (
+                            <mesh
+                                key={`sec-post-${i}`}
+                                rotation={[-Math.PI / 2, 0, 0]}
+                                position={[jnX, 0, p.z]}
+                                castShadow receiveShadow
+                                scale={[postScale, postScale, 1]}
+                            >
+                                <extrudeGeometry args={[postShape, extrudeSettings(heightM - BEAM_HEIGHT)]} />
+                                <meshStandardMaterial color={structureMaterial.color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
+                            </mesh>
+                        ))}
+
+                        {/* ── SECONDARY BASE PLATES ── */}
+                        {secPostEls.map((p, i) => (
+                            <mesh
+                                key={`sec-bp-${i}`}
+                                position={[jnX, 0.005, p.z]}
+                                receiveShadow
+                            >
+                                <boxGeometry args={[POST_SIZE + 0.04, 0.01, POST_SIZE + 0.04]} />
+                                <meshStandardMaterial color={structureMaterial.color} roughness={0.7} metalness={0.1} />
+                            </mesh>
+                        ))}
+
+                        {/* ── CORNER POST (at junction) ── */}
+                        <mesh
+                            rotation={[-Math.PI / 2, 0, 0]}
+                            position={[jnX, 0, jnZ]}
+                            castShadow receiveShadow
+                            scale={[postScale, postScale, 1]}
+                        >
+                            <extrudeGeometry args={[postShape, extrudeSettings(heightM - BEAM_HEIGHT)]} />
+                            <meshStandardMaterial color={structureMaterial.color} roughness={0.25} metalness={0.85} envMapIntensity={1.2} />
+                        </mesh>
+                    </group>
+                );
+            })()}
+
         </group>
     );
 };

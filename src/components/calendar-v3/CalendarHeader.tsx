@@ -2,7 +2,7 @@ import React from 'react';
 import { format, addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = 'day' | 'week' | 'month' | 'timeline' | 'map';
 
 interface CalendarHeaderProps {
     currentDate: Date;
@@ -28,38 +28,32 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     teamPanelOpen
 }) => {
     const handlePrevious = () => {
-        if (viewMode === 'day') {
-            onDateChange(subDays(currentDate, 1));
-        } else if (viewMode === 'week') {
-            onDateChange(subWeeks(currentDate, 1));
-        } else {
-            onDateChange(subMonths(currentDate, 1));
-        }
+        if (viewMode === 'day') onDateChange(subDays(currentDate, 1));
+        else if (viewMode === 'week') onDateChange(subWeeks(currentDate, 1));
+        else onDateChange(subMonths(currentDate, 1));
     };
 
     const handleNext = () => {
-        if (viewMode === 'day') {
-            onDateChange(addDays(currentDate, 1));
-        } else if (viewMode === 'week') {
-            onDateChange(addWeeks(currentDate, 1));
-        } else {
-            onDateChange(addMonths(currentDate, 1));
-        }
+        if (viewMode === 'day') onDateChange(addDays(currentDate, 1));
+        else if (viewMode === 'week') onDateChange(addWeeks(currentDate, 1));
+        else onDateChange(addMonths(currentDate, 1));
     };
 
-    const handleToday = () => {
-        onDateChange(new Date());
-    };
+    const handleToday = () => onDateChange(new Date());
 
     const getDateLabel = () => {
-        if (viewMode === 'day') {
-            return format(currentDate, 'EEEE, d MMMM yyyy', { locale: pl });
-        } else if (viewMode === 'week') {
-            return format(currentDate, "'Tydzień' w, MMMM yyyy", { locale: pl });
-        } else {
-            return format(currentDate, 'MMMM yyyy', { locale: pl });
-        }
+        if (viewMode === 'day') return format(currentDate, 'EEEE, d MMMM yyyy', { locale: pl });
+        if (viewMode === 'week') return format(currentDate, "'Tydzień' w, MMMM yyyy", { locale: pl });
+        return format(currentDate, 'MMMM yyyy', { locale: pl });
     };
+
+    const viewModes: { mode: ViewMode; label: string; icon: string }[] = [
+        { mode: 'day', label: 'Dzień', icon: '📅' },
+        { mode: 'week', label: 'Tydzień', icon: '📋' },
+        { mode: 'month', label: 'Miesiąc', icon: '📆' },
+        { mode: 'timeline', label: 'Gantt', icon: '📊' },
+        { mode: 'map', label: 'Mapa', icon: '🗺️' },
+    ];
 
     return (
         <div className="bg-white border-b border-slate-200 px-6 py-4">
@@ -77,18 +71,12 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                         </button>
 
                         <div className="flex items-center border border-slate-300 rounded-lg">
-                            <button
-                                onClick={handlePrevious}
-                                className="p-1.5 hover:bg-slate-50 rounded-l-lg"
-                            >
+                            <button onClick={handlePrevious} className="p-1.5 hover:bg-slate-50 rounded-l-lg">
                                 <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                 </svg>
                             </button>
-                            <button
-                                onClick={handleNext}
-                                className="p-1.5 hover:bg-slate-50 rounded-r-lg border-l border-slate-300"
-                            >
+                            <button onClick={handleNext} className="p-1.5 hover:bg-slate-50 rounded-r-lg border-l border-slate-300">
                                 <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
@@ -105,41 +93,26 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                 <div className="flex items-center gap-3">
                     {/* View Mode Switcher */}
                     <div className="flex items-center bg-slate-100 rounded-lg p-1">
-                        <button
-                            onClick={() => onViewModeChange('day')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'day'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                        >
-                            Dzień
-                        </button>
-                        <button
-                            onClick={() => onViewModeChange('week')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'week'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                        >
-                            Tydzień
-                        </button>
-                        <button
-                            onClick={() => onViewModeChange('month')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'month'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                        >
-                            Miesiąc
-                        </button>
+                        {viewModes.map(({ mode, label, icon }) => (
+                            <button
+                                key={mode}
+                                onClick={() => onViewModeChange(mode)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === mode
+                                        ? 'bg-white text-slate-900 shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                            >
+                                {icon} {label}
+                            </button>
+                        ))}
                     </div>
 
                     {/* Sidebar Toggle */}
                     <button
                         onClick={onToggleSidebar}
                         className={`p-2 rounded-lg transition-colors ${sidebarOpen
-                                ? 'bg-accent text-white'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                         title="Pokaż/Ukryj Backlog"
                     >
@@ -152,8 +125,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                     <button
                         onClick={onToggleTeamPanel}
                         className={`p-2 rounded-lg transition-colors ${teamPanelOpen
-                                ? 'bg-accent text-white'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                         title="Pokaż/Ukryj Zespoły"
                     >

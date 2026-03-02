@@ -3,6 +3,7 @@ import type { Contract } from '../../types';
 
 interface ContractStatsProps {
     contracts: Contract[];
+    showCommission?: boolean;
 }
 
 interface RepStats {
@@ -14,7 +15,7 @@ interface RepStats {
     totalProfit: number;
 }
 
-export const ContractStats: React.FC<ContractStatsProps> = ({ contracts }) => {
+export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCommission = false }) => {
     const stats = useMemo(() => {
         const repMap = new Map<string, RepStats>();
 
@@ -58,7 +59,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts }) => {
     }, [stats]);
 
     const formatCurrency = (val: number) =>
-        new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', maximumFractionDigits: 0 }).format(val);
+        new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val);
 
     return (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -76,7 +77,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts }) => {
                             <th className="px-4 py-3 rounded-l-lg">Przedstawiciel</th>
                             <th className="px-4 py-3 text-right">Liczba Umów</th>
                             <th className="px-4 py-3 text-right">Wartość Netto</th>
-                            <th className="px-4 py-3 text-right">Prowizja</th>
+                            {showCommission && <th className="px-4 py-3 text-right">Prowizja</th>}
                             <th className="px-4 py-3 text-right rounded-r-lg">Zysk Potencjalny</th>
                         </tr>
                     </thead>
@@ -92,9 +93,11 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts }) => {
                                 <td className="px-4 py-3 text-right font-medium text-slate-700">
                                     {formatCurrency(stat.totalValueNet)}
                                 </td>
-                                <td className="px-4 py-3 text-right text-indigo-600 font-medium">
-                                    {formatCurrency(stat.totalCommission)}
-                                </td>
+                                {showCommission && (
+                                    <td className="px-4 py-3 text-right text-indigo-600 font-medium">
+                                        {formatCurrency(stat.totalCommission)}
+                                    </td>
+                                )}
                                 <td className="px-4 py-3 text-right text-green-600 font-bold">
                                     {formatCurrency(stat.totalProfit)}
                                 </td>
@@ -106,7 +109,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts }) => {
                             <td className="px-4 py-3 rounded-l-lg">RAZEM</td>
                             <td className="px-4 py-3 text-right">{totals.count}</td>
                             <td className="px-4 py-3 text-right">{formatCurrency(totals.totalValueNet)}</td>
-                            <td className="px-4 py-3 text-right">{formatCurrency(totals.totalCommission)}</td>
+                            {showCommission && <td className="px-4 py-3 text-right">{formatCurrency(totals.totalCommission)}</td>}
                             <td className="px-4 py-3 text-right rounded-r-lg">{formatCurrency(totals.totalProfit)}</td>
                         </tr>
                     </tfoot>

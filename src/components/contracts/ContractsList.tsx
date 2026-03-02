@@ -19,6 +19,13 @@ export const ContractsList: React.FC = () => {
 
     const [error, setError] = useState<string | null>(null);
 
+    // Role checks
+    const userRole = currentUser?.role;
+    const isSalesRep = userRole === 'sales_rep';
+    const isManagerRole = userRole === 'manager';
+    const canSeeCommission = isAdmin() || isSalesRep; // admin & sales_rep see commission
+    const canSeeStats = isAdmin() || isManagerRole; // admin & manager see stats
+
     const loadContracts = useCallback(async () => {
         try {
             setError(null);
@@ -67,7 +74,12 @@ export const ContractsList: React.FC = () => {
         }
     };
 
-    const filteredContracts = contracts.filter(c => {
+    // Sales rep only sees their own contracts
+    const visibleContracts = isSalesRep
+        ? contracts.filter(c => c.salesRepId === currentUser?.id)
+        : contracts;
+
+    const filteredContracts = visibleContracts.filter(c => {
         const term = searchTerm.toLowerCase();
         const contractNumber = c.contractNumber.toLowerCase();
         const lastName = (c.client.lastName || '').toString().toLowerCase();
@@ -98,7 +110,7 @@ export const ContractsList: React.FC = () => {
                         <h1 className="text-2xl font-bold text-slate-800">Lista Umów</h1>
                         <p className="text-slate-500">Zarządzaj umowami i dokumentacją</p>
                     </div>
-                    {isAdmin() && (
+                    {canSeeStats && (
                         <button
                             onClick={() => setShowStats(!showStats)}
                             className={`p-2 rounded-lg border transition-all flex items-center gap-2 ${showStats ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
@@ -142,7 +154,7 @@ export const ContractsList: React.FC = () => {
                 )}
 
 
-                {showStats && isAdmin() && <ContractStats contracts={filteredContracts} />}
+                {showStats && canSeeStats && <ContractStats contracts={filteredContracts} showCommission={isAdmin()} />}
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100 flex gap-4">
@@ -172,14 +184,14 @@ export const ContractsList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Podpisana</th>
                                     <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Montaż</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Wartość Netto</th>
-                                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Prowizja</th>
+                                    {canSeeCommission && <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Prowizja</th>}
                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Akcje</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {filteredContracts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={canSeeCommission ? 10 : 9} className="px-6 py-12 text-center text-slate-500">
                                             Brak umów spełniających kryteria wyszukiwania
                                         </td>
                                     </tr>
@@ -245,11 +257,13 @@ export const ContractsList: React.FC = () => {
                                                 })()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-900">
-                                                {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} EUR
+                                                {(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet).toFixed(2)} €
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">
-                                                {(contract.commission || 0).toFixed(2)} EUR
-                                            </td>
+                                            {canSeeCommission && (
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">
+                                                    {(contract.commission || 0).toFixed(2)} €
+                                                </td>
+                                            )}
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <button
                                                     onClick={() => navigate(`/contracts/${contract.id}`)}

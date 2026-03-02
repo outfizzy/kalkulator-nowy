@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
     type LedRoofType,
     type LedControlType,
@@ -6,11 +6,15 @@ import {
     type LedElementConfig,
     type LedResults,
     ROOF_TYPE_CONFIGS,
+    SUB_MODEL_OPTIONS,
     getRoofTypeOptions,
     getAvailableElements,
     createDefaultInputs,
     calculateLedConfig,
     formatPrice,
+    fetchFieldCountFromPricing,
+    getSpotRecommendations,
+    type SpotLevel,
 } from '../../services/led-calculator.service';
 import { LedPartsTable } from './LedPartsTable';
 import { LedDiagram } from './LedDiagram';
@@ -186,9 +190,51 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
     const [step, setStep] = useState(initialData ? 3 : 1);
     const [inputs, setInputs] = useState<LedInputs>(initialData?.inputs || createDefaultInputs());
     const [results, setResults] = useState<LedResults | null>(initialData?.results || null);
+    const [fieldCountSource, setFieldCountSource] = useState<'auto' | 'manual'>('manual');
+    const [fieldCountLoading, setFieldCountLoading] = useState(false);
+    const [spotLevel, setSpotLevel] = useState<SpotLevel>('standard');
+    const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const config = ROOF_TYPE_CONFIGS[inputs.roofType];
     const roofOptions = useMemo(() => getRoofTypeOptions(), []);
+
+    // Auto-fetch field count from pricing_base when roof type or width changes
+    useEffect(() => {
+        if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+
+        // Only auto-fetch if width is reasonable
+        if (inputs.width < 1000) return;
+
+        setFieldCountLoading(true);
+        fetchTimerRef.current = setTimeout(async () => {
+            try {
+                const result = await fetchFieldCountFromPricing(inputs.roofType, inputs.width, 'wall', inputs.subModel);
+                if (result) {
+                    const newConfig = ROOF_TYPE_CONFIGS[inputs.roofType];
+                    const fieldCount = Math.max(1, Math.min(12, result.fieldCount));
+                    const mittelsparrenCount = newConfig.hasMittelsparren ? Math.max(0, fieldCount - 1) : 0;
+
+                    setInputs(prev => ({
+                        ...prev,
+                        fieldCount,
+                        mittelsparren: Array.from({ length: mittelsparrenCount }, (_, i) =>
+                            prev.mittelsparren[i] || { stripes: 0, spots: 0 }
+                        ),
+                    }));
+                    setFieldCountSource('auto');
+                    console.log(`[LED] Auto field count: ${fieldCount} (from pricing_base for ${inputs.roofType} @ ${inputs.width}mm)`);
+                }
+            } catch (e) {
+                console.warn('[LED] Auto-fetch field count failed:', e);
+            } finally {
+                setFieldCountLoading(false);
+            }
+        }, 400);
+
+        return () => {
+            if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+        };
+    }, [inputs.roofType, inputs.width, inputs.subModel]);
 
     // Update mittelsparren array when field count changes
     const updateFieldCount = useCallback((count: number) => {
@@ -199,15 +245,18 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
             currentMs[i] || { stripes: 0, spots: 0 }
         );
         setInputs(prev => ({ ...prev, fieldCount: clamped, mittelsparren: newMs }));
+        setFieldCountSource('manual');
     }, [config.hasMittelsparren, inputs.mittelsparren]);
 
     const handleRoofTypeChange = useCallback((roofType: LedRoofType) => {
         const newConfig = ROOF_TYPE_CONFIGS[roofType];
+        const subModelOptions = SUB_MODEL_OPTIONS[roofType];
         setInputs(prev => {
             const mittelsparrenCount = newConfig.hasMittelsparren ? Math.max(0, prev.fieldCount - 1) : 0;
             return {
                 ...prev,
                 roofType,
+                subModel: subModelOptions ? subModelOptions[0].id : undefined,
                 wandanschluss: newConfig.hasWandanschluss ? prev.wandanschluss : { stripes: 0, spots: 0 },
                 mittelsparren: Array.from({ length: mittelsparrenCount }, (_, i) =>
                     prev.mittelsparren[i] || { stripes: 0, spots: 0 }
@@ -217,9 +266,16 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
     }, []);
 
     const handleCalculate = useCallback(() => {
-        const calculatedResults = calculateLedConfig(inputs);
-        setResults(calculatedResults);
-        setStep(3);
+        try {
+            console.log('[LED] handleCalculate called with inputs:', JSON.stringify(inputs, null, 2));
+            const calculatedResults = calculateLedConfig(inputs);
+            console.log('[LED] Calculation results:', calculatedResults);
+            setResults(calculatedResults);
+            setStep(3);
+        } catch (e) {
+            console.error('[LED] calculateLedConfig error:', e);
+            alert('Fehler bei der Berechnung: ' + (e instanceof Error ? e.message : String(e)));
+        }
     }, [inputs]);
 
     const handleSave = useCallback(() => {
@@ -248,6 +304,31 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
                     ))}
                 </div>
             </div>
+
+            {/* Sub-model selector for grouped types (O / TR / TL) */}
+            {SUB_MODEL_OPTIONS[inputs.roofType] && (
+                <div>
+                    <h2 className="text-lg font-bold text-slate-800 mb-1">Modell wählen</h2>
+                    <p className="text-sm text-slate-500 mb-3">
+                        Verschiedene Modelle haben unterschiedliche Krokwi-Anzahlen je nach Breite
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {SUB_MODEL_OPTIONS[inputs.roofType].map(opt => (
+                            <button
+                                key={opt.id}
+                                onClick={() => setInputs(prev => ({ ...prev, subModel: opt.id }))}
+                                className={`p-3 rounded-xl border-2 transition-all text-left
+                                    ${inputs.subModel === opt.id
+                                        ? 'border-amber-400 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md'
+                                        : 'border-slate-200 bg-white hover:border-amber-200'
+                                    }`}
+                            >
+                                <div className="text-sm font-semibold text-slate-700">{opt.label}</div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Control Type */}
             <div>
@@ -303,14 +384,23 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
             {/* Dimensions */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Feldzahl (1-12)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                        Feldzahl (1-12)
+                        {fieldCountLoading && <span className="ml-1 text-amber-500 animate-pulse">⏳</span>}
+                        {fieldCountSource === 'auto' && !fieldCountLoading && (
+                            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 font-medium">
+                                auto
+                            </span>
+                        )}
+                    </label>
                     <input
                         type="number"
                         min={1}
                         max={12}
                         value={inputs.fieldCount}
                         onChange={e => updateFieldCount(parseInt(e.target.value) || 1)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none"
+                        className={`w-full px-3 py-2.5 rounded-xl border text-sm font-semibold focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none ${fieldCountSource === 'auto' ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'
+                            }`}
                     />
                 </div>
                 <div>
@@ -358,6 +448,95 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
                 <LedDiagram inputs={inputs} />
             </div>
 
+            {/* Smart Spot Recommendations */}
+            <div className="bg-gradient-to-r from-sky-50 to-indigo-50 rounded-2xl border border-sky-200 p-4">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 className="text-sm font-bold text-sky-800">💡 Spot-Empfehlung</h3>
+                        <p className="text-[10px] text-sky-600 mt-0.5">
+                            LED Spot Altea · 3W · ~120lm · 38° Abstrahlwinkel
+                        </p>
+                    </div>
+                    <div className="flex gap-1">
+                        {(['ambient', 'standard', 'bright'] as SpotLevel[]).map(lvl => (
+                            <button
+                                key={lvl}
+                                onClick={() => setSpotLevel(lvl)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${spotLevel === lvl
+                                    ? 'bg-sky-500 text-white shadow-md'
+                                    : 'bg-white text-sky-600 hover:bg-sky-100 border border-sky-200'
+                                    }`}
+                            >
+                                {lvl === 'ambient' ? '🌙 Ambient' : lvl === 'standard' ? '☀️ Standard' : '💡 Hell'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {(() => {
+                    try {
+                        const recs = getSpotRecommendations(inputs, spotLevel);
+                        return (
+                            <>
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                    <div className="bg-white rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-sky-700">{recs.totalSpots}</div>
+                                        <div className="text-[10px] text-slate-500">Spots gesamt</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-sky-700">{recs.totalArea.toFixed(1)} m²</div>
+                                        <div className="text-[10px] text-slate-500">Dachfläche</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-sky-700">{recs.luxEstimate.split(' ')[0]}</div>
+                                        <div className="text-[10px] text-slate-500">{recs.luxEstimate.split(' ').slice(1).join(' ')}</div>
+                                    </div>
+                                </div>
+
+                                {/* Per-element breakdown */}
+                                <div className="space-y-1 mb-3">
+                                    {recs.elements.map((el, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-xs">
+                                            <span className="font-semibold text-sky-800 w-32 truncate">{el.elementLabel}</span>
+                                            <span className="text-sky-600">{el.min}–{el.max} Spots</span>
+                                            <span className="text-sky-400 flex-1 truncate">{el.description}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        // Apply recommended spots to all elements
+                                        const rinneRec = recs.elements.find(e => e.element === 'rinne');
+                                        const waRec = recs.elements.find(e => e.element === 'wandanschluss');
+                                        const asRec = recs.elements.find(e => e.element === 'aussensparren');
+                                        const msRecs = recs.elements.filter(e => e.element === 'mittelsparren');
+
+                                        setInputs(prev => ({
+                                            ...prev,
+                                            rinne: { ...prev.rinne, spots: rinneRec?.recommended || prev.rinne.spots },
+                                            wandanschluss: { ...prev.wandanschluss, spots: waRec?.recommended || prev.wandanschluss.spots },
+                                            aussensparrenLinks: { ...prev.aussensparrenLinks, spots: asRec?.recommended || prev.aussensparrenLinks.spots },
+                                            aussensparrenRechts: { ...prev.aussensparrenRechts, spots: asRec?.recommended || prev.aussensparrenRechts.spots },
+                                            mittelsparren: prev.mittelsparren.map((ms, i) => ({
+                                                ...ms,
+                                                spots: msRecs[i]?.recommended || ms.spots,
+                                            })),
+                                        }));
+                                    }}
+                                    className="w-full py-2 px-4 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-all shadow-md"
+                                >
+                                    ✨ Empfehlung übernehmen ({recs.totalSpots} Spots)
+                                </button>
+                            </>
+                        );
+                    } catch (e) {
+                        console.warn('[LED] Spot recommendation error:', e);
+                        return <div className="text-xs text-slate-400 italic">Spot-Empfehlung nicht verfügbar</div>;
+                    }
+                })()}
+            </div>
+
             {/* LED Configuration per Element */}
             <div>
                 <h2 className="text-lg font-bold text-slate-800 mb-1">LED-Auswahl pro Element</h2>
@@ -385,20 +564,62 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
                     />
 
                     {/* Mittelsparren */}
-                    {config.hasMittelsparren && inputs.mittelsparren.map((ms, i) => (
-                        <ElementConfigRow
-                            key={`ms-${i}`}
-                            label={`🔸 Mittelsparren ${i + 1}`}
-                            config={ms}
-                            maxStripes={config.maxStripes.mittelsparren}
-                            maxSpots={config.maxSpots.mittelsparren}
-                            onChange={c => {
-                                const newMs = [...inputs.mittelsparren];
-                                newMs[i] = c;
-                                setInputs(prev => ({ ...prev, mittelsparren: newMs }));
-                            }}
-                        />
-                    ))}
+                    {config.hasMittelsparren && (
+                        <>
+                            {/* Bulk-set for all Mittelsparren */}
+                            <div className="flex items-center gap-2 py-2 px-4 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200">
+                                <span className="text-xs font-semibold text-orange-700 flex-1">
+                                    🔸 Alle Mittelsparren ({inputs.mittelsparren.length}) — Spots schnell setzen:
+                                </span>
+                                <div className="flex gap-0.5">
+                                    {Array.from({ length: Math.min(config.maxSpots.mittelsparren + 1, 7) }, (_, spotCount) => (
+                                        <button
+                                            key={spotCount}
+                                            onClick={() => {
+                                                const newMs = inputs.mittelsparren.map(ms => ({
+                                                    ...ms,
+                                                    spots: spotCount,
+                                                }));
+                                                setInputs(prev => ({ ...prev, mittelsparren: newMs }));
+                                            }}
+                                            className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${inputs.mittelsparren.length > 0 && inputs.mittelsparren.every(ms => ms.spots === spotCount)
+                                                ? 'bg-sky-400 text-white shadow-md'
+                                                : 'bg-white text-slate-500 hover:bg-sky-50 border border-slate-200'
+                                                }`}
+                                        >
+                                            {spotCount}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Hint about recommended spots */}
+                            <div className="px-4 -mt-1">
+                                <span className="text-[10px] text-slate-400 italic">
+                                    💡 Empfohlen: {
+                                        inputs.roofType.includes('Skyline') ? '3–6 Spots pro Krokwi' :
+                                            inputs.roofType.includes('O_Oplus') ? '2–4 Spots pro Krokwi (TR/TL)' :
+                                                '2–4 Spots pro Krokwi'
+                                    }
+                                </span>
+                            </div>
+
+                            {inputs.mittelsparren.map((ms, i) => (
+                                <ElementConfigRow
+                                    key={`ms-${i}`}
+                                    label={`🔸 Mittelsparren ${i + 1}`}
+                                    config={ms}
+                                    maxStripes={config.maxStripes.mittelsparren}
+                                    maxSpots={config.maxSpots.mittelsparren}
+                                    onChange={c => {
+                                        const newMs = [...inputs.mittelsparren];
+                                        newMs[i] = c;
+                                        setInputs(prev => ({ ...prev, mittelsparren: newMs }));
+                                    }}
+                                />
+                            ))}
+                        </>
+                    )}
 
                     {!config.hasMittelsparren && (
                         <div className="py-2 px-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
@@ -431,14 +652,16 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
             </div>
 
             {/* Action buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 relative z-10">
                 <button
+                    type="button"
                     onClick={() => setStep(1)}
                     className="px-6 py-3.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-all"
                 >
                     ← Zurück
                 </button>
                 <button
+                    type="button"
                     onClick={handleCalculate}
                     className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold text-sm shadow-lg shadow-amber-200/50 hover:shadow-xl hover:scale-[1.01] transition-all"
                 >

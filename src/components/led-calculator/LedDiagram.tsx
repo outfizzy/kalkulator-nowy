@@ -20,8 +20,9 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
     const roofX = padding;
     const roofY = padding + 20;
 
-    // Field width in SVG space
-    const fieldSvgH = roofH / fieldCount;
+    // Field width in SVG space — fields divide the WIDTH (horizontal axis)
+    // Rafters run vertically (along depth), so field divisions are along the width
+    const fieldSvgW = roofW / fieldCount;
 
     // Check if element has LED
     const hasLed = (el: { stripes: number; spots: number } | undefined) =>
@@ -72,7 +73,7 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
                     rx={4}
                 />
 
-                {/* Wall connection (top side) */}
+                {/* Wall connection (top side) - horizontal along width */}
                 {config.hasWandanschluss && (
                     <g>
                         <rect
@@ -126,7 +127,7 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
                     </g>
                 )}
 
-                {/* Rinne (bottom gutter) */}
+                {/* Rinne (bottom gutter) - horizontal along width */}
                 <rect
                     x={roofX}
                     y={roofY + roofH}
@@ -177,7 +178,7 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
                     </>
                 )}
 
-                {/* Outer rafter left */}
+                {/* Outer rafter left - VERTICAL (runs along depth) */}
                 <rect
                     x={roofX - 4}
                     y={roofY}
@@ -216,7 +217,7 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
                     </>
                 )}
 
-                {/* Outer rafter right */}
+                {/* Outer rafter right - VERTICAL (runs along depth) */}
                 <rect
                     x={roofX + roofW - 4}
                     y={roofY}
@@ -255,42 +256,45 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
                     </>
                 )}
 
-                {/* Mittelsparren (center rafters) */}
+                {/* Mittelsparren (center rafters) - VERTICAL lines dividing width into fields */}
                 {config.hasMittelsparren && inputs.mittelsparren.map((ms, idx) => {
-                    const yPos = roofY + fieldSvgH * (idx + 1);
+                    const xPos = roofX + fieldSvgW * (idx + 1);
                     const hasMs = hasLed(ms);
 
                     return (
                         <g key={`ms-${idx}`}>
+                            {/* Rafter line - vertical */}
                             <line
-                                x1={roofX + 8}
-                                y1={yPos}
-                                x2={roofX + roofW - 8}
-                                y2={yPos}
+                                x1={xPos}
+                                y1={roofY + 8}
+                                x2={xPos}
+                                y2={roofY + roofH - 8}
                                 stroke={hasMs ? activeElement : '#cbd5e1'}
                                 strokeWidth={hasMs ? 3 : 1.5}
                                 strokeDasharray={hasMs ? undefined : '6 4'}
                             />
                             {hasMs && (
                                 <>
+                                    {/* LED stripes - parallel vertical lines next to rafter */}
                                     {Array.from({ length: ms.stripes }, (_, i) => (
                                         <line
                                             key={`ms${idx}-stripe-${i}`}
-                                            x1={roofX + 20}
-                                            y1={yPos + 3 + i * 2.5}
-                                            x2={roofX + roofW - 20}
-                                            y2={yPos + 3 + i * 2.5}
+                                            x1={xPos + 3 + i * 2.5}
+                                            y1={roofY + 15}
+                                            x2={xPos + 3 + i * 2.5}
+                                            y2={roofY + roofH - 15}
                                             stroke={stripeColor}
                                             strokeWidth={2.5}
                                             strokeLinecap="round"
                                             opacity={0.9}
                                         />
                                     ))}
+                                    {/* LED spots - along the rafter */}
                                     {Array.from({ length: ms.spots }, (_, i) => (
                                         <circle
                                             key={`ms${idx}-spot-${i}`}
-                                            cx={roofX + roofW * (i + 1) / (ms.spots + 1)}
-                                            cy={yPos}
+                                            cx={xPos}
+                                            cy={roofY + roofH * (i + 1) / (ms.spots + 1)}
                                             r={3}
                                             fill={spotColor}
                                             opacity={0.9}
@@ -343,12 +347,13 @@ export const LedDiagram: React.FC<LedDiagramProps> = ({ inputs }) => {
                     {config.labelDE}
                 </text>
 
-                {/* Field count labels */}
+                {/* Field count labels - centered in each field along the width */}
                 {Array.from({ length: fieldCount }, (_, i) => (
                     <text
                         key={`field-label-${i}`}
-                        x={roofX + 16}
-                        y={roofY + fieldSvgH * i + fieldSvgH / 2 + 4}
+                        x={roofX + fieldSvgW * i + fieldSvgW / 2}
+                        y={roofY + roofH - 8}
+                        textAnchor="middle"
                         fontSize={9}
                         fill="#94a3b8"
                         fontWeight={500}

@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LeadsKanban } from './LeadsKanban';
 import { LeadsFunnelChart } from './LeadsFunnelChart';
 import { LeadsStats } from './LeadsStats';
+import { LeadsMap } from './LeadsMap';
 
 export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -20,7 +21,7 @@ export const LeadsList: React.FC = () => {
     const { isAdmin } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+    const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'map'>('kanban');
     const [showStats, setShowStats] = useState(false);
     const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all');
     const [filterFair, setFilterFair] = useState<string>('all'); // 'all' | 'website' | 'fair_all' | specific_fair_id
@@ -339,6 +340,9 @@ export const LeadsList: React.FC = () => {
                         <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-md ${viewMode === 'kanban' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}>
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" /></svg>
                         </button>
+                        <button onClick={() => setViewMode('map')} className={`p-2 rounded-md ${viewMode === 'map' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`} title="Mapa">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        </button>
                     </div>
 
                     <Link to="/leads/new" className="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
@@ -436,7 +440,9 @@ export const LeadsList: React.FC = () => {
                 </button>
             </div>
 
-            {viewMode === 'kanban' ? (
+            {viewMode === 'map' ? (
+                <LeadsMap leads={filteredLeads} />
+            ) : viewMode === 'kanban' ? (
                 <LeadsKanban leads={filteredLeads} onLeadUpdate={handleLeadUpdate} />
             ) : (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

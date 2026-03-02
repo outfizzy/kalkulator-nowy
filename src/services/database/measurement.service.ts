@@ -45,22 +45,22 @@ export const MeasurementService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        const insertData: Record<string, unknown> = {
+            user_id: user.id,
+            date: report.date,
+            car_plate: report.carPlate || '',
+            total_km: report.totalKm,
+            with_driver: report.withDriver || false,
+            car_issues: report.carIssues || null,
+            report_description: report.reportDescription || null,
+            trip_cost: report.tripCost || null,
+            cost_per_km: report.costPerKm || null,
+            measurements_snapshot: report.visits // JSONB
+        };
+
         const { data, error } = await supabase
             .from('measurement_reports')
-            .insert({
-                user_id: user.id,
-                date: report.date,
-                car_plate: report.carPlate,
-                odometer_start: report.odometerStart,
-                odometer_end: report.odometerEnd,
-                total_km: report.totalKm,
-                with_driver: report.withDriver,
-                car_issues: report.carIssues,
-                report_description: report.reportDescription,
-                trip_cost: report.tripCost || null,
-                cost_per_km: report.costPerKm || null,
-                measurements_snapshot: report.visits // JSONB
-            })
+            .insert(insertData)
             .select()
             .single();
 
@@ -71,17 +71,17 @@ export const MeasurementService = {
             date: data.date,
             salesRepId: data.user_id,
             carPlate: data.car_plate,
-            odometerStart: data.odometer_start,
-            odometerEnd: data.odometer_end,
             totalKm: data.total_km,
             withDriver: data.with_driver,
             carIssues: data.car_issues,
             reportDescription: data.report_description,
-            visits: data.measurements_snapshot,
-            signedContractsCount: 0,
+            visits: data.measurements_snapshot || [],
+            signedContractsCount: (data.measurements_snapshot || []).filter((v: { outcome: string }) => v.outcome === 'signed').length,
             offerIds: [],
             is_active: true,
             currency: 'PLN',
+            tripCost: data.trip_cost ? parseFloat(data.trip_cost) : undefined,
+            costPerKm: data.cost_per_km ? parseFloat(data.cost_per_km) : undefined,
             createdAt: new Date(data.created_at)
         };
     },
@@ -102,6 +102,15 @@ export const MeasurementService = {
         const { error } = await supabase
             .from('measurement_reports')
             .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async deleteMeasurementReport(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('measurement_reports')
+            .delete()
             .eq('id', id);
 
         if (error) throw error;
@@ -174,7 +183,7 @@ export const MeasurementService = {
             signedContractsCount: (row.measurements_snapshot || []).filter((v: { outcome: string }) => v.outcome === 'signed').length,
             offerIds: [],
             is_active: true,
-            currency: 'EUR',
+            currency: 'PLN',
             createdAt: new Date(row.created_at),
             tripCost: row.trip_cost ? parseFloat(row.trip_cost) : undefined,
             costPerKm: row.cost_per_km ? parseFloat(row.cost_per_km) : undefined,

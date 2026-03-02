@@ -138,6 +138,12 @@ export const Visualizer3D = ({ config, transparent, sunPosition = 0.5, structure
                     color={config.contextConfig?.wallColor || '#ffffff'}
                     doorPosition={config.contextConfig?.doorPosition || 0}
                     hasWall={!!config.contextConfig?.hasWall}
+                    cornerSide={
+                        config.installationType === 'corner-left' ? 'left'
+                            : config.installationType === 'corner-right' ? 'right'
+                                : undefined
+                    }
+                    secondaryDepth={config.cornerConfig?.secondaryProjection}
                 />
 
                 {/* Decor Set */}

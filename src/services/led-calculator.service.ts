@@ -9,6 +9,105 @@
  * cables, controllers).
  */
 
+import { supabase } from '../lib/supabase';
+
+// ==================== MODEL FAMILY MAPPING ====================
+// Maps LED roof types to the model_family keys used in pricing_base table
+// These keys determine field count (krokwie) based on width from price lists
+
+const LED_ROOF_TO_MODEL_FAMILY: Record<string, string> = {
+    'Skyline': 'skystyle',
+    'Skyline_Freistand': 'skystyle',
+    'Carport': 'carport',
+    'Carport_Freistand': 'carport',
+    'O_Oplus_TR_TRplus_TL_TLXL': 'orangestyle', // fallback, overridden by subModel
+    'Ultraline_compact_style': 'ultrastyle',
+    'Ultraline_compact_style_Freistand': 'ultrastyle',
+    'Ultraline_classic': 'ultrastyle',
+    'Ultraline_classic_Freistand': 'ultrastyle',
+};
+
+// Sub-model options for roof types that group multiple model families
+// Each sub-model maps to its own model_family in pricing_base with different field counts
+export const SUB_MODEL_OPTIONS: Record<string, { id: string; label: string; modelFamily: string }[]> = {
+    'O_Oplus_TR_TRplus_TL_TLXL': [
+        { id: 'orangestyle', label: 'Orangestyle (O / O+)', modelFamily: 'orangestyle' },
+        { id: 'trendstyle', label: 'Trendstyle (TR)', modelFamily: 'trendstyle' },
+        { id: 'trendstyle_plus', label: 'Trendstyle+ (TR+)', modelFamily: 'trendstyle' },
+        { id: 'topstyle', label: 'Topstyle (TL)', modelFamily: 'topstyle' },
+        { id: 'topstyle_xl', label: 'Topstyle XL (TL XL)', modelFamily: 'topstyle' },
+    ],
+};
+
+/**
+ * Fetch the field count (Feldzahl / Krokwie) from pricing_base for a given
+ * roof type and width. The pricing data stores the exact number of fields
+ * for each width bracket.
+ * 
+ * Returns null if no data found (caller should fall back to manual input).
+ */
+export async function fetchFieldCountFromPricing(
+    roofType: string,
+    widthMm: number,
+    constructionType: 'wall' | 'free' = 'wall',
+    subModel?: string
+): Promise<{ fieldCount: number; postsCount: number } | null> {
+    // Use sub-model's modelFamily if available, otherwise fall back to roof type mapping
+    let modelFamily = LED_ROOF_TO_MODEL_FAMILY[roofType];
+    if (subModel && SUB_MODEL_OPTIONS[roofType]) {
+        const subOpt = SUB_MODEL_OPTIONS[roofType].find(s => s.id === subModel);
+        if (subOpt) modelFamily = subOpt.modelFamily;
+    }
+    if (!modelFamily) return null;
+
+    // Determine construction type from roof type
+    const isFreestanding = roofType.includes('Freistand');
+    const dbConstructionType = isFreestanding ? 'free' : constructionType;
+
+    try {
+        // Query the next-larger-or-equal width entry that has fields_count
+        const { data } = await supabase
+            .from('pricing_base')
+            .select('fields_count, posts_count, width_mm')
+            .ilike('model_family', modelFamily)
+            .eq('construction_type', dbConstructionType)
+            .gte('width_mm', widthMm)
+            .not('fields_count', 'is', null)
+            .order('width_mm', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if (data?.fields_count) {
+            return {
+                fieldCount: data.fields_count,
+                postsCount: data.posts_count || 2,
+            };
+        }
+
+        // Fallback: try the largest available width if our width is bigger than all entries
+        const { data: maxData } = await supabase
+            .from('pricing_base')
+            .select('fields_count, posts_count, width_mm')
+            .ilike('model_family', modelFamily)
+            .eq('construction_type', dbConstructionType)
+            .not('fields_count', 'is', null)
+            .order('width_mm', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (maxData?.fields_count) {
+            return {
+                fieldCount: maxData.fields_count,
+                postsCount: maxData.posts_count || 2,
+            };
+        }
+    } catch (e) {
+        console.warn('[LED] Failed to fetch field count from pricing_base:', e);
+    }
+
+    return null;
+}
+
 // ==================== TYPES ====================
 
 export type LedRoofType =
@@ -31,6 +130,7 @@ export interface LedElementConfig {
 
 export interface LedInputs {
     roofType: LedRoofType;
+    subModel?: string;         // e.g., 'orangestyle', 'trendstyle', 'topstyle' — for grouped types
     controlType: LedControlType;
     fieldCount: number;        // 1-12
     width: number;             // mm (Breite)
@@ -126,6 +226,23 @@ const BREAKPOINT_2M = 2000;
 const BREAKPOINT_3M = 3000;
 
 // ==================== ROOF TYPE CONFIGURATION ====================
+// Based on Excel analysis of Eingabe+Endkundenpreis sheet:
+// N1=Skyline, N2=Skyline_Freistand, N3=Carport, N4=Carport_Freistand,
+// N5=O_Oplus_TR_TRplus_TL_TLXL, N6=Ultraline_compact_style,
+// N7=Ultraline_compact_style_Freistand, N8=Ultraline_classic,
+// N9=Ultraline_classic_Freistand
+//
+// Mittelsparren: NOT for N3,N4 (Carport types) — Excel: IF(OR($B$9=N3,$B$9=N4),"",...)
+// Also NOT for N5 (O_Oplus) — Excel: A24 = IF(B9=N5,1,...) but uses Wandanschluss instead
+//
+// Wandanschluss: Only for N3 (A36=3→Wandanschluss), N5 (single WA),
+// N6,N7 (UL compact/style), N8,N9 (UL classic)
+// Per Excel A36: IF(B9=N1,4,...) => N1=Skyline gets Pfosten, not WA
+// Simplified: WA for O_Oplus, UL_compact_style, UL_compact_style_Frei,
+// UL_classic, UL_classic_Frei, Carport (non-frei)
+//
+// Pfosten: Only for truly freestanding types (N2,N4,N6→N9 selectively)
+// Excel rows 36-40: Pfosten-related elements based on roof type
 
 export interface RoofTypeConfig {
     id: LedRoofType;
@@ -135,21 +252,26 @@ export interface RoofTypeConfig {
     hasWandanschluss: boolean;
     hasMittelsparren: boolean;
     hasOverstand: boolean;
+    hasPfosten: boolean;
     maxStripes: {
         rinne: number;
         aussensparren: number;
         mittelsparren: number;
         wandanschluss: number;
+        pfosten: number;
     };
     maxSpots: {
         rinne: number;
         aussensparren: number;
         mittelsparren: number;
         wandanschluss: number;
+        pfosten: number;
     };
 }
 
 export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
+    // N1: Skyline — wall-mounted, Mittelsparren YES, NO Wandanschluss
+    // Excel D22=3 (rinne max 3), D23=3 (aussen max 3)
     'Skyline': {
         id: 'Skyline',
         label: 'Skyline',
@@ -158,9 +280,11 @@ export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
         hasWandanschluss: false,
         hasMittelsparren: true,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
-        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
+        hasPfosten: false,
+        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0, pfosten: 0 },
+        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 6, wandanschluss: 0, pfosten: 0 },
     },
+    // N2: Skyline_Freistand — freestanding, Mittelsparren YES
     'Skyline_Freistand': {
         id: 'Skyline_Freistand',
         label: 'Skyline Freestanding',
@@ -169,42 +293,57 @@ export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
         hasWandanschluss: false,
         hasMittelsparren: true,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
-        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
+        hasPfosten: true,
+        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0, pfosten: 2 },
+        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 6, wandanschluss: 0, pfosten: 2 },
     },
+    // N3: Carport — wall-mounted, NO Mittelsparren!, Wandanschluss YES
+    // Excel: IF(OR($B$9=N3,$B$9=N4),"",...) => no Mittelsparren
+    // A36 for Carport: IF(B9=N3,3,...) => A36=3 => B36=Wandanschluss
     'Carport': {
         id: 'Carport',
         label: 'Carport',
         labelDE: 'Carport',
         isFreestanding: false,
-        hasWandanschluss: false,
-        hasMittelsparren: true,
+        hasWandanschluss: true,
+        hasMittelsparren: false,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
-        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
+        hasPfosten: false,
+        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 0, wandanschluss: 2, pfosten: 0 },
+        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 0, wandanschluss: 2, pfosten: 0 },
     },
+    // N4: Carport_Freistand — freestanding, NO Mittelsparren!
+    // Excel: IF(OR($B$9=N3,$B$9=N4),"",...) => no Mittelsparren
     'Carport_Freistand': {
         id: 'Carport_Freistand',
         label: 'Carport Freestanding',
         labelDE: 'Carport Freistand',
         isFreestanding: true,
         hasWandanschluss: false,
-        hasMittelsparren: true,
+        hasMittelsparren: false,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
-        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 3, wandanschluss: 0 },
+        hasPfosten: true,
+        maxStripes: { rinne: 3, aussensparren: 3, mittelsparren: 0, wandanschluss: 0, pfosten: 2 },
+        maxSpots: { rinne: 3, aussensparren: 3, mittelsparren: 0, wandanschluss: 0, pfosten: 2 },
     },
+    // N5: O_Oplus_TR_TRplus_TL_TLXL — wall-mounted, Mittelsparren YES (has spots between rafters)
+    // Trendline/Topline have LED spots between their krokwie
+    // Excel D23 for N5: IF(AND(B23=M23,OR(B9=N5,...)),1,...) => aussensparren max 1
+    // Wandanschluss: YES (A36 gives WA for O type)
     'O_Oplus_TR_TRplus_TL_TLXL': {
         id: 'O_Oplus_TR_TRplus_TL_TLXL',
         label: 'O / O+ / TR / TR+ / TL / TL XL',
         labelDE: 'O / O+ / TR / TR+ / TL / TL XL',
         isFreestanding: false,
         hasWandanschluss: true,
-        hasMittelsparren: false,
+        hasMittelsparren: true,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 1, mittelsparren: 0, wandanschluss: 2 },
-        maxSpots: { rinne: 3, aussensparren: 1, mittelsparren: 0, wandanschluss: 2 },
+        hasPfosten: false,
+        maxStripes: { rinne: 2, aussensparren: 1, mittelsparren: 2, wandanschluss: 2, pfosten: 0 },
+        maxSpots: { rinne: 2, aussensparren: 1, mittelsparren: 4, wandanschluss: 2, pfosten: 0 },
     },
+    // N6: Ultraline_compact_style — wall-mounted, Mittelsparren YES
+    // Excel D23 for N6: max 1 stripe on Außensparren
     'Ultraline_compact_style': {
         id: 'Ultraline_compact_style',
         label: 'Ultraline Compact / Style',
@@ -213,9 +352,11 @@ export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
         hasWandanschluss: true,
         hasMittelsparren: true,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 2 },
-        maxSpots: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 2 },
+        hasPfosten: false,
+        maxStripes: { rinne: 2, aussensparren: 1, mittelsparren: 3, wandanschluss: 2, pfosten: 0 },
+        maxSpots: { rinne: 2, aussensparren: 1, mittelsparren: 6, wandanschluss: 2, pfosten: 0 },
     },
+    // N7: Ultraline_compact_style_Freistand — freestanding, Mittelsparren YES
     'Ultraline_compact_style_Freistand': {
         id: 'Ultraline_compact_style_Freistand',
         label: 'Ultraline Compact / Style Freestanding',
@@ -224,9 +365,11 @@ export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
         hasWandanschluss: false,
         hasMittelsparren: true,
         hasOverstand: false,
-        maxStripes: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 0 },
-        maxSpots: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 0 },
+        hasPfosten: true,
+        maxStripes: { rinne: 2, aussensparren: 1, mittelsparren: 3, wandanschluss: 0, pfosten: 2 },
+        maxSpots: { rinne: 2, aussensparren: 1, mittelsparren: 6, wandanschluss: 0, pfosten: 2 },
     },
+    // N8: Ultraline_classic — wall-mounted, Mittelsparren YES, Überstand YES
     'Ultraline_classic': {
         id: 'Ultraline_classic',
         label: 'Ultraline Classic',
@@ -235,9 +378,11 @@ export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
         hasWandanschluss: true,
         hasMittelsparren: true,
         hasOverstand: true,
-        maxStripes: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 2 },
-        maxSpots: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 2 },
+        hasPfosten: false,
+        maxStripes: { rinne: 2, aussensparren: 1, mittelsparren: 3, wandanschluss: 2, pfosten: 0 },
+        maxSpots: { rinne: 2, aussensparren: 1, mittelsparren: 6, wandanschluss: 2, pfosten: 0 },
     },
+    // N9: Ultraline_classic_Freistand — freestanding, Mittelsparren YES, Überstand YES
     'Ultraline_classic_Freistand': {
         id: 'Ultraline_classic_Freistand',
         label: 'Ultraline Classic Freestanding',
@@ -246,10 +391,169 @@ export const ROOF_TYPE_CONFIGS: Record<LedRoofType, RoofTypeConfig> = {
         hasWandanschluss: false,
         hasMittelsparren: true,
         hasOverstand: true,
-        maxStripes: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 0 },
-        maxSpots: { rinne: 3, aussensparren: 1, mittelsparren: 3, wandanschluss: 0 },
+        hasPfosten: true,
+        maxStripes: { rinne: 2, aussensparren: 1, mittelsparren: 3, wandanschluss: 0, pfosten: 2 },
+        maxSpots: { rinne: 2, aussensparren: 1, mittelsparren: 6, wandanschluss: 0, pfosten: 2 },
     },
 };
+
+// ==================== SPOT RECOMMENDATIONS ENGINE ====================
+// LED Spot Altea: 3W, 12V, ~120 lumens, IP65, 38° beam angle
+// From 2.5m height → ~1.7m diameter ground circle
+// Standard spacing between spots: 600–1000mm depending on brightness level
+
+export type SpotLevel = 'ambient' | 'standard' | 'bright';
+
+export interface SpotRecommendation {
+    element: string;               // e.g. 'rinne', 'mittelsparren', 'aussensparren'
+    elementLabel: string;          // e.g. 'Rinne', 'Mittelsparren 1'
+    runLengthMm: number;           // length of the element where spots go
+    recommended: number;           // recommended count (standard brightness)
+    min: number;                   // minimum for ambient
+    max: number;                   // maximum for bright
+    description: string;           // user-facing explanation
+}
+
+export interface SpotRecommendations {
+    level: SpotLevel;
+    totalSpots: number;
+    totalArea: number;              // m² of roof
+    luxEstimate: string;           // estimated lux range
+    elements: SpotRecommendation[];
+}
+
+// Spot spacing by brightness level (mm between spots)
+const SPOT_SPACING: Record<SpotLevel, number> = {
+    ambient: 1000,    // 1 spot per meter — mood/accent lighting (~50 lux)
+    standard: 750,    // ~1.3 spots per meter — comfortable evening (~80 lux)
+    bright: 550,      // ~1.8 spots per meter — work/dining light (~120 lux)
+};
+
+/**
+ * Calculate recommended spot counts for each LED element based on roof dimensions.
+ *
+ * Logic:
+ * - Rinne & Wandanschluss run along WIDTH → width determines spot count
+ * - Außensparren & Mittelsparren run along DEPTH → depth determines spot count
+ * - Pfosten: 1 spot per post face (constant, not length-dependent)
+ */
+export function getSpotRecommendations(
+    inputs: LedInputs,
+    level: SpotLevel = 'standard'
+): SpotRecommendations {
+    const config = ROOF_TYPE_CONFIGS[inputs.roofType];
+    const spacing = SPOT_SPACING[level];
+    const elements: SpotRecommendation[] = [];
+
+    const widthM = inputs.width / 1000;
+    const depthM = inputs.depth / 1000;
+    const areaSqm = widthM * depthM;
+
+    // Helper: calculate spots for a given run length
+    const calcSpots = (lengthMm: number, maxAllowed: number): { min: number; rec: number; max: number } => {
+        if (maxAllowed <= 0) return { min: 0, rec: 0, max: 0 };
+        const minSpots = Math.max(1, Math.round(lengthMm / SPOT_SPACING.ambient));
+        const recSpots = Math.max(1, Math.round(lengthMm / SPOT_SPACING.standard));
+        const maxSpots = Math.max(1, Math.round(lengthMm / SPOT_SPACING.bright));
+        return {
+            min: Math.min(minSpots, maxAllowed),
+            rec: Math.min(recSpots, maxAllowed),
+            max: Math.min(maxSpots, maxAllowed),
+        };
+    };
+
+    // --- Rinne (gutter) — runs along width ---
+    if (config.maxSpots.rinne > 0) {
+        const spots = calcSpots(inputs.width, config.maxSpots.rinne);
+        elements.push({
+            element: 'rinne',
+            elementLabel: 'Rinne',
+            runLengthMm: inputs.width,
+            recommended: spots.rec,
+            min: spots.min,
+            max: spots.max,
+            description: `${(inputs.width / 1000).toFixed(1)}m Breite → ${spots.rec} Spots${spots.rec > 0 ? ` (alle ${Math.round(inputs.width / spots.rec)}mm)` : ''}`,
+        });
+    }
+
+    // --- Wandanschluss — runs along width ---
+    if (config.hasWandanschluss && config.maxSpots.wandanschluss > 0) {
+        const spots = calcSpots(inputs.width, config.maxSpots.wandanschluss);
+        elements.push({
+            element: 'wandanschluss',
+            elementLabel: 'Wandanschluss',
+            runLengthMm: inputs.width,
+            recommended: spots.rec,
+            min: spots.min,
+            max: spots.max,
+            description: `${(inputs.width / 1000).toFixed(1)}m Breite → ${spots.rec} Spots`,
+        });
+    }
+
+    // --- Außensparren (outer rafters) — run along depth ---
+    if (config.maxSpots.aussensparren > 0) {
+        const spots = calcSpots(inputs.depth, config.maxSpots.aussensparren);
+        const label = `Außensparren`;
+        elements.push({
+            element: 'aussensparren',
+            elementLabel: label,
+            runLengthMm: inputs.depth,
+            recommended: spots.rec,
+            min: spots.min,
+            max: spots.max,
+            description: `${(inputs.depth / 1000).toFixed(1)}m Tiefe → ${spots.rec} Spots pro Seite`,
+        });
+    }
+
+    // --- Mittelsparren (inner rafters) — run along depth ---
+    if (config.hasMittelsparren && config.maxSpots.mittelsparren > 0) {
+        const msCount = Math.max(0, inputs.fieldCount - 1);
+        for (let i = 0; i < msCount; i++) {
+            const spots = calcSpots(inputs.depth, config.maxSpots.mittelsparren);
+            elements.push({
+                element: 'mittelsparren',
+                elementLabel: `Mittelsparren ${i + 1}`,
+                runLengthMm: inputs.depth,
+                recommended: spots.rec,
+                min: spots.min,
+                max: spots.max,
+                description: `${(inputs.depth / 1000).toFixed(1)}m Tiefe → ${spots.rec} Spots${spots.rec > 0 ? ` (Abstand ~${Math.round(inputs.depth / spots.rec)}mm)` : ''}`,
+            });
+        }
+    }
+
+    // --- Pfosten (posts) — fixed 1 spot per post face ---
+    if (config.hasPfosten && config.maxSpots.pfosten > 0) {
+        elements.push({
+            element: 'pfosten',
+            elementLabel: 'Pfosten',
+            runLengthMm: 0,
+            recommended: 1,
+            min: 1,
+            max: config.maxSpots.pfosten,
+            description: '1 Spot pro Pfostenfront',
+        });
+    }
+
+    const totalRec = elements.reduce((sum, e) => sum + e.recommended, 0);
+    const totalLumens = totalRec * 120; // ~120 lm per Altea spot
+    const areaSafe = Math.max(areaSqm, 0.1); // prevent division by zero
+    const avgLux = totalLumens / areaSafe;
+
+    let luxEstimate: string;
+    if (avgLux < 40) luxEstimate = '~30-40 Lux (Ambient)';
+    else if (avgLux < 80) luxEstimate = '~50-80 Lux (Standard)';
+    else if (avgLux < 120) luxEstimate = '~80-120 Lux (Hell)';
+    else luxEstimate = '~120+ Lux (Sehr hell)';
+
+    return {
+        level,
+        totalSpots: totalRec,
+        totalArea: areaSqm,
+        luxEstimate,
+        elements,
+    };
+}
 
 // ==================== HELPER FUNCTIONS ====================
 
@@ -260,35 +564,40 @@ export function getAvailableElements(roofType: LedRoofType, fieldCount: number):
     const config = ROOF_TYPE_CONFIGS[roofType];
     const elements: string[] = [];
 
-    // Rinne (gutter) - always available
-    elements.push('Rinne');
+    // Wandanschluss (wall connection) — at TOP of roof (back, against wall)
+    // Per Excel row 35: visible for types that have wall mounting
+    if (config.hasWandanschluss) {
+        elements.push('Wandanschluss');
+    }
 
-    // Außensparren links (left outer rafter) - always available
+    // Außensparren links (left outer rafter) — always available
     elements.push('Außensparren (links)');
 
-    // Mittelsparren (center rafters) - based on field count
+    // Mittelsparren (center rafters) — based on field count
+    // NOT for Carport/Carport_Freistand (Excel: IF(OR($B$9=N3,$B$9=N4),"",...))
+    // NOT for O_Oplus (Excel: A24 = "keine Mittelsparren vorhanden")
     if (config.hasMittelsparren && fieldCount > 1) {
         for (let i = 0; i < fieldCount - 1; i++) {
             elements.push(`Mittelsparren ${i + 1}`);
         }
     }
 
-    // Außensparren rechts (right outer rafter) - always available
+    // Außensparren rechts (right outer rafter) — always available
     elements.push('Außensparren (rechts)');
 
-    // Wandanschluss (wall connection) - only for wall-mounted types
-    if (config.hasWandanschluss) {
-        elements.push('Wandanschluss');
-    }
+    // Rinne (gutter) — at BOTTOM of roof (front edge)
+    elements.push('Rinne');
 
-    // Pfosten (posts) - only for freestanding types
-    if (config.isFreestanding) {
-        elements.push('Pfosten (vorne)');
-        elements.push('Pfosten (hinten)');
+    // Pfosten (posts) — only for types with hasPfosten
+    // Excel: rows 37-40, only for UL types with Freistand and Skyline/Carport Freistand
+    if (config.hasPfosten) {
         elements.push('Pfosten (links)');
         elements.push('Pfosten (rechts)');
-        elements.push('Pfosten (links hinten)');
-        elements.push('Pfosten (rechts hinten)');
+        if (config.id === 'Ultraline_compact_style_Freistand' ||
+            config.id === 'Ultraline_classic_Freistand') {
+            elements.push('Pfosten (links hinten)');
+            elements.push('Pfosten (rechts hinten)');
+        }
     }
 
     return elements;
@@ -316,56 +625,95 @@ export function createDefaultInputs(roofType: LedRoofType = 'Carport'): LedInput
 // ==================== STRIPE/SPOT DIMENSION LOGIC ====================
 
 /**
- * Calculate the internal width available for LEDs based on roof type
- * This accounts for the structural profile widths on each side.
+ * Calculate the internal width available for LEDs based on roof type.
+ * From Beleuchtung sheet: "freie Sparrenlänge" = depth minus structural deductions
+ * From Excel: B11 = depth value, B10 = original depth
+ * The deductions apply to the DEPTH (along rafter direction) not width.
+ * For Rinne/Wandanschluss, use the full width dimension.
  */
-function getInternalWidth(inputs: LedInputs): number {
-    const { roofType, width } = inputs;
+function getInternalDepth(inputs: LedInputs): number {
+    const { roofType, depth } = inputs;
 
-    // Different roof types have different profile deduction values
-    // From Excel: B11 calculation based on roof type
+    // From Beleuchtung sheet row 10: "freie Sparrenlänge" = depth - deduction
+    // E11=211 (SK/CA wall-mounted), E10=322 (Freistand), E12=100 (O types)
     switch (roofType) {
         case 'Skyline':
         case 'Carport':
-            // B11 = B10 - E11, E11 = 60+18+2*3+98+29 = 211
-            return width - 211;
+            // Wall-mounted: deduct wall + gutter profile = 211mm
+            return depth - 211;
         case 'Skyline_Freistand':
         case 'Carport_Freistand':
-            // B11 = B10 - E10, E10 = 2*60+2*3+98*2 = 322
-            return width - 322;
+            // Freestanding: deduct both sides = 322mm
+            return depth - 322;
         case 'O_Oplus_TR_TRplus_TL_TLXL':
-            // B11 = B10 - E11 = width - 211
-            return width - 211;
+            // From Excel E12 = 100 (Abzug O, O+, etc.)
+            return depth - 100;
         case 'Ultraline_compact_style':
-            // B11 = B10 - E11
-            return width - 211;
+            // Wall-mounted: deduct Wandanschluss + compact/style = 200+211
+            return depth - 211;
         case 'Ultraline_compact_style_Freistand':
-            // B11 = B10 - E10
-            return width - 322;
+            return depth - 322;
         case 'Ultraline_classic':
+            // UL classic: deduct wall side + gutter profile = 211
+            return depth - 211;
         case 'Ultraline_classic_Freistand':
-            // B11 = B10 - E4 (from Beleuchtung sheet)
-            // E4 varies, approximate with common value
-            return width - 200;
+            return depth - 322;
         default:
-            return width - 211;
+            return depth - 211;
     }
 }
 
 /**
- * Calculate stripe run length for the gutter (Rinne) channel
- * From Excel: this is the full depth of the roof
+ * Get the width available for Rinne/Wandanschluss LED strips.
+ * From Beleuchtung sheet: this uses the roof width minus gutter profile deductions.
  */
-function getRinneRunLength(inputs: LedInputs): number {
-    return inputs.depth;
+function getGutterWidth(inputs: LedInputs): number {
+    const { roofType, width } = inputs;
+    // From Excel: Rinnenbreite calculation
+    // SK/CA: width - 234, UL: width - 392, O types: width - 100
+    switch (roofType) {
+        case 'Skyline':
+        case 'Skyline_Freistand':
+        case 'Carport':
+        case 'Carport_Freistand':
+            return width - 234;
+        case 'Ultraline_compact_style':
+        case 'Ultraline_compact_style_Freistand':
+        case 'Ultraline_classic':
+        case 'Ultraline_classic_Freistand':
+            return width - 392;
+        case 'O_Oplus_TR_TRplus_TL_TLXL':
+            return width - 100;
+        default:
+            return width - 234;
+    }
 }
 
 /**
- * Calculate the field width (distance between sparren)
- * From Excel: E9 = E6 / E8 (depth / fieldCount)
+ * Get the internal width available for LED strips running along the width.
+ * Same as gutter width — the usable LED span after structural deductions.
+ */
+function getInternalWidth(inputs: LedInputs): number {
+    return getGutterWidth(inputs);
+}
+
+/**
+ * Get the field width (width of each field between rafters)
  */
 function getFieldWidth(inputs: LedInputs): number {
-    return inputs.depth / inputs.fieldCount;
+    const internal = getInternalWidth(inputs);
+    if (inputs.fieldCount <= 0) return internal;
+    return internal / inputs.fieldCount;
+}
+
+/**
+ * Calculate the rafter spacing (Sparrenabstand)
+ * From Excel Beleuchtung E9 = E6 / E8 (free rafter length / fieldCount)
+ */
+function getRafterSpacing(inputs: LedInputs): number {
+    const freeDepth = getInternalDepth(inputs);
+    if (inputs.fieldCount <= 0) return freeDepth;
+    return freeDepth / inputs.fieldCount;
 }
 
 /**

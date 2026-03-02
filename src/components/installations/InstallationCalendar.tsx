@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Installation, InstallationTeam, ServiceTicket } from '../../types';
+import { getWeatherForInstallations, type LocationForecast } from '../../services/weather.service';
 
 interface InstallationCalendarProps {
     installations: Installation[];
@@ -23,6 +24,37 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({
     const [currentDate, setCurrentDate] = useState(new Date());
     const [draggedItem, setDraggedItem] = useState<{ id: string, type: 'installation' | 'service' } | null>(null);
     const [dragOverCell, setDragOverCell] = useState<{ date: string, teamId: string } | null>(null);
+    const [weatherData, setWeatherData] = useState<Map<string, LocationForecast>>(new Map());
+    const [weatherLoading, setWeatherLoading] = useState(false);
+
+    // Fetch weather when week or installations change
+    useEffect(() => {
+        const locations = installations
+            .filter(i => i.client?.city)
+            .map(i => ({
+                id: i.id,
+                city: i.client.city,
+                coordinates: i.client.coordinates,
+            }));
+        if (locations.length === 0) return;
+
+        let cancelled = false;
+        setWeatherLoading(true);
+        getWeatherForInstallations(locations)
+            .then(data => { if (!cancelled) setWeatherData(data); })
+            .catch(err => console.error('Weather fetch error:', err))
+            .finally(() => { if (!cancelled) setWeatherLoading(false); });
+        return () => { cancelled = true; };
+    }, [currentDate, installations.length]);
+
+    const getWeatherForCell = (city: string | undefined, date: Date) => {
+        if (!city) return null;
+        const cityKey = city.trim().toLowerCase();
+        const forecast = weatherData.get(cityKey);
+        if (!forecast) return null;
+        const dateStr = date.toISOString().split('T')[0];
+        return forecast.forecasts[dateStr] || null;
+    };
 
     const getStartOfWeek = (date: Date) => {
         const d = new Date(date);
@@ -286,19 +318,37 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({
                                                                 <div className="text-[10px] text-slate-500 truncate">
                                                                     {inst.client.postalCode ? `${inst.client.postalCode} ` : ''}{inst.client.city}
                                                                 </div>
-                                                                <div className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${inst.status === 'completed' ? 'bg-slate-200 text-slate-700' :
-                                                                    inst.status === 'confirmed' ? 'bg-green-100 text-green-700 font-bold border border-green-200' :
-                                                                        inst.status === 'issue' ? 'bg-red-100 text-red-700' :
-                                                                            'bg-blue-50 text-blue-700'
-                                                                    }`}>
-                                                                    {inst.status === 'completed' ? 'Zakończony' :
-                                                                        inst.status === 'confirmed' ? 'Potwierdzony' :
-                                                                            inst.status === 'issue' ? 'Problem' : 'Zaplanowany'}
-                                                                    {(inst.expectedDuration || 1) > 1 && (
-                                                                        <span className="ml-1 font-bold text-xs" title={`Czas trwania: ${inst.expectedDuration} dni`}>
-                                                                            ({Math.round((new Date(date.setHours(0, 0, 0, 0)).getTime() - new Date(inst.scheduledDate!.slice(0, 10)).getTime()) / (1000 * 60 * 60 * 24)) + 1}/{inst.expectedDuration})
-                                                                        </span>
-                                                                    )}
+                                                                <div className="flex items-center justify-between mt-1 gap-1">
+                                                                    <div className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${inst.status === 'completed' ? 'bg-slate-200 text-slate-700' :
+                                                                        inst.status === 'confirmed' ? 'bg-green-100 text-green-700 font-bold border border-green-200' :
+                                                                            inst.status === 'issue' ? 'bg-red-100 text-red-700' :
+                                                                                'bg-blue-50 text-blue-700'
+                                                                        }`}>
+                                                                        {inst.status === 'completed' ? 'Zakończony' :
+                                                                            inst.status === 'confirmed' ? 'Potwierdzony' :
+                                                                                inst.status === 'issue' ? 'Problem' : 'Zaplanowany'}
+                                                                        {(inst.expectedDuration || 1) > 1 && (
+                                                                            <span className="ml-1 font-bold text-xs" title={`Czas trwania: ${inst.expectedDuration} dni`}>
+                                                                                ({Math.round((new Date(date.setHours(0, 0, 0, 0)).getTime() - new Date(inst.scheduledDate!.slice(0, 10)).getTime()) / (1000 * 60 * 60 * 24)) + 1}/{inst.expectedDuration})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {(() => {
+                                                                        const w = getWeatherForCell(inst.client.city, date);
+                                                                        if (!w) return null;
+                                                                        return (
+                                                                            <div
+                                                                                className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-medium ${w.info.severity === 'bad' ? 'bg-red-50 text-red-700' :
+                                                                                        w.info.severity === 'moderate' ? 'bg-amber-50 text-amber-700' :
+                                                                                            'bg-sky-50 text-sky-700'
+                                                                                    }`}
+                                                                                title={`${w.info.label} — ${w.tempMin}°/${w.tempMax}°C`}
+                                                                            >
+                                                                                <span className="text-sm leading-none">{w.info.icon}</span>
+                                                                                <span>{w.tempMax}°</span>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             </div>
                                                         );

@@ -32,8 +32,6 @@ import { FailureReportForm } from './components/installer/FailureReportForm';
 import { InstallerSettingsPage } from './components/installer/InstallerSettingsPage';
 import { FuelPage } from './components/fuel/FuelPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ReportsList } from './components/reports/ReportsList';
-import { ReportForm } from './components/reports/ReportForm';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { InstallationDashboard } from './components/installations/InstallationDashboard';
@@ -192,8 +190,6 @@ function App() {
               <Route path="/admin/installers" element={<InstallerManagementPanel />} />
               <Route path="/admin/teams" element={<TeamManagementPanel />} />
               <Route path="/admin/wallet" element={<WalletRouter />} />
-              <Route path="/reports" element={<ReportsList />} />
-              <Route path="/reports/new" element={<ReportForm />} />
               <Route path="/reports/measurements" element={<MeasurementReportsList />} />
               <Route path="/measurements" element={<MeasurementDashboard />} />
               <Route path="/installations" element={<InstallationDashboard />} />

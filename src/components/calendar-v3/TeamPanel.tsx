@@ -12,7 +12,7 @@ export const TeamPanel: React.FC<TeamPanelProps> = ({
     installations,
     onClose
 }) => {
-    // Calculate team workload
+    // Calculate team workload using scheduledDate + expectedDuration
     const teamWorkload = useMemo(() => {
         const workload: Record<string, { hours: number; count: number }> = {};
 
@@ -22,11 +22,8 @@ export const TeamPanel: React.FC<TeamPanelProps> = ({
 
         installations.forEach(installation => {
             if (installation.teamId && workload[installation.teamId]) {
-                // Estimate 8 hours per day
-                const startDate = new Date(installation.startDate);
-                const endDate = new Date(installation.endDate);
-                const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                const hours = days * 8;
+                const duration = installation.expectedDuration || 1;
+                const hours = duration * 8; // 8 hours per day
 
                 workload[installation.teamId].hours += hours;
                 workload[installation.teamId].count += 1;
@@ -100,8 +97,8 @@ export const TeamPanel: React.FC<TeamPanelProps> = ({
                                     <div className="flex items-center justify-between text-xs mb-1">
                                         <span className="text-slate-600">Obciążenie:</span>
                                         <span className={`font-semibold ${utilization > 90 ? 'text-red-600' :
-                                                utilization > 70 ? 'text-yellow-600' :
-                                                    'text-green-600'
+                                            utilization > 70 ? 'text-yellow-600' :
+                                                'text-green-600'
                                             }`}>
                                             {utilization.toFixed(0)}%
                                         </span>
@@ -109,8 +106,8 @@ export const TeamPanel: React.FC<TeamPanelProps> = ({
                                     <div className="w-full bg-slate-200 rounded-full h-2">
                                         <div
                                             className={`h-2 rounded-full transition-all ${utilization > 90 ? 'bg-red-500' :
-                                                    utilization > 70 ? 'bg-yellow-500' :
-                                                        'bg-green-500'
+                                                utilization > 70 ? 'bg-yellow-500' :
+                                                    'bg-green-500'
                                                 }`}
                                             style={{ width: `${utilization}%` }}
                                         />
@@ -121,8 +118,8 @@ export const TeamPanel: React.FC<TeamPanelProps> = ({
                             {/* Status Badge */}
                             <div className="mt-3 pt-3 border-t border-slate-100">
                                 <span className={`text-xs px-2 py-1 rounded font-medium ${team.isActive
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-slate-100 text-slate-600'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-slate-100 text-slate-600'
                                     }`}>
                                     {team.isActive ? '✓ Aktywny' : 'Nieaktywny'}
                                 </span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndContext, type DragEndEvent, type DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import toast from 'react-hot-toast';
 import { CalendarHeader } from './CalendarHeader';
@@ -7,6 +7,7 @@ import { TeamPanelEnhanced } from './TeamPanelEnhanced';
 import { CalendarGridEnhanced } from './CalendarGridEnhanced';
 import { InstallationService } from '../../services/database/installation.service';
 import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability } from '../../types';
+import { getWeatherForInstallations, type LocationForecast } from '../../services/weather.service';
 
 interface CalendarV3EnhancedProps {
     installations: Installation[];
@@ -34,6 +35,25 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [teamPanelOpen, setTeamPanelOpen] = useState(false); // Mobile optimized default
     const [activeDragItem, setActiveDragItem] = useState<any>(null);
+    const [weatherData, setWeatherData] = useState<Map<string, LocationForecast>>(new Map());
+
+    // Fetch weather when week or installations change
+    useEffect(() => {
+        const locations = installations
+            .filter(i => i.client?.city)
+            .map(i => ({
+                id: i.id,
+                city: i.client.city,
+                coordinates: i.client.coordinates,
+            }));
+        if (locations.length === 0) return;
+
+        let cancelled = false;
+        getWeatherForInstallations(locations)
+            .then(data => { if (!cancelled) setWeatherData(data); })
+            .catch(err => console.error('Weather fetch error:', err));
+        return () => { cancelled = true; };
+    }, [currentDate, installations.length]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -156,6 +176,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                             unavailability={unavailability}
                             onRefresh={onRefresh}
                             onEditInstallation={onEditInstallation}
+                            weatherData={weatherData}
                         />
                     </div>
 

@@ -56,8 +56,6 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
 
     const [formData, setFormData] = useState({
         carPlate: report?.carPlate || '',
-        odometerStart: report?.odometerStart || 0,
-        odometerEnd: report?.odometerEnd || 0,
         totalKm: report?.totalKm || 0,
         costPerKm: report?.costPerKm || DEFAULT_COST_PER_KM,
         withDriver: report?.withDriver || false,
@@ -127,11 +125,6 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (formData.odometerEnd < formData.odometerStart && formData.odometerEnd > 0) {
-            toast.error('Licznik końcowy nie może być mniejszy od początkowego');
-            return;
-        }
-
         // Warn about pending visits but allow saving
         const pendingVisits = visits.filter(v => v.outcome === 'pending');
         if (pendingVisits.length > 0) {
@@ -185,8 +178,6 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                 // Update existing report
                 await DatabaseService.updateMeasurementReport(report.id, {
                     carPlate: formData.carPlate,
-                    odometerStart: formData.odometerStart,
-                    odometerEnd: formData.odometerEnd,
                     totalKm,
                     tripCost: estimatedTotalCost,
                     costPerKm: formData.costPerKm,
@@ -202,8 +193,6 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                     date: date.toISOString().split('T')[0],
                     salesRepId: currentUserId,
                     carPlate: formData.carPlate,
-                    odometerStart: formData.odometerStart,
-                    odometerEnd: formData.odometerEnd,
                     totalKm,
                     tripCost: estimatedTotalCost,
                     costPerKm: formData.costPerKm,
@@ -214,7 +203,7 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                     signedContractsCount: visits.filter(v => v.outcome === 'signed').length,
                     offerIds: visits.map(v => v.offerId).filter(Boolean) as string[],
                     is_active: true,
-                    currency: 'EUR'
+                    currency: 'PLN'
                 };
                 await DatabaseService.createMeasurementReport(newReport);
                 toast.success('Raport został utworzony');
@@ -479,40 +468,7 @@ export const MeasurementReportModal: React.FC<MeasurementReportModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* Optional odometer readings */}
-                            <details className="group">
-                                <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800 mb-2">
-                                    ▸ Stan licznika (opcjonalnie)
-                                </summary>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                                    <div>
-                                        <label className="block text-xs font-medium text-blue-700 mb-1">Licznik Start (km)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={formData.odometerStart}
-                                            onChange={e => setFormData({ ...formData, odometerStart: parseInt(e.target.value) || 0 })}
-                                            className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-blue-700 mb-1">Licznik Koniec (km)</label>
-                                        <input
-                                            type="number"
-                                            min={formData.odometerStart}
-                                            value={formData.odometerEnd}
-                                            onChange={e => setFormData({ ...formData, odometerEnd: parseInt(e.target.value) || 0 })}
-                                            className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-300 outline-none bg-white text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-blue-700 mb-1">Dystans (licznik)</label>
-                                        <div className="w-full px-3 py-2 bg-blue-100 border border-blue-200 rounded-lg text-blue-800 font-bold text-sm">
-                                            {Math.max(0, formData.odometerEnd - formData.odometerStart)} km
-                                        </div>
-                                    </div>
-                                </div>
-                            </details>
+
                             <div className="mt-3 flex items-center gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input

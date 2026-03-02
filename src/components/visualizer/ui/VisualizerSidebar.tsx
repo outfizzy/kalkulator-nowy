@@ -4,6 +4,7 @@ import { VisualizerOfferModal } from './VisualizerOfferModal';
 import type { ProductConfig } from '../../../types';
 import { formatCurrency } from '../../../utils/translations';
 import { PricingService } from '../../../services/pricing.service';
+import type { HouseAnalysis } from '../../../hooks/useHomography';
 
 interface VisualizerSidebarProps {
     config: ProductConfig;
@@ -18,6 +19,12 @@ interface VisualizerSidebarProps {
     // Layout Control
     isCollapsed: boolean;
     onToggle: (collapsed: boolean) => void;
+    // AR Mode
+    arMode?: boolean;
+    modelOffset?: { x: number; y: number; scale: number };
+    onModelOffsetChange?: (key: 'x' | 'y' | 'scale', value: number) => void;
+    houseAnalysis?: HouseAnalysis | null;
+    onExportAR?: () => void;
 }
 
 type Tab = 'structure' | 'finish' | 'equip' | 'env';
@@ -25,7 +32,8 @@ type Tab = 'structure' | 'finish' | 'equip' | 'env';
 export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
     config, onChange, price, priceLoading, onUploadBackground, onClearBackground,
     sunPosition = 0.5, onSunChange, onAnalyzeAI,
-    isCollapsed, onToggle
+    isCollapsed, onToggle,
+    arMode, modelOffset, onModelOffsetChange, houseAnalysis, onExportAR
 }) => {
     const [activeTab, setActiveTab] = useState<Tab>('structure');
     const [showOfferModal, setShowOfferModal] = useState(false);
@@ -221,18 +229,71 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                             {/* 2. Installation Type */}
                             <div className="pt-6 border-t border-slate-200/50">
                                 <SectionLabel>Sposób Montażu</SectionLabel>
-                                <div className="flex bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/50">
+                                <div className="grid grid-cols-2 gap-1.5 bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/50">
                                     <OptionButton
                                         active={config.installationType === 'wall-mounted'}
-                                        onClick={() => updateConfig('installationType', 'wall-mounted')}
+                                        onClick={() => {
+                                            updateConfig('installationType', 'wall-mounted');
+                                            updateConfig('cornerConfig', undefined);
+                                        }}
                                         label="Przyścienny"
                                     />
                                     <OptionButton
                                         active={config.installationType === 'freestanding'}
-                                        onClick={() => updateConfig('installationType', 'freestanding')}
+                                        onClick={() => {
+                                            updateConfig('installationType', 'freestanding');
+                                            updateConfig('cornerConfig', undefined);
+                                        }}
                                         label="Wolnostojący"
                                     />
+                                    <OptionButton
+                                        active={config.installationType === 'corner-left'}
+                                        onClick={() => {
+                                            updateConfig('installationType', 'corner-left');
+                                            if (!config.cornerConfig) {
+                                                updateConfig('cornerConfig', { secondaryWidth: config.width || 3000, secondaryProjection: config.projection || 2000 });
+                                            }
+                                        }}
+                                        label="🔲 Narożny L"
+                                    />
+                                    <OptionButton
+                                        active={config.installationType === 'corner-right'}
+                                        onClick={() => {
+                                            updateConfig('installationType', 'corner-right');
+                                            if (!config.cornerConfig) {
+                                                updateConfig('cornerConfig', { secondaryWidth: config.width || 3000, secondaryProjection: config.projection || 2000 });
+                                            }
+                                        }}
+                                        label="🔲 Narożny P"
+                                    />
                                 </div>
+
+                                {/* Corner Wing Dimensions */}
+                                {(config.installationType === 'corner-left' || config.installationType === 'corner-right') && (
+                                    <div className="mt-4 space-y-4 p-3 bg-amber-50/50 border border-amber-200/50 rounded-xl">
+                                        <SectionLabel>Drugie Skrzydło (Narożne)</SectionLabel>
+                                        <RangeControl
+                                            label="Szerokość 2 (mm)"
+                                            value={config.cornerConfig?.secondaryWidth || 3000}
+                                            min={1000} max={8000} step={100}
+                                            onChange={(v: number) => updateConfig('cornerConfig', {
+                                                ...config.cornerConfig,
+                                                secondaryWidth: v,
+                                                secondaryProjection: config.cornerConfig?.secondaryProjection || 2000
+                                            })}
+                                        />
+                                        <RangeControl
+                                            label="Głębokość 2 (mm)"
+                                            value={config.cornerConfig?.secondaryProjection || 2000}
+                                            min={1000} max={6000} step={100}
+                                            onChange={(v: number) => updateConfig('cornerConfig', {
+                                                ...config.cornerConfig,
+                                                secondaryWidth: config.cornerConfig?.secondaryWidth || 3000,
+                                                secondaryProjection: v
+                                            })}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* 3. Dimensions */}
@@ -961,22 +1022,100 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                 )}
                             </div>
 
-                            {/* 3. AI STUDIO */}
+                            {/* 3. AI AR STUDIO */}
                             <div className="pt-6 border-t border-slate-100">
-                                <SectionLabel>AI Magic Studio ✨</SectionLabel>
-                                <div className="p-5 bg-gradient-to-br from-violet-50 to-fuchsia-50 rounded-2xl border border-violet-100 flex flex-col gap-4">
-                                    <p className="text-xs text-slate-600 leading-relaxed">
-                                        Nasza sztuczna inteligencja nałoży zadaszenie na Twoje zdjęcie w fotorealistycznej jakości.
-                                    </p>
+                                <SectionLabel>{arMode ? '🎯 AR Mode — Korekta' : 'AI Magic Studio ✨'}</SectionLabel>
 
-                                    <button
-                                        onClick={onAnalyzeAI}
-                                        className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-violet-200 hover:shadow-violet-300 transform transition-all hover:scale-[1.02] flex items-center justify-center gap-2 group"
-                                    >
-                                        <span className="text-xl group-hover:animate-pulse">🪄</span>
-                                        <span>Generuj Wizualizację AI</span>
-                                    </button>
-                                </div>
+                                {arMode && modelOffset && onModelOffsetChange ? (
+                                    <div className="space-y-4">
+                                        {/* AR Confidence Badge */}
+                                        {houseAnalysis && (
+                                            <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${(houseAnalysis.confidence || 0) > 0.7
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : (houseAnalysis.confidence || 0) > 0.4
+                                                        ? 'bg-yellow-100 text-yellow-700'
+                                                        : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                    {Math.round((houseAnalysis.confidence || 0) * 100)}%
+                                                </div>
+                                                <div className="text-xs text-slate-600">
+                                                    <div className="font-bold">Pewność analizy</div>
+                                                    {houseAnalysis.notes && <div className="text-slate-400 mt-0.5">{houseAnalysis.notes}</div>}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Position Controls */}
+                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pozycja Modelu</div>
+                                            <RangeControl
+                                                label="Przesunięcie X (lewo/prawo)"
+                                                value={Math.round(modelOffset.x * 100)}
+                                                min={-300} max={300} step={5}
+                                                onChange={(v: number) => onModelOffsetChange('x', v / 100)}
+                                            />
+                                            <RangeControl
+                                                label="Przesunięcie Y (góra/dół)"
+                                                value={Math.round(modelOffset.y * 100)}
+                                                min={-200} max={200} step={5}
+                                                onChange={(v: number) => onModelOffsetChange('y', v / 100)}
+                                            />
+                                            <RangeControl
+                                                label="Skala"
+                                                value={Math.round(modelOffset.scale * 100)}
+                                                min={30} max={200} step={5}
+                                                onChange={(v: number) => onModelOffsetChange('scale', v / 100)}
+                                            />
+                                        </div>
+
+                                        {/* Estimated Dimensions from AI */}
+                                        {houseAnalysis?.estimates && (
+                                            <div className="p-3 bg-white rounded-xl border border-slate-100 grid grid-cols-3 gap-2 text-center">
+                                                <div>
+                                                    <div className="text-lg font-bold text-slate-700">{houseAnalysis.estimates.wallHeightMeters?.toFixed(1)}</div>
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase">Wys. ściany (m)</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-slate-700">{houseAnalysis.estimates.availableWidthMeters?.toFixed(1)}</div>
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase">Szer. montażu (m)</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-slate-700">{houseAnalysis.estimates.groundToMountMeters?.toFixed(1)}</div>
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase">Wys. montażu (m)</div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Export Button */}
+                                        {onExportAR && (
+                                            <button
+                                                onClick={onExportAR}
+                                                className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-green-200 hover:shadow-green-300 transform transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+                                            >
+                                                📸 Zapisz Wizualizację AR
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="p-5 bg-gradient-to-br from-violet-50 to-fuchsia-50 rounded-2xl border border-violet-100 flex flex-col gap-4">
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Wgraj zdjęcie domu klienta, a AI automatycznie dopasuje zadaszenie do budynku.
+                                        </p>
+
+                                        <button
+                                            onClick={onAnalyzeAI}
+                                            disabled={!onAnalyzeAI}
+                                            className={`w-full py-4 rounded-xl font-bold text-sm shadow-lg transform transition-all flex items-center justify-center gap-2 group ${onAnalyzeAI
+                                                ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-violet-200 hover:shadow-violet-300 hover:scale-[1.02]'
+                                                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                                                }`}
+                                        >
+                                            <span className="text-xl group-hover:animate-pulse">🏠</span>
+                                            <span>{onAnalyzeAI ? 'Analizuj Zdjęcie AI' : 'Najpierw wgraj zdjęcie ↑'}</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                         </div>

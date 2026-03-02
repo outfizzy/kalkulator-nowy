@@ -5,11 +5,10 @@ import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Measurement, Offer, User } from '../../types';
 import { AddMeasurementFromOffer } from './AddMeasurementFromOffer';
-import { MeasurementRouteView } from './MeasurementRouteView';
 import { CustomerSelector } from './CustomerSelector';
 import type { Customer } from '../../types';
 import { GeocodingService } from '../../services/GeocodingService';
-import { MapPin, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { MeasurementModal } from './MeasurementModal';
 
 export const MeasurementDashboard: React.FC = () => {
@@ -20,8 +19,7 @@ export const MeasurementDashboard: React.FC = () => {
     const [showOfferSelectionModal, setShowOfferSelectionModal] = useState(false);
     const [editingMeasurement, setEditingMeasurement] = useState<Measurement | null>(null);
     const [initialModalData, setInitialModalData] = useState<Partial<Measurement> | undefined>(undefined);
-    const [activeTab, setActiveTab] = useState<'calendar' | 'route'>('calendar');
-    const [selectedDate, setSelectedDate] = useState(new Date());
+
     const [showCustomerSelector, setShowCustomerSelector] = useState(false);
     const [availableOffersForCustomer, setAvailableOffersForCustomer] = useState<Offer[]>([]);
     // Sales rep filter for admin/manager
@@ -50,7 +48,7 @@ export const MeasurementDashboard: React.FC = () => {
 
     const loadMeasurements = React.useCallback(async () => {
         try {
-            setLoading(true);
+            if (measurements.length === 0) setLoading(true);
             let data: Measurement[];
 
             if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
@@ -191,26 +189,7 @@ export const MeasurementDashboard: React.FC = () => {
         setShowAddModal(true);
     };
 
-    const handleReorder = async (newOrder: Measurement[]) => {
-        try {
-            // Update local state first (optimistic)
-            setMeasurements(prev => {
-                const otherMeasurements = prev.filter(m => !newOrder.find(nm => nm.id === m.id));
-                return [...otherMeasurements, ...newOrder];
-            });
 
-            // Save to DB
-            await Promise.all(newOrder.map((m, index) =>
-                DatabaseService.updateMeasurement(m.id, { orderInRoute: index })
-            ));
-
-            toast.success('Kolejność zaktualizowana');
-        } catch (error) {
-            console.error('Error reordering:', error);
-            toast.error('Błąd zapisu kolejności');
-            loadMeasurements(); // Revert on error
-        }
-    };
 
     if (loading) {
         return (
@@ -284,90 +263,17 @@ export const MeasurementDashboard: React.FC = () => {
             </div>
 
 
-            {/* Tabs */}
-            <div className="flex gap-4 border-b border-slate-200">
-                <button
-                    onClick={() => setActiveTab('calendar')}
-                    className={`px-6 py-3 font-medium transition-colors relative ${activeTab === 'calendar' ? 'text-accent' : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                >
-                    Kalendarz
-                    {activeTab === 'calendar' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('route')}
-                    className={`px-6 py-3 font-medium transition-colors relative ${activeTab === 'route' ? 'text-accent' : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                >
-                    Trasa
-                    {activeTab === 'route' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />
-                    )}
-                </button>
-            </div>
-
-            {/* Content */}
-            {
-                activeTab === 'calendar' ? (
-                    <MeasurementCalendar
-                        measurements={measurements}
-                        onEdit={setEditingMeasurement}
-                        onDragDrop={handleDragDrop}
-                        viewingUserId={
-                            (currentUser?.role === 'admin' || currentUser?.role === 'manager')
-                                ? (selectedSalesRepId !== 'all' ? selectedSalesRepId : undefined)
-                                : currentUser?.id
-                        }
-                    />
-                ) : (
-                    <div className="space-y-4">
-                        {/* Date Navigation for Route View */}
-                        <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                            <button
-                                onClick={() => {
-                                    const newDate = new Date(selectedDate);
-                                    newDate.setDate(newDate.getDate() - 1);
-                                    setSelectedDate(newDate);
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
-                                Poprzedni dzień
-                            </button>
-
-                            <div className="text-lg font-semibold text-slate-800">
-                                {selectedDate.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
-                            </div>
-
-                            <button
-                                onClick={() => {
-                                    const newDate = new Date(selectedDate);
-                                    newDate.setDate(newDate.getDate() + 1);
-                                    setSelectedDate(newDate);
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
-                            >
-                                Następny dzień
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <MeasurementRouteView
-                            measurements={measurements.filter(m =>
-                                new Date(m.scheduledDate).toDateString() === selectedDate.toDateString()
-                            )}
-                            onReorder={handleReorder}
-                            date={selectedDate}
-                        />
-                    </div>
-                )
-            }
+            {/* Calendar */}
+            <MeasurementCalendar
+                measurements={measurements}
+                onEdit={setEditingMeasurement}
+                onDragDrop={handleDragDrop}
+                viewingUserId={
+                    (currentUser?.role === 'admin' || currentUser?.role === 'manager')
+                        ? (selectedSalesRepId !== 'all' ? selectedSalesRepId : undefined)
+                        : currentUser?.id
+                }
+            />
 
             {/* Add/Edit Modal */}
             {

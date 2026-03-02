@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Measurement, MeasurementReport } from '../../types';
 import { MeasurementReportModal } from './MeasurementReportModal';
 import { MeasurementOutcomeModal } from './MeasurementOutcomeModal';
+import { ClientDetailModal } from './ClientDetailModal';
 import { DailyRouteMap } from './DailyRouteMap';
 import { RecalculateRoutesButton } from './RecalculateRoutesButton';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,6 +51,10 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
     // Route Map Modal
     const [showMapModal, setShowMapModal] = useState(false);
     const [selectedMapDate, setSelectedMapDate] = useState<Date>(new Date());
+
+    // Client Detail Modal
+    const [showClientDetail, setShowClientDetail] = useState(false);
+    const [selectedClientMeasurement, setSelectedClientMeasurement] = useState<Measurement | null>(null);
 
     const weekDays = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(currentWeekStart);
@@ -351,12 +356,9 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, measurement.id)}
                                         onClick={(e) => {
-                                            if (measurement.leadId && e.ctrlKey) {
-                                                e.stopPropagation();
-                                                navigate(`/leads/${measurement.leadId}`);
-                                            } else {
-                                                onEdit(measurement);
-                                            }
+                                            e.stopPropagation();
+                                            setSelectedClientMeasurement(measurement);
+                                            setShowClientDetail(true);
                                         }}
                                         className={`
                                             p-2 rounded-lg border cursor-pointer transition-all shadow-sm
@@ -364,7 +366,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                                             hover:shadow-md active:scale-95
                                             ${draggedItemId === measurement.id ? 'opacity-50' : ''}
                                         `}
-                                        title={measurement.leadId ? 'Ctrl+Click aby zobaczyć lead' : ''}
+                                        title="Kliknij aby zobaczyć szczegóły klienta"
                                     >
                                         <div className="text-xs font-bold text-slate-800 truncate">
                                             {measurement.customerName}
@@ -522,6 +524,22 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                     measurements={getMeasurementsForDate(selectedMapDate)}
                     routes={routes}
                     onClose={() => setShowMapModal(false)}
+                />
+            )}
+
+            {/* Client Detail Modal */}
+            {showClientDetail && selectedClientMeasurement && (
+                <ClientDetailModal
+                    measurement={selectedClientMeasurement}
+                    onClose={() => {
+                        setShowClientDetail(false);
+                        setSelectedClientMeasurement(null);
+                    }}
+                    onEdit={(m) => {
+                        setShowClientDetail(false);
+                        setSelectedClientMeasurement(null);
+                        onEdit(m);
+                    }}
                 />
             )}
         </div>
