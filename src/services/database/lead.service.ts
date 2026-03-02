@@ -116,10 +116,9 @@ export const LeadService = {
             updated_at: new Date().toISOString()
         };
 
-        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.status !== undefined) dbUpdates.status = updates.status;
         if (updates.source) dbUpdates.source = updates.source;
         if (updates.customerData) dbUpdates.customer_data = updates.customerData;
-        if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo;
         if (updates.emailMessageId) dbUpdates.email_message_id = updates.emailMessageId;
         if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
         if (updates.lastContactDate) dbUpdates.last_contact_date = updates.lastContactDate.toISOString();
@@ -128,6 +127,39 @@ export const LeadService = {
         if (updates.aiScore !== undefined) dbUpdates.ai_score = updates.aiScore;
         if (updates.aiSummary !== undefined) dbUpdates.ai_summary = updates.aiSummary;
         if (updates.lostReason !== undefined) dbUpdates.lost_reason = updates.lostReason;
+
+        // --- Assignment Protection Logic ---
+        if (updates.assignedTo !== undefined) {
+            if (updates.assignedTo === null) {
+                // Only allow clearing assignment when moving to 'new' status
+                if (updates.status === 'new') {
+                    dbUpdates.assigned_to = null;
+                    console.log(`[LeadService] Lead ${id}: Clearing assigned_to (status → 'new')`);
+                } else {
+                    // Check current lead state before clearing
+                    const { data: currentLead } = await supabase
+                        .from('leads')
+                        .select('assigned_to, status')
+                        .eq('id', id)
+                        .single();
+
+                    if (currentLead?.assigned_to) {
+                        console.warn(
+                            `[LeadService] ⚠️ BLOCKED: Attempt to clear assigned_to on lead ${id} ` +
+                            `(current: ${currentLead.assigned_to}, status: ${currentLead.status} → ${updates.status || 'unchanged'}). ` +
+                            `Keeping existing assignment.`
+                        );
+                        // Do NOT set assigned_to = null — keep existing assignment
+                    } else {
+                        dbUpdates.assigned_to = null;
+                        console.log(`[LeadService] Lead ${id}: assigned_to already null, no change needed`);
+                    }
+                }
+            } else {
+                dbUpdates.assigned_to = updates.assignedTo;
+                console.log(`[LeadService] Lead ${id}: Setting assigned_to = ${updates.assignedTo}`);
+            }
+        }
 
         const { error } = await supabase
             .from('leads')

@@ -137,8 +137,7 @@ export class MeasurementReminderService {
 
             // Update lead status
             await LeadService.updateLead(leadId, {
-                status: newStatus,
-                updated_at: new Date().toISOString()
+                status: newStatus
             });
 
             // If considering, create follow-up task
