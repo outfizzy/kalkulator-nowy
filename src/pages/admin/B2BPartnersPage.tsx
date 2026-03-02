@@ -565,6 +565,49 @@ export function B2BPartnersPage() {
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs bg-gray-200 px-2 py-1 rounded">{pu.role}</span>
                                                         {pu.can_place_orders && <span className="text-xs text-green-600">✓ Zamówienia</span>}
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                try {
+                                                                    // Toggle order permission
+                                                                    const { error } = await (await import('../../lib/supabase')).supabase
+                                                                        .from('b2b_partner_users')
+                                                                        .update({ can_place_orders: !pu.can_place_orders })
+                                                                        .eq('id', pu.id);
+                                                                    if (error) throw error;
+                                                                    toast.success(pu.can_place_orders ? 'Zablokowano zamówienia' : 'Odblokowano zamówienia');
+                                                                    loadPartnerUsers(selectedPartner.id);
+                                                                } catch (err) {
+                                                                    console.error('Error toggling orders:', err);
+                                                                    toast.error('Błąd zmiany uprawnień');
+                                                                }
+                                                            }}
+                                                            className={`px-2 py-1 text-xs rounded ${pu.can_place_orders
+                                                                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                }`}
+                                                            title={pu.can_place_orders ? 'Zablokuj zamówienia' : 'Odblokuj zamówienia'}
+                                                        >
+                                                            {pu.can_place_orders ? '🔒 Zablokuj' : '🔓 Odblokuj'}
+                                                        </button>
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                if (!confirm(`Czy na pewno chcesz usunąć użytkownika ${pu.user?.full_name} z tego partnera?`)) return;
+                                                                try {
+                                                                    await B2BService.removePartnerUser(pu.id);
+                                                                    toast.success('Użytkownik usunięty z partnera');
+                                                                    loadPartnerUsers(selectedPartner.id);
+                                                                } catch (err) {
+                                                                    console.error('Error removing user:', err);
+                                                                    toast.error('Błąd usuwania użytkownika');
+                                                                }
+                                                            }}
+                                                            className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                                            title="Usuń użytkownika z partnera"
+                                                        >
+                                                            🗑️ Usuń
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))}
