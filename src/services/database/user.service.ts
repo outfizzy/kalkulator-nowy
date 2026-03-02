@@ -248,8 +248,28 @@ export const UserService = {
     },
 
     async deleteUser(userId: string): Promise<void> {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('No session');
+        // Refresh session to ensure we have a valid, non-expired token
+        const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+        if (sessionError || !session) {
+            // Fallback: try getSession
+            const { data: fallback } = await supabase.auth.getSession();
+            if (!fallback.session) throw new Error('Brak aktywnej sesji. Zaloguj się ponownie.');
+
+            const response = await fetch('/api/delete-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${fallback.session.access_token}`
+                },
+                body: JSON.stringify({ userId })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.details || error.error || 'Failed to delete user');
+            }
+            return;
+        }
 
         const response = await fetch('/api/delete-user', {
             method: 'POST',
@@ -262,7 +282,7 @@ export const UserService = {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Failed to delete user');
+            throw new Error(error.details || error.error || 'Failed to delete user');
         }
     },
 
