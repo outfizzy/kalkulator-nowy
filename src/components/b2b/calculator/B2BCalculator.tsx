@@ -49,15 +49,15 @@ interface BasketItem {
 
 // ======= PRODUCT CATALOG =======
 const ROOF_MODELS: RoofModel[] = [
-    { id: 'Orangeline', name: 'Orangeline', description: 'Ekonomiczny profil 50mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline.jpg' },
-    { id: 'Orangeline+', name: 'Orangeline+', description: 'Ekonomiczny Plus 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline-plus.jpg' },
-    { id: 'Trendline', name: 'Trendline', description: 'Klasyczny profil 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg' },
-    { id: 'Trendline+', name: 'Trendline+', description: 'Klasyczny Plus 70mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-plus.jpg' },
-    { id: 'Topline', name: 'Topline', description: 'Premium profil 80mm • od 2500mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg' },
-    { id: 'Topline XL', name: 'Topline XL', description: 'Extra duża konstrukcja XL', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/topline-xl.jpg' },
-    { id: 'Designline', name: 'Designline', description: 'Elegancki design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
-    { id: 'Ultraline', name: 'Ultraline', description: 'Najwyższa klasa 100mm • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
-    { id: 'Skyline', name: 'Skyline', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
+    { id: 'Orangeline', name: 'Orangestyle', description: 'Ekonomiczny profil 50mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline.jpg' },
+    { id: 'Orangeline+', name: 'Orangestyle+', description: 'Ekonomiczny Plus 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline-plus.jpg' },
+    { id: 'Trendline', name: 'Trendstyle', description: 'Klasyczny profil 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg' },
+    { id: 'Trendline+', name: 'Trendstyle+', description: 'Klasyczny Plus 70mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-plus.jpg' },
+    { id: 'Topline', name: 'Topstyle', description: 'Premium profil 80mm • od 2500mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg' },
+    { id: 'Topline XL', name: 'Topstyle XL', description: 'Extra duża konstrukcja XL', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/topline-xl.jpg' },
+    { id: 'Designline', name: 'Designstyle', description: 'Elegancki design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
+    { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa 100mm • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
+    { id: 'Skyline', name: 'Skystyle', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
     { id: 'Carport', name: 'Carport', description: 'Wiata garażowa z blachą', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
 ];
 
@@ -160,6 +160,12 @@ function modelToDbName(model: string): string {
         'Carport': 'Carport',
     };
     return mapping[model] || model;
+}
+
+// Convert model ID to partner-facing display name (style branding)
+function modelDisplayName(modelId: string): string {
+    const m = ROOF_MODELS.find(r => r.id === modelId);
+    return m ? m.name : modelId;
 }
 
 // ======= HELPER: Build table name =======
@@ -1210,7 +1216,7 @@ export const B2BCalculator: React.FC = () => {
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
             (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}× (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
             (structureNote ? ` (${structureNote})` : '');
-        addToBasket(model, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
+        addToBasket(modelDisplayName(model), totalPrice, configStr, `${width}×${projection}mm`, 'roof');
     };
 
     const handleAddAccessoryBatch = () => {
@@ -1456,7 +1462,7 @@ export const B2BCalculator: React.FC = () => {
                             </div>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                            <div><span className="text-slate-500">Modell:</span> <strong>{model}</strong></div>
+                            <div><span className="text-slate-500">Modell:</span> <strong>{modelDisplayName(model)}</strong></div>
                             <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
                             <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
                         </div>
@@ -2932,7 +2938,7 @@ export const B2BCalculator: React.FC = () => {
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                                                 <span className="text-indigo-900 font-medium">Materiały dla modelu:</span>
-                                                <span className="font-bold text-indigo-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-indigo-200 shadow-sm">{model}</span>
+                                                <span className="font-bold text-indigo-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-indigo-200 shadow-sm">{modelDisplayName(model)}</span>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3284,7 +3290,7 @@ export const B2BCalculator: React.FC = () => {
                             <div className="mb-6 space-y-2">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-500">Model</span>
-                                    <span className="font-bold text-slate-800">{model}</span>
+                                    <span className="font-bold text-slate-800">{modelDisplayName(model)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-500">Wymiar</span>
