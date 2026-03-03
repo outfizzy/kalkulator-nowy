@@ -37,6 +37,8 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
         transition
     };
 
+    const isService = installation.sourceType === 'service';
+
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'scheduled':
@@ -71,14 +73,16 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
     const statusBadge = getStatusBadge(installation.status);
     const partsBadge = getPartsStatusBadge(installation.partsStatus, installation.partsReady);
 
-    // Border color based on weather severity
-    const weatherBorderClass = weather
-        ? weather.info.severity === 'bad'
-            ? 'border-l-4 border-l-red-400'
-            : weather.info.severity === 'moderate'
-                ? 'border-l-4 border-l-amber-400'
-                : 'border-l-4 border-l-sky-400'
-        : 'border-l-4 border-l-slate-200';
+    // Border color: service = orange, weather-based for regular installations
+    const getBorderClass = () => {
+        if (isService) return 'border-l-4 border-l-orange-400';
+        if (!weather) return 'border-l-4 border-l-slate-200';
+        switch (weather.info.severity) {
+            case 'bad': return 'border-l-4 border-l-red-400';
+            case 'moderate': return 'border-l-4 border-l-amber-400';
+            default: return 'border-l-4 border-l-sky-400';
+        }
+    };
 
     return (
         <div
@@ -86,14 +90,20 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
             style={style}
             {...attributes}
             {...listeners}
-            className={`bg-white rounded-lg shadow-sm border border-slate-200 cursor-move transition-all ${weatherBorderClass} ${isDragging
+            className={`bg-white rounded-lg shadow-sm border border-slate-200 cursor-move transition-all ${getBorderClass()} ${isDragging
                 ? 'opacity-50 scale-95 shadow-2xl z-50'
                 : 'hover:shadow-md hover:border-slate-300'
                 }`}
         >
-            {/* Header: Client Name + Weather */}
+            {/* Header: Client Name + Service Badge / Weather */}
             <div className="px-3 pt-2.5 pb-1.5 flex items-start justify-between gap-1.5">
                 <div className="flex-1 min-w-0">
+                    {/* Service Badge */}
+                    {isService && (
+                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px] font-bold mb-1 ring-1 ring-orange-200">
+                            🔧 Serwis
+                        </div>
+                    )}
                     <h4 className="font-bold text-[13px] text-slate-900 truncate leading-tight">
                         {installation.client?.name || `${installation.client?.firstName || ''} ${installation.client?.lastName || ''}`}
                     </h4>
@@ -105,8 +115,8 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                 {weather && (
                     <div
                         className={`flex-shrink-0 flex items-center gap-0.5 px-1.5 py-1 rounded-lg text-xs font-semibold ${weather.info.severity === 'bad' ? 'bg-red-50 text-red-700 ring-1 ring-red-200' :
-                                weather.info.severity === 'moderate' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' :
-                                    'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
+                            weather.info.severity === 'moderate' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' :
+                                'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
                             }`}
                         title={`${weather.info.label} — ${weather.tempMin}°/${weather.tempMax}°C`}
                     >
@@ -129,17 +139,34 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                 )}
             </div>
 
-            {/* Contract & Product */}
+            {/* Contract & Product / Service Description */}
             <div className="px-3 pb-1.5">
-                {installation.contractNumber && (
-                    <div className="text-[11px] text-slate-500 font-mono">
-                        📝 {installation.contractNumber}
-                    </div>
-                )}
-                {installation.productSummary && (
-                    <div className="text-[11px] text-slate-700 font-medium line-clamp-1 mt-0.5">
-                        📦 {installation.productSummary}
-                    </div>
+                {isService ? (
+                    <>
+                        {installation.notes && (
+                            <div className="text-[11px] text-orange-700 font-medium line-clamp-2 mt-0.5 bg-orange-50 p-1.5 rounded border border-orange-100">
+                                {installation.notes}
+                            </div>
+                        )}
+                        {installation.productSummary && (
+                            <div className="text-[11px] text-slate-600 line-clamp-1 mt-0.5">
+                                📋 {installation.productSummary}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        {installation.contractNumber && (
+                            <div className="text-[11px] text-slate-500 font-mono">
+                                📝 {installation.contractNumber}
+                            </div>
+                        )}
+                        {installation.productSummary && (
+                            <div className="text-[11px] text-slate-700 font-medium line-clamp-1 mt-0.5">
+                                📦 {installation.productSummary}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -168,7 +195,7 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                     </span>
                 </div>
                 <div className="flex items-center gap-1 flex-wrap justify-end">
-                    {partsBadge && (
+                    {!isService && partsBadge && (
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${partsBadge.color}`}>
                             {partsBadge.label}
                         </span>

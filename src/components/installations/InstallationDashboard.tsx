@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
@@ -17,6 +18,7 @@ import { InstallationService } from '../../services/database/installation.servic
 
 
 export const InstallationDashboard: React.FC = () => {
+    const navigate = useNavigate();
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
@@ -207,6 +209,11 @@ export const InstallationDashboard: React.FC = () => {
     };
 
     const handleEdit = (installation: Installation) => {
+        // Service-type installations → navigate to service ticket details
+        if (installation.sourceType === 'service' && installation.sourceId) {
+            navigate(`/service/${installation.sourceId}`);
+            return;
+        }
         setEditingInstallation(installation);
         setIsModalOpen(true);
     };

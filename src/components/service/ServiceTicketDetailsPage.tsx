@@ -1,12 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { ServiceService } from '../../services/database/service.service';
 import { InstallationService } from '../../services/database/installation.service';
-import type { ServiceTicket, InstallationTeam, ServiceTicketTask, ServiceTicketHistory, ServiceTicketStatus } from '../../types';
+import type { ServiceTicket, InstallationTeam, ServiceTicketTask, ServiceTicketHistory, ServiceTicketStatus, ServiceTicketPriority, ServiceTicketType } from '../../types';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { generateServiceProtocol } from './ServiceProtocolPDF';
+
+// ======= LABELS & STYLING =======
+const STATUS_OPTIONS: { value: ServiceTicketStatus; label: string; color: string }[] = [
+    { value: 'new', label: 'Nowe', color: 'bg-blue-100 text-blue-800' },
+    { value: 'open', label: 'Przyjęte', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 'scheduled', label: 'Zaplanowane', color: 'bg-purple-100 text-purple-800' },
+    { value: 'in_progress', label: 'W Realizacji', color: 'bg-indigo-100 text-indigo-800' },
+    { value: 'resolved', label: 'Rozwiązane', color: 'bg-green-100 text-green-800' },
+    { value: 'closed', label: 'Zamknięte', color: 'bg-gray-800 text-white' },
+    { value: 'rejected', label: 'Odrzucone', color: 'bg-red-100 text-red-800' },
+];
+
+const PRIORITY_OPTIONS: { value: ServiceTicketPriority; label: string; icon: string; color: string }[] = [
+    { value: 'low', label: 'Niski', icon: '🟢', color: 'text-green-700 bg-green-50 border-green-200' },
+    { value: 'medium', label: 'Średni', icon: '🟡', color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+    { value: 'high', label: 'Wysoki', icon: '🟠', color: 'text-orange-700 bg-orange-50 border-orange-200' },
+    { value: 'critical', label: 'Krytyczny', icon: '🔴', color: 'text-red-700 bg-red-50 border-red-200' },
+];
+
+const TYPE_OPTIONS: { value: ServiceTicketType; label: string; icon: string }[] = [
+    { value: 'leak', label: 'Nieszczelność', icon: '💧' },
+    { value: 'electrical', label: 'Elektryka', icon: '⚡' },
+    { value: 'visual', label: 'Usterka wizualna', icon: '👁️' },
+    { value: 'mechanical', label: 'Usterka mechaniczna', icon: '⚙️' },
+    { value: 'other', label: 'Inne', icon: '📋' },
+];
 
 export const ServiceTicketDetailsPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -23,6 +49,10 @@ export const ServiceTicketDetailsPage = () => {
     const [newTaskLabel, setNewTaskLabel] = useState('');
     const [selectedTeam, setSelectedTeam] = useState<string>('');
     const [selectedDate, setSelectedDate] = useState<string>('');
+
+    // Resolution photo upload
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const photoInputRef = useRef<HTMLInputElement>(null);
 
     const loadData = useCallback(async (ticketId: string) => {
         setLoading(true);
@@ -59,12 +89,37 @@ export const ServiceTicketDetailsPage = () => {
         loadData(id);
     }, [id, loadData]);
 
+    // ======= INLINE EDIT HANDLERS =======
+
+    const handleFieldUpdate = async (field: string, value: string, label?: string) => {
+        if (!ticket) return;
+        const updates: Partial<ServiceTicket> = { [field]: value };
+        const oldValue = (ticket as any)[field];
+        if (oldValue === value) return; // No change
+
+        try {
+            await ServiceService.updateTicketWithHistory(
+                ticket.id,
+                updates,
+                label ? `Zmieniono ${label}` : undefined
+            );
+            setTicket({ ...ticket, ...updates } as ServiceTicket);
+            toast.success('Zapisano', { duration: 1500 });
+            // Refresh history in background
+            ServiceService.getTicketHistory(ticket.id).then(setHistory).catch(console.error);
+        } catch (e: unknown) {
+            toast.error('Błąd zapisu');
+            console.error(e);
+        }
+    };
+
     const handleUpdateStatus = async (newStatus: ServiceTicketStatus) => {
         if (!ticket) return;
         try {
             await ServiceService.updateTicketWithHistory(ticket.id, { status: newStatus });
+            setTicket({ ...ticket, status: newStatus });
             toast.success('Status zaktualizowany');
-            loadData(ticket.id);
+            ServiceService.getTicketHistory(ticket.id).then(setHistory).catch(console.error);
         } catch (e: unknown) {
             toast.error('Błąd aktualizacji');
             console.error(e);
@@ -77,7 +132,7 @@ export const ServiceTicketDetailsPage = () => {
             await ServiceService.updateTicketWithHistory(ticket.id, {
                 assignedTeamId: selectedTeam,
                 scheduledDate: selectedDate || undefined,
-                status: 'scheduled' // Auto-update status
+                status: 'scheduled'
             });
             toast.success('Zaplanowano serwis');
             setIsAssignModalOpen(false);
@@ -98,9 +153,7 @@ export const ServiceTicketDetailsPage = () => {
         const updatedTasks = [...(ticket.tasks || []), newTask];
         await ServiceService.updateTasks(ticket.id, updatedTasks);
         setNewTaskLabel('');
-        // Optimistic update
         setTicket({ ...ticket, tasks: updatedTasks });
-        // Background refresh to get history if we tracked it
     };
 
     const handleToggleTask = async (taskId: string, completed: boolean) => {
@@ -112,34 +165,48 @@ export const ServiceTicketDetailsPage = () => {
         setTicket({ ...ticket, tasks: updatedTasks });
     };
 
-    const getStatusBadge = (status: string) => {
-        const styles: Record<string, string> = {
-            new: 'bg-blue-100 text-blue-800',
-            open: 'bg-yellow-100 text-yellow-800',
-            scheduled: 'bg-purple-100 text-purple-800',
-            in_progress: 'bg-indigo-100 text-indigo-800',
-            resolved: 'bg-green-100 text-green-800',
-            closed: 'bg-gray-800 text-white',
-            rejected: 'bg-red-100 text-red-800'
-        };
-        const labels: Record<string, string> = {
-            new: 'Nowe',
-            open: 'Otwarta',
-            scheduled: 'Zaplanowane',
-            in_progress: 'W Realizacji',
-            resolved: 'Rozwiązane',
-            closed: 'Zamknięte',
-            rejected: 'Odrzucone'
-        };
-        return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100'}`}>
-                {labels[status] || status}
-            </span>
-        );
+    const handleDeleteTask = async (taskId: string) => {
+        if (!ticket) return;
+        const updatedTasks = (ticket.tasks || []).filter(t => t.id !== taskId);
+        await ServiceService.updateTasks(ticket.id, updatedTasks);
+        setTicket({ ...ticket, tasks: updatedTasks });
+        toast.success('Usunięto zadanie');
     };
+
+    // Resolution photo upload
+    const handleResolutionPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!ticket || !e.target.files?.length) return;
+        setUploadingPhoto(true);
+        try {
+            for (const file of Array.from(e.target.files)) {
+                const { url, error } = await ServiceService.uploadResolutionPhoto(ticket.id, file);
+                if (error) throw error;
+                if (url) {
+                    const updatedPhotos = [...ticket.photos, url];
+                    setTicket({ ...ticket, photos: updatedPhotos });
+                }
+            }
+            toast.success('Zdjęcia dodane');
+        } catch (err) {
+            toast.error('Błąd przesyłania zdjęcia');
+            console.error(err);
+        } finally {
+            setUploadingPhoto(false);
+            if (photoInputRef.current) photoInputRef.current.value = '';
+        }
+    };
+
+    // ======= HELPERS =======
+    const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
+    const getPriorityOption = (priority: string) => PRIORITY_OPTIONS.find(p => p.value === priority) || PRIORITY_OPTIONS[1];
+    const getTypeOption = (type: string) => TYPE_OPTIONS.find(t => t.value === type) || TYPE_OPTIONS[4];
 
     if (loading) return <div className="p-8 text-center text-gray-500">Ładowanie...</div>;
     if (!ticket) return null;
+
+    const statusOpt = getStatusOption(ticket.status);
+    const priorityOpt = getPriorityOption(ticket.priority);
+    const typeOpt = getTypeOption(ticket.type);
 
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
@@ -147,147 +214,269 @@ export const ServiceTicketDetailsPage = () => {
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <button onClick={() => navigate('/service')} className="text-gray-500 hover:text-gray-700 mb-2 flex items-center gap-1 text-sm">
-                        ← Powrót
+                        ← Powrót do serwisu
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                        {ticket.ticketNumber}
-                        {getStatusBadge(ticket.status)}
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold text-gray-900">{ticket.ticketNumber}</h1>
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${statusOpt.color}`}>
+                            {statusOpt.label}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${priorityOpt.color}`}>
+                            {priorityOpt.icon} {priorityOpt.label}
+                        </span>
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={() => generateServiceProtocol(ticket)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium"
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
-                        </svg>
-                        Pobierz Protokół
+                        📄 Pobierz Protokół
                     </button>
-                    <select
-                        value={ticket.status}
-                        onChange={(e) => handleUpdateStatus(e.target.value as ServiceTicketStatus)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 border-none cursor-pointer font-medium"
-                    >
-                        <option className="text-gray-900 bg-white" value="new">Nowe</option>
-                        <option className="text-gray-900 bg-white" value="open">Przyjęte</option>
-                        <option className="text-gray-900 bg-white" value="scheduled">Zaplanowane</option>
-                        <option className="text-gray-900 bg-white" value="in_progress">W Realizacji</option>
-                        <option className="text-gray-900 bg-white" value="resolved">Rozwiązane</option>
-                        <option className="text-gray-900 bg-white" value="closed">Zamknięte</option>
-                        <option className="text-gray-900 bg-white" value="rejected">Odrzucone</option>
-                    </select>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* Left Column: Info */}
-                <div className="space-y-6">
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Informacje</h3>
+                {/* ===== LEFT COLUMN: Editable Info ===== */}
+                <div className="space-y-5">
 
+                    {/* Status & Priority */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Status & Priorytet</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs text-gray-400">Klient</label>
-                                <div className="font-medium text-gray-900">
-                                    {ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'Guest'}
-                                </div>
-                                <div className="text-sm text-gray-500">{ticket.client?.phone}</div>
-                                <div className="text-sm text-gray-500">{ticket.client?.street} {ticket.client?.houseNumber}, {ticket.client?.city}</div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+                                <select
+                                    value={ticket.status}
+                                    onChange={(e) => handleUpdateStatus(e.target.value as ServiceTicketStatus)}
+                                    className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
+                                >
+                                    {STATUS_OPTIONS.map(s => (
+                                        <option key={s.value} value={s.value}>{s.label}</option>
+                                    ))}
+                                </select>
                             </div>
-
                             <div>
-                                <label className="text-xs text-gray-400">Dotyczy</label>
-                                <div className="text-sm text-gray-900 font-medium">{ticket.type}</div>
-                                <div className="text-sm text-gray-600 mt-1 bg-gray-50 p-2 rounded border border-gray-100">
-                                    {ticket.description}
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Priorytet</label>
+                                <select
+                                    value={ticket.priority}
+                                    onChange={(e) => handleFieldUpdate('priority', e.target.value, 'priorytet')}
+                                    className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
+                                >
+                                    {PRIORITY_OPTIONS.map(p => (
+                                        <option key={p.value} value={p.value}>{p.icon} {p.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Typ usterki</label>
+                                <select
+                                    value={ticket.type}
+                                    onChange={(e) => handleFieldUpdate('type', e.target.value, 'typ usterki')}
+                                    className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
+                                >
+                                    {TYPE_OPTIONS.map(t => (
+                                        <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Client Info (read-only) */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Klient</h3>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
+                                    {ticket.client ? `${ticket.client.firstName?.[0] || ''}${ticket.client.lastName?.[0] || ''}` : '?'}
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-gray-900 text-sm">
+                                        {ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'Brak danych'}
+                                    </div>
+                                    {ticket.client?.email && (
+                                        <div className="text-xs text-gray-500">{ticket.client.email}</div>
+                                    )}
                                 </div>
                             </div>
-
-                            {ticket.installation && (
-                                <div>
-                                    <label className="text-xs text-gray-400">Montaż Źródłowy</label>
-                                    <div className="text-sm text-blue-600 cursor-pointer hover:underline" onClick={() => navigate(`/installations/${ticket.installationId}`)}>
-                                        Przejdź do montażu
-                                    </div>
-                                    <div className="text-xs text-gray-500">{ticket.installation.productSummary}</div>
+                            {ticket.client?.phone && (
+                                <a href={`tel:${ticket.client.phone}`} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
+                                    📞 {ticket.client.phone}
+                                </a>
+                            )}
+                            {(ticket.client?.street || ticket.client?.city) && (
+                                <div className="text-sm text-gray-600 flex items-start gap-2">
+                                    <span>📍</span>
+                                    <span>{ticket.client?.street} {ticket.client?.houseNumber}, {ticket.client?.postalCode} {ticket.client?.city}</span>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Photos Preview */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Zdjęcia</h3>
+                    {/* Contract & Installation Links */}
+                    {(ticket.contractId || ticket.installationId) && (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Powiązania</h3>
+                            <div className="space-y-2">
+                                {ticket.contract && (
+                                    <div className="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg border border-blue-100">
+                                        <div>
+                                            <div className="text-xs text-blue-500">Umowa</div>
+                                            <div className="text-sm font-medium text-blue-800">{ticket.contract.contractNumber}</div>
+                                        </div>
+                                        <button
+                                            onClick={() => navigate(`/contracts/${ticket.contractId}`)}
+                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                        >
+                                            Otwórz →
+                                        </button>
+                                    </div>
+                                )}
+                                {ticket.installation && (
+                                    <div className="flex items-center justify-between p-2.5 bg-green-50 rounded-lg border border-green-100">
+                                        <div>
+                                            <div className="text-xs text-green-500">Montaż Źródłowy</div>
+                                            <div className="text-sm font-medium text-green-800">{ticket.installation.productSummary}</div>
+                                        </div>
+                                        <button
+                                            onClick={() => navigate(`/installations/${ticket.installationId}`)}
+                                            className="text-xs text-green-600 hover:text-green-800 font-medium"
+                                        >
+                                            Otwórz →
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Photos */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Zdjęcia ({ticket.photos.length})</h3>
+                            <div>
+                                <input
+                                    ref={photoInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleResolutionPhotoUpload}
+                                    className="hidden"
+                                />
+                                <button
+                                    onClick={() => photoInputRef.current?.click()}
+                                    disabled={uploadingPhoto}
+                                    className="text-xs text-blue-600 font-medium hover:text-blue-800 disabled:opacity-50"
+                                >
+                                    {uploadingPhoto ? '⏳ Przesyłanie...' : '+ Dodaj zdjęcie'}
+                                </button>
+                            </div>
+                        </div>
                         <div className="grid grid-cols-3 gap-2">
                             {ticket.photos.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noreferrer" className="block aspect-square rounded overflow-hidden border hover:opacity-75">
-                                    <img src={url} className="w-full h-full object-cover" />
+                                <a key={i} href={url} target="_blank" rel="noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-gray-200 hover:opacity-75 transition-opacity">
+                                    <img src={url} className="w-full h-full object-cover" alt={`Zdjęcie ${i + 1}`} />
                                 </a>
                             ))}
-                            {ticket.photos.length === 0 && <span className="text-sm text-gray-400 col-span-3">Brak zdjęć</span>}
+                            {ticket.photos.length === 0 && (
+                                <span className="text-sm text-gray-400 col-span-3 text-center py-4">Brak zdjęć</span>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Middle Column: Tasks & Execution */}
-                <div className="space-y-6">
+                {/* ===== MIDDLE COLUMN: Description, Tasks & Execution ===== */}
+                <div className="space-y-5">
+
+                    {/* Editable Description */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Opis Usterki</h3>
+                        <textarea
+                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[120px] resize-y"
+                            defaultValue={ticket.description}
+                            placeholder="Opisz usterkę..."
+                            onBlur={async (e) => {
+                                if (e.target.value !== ticket.description) {
+                                    await handleFieldUpdate('description', e.target.value, 'opis usterki');
+                                }
+                            }}
+                        />
+                    </div>
 
                     {/* Scheduling Card */}
-                    <div className="bg-white rounded-lg shadow p-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Planowanie</h3>
-                            <button onClick={() => setIsAssignModalOpen(true)} className="text-sm text-blue-600 font-medium hover:text-blue-800">
-                                {ticket.assignedTeam ? 'Zmień' : 'Przypisz'}
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Planowanie</h3>
+                            <button onClick={() => setIsAssignModalOpen(true)} className="text-xs text-blue-600 font-medium hover:text-blue-800">
+                                {ticket.assignedTeam ? '✏️ Zmień' : '+ Przypisz'}
                             </button>
                         </div>
 
                         {ticket.assignedTeam ? (
-                            <div className="bg-blue-50 rounded p-4 border border-blue-100">
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 font-bold">
+                                    <div className="w-9 h-9 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 font-bold text-sm">
                                         {ticket.assignedTeam.name.substring(0, 2)}
                                     </div>
                                     <div>
-                                        <div className="font-medium text-blue-900">{ticket.assignedTeam.name}</div>
-                                        <div className="text-xs text-blue-700">Zespół Serwisowy</div>
+                                        <div className="font-semibold text-blue-900 text-sm">{ticket.assignedTeam.name}</div>
+                                        <div className="text-[11px] text-blue-600">Zespół Serwisowy</div>
                                     </div>
                                 </div>
-                                <div className="text-sm text-blue-800 flex items-center gap-2 mt-2">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                    {ticket.scheduledDate ? format(new Date(ticket.scheduledDate), 'EEEE, d MMMM yyyy', { locale: pl }) : 'Nieustalona data'}
+                                <div className="text-sm text-blue-800 flex items-center gap-2 mt-2 bg-white/60 p-2 rounded">
+                                    📅 {ticket.scheduledDate ? format(new Date(ticket.scheduledDate), 'EEEE, d MMMM yyyy', { locale: pl }) : 'Nieustalona data'}
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center py-6 bg-gray-50 rounded border border-dashed border-gray-300">
-                                <div className="text-gray-400 mb-2">Brak przypisanego zespołu</div>
-                                <button onClick={() => setIsAssignModalOpen(true)} className="px-4 py-2 bg-white text-gray-700 text-sm border shadow-sm rounded hover:bg-gray-50">
-                                    Przypisz Termin
+                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                <div className="text-gray-400 mb-3 text-sm">Brak przypisanego zespołu</div>
+                                <button onClick={() => setIsAssignModalOpen(true)} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium shadow-sm">
+                                    🔧 Przypisz Termin
                                 </button>
                             </div>
                         )}
+
+                        {/* Quick date edit */}
+                        <div className="mt-3">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Data serwisu</label>
+                            <input
+                                type="date"
+                                value={ticket.scheduledDate ? ticket.scheduledDate.split('T')[0] : ''}
+                                onChange={async (e) => {
+                                    await handleFieldUpdate('scheduledDate', e.target.value, 'datę serwisu');
+                                }}
+                                className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
                     </div>
 
                     {/* Checklist */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Lista Czynności</h3>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Lista Czynności</h3>
 
-                        <div className="space-y-2 mb-4">
+                        <div className="space-y-1 mb-4">
                             {(ticket.tasks || []).map(task => (
-                                <div key={task.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
+                                <div key={task.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg group">
                                     <input
                                         type="checkbox"
                                         checked={task.completed}
                                         onChange={(e) => handleToggleTask(task.id, e.target.checked)}
                                         className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                     />
-                                    <span className={`text-sm ${task.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                                    <span className={`flex-1 text-sm ${task.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                                         {task.label}
                                     </span>
+                                    <button
+                                        onClick={() => handleDeleteTask(task.id)}
+                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity text-xs"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            {(ticket.tasks || []).length === 0 && <div className="text-sm text-gray-400 italic text-center py-2">Brak zadań</div>}
+                            {(ticket.tasks || []).length === 0 && <div className="text-sm text-gray-400 italic text-center py-3">Brak zadań</div>}
                         </div>
 
                         <div className="flex gap-2">
@@ -297,76 +486,76 @@ export const ServiceTicketDetailsPage = () => {
                                 onChange={(e) => setNewTaskLabel(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
                                 placeholder="Dodaj zadanie..."
-                                className="flex-1 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                className="flex-1 text-sm border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                             />
                             <button
                                 onClick={handleAddTask}
                                 disabled={!newTaskLabel.trim()}
-                                className="px-3 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 disabled:opacity-50"
+                                className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
                             >
                                 +
                             </button>
                         </div>
                     </div>
 
-                    {/* Resolution Section from old file re-incorporated */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Notatki z Naprawy</h3>
+                    {/* Resolution Notes */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Notatki z Naprawy</h3>
                         <textarea
-                            className="w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 min-h-[100px]"
+                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[100px] resize-y"
                             placeholder="Wpisz przebieg naprawy..."
                             defaultValue={ticket.resolutionNotes || ''}
                             onBlur={async (e) => {
-                                if (e.target.value !== ticket.resolutionNotes) {
+                                if (e.target.value !== (ticket.resolutionNotes || '')) {
                                     await ServiceService.updateTicketWithHistory(ticket.id, { resolutionNotes: e.target.value }, "Zaktualizowano notatki z naprawy");
-                                    toast.success('Zapisano');
+                                    setTicket({ ...ticket, resolutionNotes: e.target.value });
+                                    toast.success('Zapisano', { duration: 1500 });
                                 }
                             }}
                         />
                     </div>
                 </div>
 
-                {/* Right Column: Timeline */}
-                <div className="bg-white rounded-lg shadow p-6 h-fit">
-                    <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Historia Zgłoszenia</h3>
-                    <div className="relative border-l border-gray-200 ml-2 space-y-6">
+                {/* ===== RIGHT COLUMN: Timeline ===== */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Historia Zgłoszenia</h3>
+                    <div className="relative border-l-2 border-gray-200 ml-2 space-y-5">
                         {/* Current Status Node */}
-                        <div className="mb-6 ml-4">
-                            <div className="absolute w-3 h-3 bg-green-500 rounded-full -left-[6.5px] mt-1.5 border border-white"></div>
+                        <div className="mb-4 ml-4">
+                            <div className="absolute w-3 h-3 bg-green-500 rounded-full -left-[7px] mt-1.5 border-2 border-white shadow-sm"></div>
                             <span className="text-sm font-bold text-gray-900">Teraz</span>
                         </div>
 
                         {history.map((entry) => (
                             <div key={entry.id} className="ml-4 relative">
-                                <div className="absolute w-3 h-3 bg-gray-200 rounded-full -left-[6.5px] mt-1.5 border border-white"></div>
-                                <div className="text-xs text-gray-500 mb-0.5">
-                                    {format(entry.createdAt, 'dd.MM HH:mm')} • {entry.user?.firstName}
+                                <div className="absolute w-2.5 h-2.5 bg-gray-300 rounded-full -left-[6.5px] mt-1.5 border-2 border-white"></div>
+                                <div className="text-[11px] text-gray-400 mb-0.5">
+                                    {format(entry.createdAt, 'dd.MM HH:mm')} • {entry.user?.firstName || 'System'}
                                 </div>
-                                <div className="text-sm text-gray-900">
+                                <div className="text-sm text-gray-800">
                                     {entry.changeType === 'status' && (
-                                        <span>Zmiana statusu: <span className="font-medium">{entry.oldValue}</span> → <span className="font-medium">{entry.newValue}</span></span>
+                                        <span>Status: <span className="font-medium">{entry.oldValue}</span> → <span className="font-medium text-blue-700">{entry.newValue}</span></span>
                                     )}
                                     {entry.changeType === 'assignment' && (
-                                        <span>Przypisanie: {entry.newValue}</span>
+                                        <span>Przypisanie: <span className="font-medium">{entry.newValue}</span></span>
                                     )}
                                     {entry.changeType === 'note' && (
-                                        <span className="italic">"{entry.newValue}"</span>
+                                        <span className="italic text-gray-600">"{entry.newValue}"</span>
                                     )}
                                     {entry.changeType === 'info' && (
-                                        <span>{entry.changeType}: {entry.oldValue} → {entry.newValue}</span>
+                                        <span>{entry.newValue}</span>
                                     )}
-                                    {/* Task changes not yet fully logged but handled if present */}
                                 </div>
                             </div>
                         ))}
 
                         {/* Creation Node */}
                         <div className="ml-4">
-                            <div className="absolute w-3 h-3 bg-gray-200 rounded-full -left-[6.5px] mt-1.5 border border-white"></div>
-                            <div className="text-xs text-gray-500 mb-0.5">
+                            <div className="absolute w-2.5 h-2.5 bg-gray-300 rounded-full -left-[6.5px] mt-1.5 border-2 border-white"></div>
+                            <div className="text-[11px] text-gray-400 mb-0.5">
                                 {format(ticket.createdAt, 'dd.MM.yyyy HH:mm')}
                             </div>
-                            <div className="text-sm text-gray-900">Utworzenie zgłoszenia</div>
+                            <div className="text-sm text-gray-800 font-medium">Utworzenie zgłoszenia</div>
                         </div>
                     </div>
                 </div>
@@ -375,8 +564,8 @@ export const ServiceTicketDetailsPage = () => {
             {/* Assignment Modal */}
             {isAssignModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                        <h3 className="text-lg font-bold mb-4">Zaplanuj Serwis</h3>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+                        <h3 className="text-lg font-bold mb-4">🔧 Zaplanuj Serwis</h3>
 
                         <div className="space-y-4">
                             <div>
@@ -384,7 +573,7 @@ export const ServiceTicketDetailsPage = () => {
                                 <select
                                     value={selectedTeam}
                                     onChange={(e) => setSelectedTeam(e.target.value)}
-                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value="">Wybierz zespół...</option>
                                     {teams.map(t => (
@@ -399,7 +588,7 @@ export const ServiceTicketDetailsPage = () => {
                                     type="date"
                                     value={selectedDate}
                                     onChange={(e) => setSelectedDate(e.target.value)}
-                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                 />
                             </div>
                         </div>
@@ -414,7 +603,7 @@ export const ServiceTicketDetailsPage = () => {
                             <button
                                 onClick={handleAssignTeam}
                                 disabled={!selectedTeam || !selectedDate}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
                             >
                                 Zapisz
                             </button>
