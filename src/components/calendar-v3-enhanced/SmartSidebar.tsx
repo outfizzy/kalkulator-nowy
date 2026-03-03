@@ -5,16 +5,18 @@ import { BacklogCard } from './BacklogCard';
 interface SmartSidebarProps {
     contracts: Contract[];
     serviceTickets: ServiceTicket[];
+    followUps: Installation[];
     pendingInstallations: Installation[];
     onClose?: () => void;
     onSearchChange?: (query: string) => void;
 }
 
-type TabType = 'contracts' | 'services' | 'pending';
+type TabType = 'contracts' | 'services' | 'followups' | 'pending';
 
 export const SmartSidebar: React.FC<SmartSidebarProps> = ({
     contracts,
     serviceTickets,
+    followUps,
     pendingInstallations,
     onClose
 }) => {
@@ -51,6 +53,18 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
         );
     }), [serviceTickets, searchQuery]);
 
+    const filteredFollowUps = useMemo(() => followUps.filter(i => {
+        if (!searchQuery) return true;
+        const searchLower = searchQuery.toLowerCase();
+        return (
+            i.client?.firstName?.toLowerCase().includes(searchLower) ||
+            i.client?.lastName?.toLowerCase().includes(searchLower) ||
+            i.client?.city?.toLowerCase().includes(searchLower) ||
+            i.contractNumber?.toLowerCase().includes(searchLower) ||
+            i.followUpItems?.some(item => item.toLowerCase().includes(searchLower))
+        );
+    }), [followUps, searchQuery]);
+
     const filteredPending = useMemo(() => pendingInstallations.filter(i => {
         if (!searchQuery) return true;
         const searchLower = searchQuery.toLowerCase();
@@ -79,9 +93,6 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
             groups.get(region)!.push(contract);
         });
 
-        // Initialize expanded state for new groups
-        // We can do this in a useEffect but doing it lazily is fine too
-
         // Sort groups by region
         return Array.from(groups.entries())
             .sort(([a], [b]) => a.localeCompare(b))
@@ -93,7 +104,12 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
             }));
     }, [filteredContracts]);
 
-
+    const tabs: { id: TabType; label: string; count: number }[] = [
+        { id: 'contracts', label: 'Umowy', count: filteredContracts.length },
+        { id: 'services', label: 'Serwis', count: filteredTickets.length },
+        { id: 'followups', label: 'Dokończ.', count: filteredFollowUps.length },
+        { id: 'pending', label: 'Inne', count: filteredPending.length },
+    ];
 
     return (
         <div className="w-80 h-full flex flex-col border-r border-slate-200 bg-white">
@@ -115,7 +131,7 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
                     <input
                         type="text"
                         value={searchQuery}
-                        onChange={(e) => onSearchChange?.(e.target.value) || setSearchQuery(e.target.value)}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Szukaj..."
                         className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors"
                     />
@@ -127,51 +143,29 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
 
             {/* Tabs */}
             <div className="flex border-b border-slate-200 bg-slate-50">
-                <button
-                    onClick={() => setActiveTab('contracts')}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors relative ${activeTab === 'contracts'
-                        ? 'text-indigo-600 bg-white'
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                        }`}
-                >
-                    Umowy
-                    <span className="ml-1.5 text-xs bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200">
-                        {filteredContracts.length}
-                    </span>
-                    {activeTab === 'contracts' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('services')}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors relative ${activeTab === 'services'
-                        ? 'text-indigo-600 bg-white'
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                        }`}
-                >
-                    Serwis
-                    <span className="ml-1.5 text-xs bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200">
-                        {filteredTickets.length}
-                    </span>
-                    {activeTab === 'services' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('pending')}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors relative ${activeTab === 'pending'
-                        ? 'text-indigo-600 bg-white'
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                        }`}
-                >
-                    Inne
-                    <span className="ml-1.5 text-xs bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200">
-                        {filteredPending.length}
-                    </span>
-                    {activeTab === 'pending' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
-                    )}
-                </button>
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex-1 py-2.5 text-xs font-medium transition-colors relative ${activeTab === tab.id
+                            ? 'text-indigo-600 bg-white'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                            }`}
+                    >
+                        {tab.label}
+                        {tab.count > 0 && (
+                            <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full border ${tab.id === 'followups' && tab.count > 0
+                                    ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}>
+                                {tab.count}
+                            </span>
+                        )}
+                        {activeTab === tab.id && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
+                        )}
+                    </button>
+                ))}
             </div>
 
             {/* Content Items */}
@@ -220,6 +214,28 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
                     </div>
                 )}
 
+                {activeTab === 'followups' && (
+                    <div className="space-y-2">
+                        {filteredFollowUps.length > 0 && (
+                            <div className="text-xs text-amber-700 bg-amber-50 rounded-lg p-2 border border-amber-200 mb-3">
+                                🔄 Montaże zakończone, ale z niezrealizowanymi pozycjami zamówienia. Przeciągnij na kalendarz aby zaplanować dokończenie.
+                            </div>
+                        )}
+                        {filteredFollowUps.map(installation => (
+                            <BacklogCard
+                                key={`followup-${installation.id}`}
+                                item={{
+                                    id: installation.sourceId || installation.id,
+                                    type: 'followup',
+                                    priority: 'pending',
+                                    data: installation
+                                }}
+                                priority={'pending'}
+                            />
+                        ))}
+                    </div>
+                )}
+
                 {activeTab === 'pending' && (
                     <div className="space-y-2">
                         {filteredPending.map(installation => (
@@ -239,6 +255,7 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
 
                 {((activeTab === 'contracts' && filteredContracts.length === 0) ||
                     (activeTab === 'services' && filteredTickets.length === 0) ||
+                    (activeTab === 'followups' && filteredFollowUps.length === 0) ||
                     (activeTab === 'pending' && filteredPending.length === 0)) && (
                         <div className="p-8 text-center text-slate-500">
                             <svg className="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

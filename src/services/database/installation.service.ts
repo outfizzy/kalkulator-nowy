@@ -851,6 +851,7 @@ export const InstallationService = {
         contracts: Contract[];
         serviceTickets: ServiceTicket[];
         pendingInstallations: Installation[];
+        followUps: Installation[];
     }> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
@@ -1011,10 +1012,51 @@ export const InstallationService = {
             !activeSourceIds.has(t.id) && !t.installation_id
         );
 
+        // 5. Follow-Up Installations: completed/verified with pending order items
+        let followUps: Installation[] = [];
+        try {
+            const completedInstallations = pendingInst.filter(i =>
+                i.status === 'completed' || i.status === 'verification'
+            );
+
+            if (completedInstallations.length > 0) {
+                const completedIds = completedInstallations.map(i => i.id);
+                const { data: orderItems } = await supabase
+                    .from('installation_order_items')
+                    .select('installation_id, name, status')
+                    .in('installation_id', completedIds)
+                    .neq('status', 'delivered');
+
+                if (orderItems && orderItems.length > 0) {
+                    // Group by installation ID
+                    const pendingByInstallation = new Map<string, string[]>();
+                    orderItems.forEach((item: any) => {
+                        const list = pendingByInstallation.get(item.installation_id) || [];
+                        list.push(item.name);
+                        pendingByInstallation.set(item.installation_id, list);
+                    });
+
+                    // Mark installations that have pending items as follow-ups
+                    followUps = completedInstallations
+                        .filter(i => pendingByInstallation.has(i.id))
+                        .map(i => ({
+                            ...i,
+                            // Add followup metadata to notes for sidebar display
+                            followUpItems: pendingByInstallation.get(i.id) || [],
+                            sourceType: 'followup' as any,
+                            sourceId: i.id
+                        }));
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching follow-ups:', e);
+        }
+
         return {
             contracts: backlogContracts as Contract[],
             serviceTickets: backlogTickets as ServiceTicket[],
-            pendingInstallations
+            pendingInstallations,
+            followUps
         };
     },
 
@@ -1651,6 +1693,64 @@ export const InstallationService = {
         return {
             id: newInst.id,
             // ... minimal fields
+            createdAt: new Date(newInst.created_at)
+        } as Installation;
+    },
+
+    async createFollowUpInstallation(originalInstallationId: string, scheduledDate: string, teamId: string): Promise<Installation> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // 1. Fetch original installation
+        const { data: original, error: fetchError } = await supabase
+            .from('installations')
+            .select('*')
+            .eq('id', originalInstallationId)
+            .single();
+
+        if (fetchError || !original) throw new Error('Original installation not found');
+
+        // 2. Get pending order items for description
+        const { data: pendingItems } = await supabase
+            .from('installation_order_items')
+            .select('name, status')
+            .eq('installation_id', originalInstallationId)
+            .neq('status', 'delivered');
+
+        const itemNames = (pendingItems || []).map((i: any) => i.name);
+        const pendingDescription = itemNames.length > 0
+            ? `Do zamontowania: ${itemNames.join(', ')}`
+            : 'Dokończenie montażu';
+
+        // 3. Create follow-up installation
+        const originalData = original.installation_data || {};
+        const installationData = {
+            ...originalData,
+            notes: pendingDescription,
+            productSummary: `🔄 Dokończenie: ${itemNames.slice(0, 2).join(', ')}${itemNames.length > 2 ? ` +${itemNames.length - 2}` : ''}`,
+            teamId: teamId
+        };
+
+        const { data: newInst, error: insertError } = await supabase
+            .from('installations')
+            .insert({
+                user_id: user.id,
+                status: 'scheduled',
+                scheduled_date: scheduledDate,
+                team_id: teamId,
+                installation_data: installationData,
+                source_type: 'followup',
+                source_id: originalInstallationId,
+                offer_id: original.offer_id,
+                parts_ready: false // Parts may not be ready yet
+            })
+            .select()
+            .single();
+
+        if (insertError) throw insertError;
+
+        return {
+            id: newInst.id,
             createdAt: new Date(newInst.created_at)
         } as Installation;
     },

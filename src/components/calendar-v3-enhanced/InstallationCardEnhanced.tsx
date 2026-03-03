@@ -38,6 +38,7 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
     };
 
     const isService = installation.sourceType === 'service';
+    const isFollowUp = installation.sourceType === 'followup';
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -76,6 +77,7 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
     // Border color: service = orange, weather-based for regular installations
     const getBorderClass = () => {
         if (isService) return 'border-l-4 border-l-orange-400';
+        if (isFollowUp) return 'border-l-4 border-l-amber-400';
         if (!weather) return 'border-l-4 border-l-slate-200';
         switch (weather.info.severity) {
             case 'bad': return 'border-l-4 border-l-red-400';
@@ -98,10 +100,15 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
             {/* Header: Client Name + Service Badge / Weather */}
             <div className="px-3 pt-2.5 pb-1.5 flex items-start justify-between gap-1.5">
                 <div className="flex-1 min-w-0">
-                    {/* Service Badge */}
+                    {/* Service / Follow-Up Badge */}
                     {isService && (
                         <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px] font-bold mb-1 ring-1 ring-orange-200">
                             🔧 Serwis
+                        </div>
+                    )}
+                    {isFollowUp && (
+                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold mb-1 ring-1 ring-amber-200">
+                            🔄 Dokończ.
                         </div>
                     )}
                     <h4 className="font-bold text-[13px] text-slate-900 truncate leading-tight">
@@ -141,7 +148,7 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
 
             {/* Contract & Product / Service Description */}
             <div className="px-3 pb-1.5">
-                {isService ? (
+                {isService || isFollowUp ? (
                     <>
                         {installation.notes && (
                             <div className="text-[11px] text-orange-700 font-medium line-clamp-2 mt-0.5 bg-orange-50 p-1.5 rounded border border-orange-100">

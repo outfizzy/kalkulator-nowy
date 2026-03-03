@@ -595,7 +595,8 @@ export interface Installation {
     offerId?: string; // Link to the original offer (optional for custom installations)
     contractNumber?: string; // e.g. "UM/2025/12/001"
     customerId?: string; // Link to Customers table
-    sourceType?: 'contract' | 'service' | 'manual';
+    sourceType?: 'contract' | 'service' | 'manual' | 'followup';
+    followUpItems?: string[]; // Names of pending order items for follow-up visits
     sourceId?: string; // ID of the source contract/ticket
     title?: string; // For manual tasks
     customerFeedback?: {

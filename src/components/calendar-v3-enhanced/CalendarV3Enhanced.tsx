@@ -14,6 +14,7 @@ interface CalendarV3EnhancedProps {
     teams: InstallationTeam[];
     contracts: Contract[];
     serviceTickets: ServiceTicket[];
+    followUps: Installation[];
     unavailability: TeamUnavailability[];
     onRefresh: () => void;
     onEditInstallation?: (installation: Installation) => void;
@@ -26,6 +27,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
     teams,
     contracts,
     serviceTickets,
+    followUps,
     unavailability,
     onRefresh,
     onEditInstallation
@@ -110,6 +112,14 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                     targetTeamId
                 );
                 toast.success('Serwis zaplanowany', { id: toastId });
+            } else if (itemType === 'followup') {
+                // Create follow-up installation from completed one
+                await InstallationService.createFollowUpInstallation(
+                    itemId,
+                    targetDate,
+                    targetTeamId
+                );
+                toast.success('Dokończenie zaplanowane', { id: toastId });
             }
 
             onRefresh();
@@ -153,6 +163,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                         <SmartSidebar
                             contracts={contracts}
                             serviceTickets={serviceTickets}
+                            followUps={followUps}
                             pendingInstallations={installations.filter(i => !i.scheduledDate)}
                             onClose={() => setSidebarOpen(false)}
                         />

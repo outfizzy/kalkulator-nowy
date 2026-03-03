@@ -3,7 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 import type { Contract, ServiceTicket, Installation } from '../../types';
 
 type Priority = 'urgent' | 'ready' | 'pending' | 'future';
-type ItemType = 'contract' | 'service' | 'installation';
+type ItemType = 'contract' | 'service' | 'installation' | 'followup';
 
 interface BacklogItem {
     id: string;
@@ -22,14 +22,13 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
     const getClientData = (item: BacklogItem) => {
         if (item.type === 'contract') {
             const c = item.data as any;
-            // Service returns 'client' and 'contractData'. 'customerData' might be missing.
             const client = c.client || c.contractData?.client || c.contractData?.customer || c.customerData || {};
             return {
                 name: client.name || `${client.firstName || ''} ${client.lastName || ''}`.trim(),
                 firstName: client.firstName,
                 lastName: client.lastName,
                 city: client.city || '',
-                address: client.address || '', // Ensure address is captured
+                address: client.address || '',
                 postalCode: client.postalCode || ''
             };
         } else if (item.type === 'service') {
@@ -41,6 +40,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                 postalCode: t.client?.postalCode || ''
             };
         } else {
+            // Installation or followup
             const i = item.data as Installation;
             return {
                 name: i.client?.name || `${i.client?.firstName || ''} ${i.client?.lastName || ''}`.trim(),
@@ -60,32 +60,26 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
             : (item.data as Installation).contractNumber;
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-        id: item.id,
+        id: item.type === 'followup' ? `followup-${item.id}` : item.id,
         data: {
             type: item.type,
-            itemId: item.type === 'contract'
-                ? (item.data as Contract).id
-                : item.type === 'service'
-                    ? (item.data as ServiceTicket).id
-                    : (item.data as Installation).id,
+            itemId: item.id,
             // Additional metadata for DragOverlay
             title: itemTitle,
-            subtitle: itemSubtitle
+            subtitle: item.type === 'followup' ? 'Dokończenie' : itemSubtitle
         }
     });
 
     const renderContent = () => {
         if (item.type === 'contract') {
-            const contract = item.data as any; // Use any to access potentially unmapped props
+            const contract = item.data as any;
             const orderedItems = (contract.orderedItems || []) as any[];
 
             // Supply Logic
-            // 1. Check if we have ordered items
             const hasOrderedItems = orderedItems.length > 0;
             const allDelivered = hasOrderedItems && orderedItems.every(i => i.status === 'delivered');
             const someOrdered = hasOrderedItems && orderedItems.some(i => i.status === 'ordered');
 
-            // 2. Fallback to legacy fields if needed
             const legacyStatus = contract.supplyInfo?.status;
             const isDelivered = allDelivered || legacyStatus === 'delivered';
 
@@ -180,6 +174,57 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                     </div>
                 </>
             );
+        } else if (item.type === 'followup') {
+            // Follow-up card — completed installation with pending items
+            const installation = item.data as Installation;
+            const pendingItems = installation.followUpItems || [];
+
+            return (
+                <>
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                            <h4 className="font-semibold text-slate-900 text-sm">
+                                {itemTitle || 'Klient'}
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-0.5 font-mono">
+                                {installation.contractNumber || ''}
+                            </p>
+                        </div>
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded">
+                            🔄 Dokończ.
+                        </span>
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-600">
+                        <div className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            </svg>
+                            <span>{clientData.city}</span>
+                        </div>
+                    </div>
+                    {/* Pending items list */}
+                    {pendingItems.length > 0 && (
+                        <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
+                            <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wide mb-1">
+                                Do zamontowania:
+                            </div>
+                            <div className="space-y-0.5">
+                                {pendingItems.slice(0, 3).map((itemName, idx) => (
+                                    <div key={idx} className="text-xs text-amber-700 flex items-center gap-1">
+                                        <span className="text-amber-400">•</span>
+                                        <span className="truncate">{itemName}</span>
+                                    </div>
+                                ))}
+                                {pendingItems.length > 3 && (
+                                    <div className="text-[10px] text-amber-500">
+                                        +{pendingItems.length - 3} więcej...
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </>
+            );
         } else {
             const installation = item.data as Installation;
             return (
@@ -224,7 +269,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                     : priority === 'ready'
                         ? 'border-yellow-200'
                         : priority === 'pending'
-                            ? 'border-blue-200'
+                            ? 'border-amber-200'
                             : 'border-slate-200'
                 }`}
         >

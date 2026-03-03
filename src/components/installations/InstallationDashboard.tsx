@@ -23,6 +23,7 @@ export const InstallationDashboard: React.FC = () => {
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [serviceTickets, setServiceTickets] = useState<ServiceTicket[]>([]);
+    const [followUps, setFollowUps] = useState<Installation[]>([]);
     const [unavailability, setUnavailability] = useState<TeamUnavailability[]>([]);
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -80,6 +81,7 @@ export const InstallationDashboard: React.FC = () => {
             if (backlogResult.status === 'fulfilled') {
                 setContracts(backlogResult.value.contracts);
                 setServiceTickets(backlogResult.value.serviceTickets);
+                setFollowUps(backlogResult.value.followUps || []);
             }
 
             // If critical data failed (Installations or Teams), show error toast
@@ -344,6 +346,7 @@ export const InstallationDashboard: React.FC = () => {
                             teams={teams}
                             contracts={contracts}
                             serviceTickets={serviceTickets}
+                            followUps={followUps}
                             unavailability={unavailability}
                             onRefresh={loadData}
                             onEditInstallation={handleEdit}
