@@ -1069,6 +1069,7 @@ export interface ServiceTicket {
     ticketNumber: string;
     clientId: string;
     contractId?: string;
+    contractNumber?: string; // Manual contract number for legacy orders
     installationId?: string;
     status: ServiceTicketStatus;
     priority: ServiceTicketPriority;

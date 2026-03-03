@@ -224,6 +224,7 @@ export const ServiceService = {
             // Fix mapping for DB matches
             if (updates.clientId) dbUpdates.client_id = updates.clientId;
             if (updates.contractId) dbUpdates.contract_id = updates.contractId;
+            if ('contractNumber' in updates) dbUpdates.contract_number = updates.contractNumber;
             if (updates.assignedTeamId) dbUpdates.assigned_team_id = updates.assignedTeamId;
             if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
             if (updates.resolutionNotes) dbUpdates.resolution_notes = updates.resolutionNotes;
@@ -232,6 +233,7 @@ export const ServiceService = {
             // Remove mapped camelCase keys
             delete dbUpdates.clientId;
             delete dbUpdates.contractId;
+            delete dbUpdates.contractNumber;
             delete dbUpdates.assignedTeamId;
             delete dbUpdates.scheduledDate;
             delete dbUpdates.resolutionNotes;
@@ -335,6 +337,7 @@ export const ServiceService = {
             ticketNumber: row.ticket_number,
             clientId: row.client_id,
             contractId: row.contract_id,
+            contractNumber: row.contract_number || undefined,
             installationId: row.installation_id,
             status: row.status,
             priority: row.priority,

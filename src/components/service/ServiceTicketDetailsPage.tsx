@@ -414,6 +414,24 @@ export const ServiceTicketDetailsPage = () => {
                             </button>
                         </div>
 
+                        {/* Manual Contract Number */}
+                        <div className="mb-4">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Nr umowy (ręczny)</label>
+                            <input
+                                type="text"
+                                placeholder="np. KS/0123/01/2025"
+                                defaultValue={ticket.contractNumber || ''}
+                                onBlur={async (e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (ticket.contractNumber || '')) {
+                                        await handleFieldUpdate('contractNumber', val, 'numer umowy');
+                                    }
+                                }}
+                                className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Dla starych zleceń — pojawi się w kalendarzu</p>
+                        </div>
+
                         {ticket.assignedTeam ? (
                             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
                                 <div className="flex items-center gap-3 mb-2">

@@ -1616,6 +1616,7 @@ export const InstallationService = {
                 phone: client.phone || '',
                 coordinates: undefined
             },
+            contractNumber: ticket.contract_number || undefined, // Manual contract number for calendar display
             productSummary: `Zgłoszenie: ${ticket.title || 'Serwis'}`,
             teamId: teamId,
             notes: ticket.description
