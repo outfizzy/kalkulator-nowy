@@ -195,7 +195,7 @@ export const ServiceService = {
             .from('service_tickets')
             .select(`
                 *,
-                client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, address ),
+                client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, street ),
                 team:assigned_team_id ( id, name, color ),
                 contract:contract_id ( id, contract_number ),
                 installation:installation_id ( id, installation_data )
