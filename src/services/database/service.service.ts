@@ -347,6 +347,7 @@ export const ServiceService = {
             scheduledDate: row.scheduled_date,
             assignedTeamId: row.assigned_team_id,
             photos: row.photos || [],
+            clientNotes: row.client_notes || undefined,
             tasks: row.tasks || [], // JSONB
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),

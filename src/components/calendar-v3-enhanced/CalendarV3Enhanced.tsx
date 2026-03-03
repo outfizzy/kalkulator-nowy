@@ -166,6 +166,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                             followUps={followUps}
                             pendingInstallations={installations.filter(i => !i.scheduledDate)}
                             onClose={() => setSidebarOpen(false)}
+                            onRefresh={onRefresh}
                         />
                     </div>
 

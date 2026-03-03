@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Contract, ServiceTicket, Installation } from '../../types';
 import { BacklogCard } from './BacklogCard';
+import { AddFollowUpModal } from './AddFollowUpModal';
 
 interface SmartSidebarProps {
     contracts: Contract[];
@@ -9,6 +10,7 @@ interface SmartSidebarProps {
     pendingInstallations: Installation[];
     onClose?: () => void;
     onSearchChange?: (query: string) => void;
+    onRefresh?: () => void;
 }
 
 type TabType = 'contracts' | 'services' | 'followups' | 'pending';
@@ -18,11 +20,13 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
     serviceTickets,
     followUps,
     pendingInstallations,
-    onClose
+    onClose,
+    onRefresh
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<TabType>('contracts');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+    const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 
     const toggleGroup = (id: string) => {
         setExpandedGroups(prev => ({
@@ -155,8 +159,8 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
                         {tab.label}
                         {tab.count > 0 && (
                             <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full border ${tab.id === 'followups' && tab.count > 0
-                                    ? 'bg-amber-100 text-amber-700 border-amber-200'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
                                 }`}>
                                 {tab.count}
                             </span>
@@ -216,9 +220,16 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
 
                 {activeTab === 'followups' && (
                     <div className="space-y-2">
+                        {/* Add button */}
+                        <button
+                            onClick={() => setShowFollowUpModal(true)}
+                            className="w-full py-2 text-sm font-medium text-amber-700 bg-amber-50 border-2 border-dashed border-amber-300 rounded-lg hover:bg-amber-100 hover:border-amber-400 transition-colors"
+                        >
+                            + Dodaj dokończenie
+                        </button>
                         {filteredFollowUps.length > 0 && (
-                            <div className="text-xs text-amber-700 bg-amber-50 rounded-lg p-2 border border-amber-200 mb-3">
-                                🔄 Montaże zakończone, ale z niezrealizowanymi pozycjami zamówienia. Przeciągnij na kalendarz aby zaplanować dokończenie.
+                            <div className="text-xs text-amber-700 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                                🔄 Montaże zakończone z niezrealizowanymi pozycjami. Przeciągnij na kalendarz.
                             </div>
                         )}
                         {filteredFollowUps.map(installation => (
@@ -265,6 +276,13 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({
                         </div>
                     )}
             </div>
+
+            {/* Follow-Up Modal */}
+            <AddFollowUpModal
+                isOpen={showFollowUpModal}
+                onClose={() => setShowFollowUpModal(false)}
+                onCreated={() => onRefresh?.()}
+            />
         </div>
     );
 };

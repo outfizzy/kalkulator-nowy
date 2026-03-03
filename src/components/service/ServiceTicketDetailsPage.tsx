@@ -228,6 +228,16 @@ export const ServiceTicketDetailsPage = () => {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => {
+                            const url = `${window.location.origin}/service-form/${ticket.id}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success('Link skopiowany do schowka!');
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-blue-700 font-medium text-sm"
+                    >
+                        🔗 Link dla klienta
+                    </button>
+                    <button
                         onClick={() => generateServiceProtocol(ticket)}
                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm"
                     >
@@ -385,6 +395,16 @@ export const ServiceTicketDetailsPage = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Client Notes (from public form) */}
+                    {ticket.clientNotes && (
+                        <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-5">
+                            <h3 className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">📩 Notatki od klienta</h3>
+                            <div className="text-sm text-gray-700 whitespace-pre-line bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                {ticket.clientNotes}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ===== MIDDLE COLUMN: Description, Tasks & Execution ===== */}

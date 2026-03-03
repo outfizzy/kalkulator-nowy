@@ -68,6 +68,7 @@ import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
 import { VisualizerPage } from './pages/VisualizerPage';
 import ServiceRequestPage from './pages/public/ServiceRequestPage';
+import ServiceClientFormPage from './pages/public/ServiceClientFormPage';
 import { ServiceTicketDetailsPage } from './components/service/ServiceTicketDetailsPage';
 import { PublicOfferPage } from './pages/PublicOfferPage';
 import { CallManager } from './components/telephony/CallManager';
@@ -157,6 +158,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/reklamation" element={<ServiceRequestPage />} />
+            <Route path="/service-form/:ticketId" element={<ServiceClientFormPage />} />
             <Route path="/partner/login" element={<Navigate to="/b2b/login" replace />} />
             <Route path="/partner/register" element={<PartnerRegisterPage />} />
             <Route path="/b2b/login" element={<B2BLoginPage />} />

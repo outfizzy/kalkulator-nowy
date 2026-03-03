@@ -1081,6 +1081,8 @@ export interface ServiceTicket {
     assignedTeamId?: string;
     tasks?: ServiceTicketTask[]; // New field
     photos: string[];
+    clientNotes?: string; // Notes submitted by client via public form
+    customerName?: string; // Customer name for display
     createdAt: Date;
     updatedAt: Date;
     // Joined data

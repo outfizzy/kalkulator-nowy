@@ -1755,6 +1755,87 @@ export const InstallationService = {
         } as Installation;
     },
 
+    async createManualFollowUp(originalInstallationId: string, description: string): Promise<Installation> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // 1. Fetch original installation data
+        const { data: original, error: fetchError } = await supabase
+            .from('installations')
+            .select('*')
+            .eq('id', originalInstallationId)
+            .single();
+
+        if (fetchError || !original) throw new Error('Original installation not found');
+
+        // 2. Create pending follow-up (not scheduled yet — user will drag to calendar)
+        const originalData = original.installation_data || {};
+        const installationData = {
+            ...originalData,
+            notes: description,
+            productSummary: `🔄 Dokończenie: ${description.slice(0, 60)}${description.length > 60 ? '...' : ''}`
+        };
+
+        const { data: newInst, error: insertError } = await supabase
+            .from('installations')
+            .insert({
+                user_id: user.id,
+                status: 'pending',
+                installation_data: installationData,
+                source_type: 'followup',
+                source_id: originalInstallationId,
+                offer_id: original.offer_id,
+                parts_ready: false
+            })
+            .select()
+            .single();
+
+        if (insertError) throw insertError;
+        return { id: newInst.id, createdAt: new Date(newInst.created_at) } as Installation;
+    },
+
+    async createStandaloneFollowUp(data: {
+        clientName: string;
+        clientCity: string;
+        clientAddress: string;
+        clientPhone: string;
+        contractNumber: string;
+        description: string;
+    }): Promise<Installation> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const nameParts = data.clientName.split(' ');
+        const installationData = {
+            client: {
+                firstName: nameParts[0] || '',
+                lastName: nameParts.slice(1).join(' ') || '',
+                city: data.clientCity,
+                address: data.clientAddress,
+                phone: data.clientPhone,
+                coordinates: undefined
+            },
+            contractNumber: data.contractNumber || undefined,
+            notes: data.description,
+            productSummary: `🔄 Dokończenie: ${data.description.slice(0, 60)}${data.description.length > 60 ? '...' : ''}`
+        };
+
+        const { data: newInst, error: insertError } = await supabase
+            .from('installations')
+            .insert({
+                user_id: user.id,
+                status: 'pending',
+                installation_data: installationData,
+                source_type: 'followup',
+                parts_ready: false
+            })
+            .select()
+            .single();
+
+        if (insertError) throw insertError;
+        return { id: newInst.id, createdAt: new Date(newInst.created_at) } as Installation;
+    },
+
     async syncOrderItemsFromConfig(installationId: string, config: ProductConfig): Promise<void> {
         const existingItems = await this.getOrderItems(installationId);
         const existingNames = new Set(existingItems.map(i => i.name));
