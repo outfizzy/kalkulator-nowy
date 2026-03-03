@@ -37,11 +37,12 @@ const ServiceClientFormPage = () => {
             try {
                 const { data, error: fetchError } = await supabase
                     .from('service_tickets')
-                    .select('id, ticket_number, title, status')
+                    .select('id, ticket_number, status, description')
                     .eq('id', ticketId)
                     .single();
 
                 if (fetchError || !data) {
+                    console.error('Ticket fetch error:', fetchError);
                     setError('Service-Ticket nicht gefunden. Bitte überprüfen Sie den Link.');
                     setLoading(false);
                     return;
@@ -56,7 +57,7 @@ const ServiceClientFormPage = () => {
                 setTicketInfo({
                     id: data.id,
                     ticketNumber: data.ticket_number,
-                    title: data.title || 'Service-Anfrage',
+                    title: data.description || 'Service-Anfrage',
                     companyName: 'Polendach24'
                 });
             } catch (e) {
