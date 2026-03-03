@@ -197,7 +197,7 @@ export const ServiceService = {
                 *,
                 client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, street ),
                 team:assigned_team_id ( id, name, color ),
-                contract:contract_id ( id, contract_number ),
+                contract:contract_id ( id, contract_data ),
                 installation:installation_id ( id, installation_data )
             `)
             .order('created_at', { ascending: false });
@@ -351,8 +351,11 @@ export const ServiceService = {
             tasks: row.tasks || [], // JSONB
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),
-            client: row.client,
-            contract: row.contract,
+            client: row.client ? { ...row.client, address: row.client.street } : undefined,
+            contract: row.contract ? {
+                ...row.contract,
+                contractNumber: row.contract.contract_data?.contract_number || row.contract.contract_data?.contractNumber || ''
+            } : undefined,
             installation: row.installation,
             assignedTeam: row.team || row.assigned_team // Handle both likely aliases from join
         };
