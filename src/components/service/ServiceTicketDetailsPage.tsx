@@ -419,7 +419,7 @@ export const ServiceTicketDetailsPage = () => {
                             <label className="block text-xs font-medium text-gray-500 mb-1">Nr umowy (ręczny)</label>
                             <input
                                 type="text"
-                                placeholder="np. KS/0123/01/2025"
+                                placeholder="np. PL/0123/01/2025"
                                 defaultValue={ticket.contractNumber || ''}
                                 onBlur={async (e) => {
                                     const val = e.target.value.trim();
