@@ -3,12 +3,20 @@ import { DatabaseService } from '../services/database';
 import { toast } from 'react-hot-toast';
 import type { User, CommissionConfig } from '../types';
 import { CommissionSettingsModal } from './admin/CommissionSettingsModal';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export const UserManagementPage: React.FC = () => {
+    const { currentUser } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'internal' | 'partners'>('internal');
     const [selectedUserForCommission, setSelectedUserForCommission] = useState<User | null>(null);
+
+    // Add user modal state
+    const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+    const [newUser, setNewUser] = useState({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer' as string });
+    const [creating, setCreating] = useState(false);
 
     const loadUsers = async () => {
         try {
@@ -167,6 +175,44 @@ export const UserManagementPage: React.FC = () => {
         await loadUsers();
     };
 
+    const handleCreateUser = async () => {
+        if (!newUser.email || !newUser.password || !newUser.firstName || !newUser.lastName) {
+            toast.error('Wypełnij wszystkie wymagane pola');
+            return;
+        }
+        if (newUser.password.length < 6) {
+            toast.error('Hasło musi mieć minimum 6 znaków');
+            return;
+        }
+        setCreating(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`,
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify(newUser)
+                }
+            );
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'Błąd tworzenia konta');
+            toast.success(`Konto dla ${newUser.firstName} ${newUser.lastName} zostało utworzone`);
+            setIsAddUserOpen(false);
+            setNewUser({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer' });
+            await loadUsers();
+        } catch (error: any) {
+            console.error('Error creating user:', error);
+            toast.error(error.message || 'Błąd tworzenia użytkownika');
+        } finally {
+            setCreating(false);
+        }
+    };
+
     const handleSetHourlyRate = async (user: User) => {
         try {
             const currentRate = user.hourlyRate || 0;
@@ -275,6 +321,15 @@ export const UserManagementPage: React.FC = () => {
                     <h1 className="text-3xl font-bold text-white">Zarządzanie Użytkownikami</h1>
                     <p className="text-slate-400 mt-1">Zatwierdzaj, blokuj i zarządzaj kontami użytkowników</p>
                 </div>
+                <button
+                    onClick={() => setIsAddUserOpen(true)}
+                    className="px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2 shadow-lg"
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Dodaj Użytkownika
+                </button>
             </div>
 
             {/* Statistics Cards */}
@@ -774,6 +829,110 @@ export const UserManagementPage: React.FC = () => {
                 user={selectedUserForCommission}
                 onSave={handleSaveCommission}
             />
+
+            {/* Add User Modal */}
+            {isAddUserOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-slate-900 mb-1">Dodaj Użytkownika</h3>
+                        <p className="text-sm text-slate-500 mb-6">
+                            {currentUser?.role === 'manager'
+                                ? 'Utwórz konto dla montażysty'
+                                : 'Utwórz nowe konto pracownika'
+                            }
+                        </p>
+
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 mb-1">Imię *</label>
+                                    <input
+                                        type="text"
+                                        value={newUser.firstName}
+                                        onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Jan"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 mb-1">Nazwisko *</label>
+                                    <input
+                                        type="text"
+                                        value={newUser.lastName}
+                                        onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Kowalski"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">E-mail *</label>
+                                <input
+                                    type="email"
+                                    value={newUser.email}
+                                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="jan.kowalski@firma.pl"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Hasło *</label>
+                                <input
+                                    type="password"
+                                    value={newUser.password}
+                                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Min. 6 znaków"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Telefon</label>
+                                <input
+                                    type="tel"
+                                    value={newUser.phone}
+                                    onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="+48 600 000 000"
+                                />
+                            </div>
+
+                            {currentUser?.role === 'admin' && (
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 mb-1">Rola</label>
+                                    <select
+                                        value={newUser.role}
+                                        onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="installer">Monter</option>
+                                        <option value="sales_rep">Przedstawiciel Handlowy</option>
+                                        <option value="manager">Manager</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                onClick={() => { setIsAddUserOpen(false); setNewUser({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer' }); }}
+                                className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium"
+                            >
+                                Anuluj
+                            </button>
+                            <button
+                                onClick={handleCreateUser}
+                                disabled={creating || !newUser.email || !newUser.password || !newUser.firstName || !newUser.lastName}
+                                className="px-5 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 font-medium transition-colors"
+                            >
+                                {creating ? 'Tworzenie...' : 'Utwórz Konto'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
