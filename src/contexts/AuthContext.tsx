@@ -99,6 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('crm_tasks');
             rolePermissions.add('crm_mail');
             rolePermissions.add('contracts_list');
+            rolePermissions.add('service_module');
         } else if (role === 'sales_rep') {
             rolePermissions.add('dashboard');
             rolePermissions.add('offers_list');
@@ -106,6 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('crm_leads');
             rolePermissions.add('crm_clients');
             rolePermissions.add('contracts_list');
+            rolePermissions.add('service_module');
         }
 
         setPermissions(rolePermissions);
