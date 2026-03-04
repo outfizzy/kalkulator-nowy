@@ -129,12 +129,28 @@ export const ServiceTicketDetailsPage = () => {
     const handleAssignTeam = async () => {
         if (!ticket) return;
         try {
+            // 1. Update ticket with team and date
             await ServiceService.updateTicketWithHistory(ticket.id, {
                 assignedTeamId: selectedTeam,
                 scheduledDate: selectedDate || undefined,
                 status: 'scheduled'
             });
-            toast.success('Zaplanowano serwis');
+
+            // 2. Create installation calendar entry so it appears in Kalendarz Montaży
+            if (selectedTeam && selectedDate) {
+                try {
+                    await InstallationService.createInstallationFromServiceTicket(
+                        ticket.id,
+                        selectedDate,
+                        selectedTeam
+                    );
+                } catch (calErr) {
+                    console.error('Calendar entry creation failed (non-blocking):', calErr);
+                    // Non-blocking — ticket is still scheduled even if calendar entry fails
+                }
+            }
+
+            toast.success('Zaplanowano serwis — dodano do kalendarza');
             setIsAssignModalOpen(false);
             loadData(ticket.id);
         } catch (e: unknown) {
