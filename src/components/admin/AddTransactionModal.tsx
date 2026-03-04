@@ -131,6 +131,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
     if (!isOpen) return null;
 
     const expenseCategories = [
+        'Gotówka',
         'Materiały',
         'Paliwo',
         'Narzędzia',

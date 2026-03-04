@@ -108,6 +108,7 @@ export const Layout: React.FC = () => {
                             {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
                             {hasPermission('pricing_management') && <NavLink to="/admin/product-images" label="Zdjęcia Produktów" icon="offers" />}
                             {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
+                            {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/wallet" label="Portfel" icon="clipboard" />}
                             {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
                             <NavLink to="/admin/error-reports" label="Raporty Błędów" icon="bell" />
                             <NavLink to="/admin/email-templates" label="Szablony Wiadomości" icon="mail" />
