@@ -90,6 +90,13 @@ export const ContractsList: React.FC = () => {
             lastName.includes(term) ||
             city.includes(term)
         );
+    }).sort((a, b) => {
+        // Extract numeric part from contract number (e.g. PL/0042/... → 42)
+        const getNum = (cn: string) => {
+            const match = cn.match(/\/([0-9]+)/);
+            return match ? parseInt(match[1], 10) : 0;
+        };
+        return getNum(b.contractNumber) - getNum(a.contractNumber);
     });
 
     const getStatusColor = (status: string) => {

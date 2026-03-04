@@ -248,7 +248,18 @@ export const ContractDetails: React.FC = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                             </svg>
                         </button>
-                        <h1 className="text-2xl font-bold text-slate-800">Umowa {contract.contractNumber}</h1>
+                        <h1 className="text-2xl font-bold text-slate-800">
+                            {isEditing && isAdmin() ? (
+                                <input
+                                    value={contract.contractNumber}
+                                    onChange={e => setContract({ ...contract, contractNumber: e.target.value })}
+                                    className="text-2xl font-bold text-slate-800 border-b-2 border-blue-400 bg-transparent focus:outline-none focus:border-blue-600 w-64"
+                                    placeholder="KS/0000/DD/MM/YYYY"
+                                />
+                            ) : (
+                                <>Umowa {contract.contractNumber}</>
+                            )}
+                        </h1>
                         {isEditing ? (
                             <select
                                 value={contract.status}
@@ -269,7 +280,19 @@ export const ContractDetails: React.FC = () => {
                             </span>
                         )}
                     </div>
-                    <p className="text-slate-500 ml-9 mt-1">Utworzono: {new Date(contract.createdAt).toLocaleDateString()}</p>
+                    <p className="text-slate-500 ml-9 mt-1">
+                        Utworzono:{' '}
+                        {isEditing && isAdmin() ? (
+                            <input
+                                type="date"
+                                value={new Date(contract.createdAt).toISOString().split('T')[0]}
+                                onChange={e => setContract({ ...contract, createdAt: new Date(e.target.value) })}
+                                className="border-b-2 border-blue-400 bg-transparent focus:outline-none focus:border-blue-600 text-slate-700 font-medium"
+                            />
+                        ) : (
+                            new Date(contract.createdAt).toLocaleDateString()
+                        )}
+                    </p>
                 </div>
                 <div className="flex gap-2">
                     {isEditing ? (
