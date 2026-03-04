@@ -6,13 +6,26 @@ import type { ServiceTicket, ServiceTicketStatus } from '../../types';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { AddServiceTicketModal } from './AddServiceTicketModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const ServiceDashboard = () => {
     const navigate = useNavigate();
+    const { isAdmin } = useAuth();
     const [tickets, setTickets] = useState<ServiceTicket[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<ServiceTicketStatus | 'all'>('all');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+    const handleDeleteTicket = async (ticket: ServiceTicket) => {
+        if (!window.confirm(`Czy na pewno chcesz usunąć zgłoszenie ${ticket.ticketNumber}?`)) return;
+        const { error } = await ServiceService.deleteTicket(ticket.id);
+        if (error) {
+            toast.error('Błąd usuwania zgłoszenia');
+        } else {
+            toast.success('Zgłoszenie usunięte');
+            fetchTickets();
+        }
+    };
 
     const fetchTickets = async () => {
         setLoading(true);
@@ -150,12 +163,25 @@ export const ServiceDashboard = () => {
                                         {format(new Date(ticket.createdAt), 'dd MMM yyyy', { locale: pl })}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button
-                                            onClick={() => navigate(`/service/${ticket.id}`)}
-                                            className="text-blue-600 hover:text-blue-900"
-                                        >
-                                            Szczegóły
-                                        </button>
+                                        <div className="flex items-center justify-end gap-3">
+                                            <button
+                                                onClick={() => navigate(`/service/${ticket.id}`)}
+                                                className="text-blue-600 hover:text-blue-900"
+                                            >
+                                                Szczegóły
+                                            </button>
+                                            {isAdmin() && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTicket(ticket); }}
+                                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                                    title="Usuń zgłoszenie"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

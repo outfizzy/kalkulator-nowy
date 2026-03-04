@@ -330,6 +330,21 @@ export const ServiceService = {
         return { error };
     },
 
+    async deleteTicket(id: string): Promise<{ error: Error | null }> {
+        try {
+            // History and tasks will cascade delete via FK
+            const { error } = await supabase
+                .from('service_tickets')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+            return { error: null };
+        } catch (e: any) {
+            console.error('Delete ticket error:', e);
+            return { error: e };
+        }
+    },
+
     // Helper to map DB row to Type
     mapToType(row: any): ServiceTicket {
         return {
