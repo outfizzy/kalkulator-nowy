@@ -6,6 +6,7 @@ import { PricingService } from '../../services/pricing.service';
 import { toast } from 'react-hot-toast';
 import { WallVisualizer } from './WallVisualizer';
 import { DatabaseService } from '../../services/database';
+import { LeadService } from '../../services/database/lead.service';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Customer, Lead, Offer } from '../../types';
 import { generateOfferPDF } from '../../utils/pdfGenerator';
@@ -1399,14 +1400,28 @@ export const ProductConfiguratorV2: React.FC = () => {
                 salutation: customerState.salutation || 'Herr'
             };
 
-            // 2. Create Lead (with status 'negotiation')
-            const lead = await DatabaseService.createLead({
-                status: 'negotiation',
-                source: 'calculator_v2',
-                customerData: customerData,
-                customerId: customerState.id, // Use existing ID if we have it
-                notes: `Konfiguracja V2: ${basket.map(b => b.name).join(', ')}`
-            });
+            // 2. Reuse existing lead or create new one
+            let lead: any;
+            if (customerState.id) {
+                // Customer already exists — check for existing lead
+                const existingLeads = await LeadService.getCustomerLeads(customerState.id);
+                if (existingLeads && existingLeads.length > 0) {
+                    // Reuse the most recent lead
+                    lead = existingLeads[0];
+                    console.log('♻️ Reusing existing lead:', lead.id);
+                }
+            }
+            if (!lead) {
+                // No existing lead found — create a new one
+                lead = await DatabaseService.createLead({
+                    status: 'negotiation',
+                    source: 'calculator_v2',
+                    customerData: customerData,
+                    customerId: customerState.id,
+                    notes: `Konfiguracja V2: ${basket.map(b => b.name).join(', ')}`
+                });
+                console.log('🆕 Created new lead:', lead.id);
+            }
 
             const selectedModel = isManualMode ? manualModel : model;
             const selectedModelConfig = ROOF_MODELS.find(m => m.id === selectedModel);
