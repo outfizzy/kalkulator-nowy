@@ -44,14 +44,20 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
 
             setContracts(allContracts);
 
+            // Filter out placeholder offers created by manual contracts (not real offers)
+            const realOffers = allOffers.filter(o =>
+                !o.offerNumber?.startsWith('MANUAL/') &&
+                o.product?.modelId !== 'MANUAL'
+            );
+
             if (isAdmin()) {
                 const filtered = selectedUserId === 'all'
-                    ? allOffers
-                    : allOffers.filter(o => o.createdBy === selectedUserId);
+                    ? realOffers
+                    : realOffers.filter(o => o.createdBy === selectedUserId);
                 setFetchedOffers(filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
             } else {
                 // Sales rep: load own offers AND offers from users who delegated access
-                const userOffers = allOffers.filter(o =>
+                const userOffers = realOffers.filter(o =>
                     o.createdBy === currentUser.id || delegatedIds.includes(o.createdBy)
                 );
                 setFetchedOffers(userOffers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
