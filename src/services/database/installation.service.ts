@@ -88,12 +88,14 @@ export const InstallationService = {
             id: data.id,
             offerId: data.offer_id,
             client,
+            contractNumber: installationData.contractNumber,
             productSummary: installationData.productSummary || '',
             status: data.status as Installation['status'],
             scheduledDate,
             teamId: installationData.teamId || (data as { team_id?: string }).team_id,
             notes: installationData.notes,
             acceptance: installationData.acceptance,
+            completionReport: (installationData as any).completionReport,
             createdAt: new Date(data.created_at),
             partsReady: (data as { parts_ready?: boolean }).parts_ready,
             expectedDuration: (data as { expected_duration?: number }).expected_duration || 1,
@@ -609,7 +611,8 @@ export const InstallationService = {
                 sourceType: rowTyped.source_type,
                 sourceId: rowTyped.source_id,
                 title: rowTyped.title,
-                customerFeedback: rowTyped.customer_feedback
+                customerFeedback: rowTyped.customer_feedback,
+                completionReport: (installationData as any).completionReport
             };
         });
     },
@@ -1649,17 +1652,45 @@ export const InstallationService = {
 
         // 2. Create Installation
         const client = ticket.client || {};
+
+        // Determine client name - customers table uses first_name/last_name columns
+        let clientFirstName = client.first_name || '';
+        let clientLastName = client.last_name || '';
+        let clientCity = client.city || '';
+        let clientAddress = `${client.street || ''} ${client.house_number || ''}`.trim();
+        let clientPhone = client.phone || '';
+
+        // Fallback: parse from description if no client_id (manual-mode tickets)
+        if (!ticket.client_id && ticket.description) {
+            const desc = ticket.description;
+            const nameMatch = desc.match(/Klient:\s*(.+)/i);
+            const addrMatch = desc.match(/Adres:\s*(.+)/i);
+            const phoneMatch = desc.match(/Telefon:\s*(.+)/i);
+            if (nameMatch) {
+                const parts = nameMatch[1].trim().split(' ');
+                clientFirstName = parts[0] || '';
+                clientLastName = parts.slice(1).join(' ') || '';
+            }
+            if (addrMatch) {
+                clientAddress = addrMatch[1].trim();
+                // Try to extract city from address (last word or after comma)
+                const addrParts = clientAddress.split(',');
+                if (addrParts.length > 1) clientCity = addrParts[addrParts.length - 1].trim();
+            }
+            if (phoneMatch) clientPhone = phoneMatch[1].trim();
+        }
+
         const installationData = {
             client: {
-                firstName: client.name?.split(' ')[0] || '',
-                lastName: client.name?.split(' ').slice(1).join(' ') || '',
-                city: client.city || '',
-                address: `${client.street || ''} ${client.houseNumber || ''}`.trim(),
-                phone: client.phone || '',
+                firstName: clientFirstName,
+                lastName: clientLastName,
+                city: clientCity,
+                address: clientAddress,
+                phone: clientPhone,
                 coordinates: undefined
             },
-            contractNumber: ticket.contract_number || undefined, // Manual contract number for calendar display
-            productSummary: `Zgłoszenie: ${ticket.title || 'Serwis'}`,
+            contractNumber: ticket.contract_number || undefined,
+            productSummary: `Zgłoszenie: ${ticket.ticket_number || 'Serwis'}`,
             teamId: teamId,
             notes: ticket.description
         };
@@ -1924,5 +1955,104 @@ export const InstallationService = {
             .eq('id', id);
 
         if (error) throw error;
+    },
+
+    /**
+     * Save completion report for a finished installation.
+     * Automatically creates follow-up installations for items that need finishing.
+     */
+    async saveCompletionReport(
+        installationId: string,
+        report: {
+            notes: string;
+            followUpItems: Array<{ name: string; description: string }>;
+        }
+    ): Promise<{ followUpsCreated: number }> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // 1. Fetch current installation data
+        const { data: installation, error: fetchError } = await supabase
+            .from('installations')
+            .select('*')
+            .eq('id', installationId)
+            .single();
+
+        if (fetchError || !installation) throw new Error('Installation not found');
+
+        const currentData = (installation.installation_data as Record<string, unknown>) || {};
+
+        // 2. Build completion report object
+        const completionReport = {
+            completedAt: new Date().toISOString(),
+            completedBy: user.id,
+            notes: report.notes,
+            followUpItems: report.followUpItems
+        };
+
+        // 3. Save report into installation_data JSONB
+        const updatedData = {
+            ...currentData,
+            completionReport
+        };
+
+        const { error: updateError } = await supabase
+            .from('installations')
+            .update({ installation_data: updatedData })
+            .eq('id', installationId);
+
+        if (updateError) throw updateError;
+
+        // 4. Auto-create follow-up installations for each item
+        let followUpsCreated = 0;
+
+        if (report.followUpItems.length > 0) {
+            const clientData = (currentData as { client?: Record<string, unknown> }).client || {};
+            const contractNumber = (currentData as { contractNumber?: string }).contractNumber || '';
+
+            for (const item of report.followUpItems) {
+                try {
+                    const followUpData = {
+                        client: clientData,
+                        contractNumber,
+                        notes: item.description || item.name,
+                        productSummary: `🔄 Dokończenie: ${item.name}`,
+                        completionReport: {
+                            sourceInstallationId: installationId,
+                            itemName: item.name
+                        }
+                    };
+
+                    const { error: insertError } = await supabase
+                        .from('installations')
+                        .insert({
+                            user_id: user.id,
+                            offer_id: installation.offer_id,
+                            status: 'pending',
+                            installation_data: followUpData,
+                            source_type: 'followup',
+                            source_id: installationId,
+                            parts_ready: false
+                        });
+
+                    if (!insertError) followUpsCreated++;
+                } catch (e) {
+                    console.error('Error creating follow-up for item:', item.name, e);
+                }
+            }
+        }
+
+        return { followUpsCreated };
+    },
+
+    /**
+     * Check if an installation needs a completion report.
+     */
+    needsCompletionReport(installation: Installation): boolean {
+        const status = installation.status;
+        if (status !== 'completed' && status !== 'verification') return false;
+        // Check if completionReport exists in the raw data
+        // This relies on the mapper passing through the completionReport field
+        return !(installation as any).completionReport;
     },
 };
