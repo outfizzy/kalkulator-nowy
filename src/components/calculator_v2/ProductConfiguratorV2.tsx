@@ -544,9 +544,10 @@ export const ProductConfiguratorV2: React.FC = () => {
             if (sideWallWidth) setWallWidth(sideWallWidth);
             setWallHeight(postHeight);
         } else if (isFront || (isSchiebetur && isFrontPlacement) || isPanorama) {
-            // Front wall / front Schiebetür / Panorama: wallWidth = FULL roof width
-            // System auto-calculates segments from posts_count and shows per-segment innerWidth
-            setWallWidth(frontWidth);
+            // Front wall / front Schiebetür / Panorama: width = innerWidth (per segment between posts)
+            if (frontSegmentWidth) {
+                setWallWidth(frontSegmentWidth);
+            }
             setWallHeight(postHeight);
         }
     }, [wallProduct, wallPlacement, dachrechnerResults, wallDimsAuto, width, dachH3]);
@@ -844,12 +845,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                         } else {
                             // Front Wall: price by width, projection = 0
                             // Schiebetür: price by width, projection = 2200 (fixed height in pricelist)
-                            // For front placement: use per-segment innerWidth, not full wallWidth
-                            const isFrontPlacement = wallPlacement === 'front';
-                            const perSegmentWidth = (isFrontPlacement && dachrechnerResults?.innerWidth)
-                                ? Math.round(dachrechnerResults.innerWidth)
-                                : wallWidth;
-                            lookupWidth = perSegmentWidth;
+                            // wallWidth is already set to innerWidth (per-segment) by auto-fill
+                            lookupWidth = wallWidth;
                             lookupProjection = isSchiebetur ? 2200 : 0;
                         }
 
@@ -906,7 +903,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
         const t = setTimeout(fetchWallPrice, 300);
         return () => clearTimeout(t);
-    }, [wallProduct, wallWidth, wallHeight, projection, wedgeGlassType, panoramaOpeningType, panoramaHandleType, panoramaGlassType, panoramaSteelLook, wallPlacement, dachrechnerResults]);
+    }, [wallProduct, wallWidth, wallHeight, projection, wedgeGlassType, panoramaOpeningType, panoramaHandleType, panoramaGlassType, panoramaSteelLook, wallPlacement]);
 
     // === AUTO-CALCULATE PANORAMA TRACKS ===
     useEffect(() => {
@@ -2968,7 +2965,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         const postsCount = structuralMetadata?.posts_count || 2;
                                                         const frontSegments = postsCount - 1;
                                                         const isFrontPlacement = wallPlacement === 'front';
-                                                        const perSegmentWidth = dachrechnerResults.innerWidth ? Math.round(dachrechnerResults.innerWidth) : null;
                                                         return (
                                                             <div className="mt-3 text-xs bg-blue-50 rounded-lg p-2 border border-blue-200 space-y-1">
                                                                 <div className="flex items-center gap-2">
@@ -2983,10 +2979,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     <div className="flex items-center gap-2 bg-amber-50 rounded p-1.5 border border-amber-200">
                                                                         <span className="text-amber-600 font-bold">⬛</span>
                                                                         <span className="text-amber-800">
-                                                                            <strong>{frontSegments} {frontSegments === 1 ? 'segment' : 'segmentów'}</strong> między <strong>{postsCount} słupkami</strong>
-                                                                            {perSegmentWidth && (
-                                                                                <span className="text-amber-600 ml-1">→ każdy: <strong>{perSegmentWidth} × {wallHeight} mm</strong></span>
-                                                                            )}
+                                                                            <strong>{frontSegments} {frontSegments === 1 ? 'odcinek' : 'odcinków'}</strong> między <strong>{postsCount} słupkami</strong>
+                                                                            <span className="text-amber-600 ml-1">→ każdy: <strong>{wallWidth} × {wallHeight} mm</strong></span>
                                                                         </span>
                                                                     </div>
                                                                 )}
@@ -3583,8 +3577,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Lewa' : 'Prawa';
                                                                 const finalPrice = totalWithAccessories * segmentMultiplier;
                                                                 const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× segment)` : '';
-                                                                const perSegWidth = (isFrontPlacement && dachrechnerResults?.innerWidth)
-                                                                    ? Math.round(dachrechnerResults.innerWidth) : wallWidth;
+                                                                const perSegWidth = wallWidth;
                                                                 const dimNote = `${perSegWidth}x${wallHeight}`;
                                                                 configStr = `${placementLabel}: ${configStr}${qtyNote}`;
                                                                 addToBasket(displayName, finalPrice, configStr, dimNote, 'wall');
