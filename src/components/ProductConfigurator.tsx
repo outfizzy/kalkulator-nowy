@@ -294,7 +294,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
         const timeoutId = setTimeout(calculatePrice, 500); // Debounce
         return () => clearTimeout(timeoutId);
-    }, [config.modelId, config.width, config.projection, config.snowZone, config.roofType, config.installationType, config.selectedSurcharges, config.glassType, config.polycarbonateType, availableSurcharges]);
+    }, [config.modelId, config.width, config.projection, config.snowZone, config.roofType, config.installationType, config.selectedSurcharges, config.glassType, config.polycarbonateType, availableSurcharges, config.splitPoint]);
 
     // Fetch Available Surcharges
     useEffect(() => {
@@ -649,7 +649,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         }
     };
 
-    const invalidWidth = config.width > limits.maxWidth || config.width < limits.minWidth;
+    const invalidWidth = config.width > limits.maxWidth * 2 || config.width < limits.minWidth;
     const invalidDepth = config.projection > limits.maxDepth || config.projection < limits.minDepth;
 
     // Skystyle: automatycznie koryguj wymiary do dopuszczalnego zakresu,
@@ -891,7 +891,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         <input
                                             type="range"
                                             min={limits.minWidth}
-                                            max={limits.maxWidth}
+                                            max={Math.max(limits.maxWidth, limits.maxWidth * 2)}
                                             step={100}
                                             value={config.width}
                                             onChange={(e) => handleBasicConfigChange('width', Number(e.target.value))}
@@ -899,20 +899,105 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                                         />
                                         <div className="flex justify-between text-[10px] md:text-xs text-slate-500 mt-2 md:mt-3 font-medium gap-2">
                                             <span className="bg-white px-1.5 md:px-2 py-0.5 md:py-1 rounded text-center">Min: {limits.minWidth} mm</span>
-                                            <span className="bg-white px-1.5 md:px-2 py-0.5 md:py-1 rounded text-center">Max: {limits.maxWidth} mm</span>
+                                            <span className="bg-white px-1.5 md:px-2 py-0.5 md:py-1 rounded text-center">Max matryca: {limits.maxWidth} mm</span>
                                         </div>
-                                        {/* Direct input */}
+                                        {/* Direct input — no max cap to allow oversized widths */}
                                         <div className="mt-3 md:mt-4">
                                             <input
                                                 type="number"
                                                 min={limits.minWidth}
-                                                max={limits.maxWidth}
                                                 step={100}
                                                 value={config.width}
                                                 onChange={(e) => handleBasicConfigChange('width', Number(e.target.value))}
                                                 className="w-full p-2 md:p-3 border-2 border-slate-300 rounded-lg text-center text-base md:text-lg font-bold text-accent focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                                             />
                                         </div>
+
+                                        {/* Combined Construction — Split Point */}
+                                        {config.width > limits.maxWidth && (
+                                            <div className="mt-4 p-3 md:p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-lg">✂️</span>
+                                                    <span className="text-xs md:text-sm font-bold text-amber-800">
+                                                        Konstrukcja łączona — szerokość przekracza {limits.maxWidth} mm
+                                                    </span>
+                                                </div>
+
+                                                {/* Toggle custom split */}
+                                                <label className="flex items-center gap-3 cursor-pointer mb-3">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={!!config.splitPoint}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    // Default: split in the middle
+                                                                    handleBasicConfigChange('splitPoint', Math.round(config.width / 2 / 100) * 100);
+                                                                } else {
+                                                                    handleBasicConfigChange('splitPoint', undefined);
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-accent transition-colors"></div>
+                                                        <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform"></div>
+                                                    </div>
+                                                    <span className="text-xs md:text-sm font-medium text-amber-900">
+                                                        Określ punkt podziału (pozycja słupka)
+                                                    </span>
+                                                </label>
+
+                                                {config.splitPoint ? (
+                                                    <div className="space-y-3">
+                                                        {/* Split slider */}
+                                                        <input
+                                                            type="range"
+                                                            min={limits.minWidth}
+                                                            max={config.width - limits.minWidth}
+                                                            step={100}
+                                                            value={config.splitPoint}
+                                                            onChange={(e) => handleBasicConfigChange('splitPoint', Number(e.target.value))}
+                                                            className="w-full accent-amber-600 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer"
+                                                        />
+                                                        {/* Numeric input for split point */}
+                                                        <input
+                                                            type="number"
+                                                            min={limits.minWidth}
+                                                            max={config.width - limits.minWidth}
+                                                            step={100}
+                                                            value={config.splitPoint}
+                                                            onChange={(e) => handleBasicConfigChange('splitPoint', Number(e.target.value))}
+                                                            className="w-full p-2 border-2 border-amber-300 rounded-lg text-center text-sm font-bold text-amber-800 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none"
+                                                        />
+                                                        {/* Visual segment display */}
+                                                        <div className="flex items-stretch gap-0 rounded-lg overflow-hidden border border-amber-300 h-10">
+                                                            <div
+                                                                className="bg-blue-100 flex items-center justify-center text-[10px] md:text-xs font-bold text-blue-800 min-w-[60px]"
+                                                                style={{ width: `${(config.splitPoint / config.width) * 100}%` }}
+                                                            >
+                                                                {config.splitPoint} mm
+                                                            </div>
+                                                            <div className="w-1 bg-amber-600 flex-shrink-0 relative group cursor-help" title="Słupek łączący">
+                                                                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-amber-600 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">🔲 Słupek</span>
+                                                            </div>
+                                                            <div
+                                                                className="bg-green-100 flex items-center justify-center text-[10px] md:text-xs font-bold text-green-800 min-w-[60px]"
+                                                                style={{ width: `${((config.width - config.splitPoint) / config.width) * 100}%` }}
+                                                            >
+                                                                {config.width - config.splitPoint} mm
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-[10px] text-amber-700 text-center">
+                                                            Segment 1: <strong>{config.splitPoint} mm</strong> | Słupek | Segment 2: <strong>{config.width - config.splitPoint} mm</strong>
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] text-amber-700">
+                                                        Automatyczny podział: system dobierze optymalny punkt podziału na podstawie matrycy cenowej.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Depth */}

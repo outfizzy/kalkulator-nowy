@@ -108,7 +108,14 @@ export const UserService = {
         }
         if (profile.phone !== undefined) updates.phone = profile.phone;
         if (profile.monthlyTarget !== undefined) updates.monthly_target = profile.monthlyTarget;
-        if (profile.emailConfig !== undefined) updates.email_config = profile.emailConfig;
+        if (profile.emailConfig !== undefined || profile.mailboxes !== undefined) {
+            // Store mailboxes inside the email_config JSONB as __mailboxes key
+            const existingConfig = profile.emailConfig || {};
+            updates.email_config = {
+                ...existingConfig,
+                __mailboxes: profile.mailboxes || []
+            };
+        }
 
         const { error } = await supabase
             .from('profiles')

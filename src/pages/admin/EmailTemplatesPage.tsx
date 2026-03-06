@@ -5,11 +5,12 @@ import { EmailFooterService } from '../../services/database/email-footer.service
 import type { EmailFooter } from '../../services/database/email-footer.service';
 import { TemplateEditorModal } from '../../components/mail/TemplateEditorModal';
 import { FooterEditorModal } from '../../components/mail/FooterEditorModal';
+import { EmailPreviewModal } from '../../components/mail/EmailPreviewModal';
+import { getSystemTemplates, wrapInBrandTemplate, textToEmailHtml } from '../../utils/emailBrandKit';
 import { toast } from 'react-hot-toast';
 
 export const EmailTemplatesPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'templates' | 'footers'>('templates');
-    console.log('EmailTemplatesPage rendered, activeTab:', activeTab);
+    const [activeTab, setActiveTab] = useState<'system' | 'templates' | 'footers'>('system');
 
     // Templates State
     const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -23,9 +24,17 @@ export const EmailTemplatesPage: React.FC = () => {
     const [isFooterEditorOpen, setIsFooterEditorOpen] = useState(false);
     const [editingFooter, setEditingFooter] = useState<EmailFooter | undefined>(undefined);
 
+    // Preview State
+    const [previewHtml, setPreviewHtml] = useState('');
+    const [previewTitle, setPreviewTitle] = useState('');
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+    // System templates
+    const systemTemplates = getSystemTemplates();
+
     useEffect(() => {
         if (activeTab === 'templates') loadTemplates();
-        else loadFooters();
+        else if (activeTab === 'footers') loadFooters();
     }, [activeTab]);
 
     // --- Templates Handlers ---
@@ -64,6 +73,14 @@ export const EmailTemplatesPage: React.FC = () => {
         setIsTemplateEditorOpen(true);
     };
 
+    const handlePreviewDbTemplate = (template: EmailTemplate) => {
+        // Wrap the DB template body in brand wrapper
+        const htmlBody = template.body.includes('<') ? template.body : textToEmailHtml(template.body);
+        setPreviewTitle(template.name);
+        setPreviewHtml(wrapInBrandTemplate(htmlBody));
+        setIsPreviewOpen(true);
+    };
+
     // --- Footers Handlers ---
     const loadFooters = async () => {
         setLoadingFooters(true);
@@ -100,15 +117,28 @@ export const EmailTemplatesPage: React.FC = () => {
         setIsFooterEditorOpen(true);
     };
 
+    const CATEGORY_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+        offer: { label: 'Oferta', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+        sales: { label: 'Sprzedaż', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+        fair: { label: 'Targi', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+        service: { label: 'Serwis', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
+        installation: { label: 'Montaż', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
+    };
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800">Komunikacja E-mail</h1>
-                    <p className="text-slate-500">Zarządzaj szablonami wiadomości oraz stopkami firmowymi.</p>
+                    <p className="text-slate-500">Zarządzaj szablonami wiadomości, identyfikacją marki i stopkami firmowymi.</p>
                 </div>
                 <div className="flex bg-slate-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setActiveTab('system')}
+                        className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'system' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        🎨 Identyfikacja
+                    </button>
                     <button
                         onClick={() => setActiveTab('templates')}
                         className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'templates' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -124,8 +154,9 @@ export const EmailTemplatesPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex justify-end">
-                {activeTab === 'templates' ? (
+            {/* ACTION BAR */}
+            {activeTab === 'templates' && (
+                <div className="flex justify-end">
                     <button
                         onClick={handleCreateTemplate}
                         className="px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
@@ -135,7 +166,10 @@ export const EmailTemplatesPage: React.FC = () => {
                         </svg>
                         Nowy Szablon
                     </button>
-                ) : (
+                </div>
+            )}
+            {activeTab === 'footers' && (
+                <div className="flex justify-end">
                     <button
                         onClick={handleCreateFooter}
                         className="px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
@@ -145,12 +179,71 @@ export const EmailTemplatesPage: React.FC = () => {
                         </svg>
                         Nowa Stopka
                     </button>
-                )}
-            </div>
+                </div>
+            )}
 
-            {/* CONTENT AREA */}
-            {activeTab === 'templates' ? (
-                // TEMPLATES LIST
+            {/* ═══════ SYSTEM TEMPLATES TAB ═══════ */}
+            {activeTab === 'system' && (
+                <div className="space-y-4">
+                    {/* Brand Identity Banner */}
+                    <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 text-white flex items-center gap-6">
+                        <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold">System Identyfikacji Marki E-mail</h2>
+                            <p className="text-slate-400 text-sm mt-1">
+                                Wszystkie szablony systemowe korzystają ze wspólnej szaty graficznej PolenDach24 — jednolity nagłówek, stopka firmowa, kolorystyka i układ.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* System Templates Grid */}
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {systemTemplates.map(tmpl => {
+                            const cat = CATEGORY_LABELS[tmpl.category] || CATEGORY_LABELS.sales;
+                            return (
+                                <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
+                                    {/* Mini Preview Stripe */}
+                                    <div className="h-2 bg-gradient-to-r from-slate-800 via-blue-600 to-slate-800" />
+
+                                    <div className="p-5">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${cat.bg} ${cat.color}`}>
+                                                {cat.label}
+                                            </span>
+                                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-medium uppercase">
+                                                Systemowy
+                                            </span>
+                                        </div>
+                                        <h3 className="font-bold text-slate-800 text-sm mb-2">{tmpl.name}</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed mb-4">{tmpl.description}</p>
+                                        <button
+                                            onClick={() => {
+                                                setPreviewTitle(tmpl.name);
+                                                setPreviewHtml(tmpl.previewHtml());
+                                                setIsPreviewOpen(true);
+                                            }}
+                                            className="w-full px-4 py-2.5 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 border border-slate-200 hover:border-blue-200"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Podgląd
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════ DB TEMPLATES TAB ═══════ */}
+            {activeTab === 'templates' && (
                 loadingTemplates ? (
                     <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div></div>
                 ) : (
@@ -191,6 +284,9 @@ export const EmailTemplatesPage: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handlePreviewDbTemplate(template)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Podgląd">
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                    </button>
                                                     <button onClick={() => handleEditTemplate(template)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                     </button>
@@ -206,8 +302,10 @@ export const EmailTemplatesPage: React.FC = () => {
                         </table>
                     </div>
                 )
-            ) : (
-                // FOOTERS LIST
+            )}
+
+            {/* ═══════ FOOTERS TAB ═══════ */}
+            {activeTab === 'footers' && (
                 loadingFooters ? (
                     <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div></div>
                 ) : (
@@ -261,18 +359,24 @@ export const EmailTemplatesPage: React.FC = () => {
                 )
             )}
 
+            {/* MODALS */}
             <TemplateEditorModal
                 isOpen={isTemplateEditorOpen}
                 onClose={() => setIsTemplateEditorOpen(false)}
                 template={editingTemplate}
                 onSuccess={loadTemplates}
             />
-
             <FooterEditorModal
                 isOpen={isFooterEditorOpen}
                 onClose={() => setIsFooterEditorOpen(false)}
                 footer={editingFooter}
                 onSuccess={loadFooters}
+            />
+            <EmailPreviewModal
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                html={previewHtml}
+                title={previewTitle}
             />
         </div>
     );

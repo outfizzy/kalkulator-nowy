@@ -1,13 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import imaps from 'imap-simple';
-// import { simpleParser } from 'mailparser';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') { // Using POST to securely pass credentials in body
+    if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { config, limit = 50, box = 'INBOX' } = req.body;
+    const { config, limit = 50, box = 'INBOX', searchEmail } = req.body;
 
     if (!config || !config.imapHost || !config.imapUser || !config.imapPassword) {
         return res.status(400).json({ error: 'Missing IMAP configuration' });
@@ -20,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             host: config.imapHost,
             port: Number(config.imapPort),
             tls: Number(config.imapPort) === 993,
-            authTimeout: 3000,
+            authTimeout: 5000,
             tlsOptions: { rejectUnauthorized: false }
         }
     };
@@ -28,34 +27,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const connection = await imaps.connect(imapConfig);
 
-        // Open box: try 'box' first
-        try {
-            await connection.openBox(box);
-        } catch (e) {
-            // Fallback for Sent folder naming differences
-            if (box === 'Sent') {
-                try {
-                    await connection.openBox('Sent Items');
-                } catch (e2) {
-                    // Try Polish folder name? Home.pl often uses standard Sent but maybe mapped differently
-                    // Just fail if primary and secondary fail, or try 'Wysłane'
-                    await connection.openBox('Wysłane');
+        // Open the requested mailbox
+        if (box === 'INBOX') {
+            await connection.openBox('INBOX');
+        } else if (box === 'Sent') {
+            // Auto-discover sent folder — IMAP servers use many different names
+            const sentFolderCandidates = [
+                'Sent',
+                'INBOX.Sent',
+                'Sent Items',
+                'Sent Messages',
+                'INBOX.Sent Items',
+                'INBOX.Sent Messages',
+                'Gesendet',
+                'INBOX.Gesendet',
+                'Wysłane',
+                'INBOX.Wysłane',
+                '[Gmail]/Sent Mail',
+                '[Gmail]/Gesendet',
+            ];
+
+            let opened = false;
+
+            // First try listing all folders to find the right one
+            try {
+                const boxes = await connection.getBoxes();
+                const sentFolder = findSentFolder(boxes);
+                if (sentFolder) {
+                    try {
+                        await connection.openBox(sentFolder);
+                        opened = true;
+                        console.log(`Opened sent folder via discovery: "${sentFolder}"`);
+                    } catch (e) {
+                        console.warn(`Discovery found "${sentFolder}" but failed to open:`, e);
+                    }
                 }
-            } else {
-                throw e;
+            } catch (listErr) {
+                console.warn('Could not list boxes for sent folder discovery:', listErr);
             }
+
+            // Fall back to brute-force trying known names
+            if (!opened) {
+                for (const candidate of sentFolderCandidates) {
+                    try {
+                        await connection.openBox(candidate);
+                        opened = true;
+                        console.log(`Opened sent folder: "${candidate}"`);
+                        break;
+                    } catch (e) {
+                        // Try next candidate
+                        continue;
+                    }
+                }
+            }
+
+            if (!opened) {
+                connection.end();
+                return res.status(200).json({
+                    messages: [],
+                    warning: 'Could not find Sent folder. Tried: ' + sentFolderCandidates.join(', ')
+                });
+            }
+        } else {
+            // Custom folder name passed directly
+            await connection.openBox(box);
         }
 
-        const searchCriteria = ['ALL'];
-        // Optimal Fetch: Get structure and header, avoid full body scan for list
+        // Build search criteria — filter by email address if provided
+        let searchCriteria: any[];
+        if (searchEmail) {
+            searchCriteria = [['OR', ['FROM', searchEmail], ['TO', searchEmail]]];
+        } else {
+            searchCriteria = ['ALL'];
+        }
         const fetchOptions = {
             bodies: ['HEADER'],
             struct: true,
             markSeen: false
         };
 
-        // Fetch ALL messages (Robustness > Performance for MVP)
-        // Note: For very large inboxes this is slow, but guarantees we get the actual latest messages regardless of UID gaps.
         const messages = await connection.search(searchCriteria, fetchOptions);
 
         if (messages.length === 0) {
@@ -66,7 +116,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Sort by Date Descending
         const simplified = messages.map(msg => {
             const headerPart = msg.parts.find((part: any) => part.which === 'HEADER' || part.which.startsWith('HEADER'));
-            // Safety check for date
             const dateStr = headerPart?.body.date?.[0];
             const date = dateStr ? new Date(dateStr) : new Date();
 
@@ -81,12 +130,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 timestamp: date.getTime()
             };
         })
-            .sort((a, b) => b.timestamp - a.timestamp) // Newest first
-            .slice(0, limit); // Take top N
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
 
-        // Remove timestamp helper before sending
         const finalMessages = simplified.map(msg => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { timestamp, ...rest } = msg;
             return rest;
         });
@@ -101,4 +148,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             details: error.message
         });
     }
+}
+
+/**
+ * Recursively search IMAP folder tree for a "Sent" folder.
+ * Returns the full path (e.g. "INBOX.Sent") or null.
+ */
+function findSentFolder(boxes: any, prefix = ''): string | null {
+    const sentKeywords = ['sent', 'gesendet', 'wysłane', 'sent items', 'sent messages', 'envoyé'];
+
+    for (const [name, box] of Object.entries(boxes as Record<string, any>)) {
+        const fullPath = prefix ? `${prefix}${box.delimiter || '.'}${name}` : name;
+
+        // Check if this folder name matches known sent folder patterns
+        if (sentKeywords.some(kw => name.toLowerCase().includes(kw))) {
+            return fullPath;
+        }
+
+        // Check special-use attribute (RFC 6154) — some IMAP servers mark Sent with \Sent
+        if (box.attribs && (
+            box.attribs.includes('\\Sent') ||
+            box.attribs.includes('\\sent') ||
+            box.special_use_attrib === '\\Sent'
+        )) {
+            return fullPath;
+        }
+
+        // Recurse into child folders
+        if (box.children) {
+            const found = findSentFolder(box.children, fullPath);
+            if (found) return found;
+        }
+    }
+
+    return null;
 }

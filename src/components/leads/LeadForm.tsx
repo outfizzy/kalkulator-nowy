@@ -95,6 +95,22 @@ export const LeadForm: React.FC<LeadFormProps> = ({ initialData, onSuccess, onCa
         <div className={`bg-white rounded-xl ${embedded ? '' : 'shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto'}`}>
             {!embedded && <h2 className="text-2xl font-bold text-slate-900 mb-6">{isEditMode ? 'Edytuj Leada' : 'Nowy Lead'}</h2>}
 
+            {/* AI Estimated Price Badge */}
+            {(initialData as any)?.estimatedPrice && (
+                <div className="mb-4 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-lg">💰</span>
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Wstępna wycena AI</p>
+                        <p className="text-lg font-bold text-emerald-700">
+                            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format((initialData as any).estimatedPrice)}
+                            <span className="text-xs font-normal text-emerald-600 ml-2">UPE netto (orientacyjna)</span>
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

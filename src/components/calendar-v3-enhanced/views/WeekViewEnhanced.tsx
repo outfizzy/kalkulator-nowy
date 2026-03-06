@@ -13,6 +13,7 @@ interface WeekViewEnhancedProps {
     teams: InstallationTeam[];
     unavailability: TeamUnavailability[];
     onEditInstallation?: (installation: Installation) => void;
+    onReportClick?: (installation: Installation) => void;
     weatherData?: Map<string, LocationForecast>;
 }
 
@@ -23,6 +24,7 @@ interface DroppableDayProps {
     team: InstallationTeam;
     isUnavailable: boolean;
     onEditInstallation?: (installation: Installation) => void;
+    onReportClick?: (installation: Installation) => void;
     weatherData?: Map<string, LocationForecast>;
 }
 
@@ -33,35 +35,32 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
     team,
     isUnavailable,
     onEditInstallation,
+    onReportClick,
     weatherData
 }) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const { setNodeRef, isOver } = useDroppable({
         id: `${teamId}-${dateStr}`,
-        data: {
-            date: dateStr,
-            teamId: teamId
-        }
+        data: { date: dateStr, teamId }
     });
 
     const dayInstallations = installations.filter(
         i => i.teamId === teamId && i.scheduledDate && isSameDay(new Date(i.scheduledDate), date)
     );
 
-    const totalHours = dayInstallations.reduce((sum, inst) => sum + (inst.expectedDuration || 8), 0);
-    const isOverloaded = totalHours > 8;
     const isWeekendDay = isWeekend(date);
 
     return (
         <div
             ref={setNodeRef}
-            className={`min-h-[160px] border-r border-b border-slate-200 p-2 transition-colors ${isOver
-                ? 'bg-accent/10 ring-2 ring-accent ring-inset'
-                : isUnavailable
-                    ? 'bg-gray-100'
-                    : isWeekendDay
+            className={`min-h-[120px] border-r border-b border-slate-100 p-1 transition-colors overflow-hidden
+                ${isOver
+                    ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-300'
+                    : isUnavailable
                         ? 'bg-slate-50'
-                        : 'bg-white hover:bg-slate-50'
+                        : isWeekendDay
+                            ? 'bg-gray-50/50'
+                            : 'bg-white hover:bg-slate-50/30'
                 }`}
         >
             <SortableContext
@@ -69,16 +68,12 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
                 strategy={verticalListSortingStrategy}
             >
                 <div className="space-y-1">
-                    {isUnavailable && (
-                        <div className="text-xs text-gray-600 font-medium flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                            Niedostępna
+                    {isUnavailable && dayInstallations.length === 0 && (
+                        <div className="text-[10px] text-slate-400 text-center py-2">
+                            ⛔ Niedostępna
                         </div>
                     )}
                     {dayInstallations.map(installation => {
-                        // Get weather for this installation's city
                         const cityKey = installation.client?.city?.trim().toLowerCase();
                         const forecast = cityKey && weatherData?.get(cityKey);
                         const dayWeather = forecast ? forecast.forecasts[dateStr] : undefined;
@@ -88,18 +83,11 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
                                 installation={installation}
                                 team={team}
                                 onEdit={onEditInstallation}
+                                onReportClick={onReportClick}
                                 weather={dayWeather}
                             />
                         );
                     })}
-                    {isOverloaded && (
-                        <div className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            {totalHours}h (przeciążenie)
-                        </div>
-                    )}
                 </div>
             </SortableContext>
         </div>
@@ -112,6 +100,7 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
     teams,
     unavailability,
     onEditInstallation,
+    onReportClick,
     weatherData
 }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -121,69 +110,91 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
 
     const activeTeams = teams.filter(t => t.isActive);
 
+    // Count installations per day
+    const dayCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        weekDays.forEach(day => {
+            const ds = format(day, 'yyyy-MM-dd');
+            counts[ds] = installations.filter(i => i.scheduledDate && isSameDay(new Date(i.scheduledDate), day)).length;
+        });
+        return counts;
+    }, [installations, weekDays]);
+
     return (
         <div className="h-full flex flex-col overflow-hidden">
-            {/* Header Row */}
-            <div className="grid grid-cols-8 border-b border-slate-300 bg-slate-100 sticky top-0 z-10">
-                <div className="p-3 border-r border-slate-300 font-semibold text-slate-700">
-                    Ekipa
+            {/* Header */}
+            <div
+                className="grid border-b-2 border-slate-200 bg-slate-50 sticky top-0 z-10"
+                style={{ gridTemplateColumns: '120px repeat(7, 1fr)' }}
+            >
+                <div className="px-2 py-2 border-r border-slate-200 flex items-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ekipa</span>
                 </div>
                 {weekDays.map(day => {
                     const isToday = isSameDay(day, new Date());
+                    const dateStr = format(day, 'yyyy-MM-dd');
                     const isWeekendDay = isWeekend(day);
+                    const count = dayCounts[dateStr] || 0;
                     return (
                         <div
                             key={day.toISOString()}
-                            className={`p-3 border-r border-slate-300 text-center ${isToday
-                                ? 'bg-accent text-white font-bold'
-                                : isWeekendDay
-                                    ? 'bg-slate-200 text-slate-600'
-                                    : 'text-slate-700'
+                            className={`py-1.5 px-1 border-r border-slate-200 text-center
+                                ${isToday
+                                    ? 'bg-indigo-600 text-white'
+                                    : isWeekendDay
+                                        ? 'text-slate-400'
+                                        : 'text-slate-600'
                                 }`}
                         >
-                            <div className="text-xs uppercase">
-                                {format(day, 'EEE', { locale: pl })}
+                            <div className="text-[10px] uppercase font-semibold tracking-wide">
+                                {format(day, 'EEEEEE', { locale: pl })}
                             </div>
-                            <div className="text-lg font-bold">
+                            <div className="text-base font-bold leading-tight">
                                 {format(day, 'd')}
                             </div>
-                            <div className="text-xs">
-                                {format(day, 'MMM', { locale: pl })}
-                            </div>
+                            {count > 0 && (
+                                <span className={`inline-block text-[9px] font-bold px-1.5 rounded-full
+                                    ${isToday ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>
+                                    {count}
+                                </span>
+                            )}
                         </div>
                     );
                 })}
             </div>
 
-            {/* Team Rows */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Rows */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
                 {activeTeams.map(team => (
-                    <div key={team.id} className="grid grid-cols-8 border-b border-slate-200">
-                        {/* Team Name Cell */}
-                        <div className="p-3 border-r border-slate-300 bg-slate-50 flex items-center gap-2 sticky left-0 z-5">
+                    <div
+                        key={team.id}
+                        className="grid border-b border-slate-100"
+                        style={{ gridTemplateColumns: '120px repeat(7, 1fr)' }}
+                    >
+                        {/* Team name */}
+                        <div className="px-2 py-2 border-r border-slate-200 bg-white sticky left-0 z-5 flex items-start gap-1.5">
                             <div
-                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
                                 style={{ backgroundColor: team.color }}
                             />
-                            <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-slate-900 text-sm truncate">
+                            <div className="min-w-0">
+                                <div className="font-bold text-slate-800 text-[11px] truncate leading-tight">
                                     {team.name}
                                 </div>
                                 {team.members && team.members.length > 0 && (
-                                    <div className="text-xs text-slate-500 truncate">
+                                    <div className="text-[9px] text-slate-400 truncate">
                                         {team.members.join(', ')}
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        {/* Day Cells */}
+                        {/* Day cells */}
                         {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
                             const isUnavailable = unavailability.some(
                                 u => u.teamId === team.id && u.date === dateStr
                             );
-
                             return (
                                 <DroppableDay
                                     key={`${team.id}-${dateStr}`}
@@ -193,6 +204,7 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                                     team={team}
                                     isUnavailable={isUnavailable}
                                     onEditInstallation={onEditInstallation}
+                                    onReportClick={onReportClick}
                                     weatherData={weatherData}
                                 />
                             );
@@ -201,12 +213,9 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                 ))}
 
                 {activeTeams.length === 0 && (
-                    <div className="p-12 text-center text-slate-500">
-                        <svg className="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <p className="text-lg font-semibold mb-2">Brak aktywnych ekip</p>
-                        <p className="text-sm">Dodaj ekipy w ustawieniach, aby rozpocząć planowanie</p>
+                    <div className="p-12 text-center text-slate-400">
+                        <p className="text-base font-semibold mb-1">Brak aktywnych ekip</p>
+                        <p className="text-sm">Dodaj ekipy w ustawieniach</p>
                     </div>
                 )}
             </div>

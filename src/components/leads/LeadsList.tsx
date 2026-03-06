@@ -240,7 +240,15 @@ export const LeadsList: React.FC = () => {
                                     )}
                                 </td>
                                 <td className="px-6 py-4">
-                                    {getStatusBadge(lead.status)}
+                                    <div className="flex flex-col gap-1">
+                                        {getStatusBadge(lead.status)}
+                                        {lead.status === 'lost' && (lead.lostByName || lead.lostReason) && (
+                                            <div className="text-[10px] text-red-500 mt-0.5">
+                                                {lead.lostByName && <span className="font-medium">✕ {lead.lostByName}</span>}
+                                                {lead.lostReason && <div className="text-slate-400 truncate max-w-[120px]" title={lead.lostReason}>{lead.lostReason}</div>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     {scheduledMeasurement ? (

@@ -34,7 +34,7 @@
 export const ROOF_MODELS = {
     orangeline: {
         id: 'orangeline',
-        name: 'Orangeline',
+        name: 'Orangestyle',
         category: 'fixed_angle',
         fixedAngle: 8,
         constants: { keilhoehe: 39 },
@@ -43,7 +43,7 @@ export const ROOF_MODELS = {
     },
     'orangeline+': {
         id: 'orangeline+',
-        name: 'Orangeline+',
+        name: 'Orangestyle+',
         category: 'fixed_angle_plus',
         fixedAngle: 8,
         constants: { keilhoehe: 34 },
@@ -52,7 +52,7 @@ export const ROOF_MODELS = {
     },
     trendline: {
         id: 'trendline',
-        name: 'Trendline',
+        name: 'Trendstyle',
         category: 'calculated_angle',
         constants: { profileHeight: 47.5, keilhoehe: 39 },
         postWidth: 110,
@@ -60,7 +60,7 @@ export const ROOF_MODELS = {
     },
     'trendline+': {
         id: 'trendline+',
-        name: 'Trendline+',
+        name: 'Trendstyle+',
         category: 'calculated_angle',
         constants: { profileHeight: 57.5, keilhoehe: 50.1 },
         postWidth: 110,
@@ -68,7 +68,7 @@ export const ROOF_MODELS = {
     },
     topline: {
         id: 'topline',
-        name: 'Topline',
+        name: 'Topstyle',
         category: 'calculated_angle',
         constants: { profileHeight: 93.2, depthOffset: 155, keilhoehe: 84 },
         postWidth: 149,
@@ -76,7 +76,7 @@ export const ROOF_MODELS = {
     },
     'topline_xl': {
         id: 'topline_xl',
-        name: 'Topline XL',
+        name: 'Topstyle XL',
         category: 'calculated_angle',
         constants: { profileHeight: 117, depthOffset: 155, keilhoehe: 106 },
         postWidth: 196,
@@ -84,7 +84,7 @@ export const ROOF_MODELS = {
     },
     designline: {
         id: 'designline',
-        name: 'Designline',
+        name: 'Designstyle',
         category: 'designline',
         constants: { keilhoehe: 93 },
         postWidth: 196,
@@ -92,14 +92,14 @@ export const ROOF_MODELS = {
     },
     'ultraline_classic': {
         id: 'ultraline_classic',
-        name: 'Ultraline Classic',
+        name: 'Ultrastyle Classic',
         category: 'ultraline',
         postWidth: 196,
         inputs: ['depth', 'h1', 'overhang'],
     },
     'ultraline_style': {
         id: 'ultraline_style',
-        name: 'Ultraline Style',
+        name: 'Ultrastyle Style',
         category: 'ultraline',
         constants: { fixedOverhang: 120 },
         postWidth: 196,
@@ -107,14 +107,14 @@ export const ROOF_MODELS = {
     },
     'ultraline_compact': {
         id: 'ultraline_compact',
-        name: 'Ultraline Compact',
+        name: 'Ultrastyle Compact',
         category: 'ultraline_compact',
         postWidth: 196,
         inputs: ['depth', 'h1'],
     },
     skyline: {
         id: 'skyline',
-        name: 'Skyline',
+        name: 'Skystyle',
         category: 'flat',
         constants: { glassAngleHeight: 95 },
         postWidth: 160,
@@ -122,7 +122,7 @@ export const ROOF_MODELS = {
     },
     'skyline_freistand': {
         id: 'skyline_freistand',
-        name: 'Skyline Freistand',
+        name: 'Skystyle Freistand',
         category: 'flat_freestanding',
         constants: { glassAngleHeight: 95 },
         postWidth: 160,

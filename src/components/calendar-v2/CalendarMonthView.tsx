@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth } from 'date-fns';
+import { pl } from 'date-fns/locale';
 import type { Installation, InstallationTeam } from '../../types';
 
 // ============================================================================
-// CALENDAR MONTH VIEW - Monthly Overview
+// CALENDAR MONTH VIEW - Monthly Overview (Fixed timezone handling)
 // ============================================================================
 
 interface CalendarMonthViewProps {
@@ -13,50 +15,22 @@ interface CalendarMonthViewProps {
     onEditInstallation?: (installation: Installation) => void;
 }
 
-// Helper: Get all days in month
-const getMonthDays = (date: Date): Date[] => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-
-    // First day of month
-    const firstDay = new Date(year, month, 1);
-    // Last day of month
-    const lastDay = new Date(year, month + 1, 0);
-
-    // Start from Monday of first week
-    const startDate = new Date(firstDay);
-    const dayOfWeek = startDate.getDay();
-    startDate.setDate(startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-
-    // End on Sunday of last week
-    const endDate = new Date(lastDay);
-    const endDayOfWeek = endDate.getDay();
-    if (endDayOfWeek !== 0) {
-        endDate.setDate(endDate.getDate() + (7 - endDayOfWeek));
-    }
-
-    const days: Date[] = [];
-    const current = new Date(startDate);
-    while (current <= endDate) {
-        days.push(new Date(current));
-        current.setDate(current.getDate() + 1);
-    }
-    return days;
+// LOCAL date string (no UTC shift)
+const toLocalDateString = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 };
 
-// Helper: Format date for comparison (YYYY-MM-DD)
-const toISODateString = (date: Date): string => {
-    return date.toISOString().split('T')[0];
-};
-
-// Status colors
-const getStatusDot = (status: Installation['status']): string => {
+const getStatusDot = (status: string): string => {
     switch (status) {
         case 'scheduled': return 'bg-blue-500';
         case 'confirmed': return 'bg-green-500';
         case 'in_progress': return 'bg-amber-500';
-        case 'completed': return 'bg-slate-400';
-        case 'cancelled': return 'bg-red-500';
+        case 'verification': return 'bg-purple-500';
+        case 'completed': return 'bg-emerald-500';
+        case 'cancelled': return 'bg-red-400';
         default: return 'bg-slate-300';
     }
 };
@@ -68,20 +42,46 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     onDrop,
     onEditInstallation
 }) => {
-    const monthDays = getMonthDays(currentDate);
-    const today = toISODateString(new Date());
-    const currentMonth = currentDate.getMonth();
+    // Build the full calendar grid (6 weeks max)
+    const calendarDays = useMemo(() => {
+        const monthStart = startOfMonth(currentDate);
+        const monthEnd = endOfMonth(currentDate);
+        const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+        const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+        const days: Date[] = [];
+        let d = gridStart;
+        while (d <= gridEnd) {
+            days.push(d);
+            d = addDays(d, 1);
+        }
+        return days;
+    }, [currentDate]);
 
     // Group by weeks
-    const weeks: Date[][] = [];
-    for (let i = 0; i < monthDays.length; i += 7) {
-        weeks.push(monthDays.slice(i, i + 7));
-    }
+    const weeks = useMemo(() => {
+        const result: Date[][] = [];
+        for (let i = 0; i < calendarDays.length; i += 7) {
+            result.push(calendarDays.slice(i, i + 7));
+        }
+        return result;
+    }, [calendarDays]);
 
-    // Get installations for a specific day
-    const getInstallationsForDay = (date: string): Installation[] => {
-        return installations.filter(inst => inst.scheduledDate === date);
-    };
+    // Index installations by date for fast lookup
+    const installationsByDate = useMemo(() => {
+        const map: Record<string, Installation[]> = {};
+        installations.forEach(inst => {
+            if (inst.scheduledDate) {
+                // scheduledDate is already YYYY-MM-DD string
+                const key = inst.scheduledDate.substring(0, 10);
+                if (!map[key]) map[key] = [];
+                map[key].push(inst);
+            }
+        });
+        return map;
+    }, [installations]);
+
+    const today = toLocalDateString(new Date());
 
     // Handle drag events
     const handleDragOver = (e: React.DragEvent) => {
@@ -93,7 +93,6 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
         e.preventDefault();
         try {
             const data = JSON.parse(e.dataTransfer.getData('application/json'));
-            // Use first team as default for month view drops
             const defaultTeamId = teams[0]?.id || '';
             onDrop(data.id, data.type, date, defaultTeamId);
         } catch (err) {
@@ -101,83 +100,97 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
         }
     };
 
-    const monthNames = [
-        'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-        'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
-    ];
+    const dayNames = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
-            {/* Month Header */}
-            <div className="p-4 border-b border-slate-200 bg-slate-50">
-                <h2 className="text-lg font-bold text-slate-800">
-                    {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-                </h2>
-            </div>
-
+        <div className="h-full flex flex-col bg-white overflow-hidden">
             {/* Day Headers */}
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-                {['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Niedz'].map((day) => (
-                    <div key={day} className="p-2 text-center text-sm font-medium text-slate-600">
+            <div className="grid grid-cols-7 border-b-2 border-slate-200 bg-slate-50">
+                {dayNames.map((day, i) => (
+                    <div
+                        key={day}
+                        className={`py-2 text-center text-[11px] font-bold uppercase tracking-wider border-r border-slate-100
+                            ${i >= 5 ? 'text-slate-400' : 'text-slate-500'}`}
+                    >
                         {day}
                     </div>
                 ))}
             </div>
 
             {/* Calendar Grid */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 grid overflow-y-auto" style={{ gridTemplateRows: `repeat(${weeks.length}, 1fr)` }}>
                 {weeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="grid grid-cols-7 border-b border-slate-100">
+                    <div key={weekIndex} className="grid grid-cols-7 border-b border-slate-100 min-h-[90px]">
                         {week.map((day) => {
-                            const dateStr = toISODateString(day);
+                            const dateStr = toLocalDateString(day);
                             const isToday = dateStr === today;
-                            const isCurrentMonth = day.getMonth() === currentMonth;
-                            const dayInstallations = getInstallationsForDay(dateStr);
+                            const isCurrentMonth = isSameMonth(day, currentDate);
+                            const dayInstallations = installationsByDate[dateStr] || [];
                             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
 
                             return (
                                 <div
                                     key={dateStr}
-                                    className={`min-h-[100px] p-1 border-r border-slate-100 transition-colors ${!isCurrentMonth ? 'bg-slate-50 text-slate-400' :
-                                            isToday ? 'bg-indigo-50' :
-                                                isWeekend ? 'bg-slate-50' :
-                                                    'hover:bg-slate-50'
+                                    className={`border-r border-slate-100 p-1 transition-colors overflow-hidden
+                                        ${!isCurrentMonth
+                                            ? 'bg-slate-50/60'
+                                            : isToday
+                                                ? 'bg-indigo-50/50'
+                                                : isWeekend
+                                                    ? 'bg-gray-50/30'
+                                                    : 'hover:bg-slate-50/50'
                                         }`}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, dateStr)}
                                 >
                                     {/* Day Number */}
-                                    <div className={`text-sm font-medium mb-1 ${isToday ? 'text-indigo-600' :
-                                            !isCurrentMonth ? 'text-slate-400' :
-                                                'text-slate-700'
-                                        }`}>
-                                        {day.getDate()}
+                                    <div className="flex items-center justify-between mb-0.5">
+                                        <span className={`text-xs font-bold leading-none
+                                            ${isToday
+                                                ? 'bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center'
+                                                : !isCurrentMonth
+                                                    ? 'text-slate-300'
+                                                    : 'text-slate-600'
+                                            }`}
+                                        >
+                                            {day.getDate()}
+                                        </span>
+                                        {dayInstallations.length > 0 && !isToday && (
+                                            <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1 rounded-full">
+                                                {dayInstallations.length}
+                                            </span>
+                                        )}
                                     </div>
 
-                                    {/* Installations */}
+                                    {/* Installation items */}
                                     <div className="space-y-0.5">
                                         {dayInstallations.slice(0, 3).map((inst) => {
                                             const team = teams.find(t => t.id === inst.teamId);
+                                            const clientName = inst.client?.name
+                                                || `${inst.client?.firstName || ''} ${inst.client?.lastName || ''}`.trim()
+                                                || inst.client?.city
+                                                || 'Montaż';
+
                                             return (
                                                 <div
                                                     key={inst.id}
                                                     onClick={() => onEditInstallation?.(inst)}
-                                                    className="flex items-center gap-1 px-1 py-0.5 rounded text-xs cursor-pointer hover:bg-white hover:shadow-sm transition-all truncate"
+                                                    className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:shadow-sm transition-all truncate"
                                                     style={{
-                                                        backgroundColor: team?.color ? `${team.color}20` : '#f1f5f9',
+                                                        backgroundColor: team?.color ? `${team.color}15` : '#f1f5f9',
                                                         borderLeft: `2px solid ${team?.color || '#94a3b8'}`
                                                     }}
-                                                    title={inst.title || `${inst.client?.firstName} ${inst.client?.lastName}`}
+                                                    title={`${clientName} • ${inst.client?.city || ''} • ${inst.contractNumber || ''}`}
                                                 >
                                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDot(inst.status)}`} />
-                                                    <span className="truncate text-slate-700">
-                                                        {inst.client?.city || inst.title?.slice(0, 15) || 'Montaż'}
+                                                    <span className={`truncate text-[10px] font-medium ${!isCurrentMonth ? 'text-slate-400' : 'text-slate-700'}`}>
+                                                        {clientName}
                                                     </span>
                                                 </div>
                                             );
                                         })}
                                         {dayInstallations.length > 3 && (
-                                            <div className="text-xs text-slate-500 px-1">
+                                            <div className="text-[9px] text-indigo-500 font-semibold px-1 cursor-pointer hover:underline">
                                                 +{dayInstallations.length - 3} więcej
                                             </div>
                                         )}
@@ -190,15 +203,15 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             </div>
 
             {/* Legend */}
-            <div className="p-2 border-t border-slate-200 flex flex-wrap gap-3 text-xs">
-                <span className="text-slate-500">Ekipy:</span>
-                {teams.slice(0, 6).map(team => (
+            <div className="px-3 py-1.5 border-t border-slate-200 bg-slate-50 flex items-center gap-3 flex-wrap">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Ekipy:</span>
+                {teams.filter(t => t.isActive).slice(0, 8).map(team => (
                     <div key={team.id} className="flex items-center gap-1">
                         <span
-                            className="w-3 h-3 rounded"
+                            className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                             style={{ backgroundColor: team.color || '#6366f1' }}
                         />
-                        <span className="text-slate-600">{team.name}</span>
+                        <span className="text-[10px] text-slate-600">{team.name}</span>
                     </div>
                 ))}
             </div>

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { MODEL_IMAGES, getModelImage } from '../../config/modelImages';
+import { MODEL_IMAGES, getModelImage, getModelDisplayName } from '../../config/modelImages';
 
 const ROOF_MODELS = [
     'Trendline', 'Trendline+', 'Topline', 'Topline XL',
@@ -102,7 +102,7 @@ export function ProductImagesPage() {
 
                             {/* Model Name */}
                             <div className="p-3 text-center border-t">
-                                <h3 className="text-base font-bold text-slate-800">{model}</h3>
+                                <h3 className="text-base font-bold text-slate-800">{getModelDisplayName(model)}</h3>
                                 <p className="text-xs text-slate-500 mt-1">
                                     {MODEL_IMAGES[model]?.split('/').pop() || 'nie ustawiono'}
                                 </p>

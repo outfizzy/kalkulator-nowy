@@ -195,10 +195,11 @@ export const CustomerService = {
                         quantity: 1,
                         price: 0
                     }],
+                    totalPrice: 0,
                     contractDetails: {
                         contractNumber: customer.contract_number.trim(),
                         createdAt: new Date(),
-                        signedAt: undefined, // Draft status
+                        signedAt: undefined,
                         advance: 0,
                         comments: 'Automatycznie utworzona przy dodawaniu klienta. Uzupełnij szczegóły w sekcji Umowy.'
                     }

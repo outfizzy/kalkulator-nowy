@@ -317,8 +317,8 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
                                                                 )}
                                                             </div>
                                                             <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${item.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                                                                    item.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
-                                                                        'bg-yellow-100 text-yellow-700'
+                                                                item.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-yellow-100 text-yellow-700'
                                                                 }`}>
                                                                 {item.status === 'delivered' ? '✓ Dostarczone' :
                                                                     item.status === 'ordered' ? '🚚 Zamówione' :
@@ -352,47 +352,83 @@ export const CalendarSidebar: React.FC<CalendarSidebarProps> = ({
                 ))}
 
                 {/* ======================== SERVICES TAB ======================== */}
-                {activeTab === 'services' && filteredTickets.map((ticket) => (
-                    <div
-                        key={ticket.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, ticket.id, 'service')}
-                        className="p-3 bg-amber-50 rounded-lg border border-amber-200 shadow-sm cursor-grab hover:shadow-md hover:border-amber-400 transition-all group"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium text-amber-800 truncate">
-                                    🔧 {ticket.ticketNumber || 'Zgłoszenie serwisowe'}
-                                </p>
-                                <p className="text-sm text-amber-700 mt-1">
-                                    {ticket.client?.firstName} {ticket.client?.lastName}
-                                </p>
-                                {ticket.client?.city && (
-                                    <p className="text-xs text-amber-600 mt-0.5">
-                                        📍 {ticket.client.city}
+                {activeTab === 'services' && filteredTickets.map((ticket) => {
+                    const priorityConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
+                        critical: { label: 'Krytyczny', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
+                        high: { label: 'Wysoki', bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+                        medium: { label: 'Średni', bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+                        low: { label: 'Niski', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
+                    };
+                    const prio = priorityConfig[ticket.priority] || priorityConfig.medium;
+                    const clientName = ticket.client
+                        ? `${ticket.client.firstName || ''} ${ticket.client.lastName || ''}`.trim()
+                        : ticket.customerName || 'Brak klienta';
+                    const contractNum = ticket.contractNumber || ticket.contract?.contractNumber;
+
+                    return (
+                        <div
+                            key={ticket.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, ticket.id, 'service')}
+                            className={`p-3 bg-amber-50 rounded-lg border shadow-sm cursor-grab hover:shadow-md transition-all group ${ticket.priority === 'critical' ? 'border-red-300 bg-red-50' :
+                                    ticket.priority === 'high' ? 'border-orange-300 bg-orange-50' :
+                                        'border-amber-200 hover:border-amber-400'
+                                }`}
+                        >
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0">
+                                    {/* Client name — prominent */}
+                                    <p className="font-bold text-sm text-slate-800">
+                                        {clientName}
                                     </p>
-                                )}
-                                {ticket.description && (
-                                    <p className="text-xs text-amber-600 mt-1 line-clamp-2">
-                                        {ticket.description}
-                                    </p>
-                                )}
+
+                                    {/* Ticket number + priority row */}
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-slate-500 font-mono">
+                                            {ticket.ticketNumber || 'Serwis'}
+                                        </span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${prio.bg} ${prio.text}`}>
+                                            {prio.label}
+                                        </span>
+                                    </div>
+
+                                    {/* Contract number */}
+                                    {contractNum && (
+                                        <p className="text-[11px] text-indigo-600 font-medium mt-1">
+                                            📋 Umowa: {contractNum}
+                                        </p>
+                                    )}
+
+                                    {/* City */}
+                                    {ticket.client?.city && (
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            📍 {ticket.client.street ? `${ticket.client.street}, ` : ''}{ticket.client.postalCode ? `${ticket.client.postalCode} ` : ''}{ticket.client.city}
+                                        </p>
+                                    )}
+
+                                    {/* Description preview */}
+                                    {ticket.description && (
+                                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                                            {ticket.description}
+                                        </p>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSchedule(ticket.id, 'service');
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-amber-200 text-amber-700 hover:bg-amber-300 transition-opacity flex-shrink-0"
+                                    title="Utwórz zlecenie"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </button>
                             </div>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onSchedule(ticket.id, 'service');
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-amber-200 text-amber-700 hover:bg-amber-300 transition-opacity flex-shrink-0"
-                                title="Utwórz zlecenie"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                            </button>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {/* ======================== PENDING TAB ======================== */}
                 {activeTab === 'pending' && filteredPending.map((inst) => (

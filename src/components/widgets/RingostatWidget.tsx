@@ -1,6 +1,6 @@
 /**
  * RingostatWidget - Widget do wyświetlania statystyk połączeń z Ringostat
- * Supports: call sync to DB, customer matching, callback tracking with rep name
+ * Shows: call list, team stats, missed call queue with callback tracking
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -18,34 +18,32 @@ interface CustomerMatch {
     latestOfferId?: string;
 }
 
+interface CallRecord {
+    id: string;
+    date: string;
+    duration: number;
+    caller: string;
+    callee: string;
+    status: 'answered' | 'missed';
+    direction: 'incoming' | 'outgoing';
+    recording?: string;
+    disposition?: string;
+    internal_extension?: string;
+    client_number?: string;
+}
+
 interface CallStats {
     total: number;
     answered: number;
     missed: number;
     byNumber: Record<string, { total: number; answered: number; missed: number }>;
-    calls: Array<{
-        id: string;
-        date: string;
-        duration: number;
-        caller: string;
-        callee: string;
-        status: 'answered' | 'missed';
-        direction: 'incoming' | 'outgoing';
-        recording?: string;
-        disposition?: string;
-    }>;
-    sync?: {
-        synced: number;
-        matched: number;
-        communications_created: number;
-    };
+    calls: CallRecord[];
+    sync?: { synced: number; matched: number; communications_created: number };
     error?: string;
 }
 
 interface CallbackInfo {
     id: string;
-    ringostat_id?: string;
-    call_id?: string;
     user_id: string;
     callback_at?: string;
     created_at: string;
@@ -84,88 +82,51 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     }, [dateRange]);
 
     const fetchUsers = useCallback(async () => {
-        try {
-            const allUsers = await DatabaseService.getAllUsers();
-            setUsers(allUsers);
-        } catch (err) {
-            console.error('Error fetching users:', err);
-        }
+        try { setUsers(await DatabaseService.getAllUsers()); } catch (err) { console.error('Error fetching users:', err); }
     }, []);
 
     const fetchCustomers = useCallback(async () => {
-        try {
-            const uniqueCustomers = await DatabaseService.getUniqueCustomers();
-            setCustomers(uniqueCustomers);
-        } catch (err) {
-            console.error('Error fetching customers:', err);
-        }
+        try { setCustomers(await DatabaseService.getUniqueCustomers()); } catch (err) { console.error('Error fetching customers:', err); }
     }, []);
 
     const fetchCallbacks = useCallback(async () => {
         try {
-            // Fetch from call_log (primary) — where callback_by is set
-            const { data: callLogCallbacks } = await supabase
-                .from('call_log')
-                .select('ringostat_id, callback_by, callback_at')
-                .not('callback_by', 'is', null);
+            // Fetch from call_log (synced calls)
+            const { data: callLogCbs } = await supabase.from('call_log').select('ringostat_id, callback_by, callback_at').not('callback_by', 'is', null);
+            // Fetch from call_actions (primary callback storage)
+            const { data: callActions } = await supabase.from('call_actions').select('*').eq('action_type', 'callback');
 
-            // Fetch from call_actions (legacy)
-            const { data: callActions } = await supabase
-                .from('call_actions')
-                .select('*');
-
-            // Fetch profile names for callback users
             const userIds = new Set<string>();
-            (callLogCallbacks || []).forEach(c => { if (c.callback_by) userIds.add(c.callback_by); });
+            (callLogCbs || []).forEach(c => { if (c.callback_by) userIds.add(c.callback_by); });
             (callActions || []).forEach(c => { if (c.user_id) userIds.add(c.user_id); });
 
             let profilesMap: Record<string, string> = {};
             if (userIds.size > 0) {
-                const { data: profiles } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, first_name, last_name')
-                    .in('id', Array.from(userIds));
+                const { data: profiles, error: profErr } = await supabase.from('profiles').select('id, full_name').in('id', Array.from(userIds));
+                if (profErr) console.error('Profile fetch error:', profErr.message);
                 if (profiles) {
                     profilesMap = profiles.reduce((acc, p) => ({
                         ...acc,
-                        [p.id]: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Nieznany'
-                    }), {});
+                        [p.id]: p.full_name || 'Użytkownik'
+                    }), {} as Record<string, string>);
                 }
             }
 
             const cbMap: Record<string, CallbackInfo> = {};
-
-            // Map call_log callbacks
-            (callLogCallbacks || []).forEach(c => {
-                if (c.ringostat_id && c.callback_by) {
-                    cbMap[c.ringostat_id] = {
-                        id: c.ringostat_id,
-                        ringostat_id: c.ringostat_id,
-                        user_id: c.callback_by,
-                        callback_at: c.callback_at,
-                        created_at: c.callback_at || '',
-                        user_name: profilesMap[c.callback_by] || 'Nieznany'
-                    };
-                }
-            });
-
-            // Map legacy call_actions (fallback)
+            // call_actions is primary — populate first
             (callActions || []).forEach(a => {
-                if (a.call_id && !cbMap[a.call_id]) {
-                    cbMap[a.call_id] = {
-                        id: a.id,
-                        call_id: a.call_id,
-                        user_id: a.user_id,
-                        created_at: a.created_at,
-                        user_name: profilesMap[a.user_id] || 'Nieznany'
-                    };
+                if (a.call_id) {
+                    cbMap[a.call_id] = { id: a.id, user_id: a.user_id, created_at: a.created_at, user_name: profilesMap[a.user_id] || 'Użytkownik' };
                 }
             });
-
+            // call_log overrides if present (has callback_at timestamp)
+            (callLogCbs || []).forEach(c => {
+                if (c.ringostat_id && c.callback_by) {
+                    cbMap[c.ringostat_id] = { id: c.ringostat_id, user_id: c.callback_by, callback_at: c.callback_at, created_at: c.callback_at || '', user_name: profilesMap[c.callback_by] || 'Użytkownik' };
+                }
+            });
             setCallbacks(cbMap);
-        } catch (err) {
-            console.error('Error fetching callbacks:', err);
-        }
+        } catch (err) { console.error('Error fetching callbacks:', err); }
     }, []);
 
     const fetchStats = useCallback(async () => {
@@ -178,8 +139,7 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
             if (data.error) throw new Error(data.error);
             setStats(data);
         } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Błąd pobierania danych';
-            setError(errorMessage);
+            setError(err instanceof Error ? err.message : 'Błąd pobierania danych');
             setStats({ total: 0, answered: 0, missed: 0, byNumber: {}, calls: [] });
         }
     }, [getDateRange]);
@@ -191,65 +151,56 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
             const response = await fetch(`/api/ringostat-calls?date_from=${dateFrom}&date_to=${dateTo}&sync=true`);
             if (!response.ok) throw new Error(`API error: ${response.status}`);
             const data = await response.json();
-            if (data.sync) {
-                toast.success(`Zsynchronizowano ${data.sync.synced} połączeń, ${data.sync.matched} dopasowanych do klientów`);
-            }
+            if (data.sync) toast.success(`Zsynchronizowano ${data.sync.synced} połączeń, ${data.sync.matched} dopasowanych`);
             setStats(data);
-            fetchCallbacks(); // Refresh callbacks after sync
-        } catch (err: unknown) {
-            toast.error('Błąd synchronizacji');
-        } finally {
-            setSyncing(false);
-        }
+            fetchCallbacks();
+        } catch { toast.error('Błąd synchronizacji'); }
+        finally { setSyncing(false); }
     }, [getDateRange, fetchCallbacks]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        try {
-            await Promise.all([fetchStats(), fetchCustomers(), fetchCallbacks(), fetchUsers()]);
-        } finally {
-            setLoading(false);
-        }
+        try { await Promise.all([fetchStats(), fetchCustomers(), fetchCallbacks(), fetchUsers()]); }
+        finally { setLoading(false); }
     }, [fetchStats, fetchCustomers, fetchCallbacks, fetchUsers]);
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
-    // --- Callback handler ---
+    // --- Callback handler — records who clicked ---
     const handleCallback = async (callId: string) => {
         if (!currentUser) return;
+        const now = new Date().toISOString();
+        const userName = currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : 'Użytkownik';
         try {
-            // Update call_log table
-            const { error: callLogError } = await supabase
-                .from('call_log')
-                .update({
-                    callback_by: currentUser.id,
-                    callback_at: new Date().toISOString()
-                })
-                .eq('ringostat_id', callId);
-
-            if (callLogError) {
-                console.warn('call_log update failed (may not exist yet):', callLogError.message);
-            }
-
-            // Also insert into call_actions (legacy compatibility)
-            await supabase.from('call_actions').insert({
+            // Primary storage: call_actions (always works, no dependency on sync)
+            const { error: actErr } = await supabase.from('call_actions').insert({
                 call_id: callId,
                 customer_id: null,
                 user_id: currentUser.id,
                 action_type: 'callback'
-            }).then(() => { }, () => { }); // Ignore errors on legacy table
+            });
+            if (actErr) console.error('call_actions insert error:', actErr.message);
 
-            toast.success('Oznaczono jako oddzwonione');
-            fetchCallbacks();
-        } catch {
-            toast.error('Błąd zapisu akcji');
+            // Secondary: also try updating call_log if that row exists
+            await supabase.from('call_log').update({
+                callback_by: currentUser.id,
+                callback_at: now
+            }).eq('ringostat_id', callId);
+
+            // Instant UI update
+            setCallbacks(prev => ({
+                ...prev,
+                [callId]: { id: callId, user_id: currentUser.id, callback_at: now, created_at: now, user_name: userName }
+            }));
+            toast.success(`Oddzwonione przez ${userName}`);
+        } catch (err) {
+            console.error('Callback save error:', err);
+            toast.error('Błąd zapisu oddzwonienia');
         }
     };
 
     // --- Helpers ---
-    const normalizePhoneNumber = (phone: string | undefined | null) => {
+    const normalizePhone = (phone: string | undefined | null) => {
         if (!phone) return '';
         let p = phone.replace(/\D/g, '');
         if (p.startsWith('00')) p = p.substring(2);
@@ -259,323 +210,284 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     };
 
     const getCustomerMatch = (phoneNumber: string) => {
-        const normalizedCall = normalizePhoneNumber(phoneNumber);
-        if (normalizedCall.length < 7) return undefined;
+        const n = normalizePhone(phoneNumber);
+        if (n.length < 7) return undefined;
         return customers.find(c => {
-            const cleanStored = normalizePhoneNumber(c.customer.phone);
-            return cleanStored.length >= 7 && (normalizedCall === cleanStored || normalizedCall.endsWith(cleanStored) || cleanStored.endsWith(normalizedCall));
+            const s = normalizePhone(c.customer.phone);
+            return s.length >= 7 && (n === s || n.endsWith(s) || s.endsWith(n));
         });
     };
 
-    const getUserForExtension = useCallback((extension: string) => {
-        return users.find(u => u.phone && u.phone.endsWith(extension));
+    const getUserForExtension = useCallback((ext: string) => {
+        if (!ext || ext.length < 2 || ext.length > 5) return undefined;
+        return users.find(u => {
+            if (!u.phone) return false;
+            const d = u.phone.replace(/\D/g, '');
+            return d === ext || d.endsWith(ext);
+        });
     }, [users]);
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    };
+    const formatDate = (d: string) => d ? new Date(d).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+    const formatDuration = (s: number) => { if (!s) return '0s'; const m = Math.floor(s / 60); return m > 0 ? `${m}m ${s % 60}s` : `${s}s`; };
 
-    const formatDuration = (seconds: number) => {
-        if (!seconds) return '0s';
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return m > 0 ? `${m}m ${s}s` : `${s}s`;
-    };
+    // --- Computed Data ---
+    const allCalls = useMemo(() => (stats?.calls || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [stats]);
+    const missedQueue = useMemo(() => allCalls.filter(c => c.status === 'missed' && c.direction === 'incoming' && !callbacks[c.id]), [allCalls, callbacks]);
 
-    // --- Data Processing ---
-    const allCalls = (stats?.calls || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const filteredCalls = allCalls;
-    const missedCallsQueue = allCalls.filter(call => call.status === 'missed' && call.direction === 'incoming' && !callbacks[call.id]);
+    // Get consultant for a call (the internal person)
+    const getCallConsultant = useCallback((call: CallRecord) => {
+        const ext = call.internal_extension || (call.direction === 'outgoing' ? call.caller : call.callee);
+        return getUserForExtension(ext);
+    }, [getUserForExtension]);
 
-    // Group stats by consultant
-    const consultantStats = useMemo(() => {
-        const statsMap: Record<string, { name: string; total: number; answered: number; missed: number; extension: string }> = {};
+    // Team stats
+    const teamStats = useMemo(() => {
+        const map: Record<string, { name: string; total: number; answered: number; missed: number; ext: string }> = {};
         allCalls.forEach(call => {
-            const internalNumber = call.direction === 'outgoing' ? call.caller : call.callee;
-            if (internalNumber && internalNumber.length >= 3 && internalNumber.length <= 4) {
-                if (!statsMap[internalNumber]) {
-                    const user = getUserForExtension(internalNumber);
-                    statsMap[internalNumber] = {
-                        name: user ? `${user.firstName} ${user.lastName}` : `Konsultant ${internalNumber}`,
-                        total: 0, answered: 0, missed: 0, extension: internalNumber
-                    };
-                }
-                statsMap[internalNumber].total++;
-                if (call.status === 'answered') statsMap[internalNumber].answered++;
-                else statsMap[internalNumber].missed++;
+            const ext = call.internal_extension;
+            if (!ext) return;
+            if (!map[ext]) {
+                const u = getUserForExtension(ext);
+                map[ext] = { name: u ? `${u.firstName} ${u.lastName}` : `Kons. ${ext}`, total: 0, answered: 0, missed: 0, ext };
             }
+            map[ext].total++;
+            if (call.status === 'answered') map[ext].answered++; else map[ext].missed++;
         });
-        return Object.values(statsMap).sort((a, b) => b.total - a.total);
+        return Object.values(map).sort((a, b) => b.total - a.total);
     }, [allCalls, getUserForExtension]);
 
-    // --- Compact View ---
+    // =============== COMPACT VIEW ===============
     if (compact) {
         return (
             <div className="bg-white rounded-xl border border-slate-200 p-4 h-full flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">📞 Ringostat</h3>
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">📞 Ringostat</h3>
+                    <div className="flex items-center gap-1.5">
                         <select value={dateRange} onChange={e => setDateRange(e.target.value as any)} className="text-xs border rounded px-2 py-1">
-                            <option value="today">Dziś</option>
-                            <option value="week">Tydzień</option>
+                            <option value="today">Dziś</option><option value="week">Tydzień</option>
                         </select>
-                        <button
-                            onClick={handleSync}
-                            disabled={syncing}
-                            className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 font-medium disabled:opacity-50"
-                            title="Synchronizuj połączenia z bazą danych"
-                        >
-                            {syncing ? '⟳' : '🔄'} Sync
+                        <button onClick={handleSync} disabled={syncing} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 font-medium disabled:opacity-50">
+                            {syncing ? '⟳' : '🔄'}
                         </button>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto min-h-0 space-y-2">
-                    {missedCallsQueue.length > 0 && (
-                        <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-2">
-                            <div className="text-red-700 font-bold text-xs flex justify-between">
-                                <span>⚠️ Nieodebrane ({missedCallsQueue.length})</span>
-                            </div>
-                        </div>
-                    )}
-                    {filteredCalls.slice(0, 5).map(call => {
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="bg-slate-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-slate-800">{stats?.total || 0}</div>
+                        <div className="text-[9px] text-slate-500 font-medium">Razem</div>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-green-700">{stats?.answered || 0}</div>
+                        <div className="text-[9px] text-green-600 font-medium">Odebr.</div>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-red-700">{stats?.missed || 0}</div>
+                        <div className="text-[9px] text-red-600 font-medium">Nieodebr.</div>
+                    </div>
+                </div>
+                {missedQueue.length > 0 && (
+                    <div className="bg-red-50 border border-red-100 rounded-lg p-2 mb-2">
+                        <div className="text-red-700 font-bold text-xs">⚠️ Nieodebrane do oddzw. ({missedQueue.length})</div>
+                    </div>
+                )}
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-1">
+                    {allCalls.slice(0, 6).map(call => {
                         const cb = callbacks[call.id];
-                        const isHandled = call.status === 'answered' || !!cb;
+                        const clientNum = call.client_number || (call.direction === 'incoming' ? call.caller : call.callee);
+                        const match = getCustomerMatch(clientNum);
                         return (
-                            <div key={call.id} className="flex justify-between text-xs py-1 border-b border-slate-50 last:border-0">
-                                <span className={call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}>
-                                    {call.direction === 'incoming' ? '↙' : '↗'} {call.direction === 'incoming' ? call.caller : call.callee}
-                                </span>
-                                <span className={isHandled ? 'text-green-500 font-medium' : 'text-red-500 font-bold'}>
-                                    {call.status === 'answered'
-                                        ? 'Odebrane'
-                                        : (cb ? `✓ ${cb.user_name}` : 'Nieodebrane')}
+                            <div key={call.id} className="flex justify-between items-center text-xs py-1.5 border-b border-slate-50 last:border-0 gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className={call.direction === 'incoming' ? 'text-blue-500' : 'text-orange-500'}>{call.direction === 'incoming' ? '↙' : '↗'}</span>
+                                    <span className="truncate text-slate-700">{match ? `${match.customer.firstName} ${match.customer.lastName}` : clientNum}</span>
+                                </div>
+                                <span className={`shrink-0 ${call.status === 'answered' || cb ? 'text-green-600' : 'text-red-500 font-bold'}`}>
+                                    {call.status === 'answered' ? `✅ ${formatDuration(call.duration)}` : cb ? `✓ ${cb.user_name}` : '❌'}
                                 </span>
                             </div>
                         );
                     })}
                 </div>
-                <button onClick={() => setShowDetails(true)} className="w-full py-2 text-xs text-accent font-bold mt-2">Pełny Raport →</button>
+                <button onClick={() => setShowDetails(true)} className="w-full py-2 text-xs text-blue-600 font-bold mt-2 hover:bg-blue-50 rounded-lg transition-colors">Pełny Raport →</button>
             </div>
         );
     }
 
-    // --- Full Admin View ---
+    // =============== FULL VIEW ===============
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[600px] relative overflow-hidden group">
-            {/* Decorative element like WalletWidget */}
-            <div className="absolute right-0 top-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
-
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col relative overflow-hidden">
             {/* Header */}
-            <div className="relative z-10 p-6 border-b border-slate-100 flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            <div className="p-3 sm:p-4 border-b border-slate-100 space-y-2.5">
+                {/* Title + controls */}
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg shrink-0">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">
-                            Centrum Połączeń
-                            {loading && <span className="animate-spin ml-2 text-blue-500">⟳</span>}
-                        </h2>
+                        <h2 className="text-sm sm:text-base font-bold text-slate-800">Centrum Połączeń{loading && <span className="animate-spin ml-1 text-blue-400 text-xs">⟳</span>}</h2>
                     </div>
-                    {/* Tabs */}
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                        <button
-                            onClick={() => setActiveTab('calls')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'calls'
-                                ? 'bg-white text-slate-800 shadow-sm'
-                                : 'text-slate-600 hover:text-slate-800'
-                                }`}
-                        >
-                            Lista Połączeń
+                    <div className="flex gap-1.5 items-center shrink-0">
+                        <select value={dateRange} onChange={e => setDateRange(e.target.value as any)}
+                            className="border border-slate-200 rounded-md px-2 py-1 text-[11px] bg-white font-medium text-slate-600 focus:border-blue-400 transition-all">
+                            <option value="today">Dziś</option><option value="week">7 dni</option><option value="month">30 dni</option>
+                        </select>
+                        <button onClick={handleSync} disabled={syncing}
+                            className="px-2 py-1 bg-blue-600 text-white rounded-md text-[11px] font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 transition-colors">
+                            <svg className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            <span className="hidden sm:inline">Sync</span>
                         </button>
-                        <button
-                            onClick={() => setActiveTab('team')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'team'
-                                ? 'bg-white text-slate-800 shadow-sm'
-                                : 'text-slate-600 hover:text-slate-800'
-                                }`}
-                        >
-                            Wyniki Zespołu
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('missed')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'missed'
-                                ? 'bg-white text-red-600 shadow-sm'
-                                : 'text-slate-600 hover:text-slate-800'
-                                }`}
-                        >
-                            <span>Do Oddzwonienia</span>
-                            {missedCallsQueue.length > 0 && (
-                                <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full">
-                                    {missedCallsQueue.length}
-                                </span>
-                            )}
+                        <button onClick={fetchData} className="p-1 text-slate-400 hover:text-blue-600 rounded transition-all" title="Odśwież">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         </button>
                     </div>
                 </div>
 
-                <div className="flex gap-3 items-center">
-                    <select
-                        value={dateRange}
-                        onChange={e => setDateRange(e.target.value as any)}
-                        className="border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white font-medium text-slate-700 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                    >
-                        <option value="today">📅 Dziś</option>
-                        <option value="week">📊 7 dni</option>
-                        <option value="month">📈 30 dni</option>
-                    </select>
-                    <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-                        title="Synchronizuj połączenia do bazy danych i dopasuj do klientów"
-                    >
-                        {syncing ? <span className="animate-spin">⟳</span> : '🔄'}
-                        <span>{syncing ? 'Synchronizacja...' : 'Sync'}</span>
-                    </button>
-                    <button
-                        onClick={fetchData}
-                        className="p-2.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-xl transition-all"
-                        title="Odśwież"
-                    >
-                        <span className="text-xl">🔄</span>
-                    </button>
+                {/* Stats bar */}
+                <div className="grid grid-cols-3 gap-1.5">
+                    <div className="bg-slate-50 rounded-md px-2 py-1.5 text-center border border-slate-100">
+                        <div className="text-base font-bold text-slate-800">{stats?.total || 0}</div>
+                        <div className="text-[8px] text-slate-400 font-semibold uppercase tracking-wider">Razem</div>
+                    </div>
+                    <div className="bg-emerald-50 rounded-md px-2 py-1.5 text-center border border-emerald-100">
+                        <div className="text-base font-bold text-emerald-700">{stats?.answered || 0}</div>
+                        <div className="text-[8px] text-emerald-500 font-semibold uppercase tracking-wider">Odebrane</div>
+                    </div>
+                    <div className="bg-rose-50 rounded-md px-2 py-1.5 text-center border border-rose-100">
+                        <div className="text-base font-bold text-rose-700">{stats?.missed || 0}</div>
+                        <div className="text-[8px] text-rose-500 font-semibold uppercase tracking-wider">Nieodebrane</div>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex bg-slate-100 p-0.5 rounded-md">
+                    {[
+                        { key: 'calls' as const, icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>, label: 'Lista' },
+                        { key: 'team' as const, icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>, label: 'Zespół' },
+                        { key: 'missed' as const, icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>, label: 'Oddzw.', badge: missedQueue.length },
+                    ].map(tab => (
+                        <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                            className={`flex-1 px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1 ${activeTab === tab.key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                            {tab.icon} {tab.label}
+                            {tab.badge ? <span className="bg-rose-500 text-white text-[8px] px-1 rounded-full min-w-[14px] text-center leading-[14px]">{tab.badge}</span> : null}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {/* Sync info badge */}
+            {/* Sync badge */}
             {stats?.sync && (
-                <div className="mx-6 mt-3 p-3 bg-green-50 border border-green-100 rounded-lg text-sm text-green-800 flex items-center gap-3">
-                    <span className="text-lg">✅</span>
-                    <div>
-                        <strong>Zsynchronizowano:</strong> {stats.sync.synced} nowych połączeń,{' '}
-                        {stats.sync.matched} dopasowanych do klientów,{' '}
-                        {stats.sync.communications_created} wpisów komunikacji
-                    </div>
+                <div className="mx-3 mt-2 p-1.5 bg-emerald-50 border border-emerald-100 rounded-md text-[11px] text-emerald-800 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    <span><strong>Sync:</strong> {stats.sync.synced} nowych, {stats.sync.matched} dopasowanych</span>
                 </div>
             )}
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-auto p-6 bg-white rounded-b-2xl">
-                {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-lg">{error}</div>}
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-3 sm:p-4 max-h-[520px]">
+                {error && <div className="p-2 mb-2 bg-rose-50 text-rose-600 rounded-md text-[11px]">{error}</div>}
 
-
-                {/* View: Calls List */}
+                {/* ===== CALLS LIST ===== */}
                 {activeTab === 'calls' && (
-                    <div className="overflow-x-auto rounded-2xl border-2 border-slate-200 shadow-sm">
-                        <table className="w-full text-sm min-w-[1200px]">
-                            <thead className="bg-gradient-to-r from-slate-50 to-slate-100 text-slate-600 font-semibold">
-                                <tr>
-                                    <th className="p-4 text-left border-b-2 border-slate-200 whitespace-nowrap">⏰ Czas</th>
-                                    <th className="p-4 text-left border-b-2 border-slate-200 whitespace-nowrap">↔️ Kierunek</th>
-                                    <th className="p-4 text-left border-b-2 border-slate-200 whitespace-nowrap">👤 Klient</th>
-                                    <th className="p-4 text-left border-b-2 border-slate-200 whitespace-nowrap">💼 Konsultant</th>
-                                    <th className="p-4 text-center border-b-2 border-slate-200 whitespace-nowrap">📊 Status</th>
-                                    <th className="p-4 text-center border-b-2 border-slate-200 whitespace-nowrap">⏱️ Czas trwania</th>
-                                    <th className="p-4 text-right border-b-2 border-slate-200 whitespace-nowrap">⚡ Akcje</th>
+                    <div className="overflow-auto rounded-lg border border-slate-200 max-h-[440px]">
+                        <table className="w-full text-[11px] min-w-[580px]">
+                            <thead className="bg-slate-50/80 sticky top-0 z-10">
+                                <tr className="text-slate-400 font-semibold uppercase text-[9px] tracking-wider">
+                                    <th className="px-2 py-2 text-left border-b border-slate-200">Czas</th>
+                                    <th className="px-2 py-2 text-left border-b border-slate-200">Nr klienta</th>
+                                    <th className="px-2 py-2 text-left border-b border-slate-200">Nasz nr</th>
+                                    <th className="px-2 py-2 text-left border-b border-slate-200">Klient</th>
+                                    <th className="px-2 py-2 text-center border-b border-slate-200">Status</th>
+                                    <th className="px-2 py-2 text-right border-b border-slate-200">Akcje</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredCalls.map(call => {
-                                    const match = getCustomerMatch(call.direction === 'outgoing' ? call.callee : call.caller);
-                                    const clientNum = call.direction === 'outgoing' ? call.callee : call.caller;
-                                    const internalNum = call.direction === 'outgoing' ? call.caller : call.callee;
-                                    const internalUser = getUserForExtension(internalNum);
-                                    const isMissed = call.status === 'missed';
+                            <tbody>
+                                {allCalls.map(call => {
+                                    // Consistent: always show client number and our internal number in proper columns
+                                    const clientNum = call.client_number || (call.direction === 'outgoing' ? call.callee : call.caller);
+                                    const internalNum = call.internal_extension || (call.direction === 'outgoing' ? call.caller : call.callee);
+                                    const match = getCustomerMatch(clientNum);
+                                    const consultant = getCallConsultant(call);
+                                    // Smart status: if there's a recording AND duration, it was answered
+                                    const isMissed = call.status === 'missed' && !(call.recording && call.duration > 0);
                                     const cb = callbacks[call.id];
+                                    const dirColor = call.direction === 'incoming' ? 'text-blue-500' : 'text-amber-500';
+                                    const dirArrow = call.direction === 'incoming' ? '↙' : '↗';
 
                                     return (
-                                        <tr key={call.id} className={`hover:bg-blue-50/30 transition-all duration-150 border-b border-slate-100 ${isMissed && !cb ? 'bg-red-50/50 hover:bg-red-50/70' : 'hover:shadow-sm'}`}>
-                                            <td className="p-4 whitespace-nowrap text-slate-600 font-medium">{formatDate(call.date)}</td>
-                                            <td className="p-4">
-                                                <span className={`flex items-center gap-2 font-semibold px-3 py-1.5 rounded-lg ${call.direction === 'incoming' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>
-                                                    {call.direction === 'incoming' ? '↙ Przychodzące' : '↗ Wychodzące'}
-                                                </span>
+                                        <tr key={call.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors ${isMissed && !cb ? 'bg-rose-50/40' : ''}`}>
+                                            {/* Time + direction */}
+                                            <td className="px-2 py-1.5 whitespace-nowrap">
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`${dirColor} text-xs font-bold`}>{dirArrow}</span>
+                                                    <span className="text-slate-500">{formatDate(call.date)}</span>
+                                                </div>
                                             </td>
-                                            <td className="p-4">
+                                            {/* Client number — always the external/client number */}
+                                            <td className="px-2 py-1.5 whitespace-nowrap">
+                                                <span className="font-mono text-slate-700">{clientNum || '—'}</span>
+                                            </td>
+                                            {/* Our number — always the internal/company number */}
+                                            <td className="px-2 py-1.5 whitespace-nowrap">
+                                                <span className="font-mono text-slate-400">{internalNum || '—'}</span>
+                                            </td>
+                                            {/* Client match */}
+                                            <td className="px-2 py-1.5">
                                                 {match ? (
-                                                    <Link to={`/customers/${match.customer.id}`} className="font-bold text-slate-800 hover:text-blue-600 hover:underline flex items-center gap-2 group">
-                                                        <span className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-sm group-hover:shadow-md transition-all">
+                                                    <Link to={`/customers/${match.customer.id}`} className="font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1">
+                                                        <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-[7px] font-bold shrink-0">
                                                             {match.customer.firstName[0]}{match.customer.lastName[0]}
                                                         </span>
-                                                        {match.customer.firstName} {match.customer.lastName}
+                                                        <span className="truncate max-w-[100px]">{match.customer.firstName} {match.customer.lastName}</span>
                                                     </Link>
+                                                ) : consultant ? (
+                                                    <span className="text-slate-500">{consultant.firstName} {consultant.lastName}</span>
                                                 ) : (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded">{clientNum}</span>
-                                                        <Link
-                                                            to={`/customers/new?phone=${clientNum}`}
-                                                            className="w-7 h-7 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-white flex items-center justify-center hover:scale-110 transition-all font-bold text-sm shadow-sm hover:shadow-md"
-                                                            title="Dodaj do bazy"
-                                                        >
-                                                            +
-                                                        </Link>
-                                                    </div>
+                                                    <Link to={`/customers/new?phone=${clientNum}`}
+                                                        className="text-slate-400 hover:text-green-600 flex items-center gap-1 transition-colors" title="Dodaj do bazy">
+                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                                        <span className="text-[10px]">Dodaj</span>
+                                                    </Link>
                                                 )}
                                             </td>
-                                            <td className="p-3">
-                                                {internalUser ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                                                            {internalUser.firstName[0]}{internalUser.lastName[0]}
-                                                        </div>
-                                                        <span className="text-slate-700">{internalUser.firstName} {internalUser.lastName}</span>
-                                                    </div>
+                                            {/* Status + Duration */}
+                                            <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                                                {isMissed ? (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Nieodebr.
+                                                    </span>
                                                 ) : (
-                                                    <span className="text-slate-400 font-mono">{internalNum || '-'}</span>
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{call.duration > 0 ? formatDuration(call.duration) : 'Odebr.'}
+                                                    </span>
                                                 )}
                                             </td>
-                                            <td className="p-4 text-center">
-                                                <span className={`px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm ${isMissed ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white' : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'}`}>
-                                                    {isMissed ? '❌ Nieodebrane' : '✅ Odebrane'}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                <span className="font-mono text-slate-700 bg-slate-100 px-3 py-1 rounded-lg font-semibold">
-                                                    {call.duration > 0 ? formatDuration(call.duration) : '—'}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {/* Recording player */}
+                                            {/* Actions */}
+                                            <td className="px-2 py-1.5 text-right">
+                                                <div className="flex items-center justify-end gap-1">
                                                     {call.recording && (
-                                                        <button
-                                                            onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
-                                                            className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg hover:from-purple-600 hover:to-pink-600 font-bold shadow-sm hover:shadow-md transition-all"
-                                                            title="Odtwórz nagranie"
-                                                        >
-                                                            {playingRecording === call.id ? '⏹ Stop' : '▶ Nagranie'}
+                                                        <button onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
+                                                            className="text-[10px] bg-slate-700 text-white w-5 h-5 rounded flex items-center justify-center hover:bg-slate-800 transition-colors">
+                                                            {playingRecording === call.id ? <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" /></svg> : <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
                                                         </button>
                                                     )}
-                                                    {/* Callback button */}
                                                     {isMissed && !cb && call.direction === 'incoming' && (
-                                                        <button
-                                                            onClick={() => handleCallback(call.id)}
-                                                            className="text-xs bg-gradient-to-r from-red-500 to-rose-500 text-white px-3 py-1.5 rounded-lg hover:from-red-600 hover:to-rose-600 font-bold shadow-sm hover:shadow-md transition-all animate-pulse"
-                                                        >
-                                                            📞 Oddzwoń
+                                                        <button onClick={() => handleCallback(call.id)}
+                                                            className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded hover:bg-rose-700 font-semibold transition-colors flex items-center gap-0.5">
+                                                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                                            Oddzwoń
                                                         </button>
                                                     )}
-                                                    {/* Callback info */}
                                                     {cb && (
-                                                        <span
-                                                            className="text-xs text-green-600 font-bold cursor-help border-b border-dotted border-green-600"
-                                                            title={`Oddzwonił: ${cb.user_name}\nData: ${cb.callback_at ? new Date(cb.callback_at).toLocaleString('pl-PL') : new Date(cb.created_at).toLocaleString('pl-PL')}`}
-                                                        >
-                                                            ✓ {cb.user_name}
+                                                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                                                            title={`Oddzwonił: ${cb.user_name}\n${cb.callback_at ? new Date(cb.callback_at).toLocaleString('pl-PL') : ''}`}>
+                                                            <span className="inline-flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>{cb.user_name}</span>
                                                         </span>
                                                     )}
                                                 </div>
-                                                {/* Inline audio player */}
                                                 {playingRecording === call.id && call.recording && (
-                                                    <div className="mt-2">
-                                                        <audio controls autoPlay className="w-full h-8" style={{ maxWidth: 250 }}>
-                                                            <source src={call.recording} />
-                                                        </audio>
-                                                    </div>
+                                                    <audio controls autoPlay className="w-full h-6 mt-1" style={{ maxWidth: 150 }}><source src={call.recording} /></audio>
                                                 )}
                                             </td>
                                         </tr>
@@ -583,151 +495,108 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                 })}
                             </tbody>
                         </table>
+                        {allCalls.length === 0 && <div className="text-center py-8 text-slate-400 text-xs">Brak połączeń w wybranym okresie</div>}
                     </div>
                 )}
 
-                {/* View: Team Stats */}
+                {/* ===== TEAM STATS ===== */}
                 {activeTab === 'team' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {consultantStats.map(stat => (
-                            <div key={stat.extension} className="bg-white border-2 border-slate-200 rounded-2xl p-5 hover:shadow-xl hover:border-blue-300 transition-all duration-300 transform hover:scale-105">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {teamStats.map(stat => (
+                            <div key={stat.ext} className="bg-white border border-slate-200 rounded-xl p-3.5 hover:shadow-md hover:border-blue-200 transition-all">
+                                <div className="flex items-center gap-2.5 mb-3">
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                                         {stat.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                                     </div>
-                                    <div>
-                                        <div className="font-bold text-slate-800 text-lg">{stat.name}</div>
-                                        <div className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">Ext: {stat.extension}</div>
+                                    <div className="min-w-0">
+                                        <div className="font-bold text-slate-800 text-sm truncate">{stat.name}</div>
+                                        <div className="text-[9px] text-slate-400 font-mono">ext. {stat.ext}</div>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-3 text-center text-sm mb-4">
-                                    <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-3 border border-slate-200">
-                                        <div className="font-bold text-slate-800 text-xl">{stat.total}</div>
-                                        <div className="text-[10px] text-slate-500 font-semibold mt-1">Razem</div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200">
-                                        <div className="font-bold text-green-700 text-xl">{stat.answered}</div>
-                                        <div className="text-[10px] text-green-600 font-semibold mt-1">Odebrane</div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-3 border border-red-200">
-                                        <div className="font-bold text-red-700 text-xl">{stat.missed}</div>
-                                        <div className="text-[10px] text-red-600 font-semibold mt-1">Nieodebrane</div>
-                                    </div>
+                                <div className="grid grid-cols-3 gap-1.5 text-center text-xs mb-2.5">
+                                    <div className="bg-slate-50 rounded-lg p-1.5"><div className="font-bold text-slate-800 text-base">{stat.total}</div><div className="text-[8px] text-slate-500 font-semibold">Razem</div></div>
+                                    <div className="bg-green-50 rounded-lg p-1.5"><div className="font-bold text-green-700 text-base">{stat.answered}</div><div className="text-[8px] text-green-600 font-semibold">Odebr.</div></div>
+                                    <div className="bg-red-50 rounded-lg p-1.5"><div className="font-bold text-red-700 text-base">{stat.missed}</div><div className="text-[8px] text-red-600 font-semibold">Nieodebr.</div></div>
                                 </div>
-                                <div>
-                                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
-                                        <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-500" style={{ width: `${stat.total ? (stat.answered / stat.total) * 100 : 0}%` }} />
-                                    </div>
-                                    <div className="text-xs text-center mt-2 font-semibold text-slate-600">
-                                        {stat.total ? Math.round((stat.answered / stat.total) * 100) : 0}% skuteczności
-                                    </div>
+                                <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-500" style={{ width: `${stat.total ? (stat.answered / stat.total) * 100 : 0}%` }} />
                                 </div>
+                                <div className="text-[9px] text-center mt-1 font-semibold text-slate-400">{stat.total ? Math.round((stat.answered / stat.total) * 100) : 0}% skuteczność</div>
                             </div>
                         ))}
-                        {consultantStats.length === 0 && (
-                            <div className="col-span-full text-center py-16">
-                                <div className="text-6xl mb-4">📊</div>
-                                <div className="text-slate-400 text-lg">Brak danych dla wybranego okresu</div>
-                            </div>
-                        )}
+                        {teamStats.length === 0 && <div className="col-span-full text-center py-8"><svg className="w-8 h-8 mx-auto mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg><div className="text-slate-400 text-xs">Brak danych</div></div>}
                     </div>
                 )}
 
-                {/* View: Missed Queue */}
+                {/* ===== MISSED QUEUE ===== */}
                 {activeTab === 'missed' && (
-                    <div className="space-y-6">
-                        <div className="p-5 bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-2xl text-orange-900 text-sm flex items-start gap-4 shadow-sm">
-                            <div className="text-3xl">⚠️</div>
+                    <div className="space-y-3">
+                        <div className="p-2.5 bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] flex items-start gap-2">
+                            <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
                             <div>
-                                <div className="font-bold text-lg mb-1">Kolejka połączeń nieodebranych</div>
-                                <p className="text-orange-800">Połączenia przychodzące, na które nikt jeszcze nie oddzwonił. Kliknij "Oddzwoń" aby oznaczyć jako obsłużone.</p>
+                                <div className="font-bold text-xs mb-0.5">Kolejka nieodebranych</div>
+                                <p className="text-amber-800">Kliknij „Oddzwoń" — Twoje imię zostanie zapisane przy połączeniu.</p>
                             </div>
                         </div>
 
-                        {missedCallsQueue.length > 0 ? (
-                            <div className="grid gap-3">
-                                {missedCallsQueue.map(call => {
+                        {missedQueue.length > 0 ? (
+                            <div className="space-y-2">
+                                {missedQueue.map(call => {
                                     const match = getCustomerMatch(call.caller);
                                     return (
-                                        <div key={call.id} className="bg-white border-2 border-red-200 shadow-md rounded-2xl p-4 flex items-center justify-between hover:bg-red-50/50 hover:border-red-300 transition-all hover:shadow-lg">
-                                            <div className="flex items-center gap-5">
-                                                <div className="text-red-600 font-bold whitespace-nowrap bg-red-50 px-3 py-2 rounded-lg">{formatDate(call.date)}</div>
-                                                <div>
-                                                    <div className="font-bold text-slate-900 text-xl flex items-center gap-2">
-                                                        {match ? (
-                                                            <>
-                                                                <span className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-sm font-bold shadow-md">
-                                                                    {match.customer.firstName[0]}{match.customer.lastName[0]}
-                                                                </span>
-                                                                {match.customer.firstName} {match.customer.lastName}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className="w-10 h-10 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center text-xl">📞</span>
-                                                                {call.caller}
-                                                            </>
-                                                        )}
+                                        <div key={call.id} className="bg-white border border-red-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-red-50/30 transition-all">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="text-red-600 font-bold whitespace-nowrap bg-red-50 px-2 py-1 rounded text-xs">{formatDate(call.date)}</div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 truncate">
+                                                        {match ? `${match.customer.firstName} ${match.customer.lastName}` : call.caller}
                                                     </div>
-                                                    <div className="text-sm text-slate-600 mt-1">
-                                                        {match && <span className="font-mono mr-2 bg-slate-100 px-2 py-0.5 rounded">{call.caller}</span>}
-                                                        Dzwonił na: <span className="font-mono bg-blue-50 px-2 py-0.5 rounded text-blue-700">{call.callee}</span>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        Od: <span className="font-mono">{call.caller}</span> → Na: <span className="font-mono">{call.callee}</span>
                                                     </div>
-                                                    {!match && (
-                                                        <Link to={`/customers/new?phone=${call.caller}`} className="text-green-600 text-sm font-bold hover:underline mt-2 inline-flex items-center gap-1">
-                                                            <span className="text-lg">+</span> Dodaj klienta
-                                                        </Link>
-                                                    )}
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => handleCallback(call.id)}
-                                                className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl font-bold hover:from-red-700 hover:to-rose-700 shadow-lg hover:shadow-xl transition-all flex items-center gap-2 text-lg transform hover:scale-105 active:scale-95"
-                                            >
-                                                <span>📞</span> Oddzwoń
+                                            <button onClick={() => handleCallback(call.id)}
+                                                className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 shadow-sm transition-all flex items-center justify-center gap-1 text-xs shrink-0 active:scale-95">
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> Oddzwoń
                                             </button>
                                         </div>
                                     );
                                 })}
                             </div>
                         ) : (
-                            <div className="text-center py-20 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200">
-                                <div className="text-7xl mb-4 animate-bounce">🎉</div>
-                                <div className="text-2xl font-bold text-green-700 mb-2">Świetna robota!</div>
-                                <div className="text-green-600">Wszystkie połączenia obsłużone!</div>
+                            <div className="text-center py-8 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200">
+                                <svg className="w-10 h-10 mx-auto mb-2 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <div className="text-sm font-bold text-emerald-700">Świetna robota!</div>
+                                <div className="text-emerald-600 text-xs">Wszystkie połączenia obsłużone</div>
                             </div>
                         )}
 
-                        {/* Show recently handled callbacks */}
-                        {Object.keys(callbacks).length > 0 && (
-                            <div className="mt-6">
-                                <h3 className="text-sm font-bold text-slate-500 mb-3">Ostatnio oddzwonione</h3>
+                        {/* Recently called back — shows who handled it */}
+                        {allCalls.filter(c => c.status === 'missed' && c.direction === 'incoming' && callbacks[c.id]).length > 0 && (
+                            <div>
+                                <h3 className="text-[11px] font-bold text-slate-500 mb-2 flex items-center gap-1"><svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>Ostatnio oddzwonione</h3>
                                 <div className="space-y-1">
-                                    {allCalls
-                                        .filter(c => c.status === 'missed' && c.direction === 'incoming' && callbacks[c.id])
-                                        .slice(0, 10)
-                                        .map(call => {
-                                            const cb = callbacks[call.id];
-                                            const match = getCustomerMatch(call.caller);
-                                            return (
-                                                <div key={call.id} className="flex items-center justify-between text-sm py-2 px-3 bg-green-50/50 rounded-lg border border-green-100/50">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-green-600">✓</span>
-                                                        <span className="text-slate-600">{formatDate(call.date)}</span>
-                                                        <span className="font-medium text-slate-800">
-                                                            {match ? `${match.customer.firstName} ${match.customer.lastName}` : call.caller}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-xs text-green-700 font-medium">
-                                                        Oddzwonił: <strong>{cb.user_name}</strong>
-                                                        {cb.callback_at && (
-                                                            <span className="ml-1 text-slate-400">
-                                                                ({new Date(cb.callback_at).toLocaleString('pl-PL', { hour: '2-digit', minute: '2-digit' })})
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                    {allCalls.filter(c => c.status === 'missed' && c.direction === 'incoming' && callbacks[c.id]).slice(0, 10).map(call => {
+                                        const cb = callbacks[call.id];
+                                        const match = getCustomerMatch(call.caller);
+                                        return (
+                                            <div key={call.id} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs py-2 px-3 bg-green-50/50 rounded-lg border border-green-100 gap-1">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <svg className="w-3 h-3 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                    <span className="text-slate-500 whitespace-nowrap">{formatDate(call.date)}</span>
+                                                    <span className="font-medium text-slate-800 truncate">{match ? `${match.customer.firstName} ${match.customer.lastName}` : call.caller}</span>
                                                 </div>
-                                            );
-                                        })}
+                                                <div className="text-green-700 font-bold pl-5 sm:pl-0 flex items-center gap-1 shrink-0">
+                                                    <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-bold">
+                                                        {cb.user_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                                    </span>
+                                                    {cb.user_name}
+                                                    {cb.callback_at && <span className="text-slate-400 font-normal ml-1">{new Date(cb.callback_at).toLocaleString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</span>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -735,16 +604,15 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                 )}
             </div>
 
+            {/* Detail modal from compact view */}
             {showDetails && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-                        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                            <h2 className="font-bold text-lg">Raport Połączeń</h2>
-                            <button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100">✕</button>
+                        <div className="p-3 border-b flex justify-between items-center bg-slate-50">
+                            <h2 className="font-bold text-base">Raport Połączeń</h2>
+                            <button onClick={() => setShowDetails(false)} className="w-7 h-7 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100 text-sm">✕</button>
                         </div>
-                        <div className="flex-1 overflow-auto p-0">
-                            <RingostatWidget compact={false} />
-                        </div>
+                        <div className="flex-1 overflow-auto"><RingostatWidget compact={false} /></div>
                     </div>
                 </div>
             )}

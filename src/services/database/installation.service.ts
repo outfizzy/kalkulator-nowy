@@ -78,6 +78,7 @@ export const InstallationService = {
             city: clientData.city || '',
             address: clientData.address || '',
             phone: clientData.phone || '',
+            email: clientData.email || '',
             coordinates: clientData.coordinates
         };
 
@@ -99,7 +100,8 @@ export const InstallationService = {
             createdAt: new Date(data.created_at),
             partsReady: (data as { parts_ready?: boolean }).parts_ready,
             expectedDuration: (data as { expected_duration?: number }).expected_duration || 1,
-            deliveryDate: (data as { delivery_date?: string }).delivery_date
+            deliveryDate: (data as { delivery_date?: string }).delivery_date,
+            measurementTasks: (installationData as any).measurementTasks || []
         };
     },
 
@@ -172,8 +174,8 @@ export const InstallationService = {
                     city: client.city || '',
                     postalCode: client.postalCode || client.zip || '',
                     address: `${client.street || ''} ${client.houseNumber || ''} `.trim(),
-
                     phone: client.phone || '',
+                    email: client.email || '',
                     coordinates: undefined
                 },
                 productSummary
@@ -265,8 +267,8 @@ export const InstallationService = {
                     const email = (contractData?.contract_data as unknown as Partial<Contract>)?.client?.email;
 
                     if (email) {
-                        const { EmailService } = await import('../email.service');
-                        await EmailService.sendCompletionEmail(installation, email);
+                        // Auto-email disabled per user request — feedback is sent manually via FeedbackRequestWidget
+                        console.log(`[Installation] Completion email SKIPPED for ${email} (auto-send disabled)`);
                     }
                 }
             } catch (notifyError) {
@@ -466,6 +468,7 @@ export const InstallationService = {
                     city: clientData?.city || '',
                     address: clientData?.address || '',
                     phone: clientData?.phone || '',
+                    email: clientData?.email || '',
                     postalCode: clientData?.postalCode || undefined,
                     coordinates: clientData?.coordinates || undefined
                 },
@@ -567,6 +570,7 @@ export const InstallationService = {
                 address: clientData?.address || '',
                 postalCode: clientData?.postalCode || contractPostalCode, // Fallback to contract postal code
                 phone: clientData?.phone || '',
+                email: clientData?.email || '',
                 coordinates: clientData?.coordinates
             };
 
@@ -739,14 +743,15 @@ export const InstallationService = {
         }
 
         // Merge installation_data
-        if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance) {
+        if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance || updates.measurementTasks) {
             const installationData = {
                 ...currentData,
                 ...(updates.client && { client: updates.client }),
                 ...(updates.productSummary && { productSummary: updates.productSummary }),
                 ...(updates.teamId !== undefined && { teamId: updates.teamId }),
                 ...(updates.notes && { notes: updates.notes }),
-                ...(updates.acceptance && { acceptance: updates.acceptance })
+                ...(updates.acceptance && { acceptance: updates.acceptance }),
+                ...(updates.measurementTasks !== undefined && { measurementTasks: updates.measurementTasks })
             };
 
             // Redundant assignment for clarity: updates.teamId handles logic above

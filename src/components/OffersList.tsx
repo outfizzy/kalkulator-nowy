@@ -26,6 +26,8 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
     const [previewOffer, setPreviewOffer] = useState<Offer | null>(null);
     const [selectedOfferForEmail, setSelectedOfferForEmail] = useState<Offer | null>(null);
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 25;
 
     const offers = propOffers || fetchedOffers;
     const [loading, setLoading] = useState(!propOffers);
@@ -235,6 +237,15 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
             );
         });
 
+    // Pagination (only for standalone usage, not embedded)
+    const isPaginated = !propOffers;
+    const totalPages = Math.max(1, Math.ceil(filteredOffers.length / ITEMS_PER_PAGE));
+    const safePage = Math.min(currentPage, totalPages);
+    const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+    const displayedOffers = isPaginated ? filteredOffers.slice(startIdx, startIdx + ITEMS_PER_PAGE) : filteredOffers;
+    const showingFrom = filteredOffers.length === 0 ? 0 : startIdx + 1;
+    const showingTo = Math.min(startIdx + ITEMS_PER_PAGE, filteredOffers.length);
+
     const getStatusColor = (status: OfferStatus) => {
         switch (status) {
             case 'draft': return 'bg-gray-100 text-gray-700';
@@ -262,31 +273,31 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                 <div className="flex gap-4 flex-wrap items-center">
                     <div className="flex gap-2 flex-wrap flex-1">
                         <button
-                            onClick={() => setFilter('all')}
+                            onClick={() => { setFilter('all'); setCurrentPage(1); }}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'all' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             Wszystkie ({offers.length})
                         </button>
                         <button
-                            onClick={() => setFilter('draft')}
+                            onClick={() => { setFilter('draft'); setCurrentPage(1); }}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'draft' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             Utworzone ({offers.filter(o => o.status === 'draft').length})
                         </button>
                         <button
-                            onClick={() => setFilter('sent')}
+                            onClick={() => { setFilter('sent'); setCurrentPage(1); }}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'sent' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             Wysłane ({offers.filter(o => o.status === 'sent').length})
                         </button>
                         <button
-                            onClick={() => setFilter('sold')}
+                            onClick={() => { setFilter('sold'); setCurrentPage(1); }}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'sold' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             Sprzedane ({offers.filter(o => o.status === 'sold').length})
                         </button>
                         <button
-                            onClick={() => setFilter('rejected')}
+                            onClick={() => { setFilter('rejected'); setCurrentPage(1); }}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'rejected' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             Odrzucone ({offers.filter(o => o.status === 'rejected').length})
@@ -318,7 +329,7 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                             type="text"
                             placeholder="Szukaj po nazwisku, mieście lub ID..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                             className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
                         />
                     </div>
@@ -350,7 +361,7 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {filteredOffers.map((offer) => {
+                                {displayedOffers.map((offer) => {
                                     const pricing = offer.pricing || ({} as any);
                                     const priceGross = Number(pricing.sellingPriceGross ?? pricing.sellingPriceNet ?? 0);
                                     const commission = Number(offer.commission ?? 0);
@@ -499,6 +510,55 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {isPaginated && filteredOffers.length > ITEMS_PER_PAGE && (
+                    <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <span className="text-sm text-slate-500">
+                            Pokazuje {showingFrom}–{showingTo} z {filteredOffers.length} ofert
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={safePage <= 1}
+                                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                ← Wstecz
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                                .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                                    if (i > 0 && p - (arr[i - 1]) > 1) acc.push('...');
+                                    acc.push(p);
+                                    return acc;
+                                }, [])
+                                .map((p, i) =>
+                                    p === '...' ? (
+                                        <span key={`dots-${i}`} className="px-2 text-slate-400">…</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            onClick={() => setCurrentPage(p)}
+                                            className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${p === safePage
+                                                    ? 'bg-accent text-white shadow-sm'
+                                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
+                                )
+                            }
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={safePage >= totalPages}
+                                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Dalej →
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

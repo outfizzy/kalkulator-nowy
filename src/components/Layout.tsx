@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationsDropdown } from './notifications/NotificationsDropdown';
@@ -13,6 +13,32 @@ export const Layout: React.FC = () => {
     const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
     const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Poll unread email count every 3 minutes
+    const checkUnread = useCallback(async () => {
+        if (!currentUser?.mailboxes || currentUser.mailboxes.length === 0) return;
+        try {
+            const config = currentUser.mailboxes[0];
+            const resp = await fetch('/api/email-unread-count', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                setUnreadCount(data.count || 0);
+            }
+        } catch (e) {
+            // Silent fail — badge just stays at current value
+        }
+    }, [currentUser?.mailboxes]);
+
+    useEffect(() => {
+        checkUnread();
+        const interval = setInterval(checkUnread, 3 * 60 * 1000); // every 3 min
+        return () => clearInterval(interval);
+    }, [checkUnread]);
 
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -58,7 +84,7 @@ export const Layout: React.FC = () => {
                         <div className="space-y-1">
                             <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sprzedaż</div>
                             {hasPermission('dashboard') && <NavLink to="/dashboard" label="Dashboard" icon="dashboard" />}
-                            {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" />}
+                            {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" badge={unreadCount} />}
                             {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" />}
                             {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" />}
                             <NavLink to="/admin/fairs" label="Targi / Hub" icon="calendar" />
@@ -181,24 +207,58 @@ export const Layout: React.FC = () => {
                             </button>
                         </div>
 
-                        <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-                            <NavLink to="/dashboard" label="Dashboard" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/mail" label="Poczta" icon="mail" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/tasks" label="Zadania" icon="check-circle" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/leads" label="Leady" icon="users" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/offers" label="Lista Ofert" icon="offers" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/customers" label="Klienci" icon="users" onClick={() => setMobileMenuOpen(false)} />
+                        <nav className="flex-1 px-4 py-4 space-y-5 overflow-y-auto">
+                            {/* SPRZEDAŻ */}
+                            {(hasPermission('dashboard') || hasPermission('crm_mail') || hasPermission('crm_tasks') || hasPermission('crm_leads') || hasPermission('crm_clients') || hasPermission('offers_create')) && (
+                                <div className="space-y-1">
+                                    <div className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sprzedaż</div>
+                                    {hasPermission('dashboard') && <NavLink to="/dashboard" label="Dashboard" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" badge={unreadCount} onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" onClick={() => setMobileMenuOpen(false)} />}
+                                    <NavLink to="/admin/fairs" label="Targi / Hub" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
+                                    {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" onClick={() => setMobileMenuOpen(false)} />}
+                                    <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
+                                </div>
+                            )}
 
-                            <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/installations" label="Planowanie Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/contracts" label="Lista Umów" icon="contracts" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/service" label="Serwis" icon="tools" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/deliveries" label="Kalendarz Dostaw" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
-                            {isAdmin() && <NavLink to="/admin/users" label="Użytkownicy" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
-                            {isAdmin() && <NavLink to="/admin/partner-offers" label="Oferty Partnerów" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
-                            <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />
-                            <NavLink to="/settings" label="Ustawienia" icon="settings" onClick={() => setMobileMenuOpen(false)} />
+                            {/* REALIZACJA */}
+                            {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
+                                <div className="space-y-1">
+                                    <div className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Realizacja</div>
+                                    {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('logistics') && <NavLink to="/procurement" label="Logistyka" icon="box" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('deliveries') && <NavLink to="/deliveries" label="Dostawy" icon="calendar" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('service_module') && <NavLink to="/service" label="Serwis" icon="tools" onClick={() => setMobileMenuOpen(false)} />}
+                                </div>
+                            )}
+
+                            {/* ADMINISTRACJA */}
+                            {(hasPermission('team_management') || hasPermission('pricing_management') || hasPermission('settings_general')) && (
+                                <div className="space-y-1">
+                                    <div className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Administracja</div>
+                                    {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
+                                </div>
+                            )}
+
+                            {/* PORTAL B2B */}
+                            {hasPermission('partner_management') && (
+                                <div className="space-y-1">
+                                    <div className="px-4 text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2">🏢 Portal B2B</div>
+                                    <NavLink to="/admin/b2b/partners" label="Partnerzy B2B" icon="users" onClick={() => setMobileMenuOpen(false)} />
+                                    <NavLink to="/admin/b2b/offers" label="Oferty B2B" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
+                                    <NavLink to="/admin/b2b/orders" label="Zamówienia B2B" icon="box" onClick={() => setMobileMenuOpen(false)} />
+                                </div>
+                            )}
                         </nav>
 
                         <div className="p-4 border-t border-slate-800 space-y-2">
@@ -291,9 +351,10 @@ interface NavLinkProps {
     label: string;
     icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail' | 'chat' | 'box' | 'list' | 'check-circle' | 'tools' | 'bell';
     onClick?: () => void;
+    badge?: number;
 }
 
-const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
+const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick, badge }) => {
     const location = useLocation();
     const isActive = location.pathname === to;
 
@@ -397,7 +458,12 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick }) => {
                 }`}
         >
             {icons[icon] || icons['dashboard']}
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge !== undefined && badge > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-[10px] font-bold min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 animate-pulse">
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
         </Link>
     );
 };

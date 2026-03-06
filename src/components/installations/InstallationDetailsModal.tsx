@@ -19,6 +19,8 @@ interface InstallationDetailsModalProps {
     readOnly?: boolean;
 }
 
+type TabId = 'overview' | 'contract' | 'docs';
+
 export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> = ({
     installation,
     isOpen,
@@ -28,6 +30,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     readOnly = false
 }) => {
     const { currentUser } = useAuth();
+    const [activeTab, setActiveTab] = useState<TabId>('overview');
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [formData, setFormData] = useState<Partial<Installation>>({});
     const [isGeocoding, setIsGeocoding] = useState(false);
@@ -38,25 +41,18 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([]);
     const [isThinking, setIsThinking] = useState(false);
     const [allInstallations, setAllInstallations] = useState<Installation[]>([]);
-
     const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
     const [hasConflict, setHasConflict] = useState(false);
     const [contractDetails, setContractDetails] = useState<any>(null);
-
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
+    // ---- Data Loading ----
     useEffect(() => {
         if (isOpen && installation.offerId) {
             void (async () => {
                 const { data: contract } = await supabase.from('contracts').select('*, contract_data').eq('offer_id', installation.offerId).single();
                 const { data: offer } = await supabase.from('offers').select('*, orders(*)').eq('id', installation.offerId).single();
-
-                if (contract) {
-                    setContractDetails({
-                        ...contract,
-                        offerOrders: offer?.orders || []
-                    });
-                }
+                if (contract) setContractDetails({ ...contract, offerOrders: offer?.orders || [] });
             })();
         }
     }, [isOpen, installation.offerId]);
@@ -71,826 +67,775 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                         DatabaseService.getInstallers(),
                         DatabaseService.getInstallations()
                     ]);
-
                     setTeams(dbTeams);
                     setAssignedInstallerIds(assignedIds);
                     setInstallers(allInstallers);
                     setAllInstallations(allInst);
                 } catch (error) {
-                    console.error('Error loading teams/assignments/installers:', error);
+                    console.error('Error loading data:', error);
                 }
             })();
-
-            setFormData({
-                ...installation,
-                client: { ...installation.client }
-            });
+            setFormData({ ...installation, client: { ...installation.client } });
             setPhotos(installation.offerId ? getOfferPhotos(installation.offerId) : []);
+            setActiveTab('overview');
         }
     }, [isOpen, installation]);
 
-    // Check availability whenever team, date or duration changes
+    // Availability check
     useEffect(() => {
-        const checkAvailability = () => {
+        const check = () => {
             if (formData.teamId && formData.scheduledDate) {
-                // Strict Conflict Check
                 const isAvailable = SchedulerService.isTeamAvailable(
-                    formData.teamId,
-                    formData.scheduledDate,
-                    formData.expectedDuration || 1,
-                    // Filter out CURRENT installation if it's being edited
+                    formData.teamId, formData.scheduledDate, formData.expectedDuration || 1,
                     allInstallations.filter(i => i.id !== installation.id)
                 );
-
-                if (!isAvailable) {
-                    setHasConflict(true);
-                    setAvailabilityWarning('⚠️ KONFLIKT TERMINÓW: Zespół jest już zajęty w tym czasie!');
-                } else {
-                    setHasConflict(false);
-                    // Optional: Check soft availability (e.g. busy but not full blocking?)
-                    // For now, clear warning if no strict conflict.
-                    setAvailabilityWarning(null);
-                }
+                setHasConflict(!isAvailable);
+                setAvailabilityWarning(!isAvailable ? '⚠️ KONFLIKT TERMINÓW: Zespół jest już zajęty!' : null);
             } else {
                 setAvailabilityWarning(null);
                 setHasConflict(false);
             }
         };
-
-        const timer = setTimeout(checkAvailability, 500);
-        return () => clearTimeout(timer);
+        const t = setTimeout(check, 500);
+        return () => clearTimeout(t);
     }, [formData.teamId, formData.scheduledDate, formData.expectedDuration, allInstallations, installation.id]);
-
-
 
     if (!isOpen) return null;
 
+    // ---- Handlers ----
     const handleChange = (field: keyof Installation, value: any) => {
         if (readOnly && field !== 'status' && field !== 'notes') return;
         setFormData(prev => ({ ...prev, [field]: value }));
     };
-
     const handleClientChange = (field: string, value: string) => {
         if (readOnly) return;
-        setFormData(prev => ({
-            ...prev,
-            client: {
-                ...prev.client!,
-                [field]: value
-            }
-        }));
+        setFormData(prev => ({ ...prev, client: { ...prev.client!, [field]: value } }));
     };
 
     const handleSuggest = () => {
         setIsThinking(true);
-        // Simulate thinking delay for effect
         setTimeout(() => {
             try {
                 const results = SchedulerService.findOptimalSlots(
-                    { ...installation, expectedDuration: formData.expectedDuration || 1 }, // Use current duration local state
-                    allInstallations,
-                    teams
+                    { ...installation, expectedDuration: formData.expectedDuration || 1 },
+                    allInstallations, teams
                 );
                 setSuggestions(results);
-                if (results.length === 0) {
-                    toast('Nie znaleziono oczywistych sugestii w najbliższym miesiącu', { icon: '🤔' });
-                }
-            } catch (e) {
-                console.error(e);
-                toast.error('Błąd algorytmu');
-            } finally {
-                setIsThinking(false);
-            }
+                if (results.length === 0) toast('Brak sugestii w najbliższym miesiącu', { icon: '🤔' });
+            } catch { toast.error('Błąd algorytmu'); }
+            finally { setIsThinking(false); }
         }, 800);
     };
 
     const applySuggestion = (s: ScheduleSuggestion) => {
-        setFormData(prev => ({
-            ...prev,
-            scheduledDate: s.date,
-            teamId: s.teamId
-        }));
-        setSuggestions([]); // Clear after selection
-        toast.success(`Wybrano termin: ${s.date}`);
+        setFormData(prev => ({ ...prev, scheduledDate: s.date, teamId: s.teamId }));
+        setSuggestions([]);
+        toast.success(`Wybrano: ${s.date}`);
     };
 
     const handleSave = async () => {
         if (!formData.id) return;
         setSaving(true);
-
         try {
-            // Check if address changed, if so, re-geocode
-            if (
-                !readOnly &&
-                (formData.client?.address !== installation.client.address ||
-                    formData.client?.city !== installation.client.city)
-            ) {
+            if (!readOnly && (formData.client?.address !== installation.client.address || formData.client?.city !== installation.client.city)) {
                 setIsGeocoding(true);
                 const coords = await geocodeAddress(formData.client!.address, formData.client!.city);
-                if (coords) {
-                    setFormData(prev => ({
-                        ...prev,
-                        client: {
-                            ...prev.client!,
-                            coordinates: coords
-                        }
-                    }));
-                    toast.success('Zaktualizowano współrzędne GPS');
-                } else {
-                    toast.error('Nie udało się znaleźć współrzędnych dla nowego adresu');
-                }
+                if (coords) setFormData(prev => ({ ...prev, client: { ...prev.client!, coordinates: coords } }));
                 setIsGeocoding(false);
             }
-
             await onSave(formData as Installation);
             toast.success('Zapisano zmiany');
-            onUpdate(); // Call onUpdate without arguments
+            onUpdate();
             onClose();
-        } catch (error) {
-            console.error('Error saving installation:', error);
-            toast.error('Błąd zapisu');
-        } finally {
-            setSaving(false);
-        }
+        } catch { toast.error('Błąd zapisu'); }
+        finally { setSaving(false); }
     };
 
     const handleRestoreToBacklog = async () => {
-        if (readOnly) return;
-        if (!window.confirm('Czy na pewno chcesz usunąć z kalendarza? Instalacja wróci do listy umów/zleceń.')) return;
+        if (readOnly || !window.confirm('Usunąć z kalendarza? Instalacja wróci do listy.')) return;
+        setSaving(true);
+        try { await DatabaseService.deleteInstallation(installation.id); toast.success('Przywrócono do listy'); onClose(); onUpdate(); }
+        catch { toast.error('Błąd usuwania'); setSaving(false); }
+    };
+
+    const handleForceComplete = async () => {
+        if (!window.confirm('Zakończyć montaż manualnie?')) return;
+        const offerPhotos = installation.offerId ? getOfferPhotos(installation.offerId) : [];
+        if (!offerPhotos.length && !window.confirm('Brak zdjęć. Kontynuować?')) return;
+
+        const acceptanceData = {
+            acceptedAt: new Date().toISOString(),
+            clientName: `${formData.client?.firstName} ${formData.client?.lastName}`,
+            notes: `Zakończono manualnie: ${currentUser?.email || 'Admin'}`
+        };
+        setFormData(prev => ({ ...prev, status: 'completed', acceptance: acceptanceData }));
         setSaving(true);
         try {
-            await DatabaseService.deleteInstallation(installation.id);
-            toast.success('Przywrócono do listy');
+            await DatabaseService.updateInstallationAcceptance(installation.id, acceptanceData);
+            if (offerPhotos.length > 0) {
+                try {
+                    toast.loading('Generowanie protokołu...', { id: 'protocol' });
+                    const protocolBlob = await generateInstallationProtocolPDFAsBlob(formData as Installation);
+                    const contract = installation.offerId ? await DatabaseService.findContractByOfferId(installation.offerId) : null;
+                    if (contract) { await DatabaseService.addProtocolToContract(contract.id, protocolBlob, installation.id); toast.success('Protokół zapisany!', { id: 'protocol' }); }
+                    else toast('Brak kontraktu — protokół nie zapisany', { id: 'protocol', icon: '⚠️' });
+                } catch { toast.error('Błąd zapisu protokołu', { id: 'protocol' }); }
+            }
+            await onUpdate();
             onClose();
-            onUpdate();
-        } catch (e) {
-            console.error(e);
-            toast.error('Błąd usuwania');
-            setSaving(false);
-        }
+            toast.success('Montaż zakończony!');
+        } catch { toast.error('Błąd zapisu odbioru'); }
+        finally { setSaving(false); }
     };
+
+    // ---- Derived Data ----
+    const product = contractDetails?.contract_data?.product;
+    const contractClient = contractDetails?.contract_data?.client || contractDetails?.contract_data?.customer;
+    const contractNumber = contractDetails?.contract_number || contractDetails?.contract_data?.contractNumber;
+    const teamName = teams.find(t => t.id === formData.teamId)?.name;
+
+    const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+        pending: { label: 'Oczekujący', color: 'text-slate-700', bg: 'bg-slate-100' },
+        scheduled: { label: 'Zaplanowany', color: 'text-blue-700', bg: 'bg-blue-100' },
+        confirmed: { label: 'Potwierdzony', color: 'text-green-700', bg: 'bg-green-100' },
+        completed: { label: 'Zakończony', color: 'text-slate-500', bg: 'bg-slate-200' },
+        issue: { label: 'Problem', color: 'text-red-700', bg: 'bg-red-100' },
+        cancelled: { label: 'Anulowany', color: 'text-red-500', bg: 'bg-red-50' },
+    };
+    const currentStatus = statusConfig[formData.status || 'pending'] || statusConfig.pending;
+
+    const TABS: { id: TabId; label: string; icon: string }[] = [
+        { id: 'overview', label: 'Przegląd', icon: '📋' },
+        { id: 'contract', label: 'Umowa', icon: '📄' },
+        { id: 'docs', label: 'Dokumentacja', icon: '📸' },
+    ];
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
-            <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:rounded-xl shadow-xl overflow-y-auto animate-scale-in flex flex-col md:block">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-slate-800">Szczegóły Montażu</h2>
-                        {installation.offerId && (
-                            <a
-                                href={`/offers/edit/${installation.offerId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md hover:bg-indigo-100 transition-colors flex items-center gap-1"
-                            >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                Otwórz Ofertę
-                            </a>
-                        )}
-                        {formData.status === 'scheduled' && (
-                            <button
-                                onClick={() => {
-                                    handleChange('status', 'confirmed');
-                                    toast.success('Status zmieniony na Potwierdzony. Zapisz zmiany.');
-                                }}
-                                className="text-xs bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm animate-pulse-slow font-bold"
-                            >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Potwierdź Termin
-                            </button>
-                        )}
-                        {formData.status === 'confirmed' && (
-                            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-md border border-green-200 flex items-center gap-1 font-bold">
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Termin Potwierdzony
+            <div className="bg-white w-full h-full md:h-auto md:max-h-[92vh] md:max-w-4xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-in">
+
+                {/* ============ HEADER ============ */}
+                <div className="border-b border-slate-200 bg-gradient-to-r from-slate-800 to-slate-700 text-white px-5 py-4 flex-shrink-0">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                {contractNumber && (
+                                    <span className="bg-white/20 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded">
+                                        {contractNumber}
+                                    </span>
+                                )}
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${currentStatus.bg} ${currentStatus.color}`}>
+                                    {currentStatus.label}
+                                </span>
+                                {installation.title && (
+                                    <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                                        {installation.title}
+                                    </span>
+                                )}
                             </div>
-                        )}
-                        <button
-                            onClick={async () => {
-                                const toastId = toast.loading('Generowanie protokołu...');
-                                try {
-                                    const { generateInstallationProtocolPDF } = await import('../../utils/installationProtocolPDF');
-                                    await generateInstallationProtocolPDF(formData as Installation);
-                                    toast.success('Pobrano protokół', { id: toastId });
-                                } catch (e) {
-                                    console.error(e);
-                                    toast.error('Błąd generowania PDF', { id: toastId });
-                                }
-                            }}
-                            className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md hover:bg-emerald-100 transition-colors flex items-center gap-1 border border-emerald-200"
-                        >
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Pobierz Protokół (PDF)
-                        </button>
+                            <h2 className="text-lg font-bold truncate">
+                                {formData.client?.firstName} {formData.client?.lastName}
+                                {formData.client?.city && <span className="font-normal text-slate-300 text-base"> — {formData.client.city}</span>}
+                            </h2>
+                            {installation.productSummary && (
+                                <p className="text-sm text-slate-300 mt-0.5 truncate">{installation.productSummary}</p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {installation.offerId && (
+                                <a href={`/offers/edit/${installation.offerId}`} target="_blank" rel="noopener noreferrer"
+                                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                    Oferta
+                                </a>
+                            )}
+                            <button onClick={onClose} className="text-white/60 hover:text-white p-1 transition-colors">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+
+                    {/* Tabs */}
+                    <div className="flex gap-1 mt-3 -mb-4 px-0">
+                        {TABS.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-all ${activeTab === tab.id
+                                    ? 'bg-white text-slate-800 shadow-sm'
+                                    : 'text-white/60 hover:text-white/90 hover:bg-white/10'
+                                    }`}
+                            >
+                                <span className="mr-1.5">{tab.icon}</span>{tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="p-6 space-y-6">
-                    {/* Status & Assignment */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select
-                                value={formData.status}
-                                onChange={(e) => handleChange('status', e.target.value as InstallationStatus)}
-                                className="w-full p-2 border border-slate-300 rounded-lg"
-                            >
-                                <option value="pending">Oczekujący</option>
-                                <option value="scheduled">Zaplanowany</option>
-                                <option value="confirmed">Potwierdzony</option>
-                                <option value="completed">Zakończony</option>
-                                <option value="issue">Problem</option>
-                                <option value="cancelled">Anulowany</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Ekipa</label>
-                            <select
-                                value={formData.teamId || ''}
-                                onChange={(e) => handleChange('teamId', e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg"
-                            >
-                                <option value="">-- Nieprzypisana --</option>
-                                {teams
-                                    .filter(t => t.isActive !== false || t.id === formData.teamId)
-                                    .map(t => (
-                                        <option key={t.id} value={t.id}>
-                                            {t.name} {t.isActive === false ? '(Nieaktywna)' : ''}
-                                        </option>
-                                    ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                            <input
-                                type="date"
-                                value={formData.scheduledDate || ''}
-                                onChange={(e) => handleChange('scheduledDate', e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg"
-                            />
-                        </div>
-                    </div>
-                    {availabilityWarning && (
-                        <div className={`mt-4 p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${hasConflict ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700'}`}>
-                            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            {availabilityWarning}
+                {/* ============ CONTENT ============ */}
+                <div className="flex-1 overflow-y-auto">
+
+                    {/* ---- TAB: OVERVIEW ---- */}
+                    {activeTab === 'overview' && (
+                        <div className="p-5 space-y-5">
+
+                            {/* Conflict Warning */}
+                            {availabilityWarning && (
+                                <div className={`p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${hasConflict ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700'}`}>
+                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    {availabilityWarning}
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                                {/* LEFT: Client + Product */}
+                                <div className="space-y-4">
+
+                                    {/* Client Card */}
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
+                                            <span className="text-base">👤</span>
+                                            <h3 className="font-bold text-slate-700 text-sm">Dane Klienta</h3>
+                                        </div>
+                                        <div className="p-4 space-y-3">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Imię i Nazwisko</label>
+                                                    <p className="font-semibold text-slate-800">{formData.client?.firstName} {formData.client?.lastName}</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Telefon</label>
+                                                    {formData.client?.phone ? (
+                                                        <a href={`tel:${formData.client.phone}`} className="font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                                            📞 {formData.client.phone}
+                                                        </a>
+                                                    ) : <p className="text-slate-400">—</p>}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Email</label>
+                                                {formData.client?.email ? (
+                                                    <a href={`mailto:${formData.client.email}`} className="text-sm text-blue-600 hover:text-blue-800 block truncate">
+                                                        ✉️ {formData.client.email}
+                                                    </a>
+                                                ) : <p className="text-sm text-slate-400">Brak emaila</p>}
+                                            </div>
+                                            <div className="border-t border-slate-200 pt-3">
+                                                <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Adres</label>
+                                                <div className="grid grid-cols-3 gap-2 mt-1">
+                                                    <div className="col-span-2">
+                                                        <input type="text" value={formData.client?.address || ''} onChange={e => handleClientChange('address', e.target.value)}
+                                                            className="w-full p-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" placeholder="Ulica i numer" />
+                                                    </div>
+                                                    <div>
+                                                        <input type="text" value={formData.client?.postalCode || ''} onChange={e => handleClientChange('postalCode', e.target.value)}
+                                                            className="w-full p-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" placeholder="Kod" />
+                                                    </div>
+                                                </div>
+                                                <input type="text" value={formData.client?.city || ''} onChange={e => handleClientChange('city', e.target.value)}
+                                                    className="w-full p-1.5 border border-slate-200 rounded text-sm mt-1.5 focus:ring-1 focus:ring-blue-400 outline-none" placeholder="Miasto" />
+                                                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                                    📍 GPS: {formData.client?.coordinates ? `${formData.client.coordinates.lat.toFixed(4)}, ${formData.client.coordinates.lng.toFixed(4)}` : 'Brak'}
+                                                    {isGeocoding && <span className="text-blue-500 animate-pulse">Aktualizuję...</span>}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Product Card */}
+                                    {product && (
+                                        <div className="bg-indigo-50/50 rounded-xl border border-indigo-200 overflow-hidden">
+                                            <div className="px-4 py-2.5 bg-indigo-100/70 border-b border-indigo-200 flex items-center gap-2">
+                                                <span className="text-base">📦</span>
+                                                <h3 className="font-bold text-indigo-800 text-sm">Produkt do Montażu</h3>
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {product.modelId && (
+                                                        <div>
+                                                            <label className="text-[11px] text-indigo-400 uppercase tracking-wider font-semibold">Model</label>
+                                                            <p className="font-bold text-indigo-900 text-base">{product.modelId}</p>
+                                                        </div>
+                                                    )}
+                                                    {(product.width || product.projection) && (
+                                                        <div>
+                                                            <label className="text-[11px] text-indigo-400 uppercase tracking-wider font-semibold">Wymiary</label>
+                                                            <p className="font-bold text-indigo-900 text-base font-mono">
+                                                                {product.width && `${product.width}`}{product.projection && ` × ${product.projection}`} mm
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {(product.color || product.colorName) && (
+                                                    <div>
+                                                        <label className="text-[11px] text-indigo-400 uppercase tracking-wider font-semibold">Kolor</label>
+                                                        <p className="text-sm text-indigo-800">{product.colorName || product.color}{product.colorCode ? ` (${product.colorCode})` : ''}</p>
+                                                    </div>
+                                                )}
+                                                {product.selectedAddons && product.selectedAddons.length > 0 && (
+                                                    <div>
+                                                        <label className="text-[11px] text-indigo-400 uppercase tracking-wider font-semibold">Dodatki</label>
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {product.selectedAddons.map((addon: any, i: number) => (
+                                                                <span key={i} className="bg-white text-indigo-700 text-[11px] px-2 py-0.5 rounded border border-indigo-200">
+                                                                    {addon.name || addon.label || addon.id}
+                                                                    {addon.quantity && addon.quantity > 1 && ` ×${addon.quantity}`}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {product.wallEnclosures && product.wallEnclosures.length > 0 && (
+                                                    <div>
+                                                        <label className="text-[11px] text-indigo-400 uppercase tracking-wider font-semibold">Ściany</label>
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {product.wallEnclosures.map((wall: any, i: number) => (
+                                                                <span key={i} className="bg-white text-indigo-700 text-[11px] px-2 py-0.5 rounded border border-indigo-200">
+                                                                    {wall.name || wall.side || wall.type || `Ściana ${i + 1}`}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {product.customItems && product.customItems.length > 0 && (
+                                                    <div>
+                                                        <label className="text-[11px] text-indigo-400 uppercase tracking-wider font-semibold">Pozycje (umowa manualna)</label>
+                                                        <ul className="mt-1 space-y-1">
+                                                            {product.customItems.map((item: any, i: number) => (
+                                                                <li key={i} className="text-sm text-indigo-800 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                                                                    {item.name}{item.quantity ? ` — ${item.quantity} szt.` : ''}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* RIGHT: Schedule + Installers */}
+                                <div className="space-y-4">
+
+                                    {/* Schedule Card */}
+                                    <div className="bg-blue-50/50 rounded-xl border border-blue-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-blue-100/50 border-b border-blue-200 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base">📅</span>
+                                                <h3 className="font-bold text-blue-800 text-sm">Planowanie</h3>
+                                            </div>
+                                            {formData.status === 'scheduled' && (
+                                                <button onClick={() => { handleChange('status', 'confirmed'); toast.success('Zmieniono na Potwierdzony'); }}
+                                                    className="text-xs bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition-colors flex items-center gap-1 font-bold shadow-sm">
+                                                    ✓ Potwierdź
+                                                </button>
+                                            )}
+                                            {formData.status === 'confirmed' && (
+                                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-md border border-green-200 font-bold">✓ Potwierdzony</span>
+                                            )}
+                                        </div>
+                                        <div className="p-4 space-y-3">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                                                    <select value={formData.status} onChange={e => handleChange('status', e.target.value as InstallationStatus)}
+                                                        className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-blue-400 outline-none">
+                                                        <option value="pending">Oczekujący</option>
+                                                        <option value="scheduled">Zaplanowany</option>
+                                                        <option value="confirmed">Potwierdzony</option>
+                                                        <option value="completed">Zakończony</option>
+                                                        <option value="issue">Problem</option>
+                                                        <option value="cancelled">Anulowany</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Czas trwania (dni)</label>
+                                                    <input type="number" min="1" max="14" value={formData.expectedDuration || 1}
+                                                        onChange={e => handleChange('expectedDuration', parseInt(e.target.value) || 1)}
+                                                        className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-blue-400 outline-none" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Ekipa</label>
+                                                <select value={formData.teamId || ''} onChange={e => handleChange('teamId', e.target.value)}
+                                                    className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-blue-400 outline-none">
+                                                    <option value="">— Nieprzypisana —</option>
+                                                    {teams.filter(t => t.isActive !== false || t.id === formData.teamId).map(t => (
+                                                        <option key={t.id} value={t.id}>{t.name} {t.isActive === false ? '(Nieaktywna)' : ''}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <div className="flex-1">
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Data montażu</label>
+                                                    <input type="date" value={formData.scheduledDate || ''} onChange={e => handleChange('scheduledDate', e.target.value)}
+                                                        className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-blue-400 outline-none" />
+                                                </div>
+                                                <button onClick={handleSuggest} disabled={isThinking || readOnly}
+                                                    className="self-end px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 whitespace-nowrap flex items-center gap-1 text-sm transition-all">
+                                                    {isThinking ? <span className="animate-pulse">⚡ Analizuję...</span> : <><span>⚡</span> AI</>}
+                                                </button>
+                                            </div>
+
+                                            {/* AI Suggestions */}
+                                            {suggestions.length > 0 && (
+                                                <div className="space-y-1.5 animate-scale-in">
+                                                    <h4 className="text-[10px] font-bold text-violet-500 uppercase tracking-wider">✨ Rekomendacje</h4>
+                                                    {suggestions.map((sug, idx) => (
+                                                        <button key={idx} onClick={() => applySuggestion(sug)}
+                                                            className="w-full text-left p-2 rounded-lg border border-violet-100 bg-white hover:bg-violet-50 hover:border-violet-300 transition-all text-sm">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-semibold text-slate-800">
+                                                                    {new Date(sug.date).toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                                                    <span className="text-xs text-violet-600 ml-2">{teams.find(t => t.id === sug.teamId)?.name}</span>
+                                                                </span>
+                                                                <span className={`text-xs font-bold ${sug.score >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>{Math.round(sug.score)}%</span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-500 mt-0.5">{sug.reason}</p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Materials Checkbox */}
+                                            <label className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                                                <input type="checkbox" checked={formData.partsReady || false} onChange={e => handleChange('partsReady', e.target.checked)}
+                                                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500" />
+                                                <span className="text-sm font-medium text-slate-700">Materiały skompletowane ✅</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Installers Card */}
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
+                                            <span className="text-base">👷</span>
+                                            <h3 className="font-bold text-slate-700 text-sm">Monterzy</h3>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                                {assignedInstallerIds.length === 0 && <span className="text-xs text-slate-400 italic">Brak przypisanych</span>}
+                                                {assignedInstallerIds.map(id => {
+                                                    const inst = installers.find(i => i.id === id);
+                                                    if (!inst) return null;
+                                                    return (
+                                                        <span key={id} className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-200 rounded-full text-xs text-slate-700 shadow-sm">
+                                                            {inst.firstName} {inst.lastName}
+                                                            {canManageAssignments && (
+                                                                <button type="button" onClick={async () => {
+                                                                    try { await DatabaseService.unassignInstaller(installation.id, id); setAssignedInstallerIds(prev => prev.filter(x => x !== id)); toast.success('Usunięto'); }
+                                                                    catch { toast.error('Błąd'); }
+                                                                }} className="text-slate-400 hover:text-red-500">✕</button>
+                                                            )}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                            {canManageAssignments && installers.length > 0 && (
+                                                <select className="w-full p-2 border border-slate-200 rounded-lg text-sm" defaultValue=""
+                                                    onChange={async e => {
+                                                        const iid = e.target.value; if (!iid) return;
+                                                        if (assignedInstallerIds.includes(iid)) { toast('Już przypisany'); e.target.value = ''; return; }
+                                                        try { await DatabaseService.assignInstaller(installation.id, iid); setAssignedInstallerIds(prev => [...prev, iid]); toast.success('Przypisano'); }
+                                                        catch { toast.error('Błąd'); }
+                                                        finally { e.target.value = ''; }
+                                                    }}>
+                                                    <option value="">+ Dodaj montera</option>
+                                                    {installers.map(inst => <option key={inst.id} value={inst.id}>{inst.firstName} {inst.lastName}</option>)}
+                                                </select>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Measurement Tasks Card */}
+                                    <div className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-amber-100 border-b border-amber-200 flex items-center gap-2">
+                                            <span className="text-base">📐</span>
+                                            <h3 className="font-bold text-amber-800 text-sm">Zadania do domierzenia</h3>
+                                        </div>
+                                        <div className="p-4 space-y-2">
+                                            {(!formData.measurementTasks || formData.measurementTasks.length === 0) && (
+                                                <p className="text-xs text-amber-600 italic">Brak zadań — dodaj poniżej</p>
+                                            )}
+                                            {formData.measurementTasks?.map((task: any) => (
+                                                <div key={task.id} className="flex items-start gap-2 p-2 bg-white rounded-lg border border-amber-100">
+                                                    <span className={`mt-0.5 text-sm ${task.completed ? 'text-green-500' : 'text-amber-400'}`}>
+                                                        {task.completed ? '✅' : '🔲'}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-sm ${task.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.description}</p>
+                                                        {task.completed && task.completedAt && (
+                                                            <p className="text-[10px] text-green-600 mt-0.5">Wykonano: {new Date(task.completedAt).toLocaleDateString('pl-PL')}</p>
+                                                        )}
+                                                    </div>
+                                                    {canManageAssignments && !task.completed && (
+                                                        <button type="button" onClick={() => {
+                                                            handleChange('measurementTasks', (formData.measurementTasks || []).filter((t: any) => t.id !== task.id));
+                                                        }} className="text-slate-400 hover:text-red-500 text-xs flex-shrink-0">✕</button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {canManageAssignments && (
+                                                <div className="flex gap-2 mt-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Np. domierzyć wysokość okapu..."
+                                                        className="flex-1 p-2 border border-amber-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                                                                const val = (e.target as HTMLInputElement).value.trim();
+                                                                const newTask = { id: crypto.randomUUID(), description: val, completed: false };
+                                                                handleChange('measurementTasks', [...(formData.measurementTasks || []), newTask]);
+                                                                (e.target as HTMLInputElement).value = '';
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button type="button" onClick={() => {
+                                                        const input = document.querySelector('input[placeholder*="domierzyć"]') as HTMLInputElement;
+                                                        if (input?.value.trim()) {
+                                                            const newTask = { id: crypto.randomUUID(), description: input.value.trim(), completed: false };
+                                                            handleChange('measurementTasks', [...(formData.measurementTasks || []), newTask]);
+                                                            input.value = '';
+                                                        }
+                                                    }} className="px-3 py-2 bg-amber-500 text-white rounded-lg text-sm font-bold hover:bg-amber-600 transition-colors">+</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
                         </div>
                     )}
 
-                    {/* Planning Stats (New) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-purple-50 p-4 rounded-lg border border-purple-100 mb-6">
-                        <div className="flex items-center gap-2 relative">
-                            <input
-                                type="checkbox"
-                                id="partsReady"
-                                checked={formData.partsReady || false}
-                                onChange={(e) => handleChange('partsReady', e.target.checked)}
-                                className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
-                            />
-                            <label htmlFor="partsReady" className="font-medium text-slate-800 cursor-pointer">
-                                Materiały skompletowane (Gotowe do montażu)
-                            </label>
-
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <div className="flex-grow">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Przewidywany czas (dni)</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="14"
-                                    value={formData.expectedDuration || 1}
-                                    onChange={(e) => handleChange('expectedDuration', parseInt(e.target.value) || 1)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 mt-6">
-                        <button
-                            onClick={handleRestoreToBacklog}
-                            disabled={readOnly || saving}
-                            className="mr-auto px-4 py-2 text-red-600 font-medium hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
-                        >
-                            Usuń z kalendarza
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
-                        >
-                            Anuluj
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || readOnly || hasConflict}
-                            className={`px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center gap-2 ${saving || readOnly || hasConflict ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
-                                }`}
-                        >
-                            {saving ? (
+                    {/* ---- TAB: CONTRACT ---- */}
+                    {activeTab === 'contract' && (
+                        <div className="p-5 space-y-5">
+                            {contractDetails ? (
                                 <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
-                                    Zapisywanie...
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Zapisz Zmiany
-                                </>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* AI Scheduling & Auto-Reschedule */}
-                    <div className="flex flex-col md:flex-row gap-3 mt-6">
-                        <div className="flex-grow">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="date"
-                                    value={formData.scheduledDate || ''}
-                                    onChange={(e) => handleChange('scheduledDate', e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg"
-                                />
-                                <button
-                                    onClick={handleSuggest}
-                                    disabled={isThinking || readOnly}
-                                    className="px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 whitespace-nowrap flex items-center gap-1 transition-all"
-                                >
-                                    {isThinking ? (
-                                        <>
-                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            <span className="animate-pulse">Analizuję...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                            </svg>
-                                            Sugestie AI
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Suggestions Display */}
-                            {suggestions.length > 0 && (
-                                <div className="mt-3 space-y-2 animate-scale-in">
-                                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                                        ✨ Rekomendowane Terminy
-                                    </h4>
-                                    {suggestions.map((sug, idx) => {
-                                        const teamName = teams.find(t => t.id === sug.teamId)?.name || 'Nieznany Zespół';
-                                        return (
-                                            <button
-                                                key={`${sug.date}-${sug.teamId}-${idx}`}
-                                                onClick={() => applySuggestion(sug)}
-                                                className="w-full text-left p-3 rounded-lg border border-violet-100 bg-violet-50/50 hover:bg-violet-50 hover:border-violet-300 transition-all group relative overflow-hidden"
-                                            >
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="font-semibold text-slate-800 flex items-center gap-2">
-                                                            {new Date(sug.date).toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'long' })}
-                                                            <span className="text-xs bg-white px-2 py-0.5 rounded-full border border-violet-200 text-violet-700">
-                                                                {teamName}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-slate-600 mt-1 flex items-center gap-1">
-                                                            <svg className="w-3 h-3 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                            {sug.reason}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end">
-                                                        <span className={`text-sm font-bold ${sug.score >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                            {Math.round(sug.score)}%
-                                                        </span>
-                                                        <span className="text-[10px] text-slate-400">zgodności</span>
-                                                    </div>
+                                    {/* Contract Header */}
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
+                                            <span className="text-base">📄</span>
+                                            <h3 className="font-bold text-slate-700 text-sm">Szczegóły Umowy</h3>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Numer Umowy</label>
+                                                    <p className="font-bold text-slate-800 font-mono">{contractNumber || '—'}</p>
                                                 </div>
-                                                {/* Hover effect bar */}
-                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div >
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Przypisani monterzy</label>
-                            <div className="flex flex-wrap gap-2 mb-3">
-                                {assignedInstallerIds.length === 0 && (
-                                    <span className="text-xs text-slate-400">Brak przypisanych monterów</span>
-                                )}
-                                {assignedInstallerIds.map(id => {
-                                    const installer = installers.find(i => i.id === id);
-                                    if (!installer) return null;
-                                    return (
-                                        <span
-                                            key={id}
-                                            className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-slate-200 rounded-full text-xs text-slate-700"
-                                        >
-                                            {installer.firstName} {installer.lastName}
-                                            {canManageAssignments && (
-                                                <button
-                                                    type="button"
-                                                    onClick={async () => {
-                                                        try {
-                                                            await DatabaseService.unassignInstaller(installation.id, id);
-                                                            setAssignedInstallerIds(prev => prev.filter(x => x !== id));
-                                                            toast.success('Usunięto montera z montażu');
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                            toast.error('Błąd usuwania montera');
-                                                        }
-                                                    }}
-                                                    className="text-slate-400 hover:text-red-500"
-                                                >
-                                                    ✕
-                                                </button>
-                                            )}
-                                        </span>
-                                    );
-                                })}
-                            </div>
-                            {canManageAssignments && installers.length > 0 && (
-                                <select
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm"
-                                    defaultValue=""
-                                    onChange={async (e) => {
-                                        const installerId = e.target.value;
-                                        if (!installerId) return;
-                                        if (assignedInstallerIds.includes(installerId)) {
-                                            toast('Ten monter jest już przypisany');
-                                            e.target.value = '';
-                                            return;
-                                        }
-                                        try {
-                                            await DatabaseService.assignInstaller(installation.id, installerId);
-                                            setAssignedInstallerIds(prev => [...prev, installerId]);
-                                            toast.success('Przypisano montera');
-                                        } catch (error) {
-                                            console.error(error);
-                                            toast.error('Błąd przypisywania montera');
-                                        } finally {
-                                            e.target.value = '';
-                                        }
-                                    }}
-                                >
-                                    <option value="">+ Dodaj montera</option>
-                                    {installers.map(inst => (
-                                        <option key={inst.id} value={inst.id}>
-                                            {inst.firstName} {inst.lastName}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-
-                        {/* Client Details */}
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                            <h3 className="font-bold text-slate-700 mb-3">Dane Klienta i Lokalizacja</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Imię i Nazwisko</label>
-                                    <div className="font-medium">{formData.client?.firstName} {formData.client?.lastName}</div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Telefon</label>
-                                    <div className="font-medium">{formData.client?.phone}</div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Ulica i Numer</label>
-                                    <input
-                                        type="text"
-                                        value={formData.client?.address || ''}
-                                        onChange={(e) => handleClientChange('address', e.target.value)}
-                                        className="w-full p-1 border border-slate-300 rounded text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Kod Pocztowy</label>
-                                    <input
-                                        type="text"
-                                        value={formData.client?.postalCode || ''}
-                                        onChange={(e) => handleClientChange('postalCode', e.target.value)}
-                                        className="w-full p-1 border border-slate-300 rounded text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Miasto</label>
-                                    <input
-                                        type="text"
-                                        value={formData.client?.city || ''}
-                                        onChange={(e) => handleClientChange('city', e.target.value)}
-                                        className="w-full p-1 border border-slate-300 rounded text-sm"
-                                    />
-                                </div>
-                            </div>
-                            <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
-                                <span>GPS: {formData.client?.coordinates ? `${formData.client.coordinates.lat.toFixed(4)}, ${formData.client.coordinates.lng.toFixed(4)}` : 'Brak'}</span>
-                                {isGeocoding && <span className="text-blue-500">Aktualizowanie...</span>}
-                            </div>
-                        </div>
-
-                        {/* Contract Details Section */}
-                        {contractDetails && (
-                            <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                                <h4 className="font-bold text-slate-700 mb-3 text-sm border-b pb-2">Szczegóły Umowy</h4>
-                                <div className="space-y-3 text-sm">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <span className="text-xs text-slate-500 block">Numer umowy</span>
-                                            <span className="font-medium text-slate-800">
-                                                {contractDetails.contract_number || contractDetails.contract_data?.contractNumber || 'Brak'}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block">Data podpisania</span>
-                                            <span className="font-medium text-slate-800">
-                                                {contractDetails.signed_at ? new Date(contractDetails.signed_at).toLocaleDateString('pl-PL') : '-'}
-                                            </span>
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Data Podpisania</label>
+                                                    <p className="font-medium text-slate-800">{contractDetails.signed_at ? new Date(contractDetails.signed_at).toLocaleDateString('pl-PL') : '—'}</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Status Umowy</label>
+                                                    <p className="font-medium text-slate-800 capitalize">{contractDetails.status || '—'}</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Client Data from Contract (readonly reference) */}
-                                    <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 mt-2">
-                                        <div className="col-span-2">
-                                            <span className="text-xs text-slate-500 block font-semibold">Dane klienta z umowy:</span>
+                                    {/* Contract Client */}
+                                    {contractClient && (
+                                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                            <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200">
+                                                <h3 className="font-bold text-slate-700 text-sm">👤 Dane Klienta z Umowy</h3>
+                                            </div>
+                                            <div className="p-4 grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase font-semibold">Klient</label>
+                                                    <p className="text-sm text-slate-800 font-medium">{contractClient.firstName} {contractClient.lastName}</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase font-semibold">Telefon</label>
+                                                    <p className="text-sm text-slate-800">{contractClient.phone || '—'}</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase font-semibold">Email</label>
+                                                    <p className="text-sm text-slate-800">{contractClient.email || '—'}</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] text-slate-400 uppercase font-semibold">Adres</label>
+                                                    <p className="text-sm text-slate-800">
+                                                        {contractClient.address || contractClient.street || '—'}
+                                                        {contractClient.city && `, ${contractClient.postalCode || ''} ${contractClient.city}`}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block">Klient</span>
-                                            <span className="text-sm text-slate-700">
-                                                {contractDetails.contract_data?.client?.firstName} {contractDetails.contract_data?.client?.lastName}
-                                                {contractDetails.contract_data?.customer?.firstName} {contractDetails.contract_data?.customer?.lastName}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block">Adres</span>
-                                            <span className="text-sm text-slate-700">
-                                                {contractDetails.contract_data?.client?.address || contractDetails.contract_data?.customer?.address || '-'}
-                                                {/* Postal Code / City */}
-                                                {(contractDetails.contract_data?.client?.city || contractDetails.contract_data?.client?.postalCode) &&
-                                                    `, ${contractDetails.contract_data?.client?.postalCode || ''} ${contractDetails.contract_data?.client?.city || ''}`}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block">Telefon</span>
-                                            <span className="text-sm text-slate-700">
-                                                {contractDetails.contract_data?.client?.phone || contractDetails.contract_data?.customer?.phone || '-'}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    )}
 
                                     {/* Supply Status */}
-                                    <div className="bg-slate-50 p-3 rounded text-xs border border-slate-100">
-                                        <div className="font-semibold text-slate-700 mb-2 uppercase tracking-wide">Status Materiałów</div>
-                                        {contractDetails.offerOrders?.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {contractDetails.offerOrders.map((o: any) => (
-                                                    <div key={o.id} className="flex flex-col gap-1 bg-white p-2 border border-slate-200 rounded">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="font-bold text-slate-800">{o.order_number || 'Zamówienie'}</span>
-                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${o.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                                                                o.status === 'ordered' ? 'bg-blue-100 text-blue-700' :
-                                                                    'bg-slate-100 text-slate-500'
-                                                                }`}>
-                                                                {o.status === 'delivered' ? 'Dostarczono' :
-                                                                    o.status === 'ordered' ? 'Zamówiono' : o.status}
-                                                            </span>
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200">
+                                            <h3 className="font-bold text-slate-700 text-sm">📦 Status Materiałów</h3>
+                                        </div>
+                                        <div className="p-4">
+                                            {contractDetails.offerOrders?.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {contractDetails.offerOrders.map((o: any) => (
+                                                        <div key={o.id} className="flex items-center justify-between bg-white p-3 border border-slate-200 rounded-lg">
+                                                            <div>
+                                                                <p className="font-bold text-slate-800 text-sm">{o.order_number || 'Zamówienie'}</p>
+                                                                <p className="text-xs text-slate-500">{o.items_summary || 'Materiał'}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${o.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                                                    o.status === 'ordered' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                                                                    }`}>
+                                                                    {o.status === 'delivered' ? 'Dostarczono' : o.status === 'ordered' ? 'Zamówiono' : o.status}
+                                                                </span>
+                                                                {(o.delivery_date || o.planned_delivery_date) && (
+                                                                    <p className="text-[10px] text-slate-400 mt-1">
+                                                                        {new Date(o.delivery_date || o.planned_delivery_date).toLocaleDateString('pl-PL')}
+                                                                    </p>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <div className="flex justify-between text-slate-500">
-                                                            <span>{o.items_summary || 'Materiał'}</span>
-                                                            {(o.delivery_date || o.planned_delivery_date) && (
-                                                                <span>Dostawa: {new Date(o.delivery_date || o.planned_delivery_date).toLocaleDateString('pl-PL')}</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-slate-400 italic">Brak powiązanych zamówień.</div>
-                                        )}
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-slate-400 italic">Brak powiązanych zamówień</p>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {/* Comments */}
+                                    {/* Contract Comments */}
                                     {contractDetails.contract_data?.comments?.length > 0 && (
-                                        <div className="mt-2 text-xs">
-                                            <span className="text-slate-500 block mb-1">Uwagi z umowy:</span>
-                                            <div className="bg-yellow-50 p-2 rounded text-slate-700 border border-yellow-100 italic">
-                                                {contractDetails.contract_data.comments[0].text}
-                                            </div>
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                                            <h4 className="font-bold text-yellow-800 text-sm mb-2">💬 Uwagi z Umowy</h4>
+                                            {contractDetails.contract_data.comments.map((c: any, i: number) => (
+                                                <p key={i} className="text-sm text-yellow-900 italic mb-1">"{c.text}"</p>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-12 text-slate-400">
+                                    <span className="text-4xl mb-3 block">📄</span>
+                                    <p className="font-medium">Brak powiązanej umowy</p>
+                                    <p className="text-sm mt-1">Ten montaż nie jest powiązany z żadną umową.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ---- TAB: DOCUMENTATION ---- */}
+                    {activeTab === 'docs' && (
+                        <div className="p-5 space-y-5">
+
+                            {/* Notes */}
+                            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
+                                    <span className="text-base">📝</span>
+                                    <h3 className="font-bold text-slate-700 text-sm">Notatki dla Ekipy</h3>
+                                </div>
+                                <div className="p-4">
+                                    <textarea value={formData.notes || ''} onChange={e => handleChange('notes', e.target.value)}
+                                        placeholder="Np. kod do bramy, uwaga na psa, specyficzne warunki montażu..."
+                                        className="w-full p-3 border border-slate-200 rounded-lg h-28 focus:ring-2 focus:ring-blue-400 outline-none resize-none text-sm" />
+                                </div>
+                            </div>
+
+                            {/* Photos */}
+                            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base">📸</span>
+                                        <h3 className="font-bold text-slate-700 text-sm">Zdjęcia Montażu</h3>
+                                        <span className="text-xs text-slate-400">({photos.length})</span>
+                                    </div>
+                                    <div>
+                                        <input type="file" accept="image/*" multiple id="photo-upload" className="hidden"
+                                            onChange={e => {
+                                                Array.from(e.target.files || []).forEach(file => {
+                                                    const reader = new FileReader();
+                                                    reader.onload = ev => {
+                                                        if (installation.offerId) { addOfferPhoto(installation.offerId, ev.target?.result as string); setPhotos(getOfferPhotos(installation.offerId)); }
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                });
+                                                e.target.value = '';
+                                            }} />
+                                        <label htmlFor="photo-upload" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg cursor-pointer border border-slate-200 transition-colors">
+                                            + Dodaj
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="p-4">
+                                    {photos.length > 0 ? (
+                                        <PhotoGallery photos={photos} onDelete={i => {
+                                            if (installation.offerId) { removeOfferPhoto(installation.offerId, i); setPhotos(getOfferPhotos(installation.offerId)); toast.success('Usunięto'); }
+                                        }} />
+                                    ) : (
+                                        <p className="text-sm text-slate-400 italic text-center py-4">Brak zdjęć — dodaj dokumentację montażu</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Client Acceptance */}
+                            <div className="bg-green-50/50 rounded-xl border border-green-200 overflow-hidden">
+                                <div className="px-4 py-2.5 bg-green-100/50 border-b border-green-200 flex items-center gap-2">
+                                    <span className="text-base">✅</span>
+                                    <h3 className="font-bold text-green-800 text-sm">Odbiór Klienta</h3>
+                                </div>
+                                <div className="p-4">
+                                    {formData.acceptance ? (
+                                        <div className="bg-green-100 text-green-800 p-3 rounded-lg border border-green-200 text-sm space-y-1">
+                                            <p className="font-bold">✅ Montaż odebrany</p>
+                                            <p>Przez: {formData.acceptance.clientName}</p>
+                                            <p>Data: {new Date(formData.acceptance.acceptedAt).toLocaleString('pl-PL')}</p>
+                                            {formData.acceptance.notes && <p className="italic">"{formData.acceptance.notes}"</p>}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-sm text-slate-600">Potwierdź odbiór prac przez klienta. Status zmieni się na "Zakończony".</p>
+                                            {(!readOnly || formData.status !== 'completed') && (
+                                                <button onClick={handleForceComplete} disabled={saving}
+                                                    className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm">
+                                                    {saving ? '⏳ Zapisywanie...' : '✅ Wymuś Zakończenie (Biuro)'}
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        )}
-
-                        {/* Notes */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Notatki dla Ekipy</label>
-                            <textarea
-                                value={formData.notes || ''}
-                                onChange={(e) => handleChange('notes', e.target.value)}
-                                placeholder="Np. kod do bramy, uwaga na psa, specyficzne warunki montażu..."
-                                className="w-full p-3 border border-slate-300 rounded-lg h-32 focus:ring-2 focus:ring-accent outline-none resize-none"
-                            />
                         </div>
+                    )}
+                </div>
 
-                        {/* Photos Section */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Zdjęcia Montażu</label>
-
-                            {/* Upload Button */}
-                            <div className="mb-4">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={(e) => {
-                                        const files = Array.from(e.target.files || []);
-                                        files.forEach(file => {
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                                const imageData = event.target?.result as string;
-                                                if (installation.offerId) {
-                                                    addOfferPhoto(installation.offerId, imageData);
-                                                    setPhotos(getOfferPhotos(installation.offerId));
-                                                } else {
-                                                    toast.error('Brak ID oferty - nie można dodać zdjęć (wymagana implementacja dla ręcznych montaży)');
-                                                }
-                                            };
-                                            reader.readAsDataURL(file);
-                                        });
-                                        e.target.value = ''; // Reset input
-                                    }}
-                                    className="hidden"
-                                    id="photo-upload"
-                                />
-                                <label
-                                    htmlFor="photo-upload"
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg cursor-pointer transition-colors"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Dodaj Zdjęcia
-                                </label>
-                                <span className="ml-3 text-sm text-slate-500">
-                                    {photos.length} {photos.length === 1 ? 'zdjęcie' : 'zdjęć'}
-                                </span>
-                            </div>
-
-                            {/* Photo Gallery */}
-                            <PhotoGallery
-                                photos={photos}
-                                onDelete={(index) => {
-                                    if (installation.offerId) {
-                                        removeOfferPhoto(installation.offerId, index);
-                                        setPhotos(getOfferPhotos(installation.offerId));
-                                        toast.success('Usunięto zdjęcie');
-                                    }
-                                }}
-                            />
-                        </div>
-
-                        {/* Client Acceptance Section */}
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Odbiór przez Klienta
-                            </h3>
-
-                            {formData.acceptance ? (
-                                <div className="bg-green-50 text-green-800 p-3 rounded border border-green-200 text-sm">
-                                    <p className="font-bold">✅ Montaż odebrany</p>
-                                    <p>Przez: {formData.acceptance.clientName}</p>
-                                    <p>Data: {new Date(formData.acceptance.acceptedAt).toLocaleString()}</p>
-                                    {formData.acceptance.notes && <p className="italic mt-1">"{formData.acceptance.notes}"</p>}
-                                </div>
+                {/* ============ FOOTER ============ */}
+                <div className="border-t border-slate-200 px-5 py-3 bg-white flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleRestoreToBacklog} disabled={readOnly || saving}
+                            className="px-3 py-2 text-red-600 text-sm font-medium hover:bg-red-50 rounded-lg transition-colors">
+                            🗑 Usuń z kalendarza
+                        </button>
+                        <button onClick={async () => {
+                            try { await generateInstallationProtocolPDF(formData as Installation); toast.success('Pobrano PDF'); }
+                            catch { toast.error('Błąd PDF'); }
+                        }} className="px-3 py-2 text-slate-600 text-sm hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1">
+                            📄 Protokół PDF
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={onClose} className="px-4 py-2 text-slate-600 text-sm font-medium hover:bg-slate-100 rounded-lg transition-colors">
+                            Anuluj
+                        </button>
+                        <button onClick={handleSave} disabled={saving || readOnly || hasConflict}
+                            className={`px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center gap-2 text-sm ${saving || readOnly || hasConflict ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'
+                                }`}>
+                            {saving ? (
+                                <><span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> Zapisuję...</>
                             ) : (
-                                <div className="space-y-3">
-                                    <p className="text-sm text-slate-600">
-                                        Potwierdź odbiór prac przez klienta. Status montażu zostanie zmieniony na "Zakończony".
-                                    </p>
-                                    {!readOnly || (readOnly && formData.status !== 'completed') ? (
-                                        <button
-                                            onClick={async () => {
-                                                if (!window.confirm('Czy na pewno chcesz ręcznie potwierdzić montaż? Spowoduje to wysłanie emaila do klienta i zamknięcie zlecenia.')) return;
-
-                                                // Check if there are photos for protocol
-                                                const offerPhotos = installation.offerId ? getOfferPhotos(installation.offerId) : [];
-                                                if (!offerPhotos || offerPhotos.length === 0) {
-                                                    if (!window.confirm('Brak zdjęć montażu. Czy chcesz kontynuować bez protokołu?')) {
-                                                        return;
-                                                    }
-                                                }
-
-                                                const acceptanceData = {
-                                                    acceptedAt: new Date().toISOString(),
-                                                    clientName: `${formData.client?.firstName} ${formData.client?.lastName}`, // Client is still the "accepting party" technically
-                                                    notes: `Zakończono manualnie przez biuro: ${currentUser?.email || 'Admin'}`
-                                                };
-
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    status: 'completed',
-                                                    acceptance: acceptanceData
-                                                }));
-
-                                                // Save immediately
-                                                try {
-                                                    setSaving(true);
-                                                    // Use updateInstallationAcceptance to trigger emails and tasks
-                                                    await DatabaseService.updateInstallationAcceptance(installation.id, acceptanceData);
-
-                                                    // Try to find and save protocol to CRM
-                                                    if (offerPhotos && offerPhotos.length > 0) {
-                                                        try {
-                                                            toast.loading('Generowanie protokołu...', { id: 'protocol' });
-
-                                                            // Generate protocol PDF
-                                                            const protocolBlob = await generateInstallationProtocolPDFAsBlob(formData as Installation);
-
-                                                            // Find contract by offer ID
-                                                            const contract = installation.offerId ? await DatabaseService.findContractByOfferId(installation.offerId) : null;
-
-                                                            if (contract) {
-                                                                // Save protocol to contract attachments
-                                                                await DatabaseService.addProtocolToContract(contract.id, protocolBlob, installation.id);
-                                                                toast.success('Protokół zapisany w CRM!', { id: 'protocol' });
-                                                            } else {
-                                                                toast('Montaż ukończony. Brak powiązanego kontraktu - protokół nie został zapisany w CRM.', {
-                                                                    id: 'protocol',
-                                                                    icon: '⚠️',
-                                                                    duration: 5000
-                                                                });
-                                                            }
-                                                        } catch (protocolError) {
-                                                            console.error('Error saving protocol to CRM:', protocolError);
-                                                            toast.error('Błąd zapisu protokołu w CRM (montaż ukończony)', { id: 'protocol' });
-                                                        }
-                                                    }
-
-                                                    await onUpdate();
-                                                    onClose();
-                                                    toast.success('Zakończono montaż i wysłano powiadomienie!');
-                                                } catch (e) {
-                                                    console.error(e);
-                                                    toast.error('Błąd zapisu odbioru');
-                                                } finally {
-                                                    setSaving(false);
-                                                }
-                                            }}
-                                            disabled={saving}
-                                            className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            {saving ? 'Zapisywanie...' : 'Wymuś Zakończenie (Biuro)'}
-                                        </button>
-                                    ) : null}
-                                </div>
+                                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Zapisz</>
                             )}
-                        </div>
-                    </div >
-
-                    <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white md:rounded-b-xl sticky bottom-0 z-10">
-                        {/* Download Protocol PDF Button */}
-                        <button
-                            onClick={() => {
-                                const offerPhotos = installation.offerId ? getOfferPhotos(installation.offerId) : [];
-                                if (offerPhotos && offerPhotos.length > 0) {
-                                    generateInstallationProtocolPDF(formData as Installation);
-                                    toast.success('Generowanie protokołu PDF...');
-                                } else {
-                                    toast.error('Brak zdjęć montażu do wygenerowania protokołu.');
-                                }
-                            }}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                        >
-                            Pobierz Protokół PDF
                         </button>
                     </div>
                 </div>

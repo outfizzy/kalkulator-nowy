@@ -29,35 +29,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const connection = await imaps.connect(imapConfig);
-        // Open box: try 'box' first with fallback logic
+
+        // Open box with auto-discovery for Sent folder
         console.log(`[DEBUG] Opening box: ${box} for UID: ${uid}`);
-        try {
-            await connection.openBox(box);
-        } catch (e) {
-            console.warn(`[DEBUG] Failed to open box '${box}', trying fallbacks...`);
-            // Fallback for Sent folder naming differences
-            if (box === 'Sent') {
-                try {
-                    await connection.openBox('Sent Items');
-                } catch {
+        if (box === 'INBOX') {
+            await connection.openBox('INBOX');
+        } else if (box === 'Sent') {
+            const sentFolderCandidates = [
+                'Sent', 'INBOX.Sent', 'Sent Items', 'Sent Messages',
+                'INBOX.Sent Items', 'INBOX.Sent Messages',
+                'Gesendet', 'INBOX.Gesendet',
+                'Wysłane', 'INBOX.Wysłane',
+                '[Gmail]/Sent Mail', '[Gmail]/Gesendet',
+            ];
+
+            let opened = false;
+
+            // Try auto-discovery first
+            try {
+                const boxes = await connection.getBoxes();
+                const sentFolder = findSentFolder(boxes);
+                if (sentFolder) {
                     try {
-                        await connection.openBox('Wysłane');
-                    } catch {
-                        // Some providers use [Gmail]/Sent Mail or similar. 
-                        // For now if these 3 fail, we fail, but we could try listing boxes.
-                        console.error('[DEBUG] All Sent folder fallbacks failed.');
-                        throw e;
+                        await connection.openBox(sentFolder);
+                        opened = true;
+                        console.log(`[DEBUG] Opened sent folder via discovery: "${sentFolder}"`);
+                    } catch (e) {
+                        console.warn(`[DEBUG] Discovery found "${sentFolder}" but failed to open`);
                     }
                 }
-            } else {
-                throw e;
+            } catch (listErr) {
+                console.warn('[DEBUG] Could not list boxes for discovery');
             }
+
+            // Brute-force fallback
+            if (!opened) {
+                for (const candidate of sentFolderCandidates) {
+                    try {
+                        await connection.openBox(candidate);
+                        opened = true;
+                        console.log(`[DEBUG] Opened sent folder: "${candidate}"`);
+                        break;
+                    } catch { continue; }
+                }
+            }
+
+            if (!opened) {
+                connection.end();
+                return res.status(404).json({ error: 'Could not find Sent folder on this mail server' });
+            }
+        } else {
+            await connection.openBox(box);
         }
 
         const searchCriteria = [['UID', uid.toString()]];
         const fetchOptions = {
-            bodies: [''], // Empty string fetches the entire raw message for parsing
-            markSeen: true // Mark as read when opening details
+            bodies: [''],
+            markSeen: true
         };
 
         const messages = await connection.search(searchCriteria, fetchOptions);
@@ -75,7 +103,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(500).json({ error: 'Failed to retrieve message body' });
         }
 
-        // Parse the raw email
         const parsed = await simpleParser(rawBody);
 
         const attachments = parsed.attachments.map(att => ({
@@ -83,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             contentType: att.contentType,
             size: att.size,
             contentId: att.contentId,
-            content: att.content.toString('base64') // Send as base64
+            content: att.content.toString('base64')
         }));
 
         connection.end();
@@ -106,4 +133,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             details: error.message
         });
     }
+}
+
+/**
+ * Recursively search IMAP folder tree for a "Sent" folder.
+ */
+function findSentFolder(boxes: any, prefix = ''): string | null {
+    const sentKeywords = ['sent', 'gesendet', 'wysłane', 'sent items', 'sent messages', 'envoyé'];
+
+    for (const [name, box] of Object.entries(boxes as Record<string, any>)) {
+        const fullPath = prefix ? `${prefix}${box.delimiter || '.'}${name}` : name;
+
+        if (sentKeywords.some(kw => name.toLowerCase().includes(kw))) {
+            return fullPath;
+        }
+
+        if (box.attribs && (
+            box.attribs.includes('\\Sent') ||
+            box.attribs.includes('\\sent') ||
+            box.special_use_attrib === '\\Sent'
+        )) {
+            return fullPath;
+        }
+
+        if (box.children) {
+            const found = findSentFolder(box.children, fullPath);
+            if (found) return found;
+        }
+    }
+
+    return null;
 }

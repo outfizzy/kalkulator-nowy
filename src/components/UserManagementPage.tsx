@@ -6,9 +6,27 @@ import { CommissionSettingsModal } from './admin/CommissionSettingsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
+const formatRelativeTime = (dateStr: string | null) => {
+    if (!dateStr) return 'Nigdy';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Nigdy';
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHrs = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMin < 1) return 'Teraz';
+    if (diffMin < 60) return `${diffMin}min temu`;
+    if (diffHrs < 24) return `${diffHrs}h temu`;
+    if (diffDays === 1) return 'Wczoraj';
+    if (diffDays < 7) return `${diffDays}d temu`;
+    return d.toLocaleDateString('pl-PL');
+};
+
 export const UserManagementPage: React.FC = () => {
     const { currentUser } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
+    const [lastLogins, setLastLogins] = useState<Record<string, string | null>>({});
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'internal' | 'partners'>('internal');
     const [selectedUserForCommission, setSelectedUserForCommission] = useState<User | null>(null);
@@ -23,6 +41,18 @@ export const UserManagementPage: React.FC = () => {
             setLoading(true);
             const allUsers = await DatabaseService.getAllUsers();
             setUsers(allUsers);
+
+            // Fetch last login times via RPC
+            try {
+                const { data: loginData } = await supabase.rpc('get_users_last_login');
+                if (loginData) {
+                    const map: Record<string, string | null> = {};
+                    (loginData as any[]).forEach((r: any) => { map[r.user_id] = r.last_sign_in_at; });
+                    setLastLogins(map);
+                }
+            } catch (e) {
+                console.warn('Could not fetch last logins:', e);
+            }
         } catch (error) {
             console.error('Error loading users:', error);
             toast.error('Błąd wczytywania użytkowników');
@@ -629,6 +659,9 @@ export const UserManagementPage: React.FC = () => {
                                     </>
                                 )}
                                 <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    E-mail
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Rola
                                 </th>
                                 <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -654,6 +687,9 @@ export const UserManagementPage: React.FC = () => {
                                 </th>
                                 <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Data rejestracji
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Ostatnie logowanie
                                 </th>
                                 <th className="px-6 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Akcje
@@ -688,6 +724,9 @@ export const UserManagementPage: React.FC = () => {
                                             </td>
                                         </>
                                     )}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-mono">
+                                        {user.email}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                                         <select
                                             value={user.role}
@@ -756,6 +795,18 @@ export const UserManagementPage: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {new Date(user.createdAt).toLocaleDateString('pl-PL')}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        {(() => {
+                                            const ll = lastLogins[user.id];
+                                            const txt = formatRelativeTime(ll || null);
+                                            const isRecent = ll && (Date.now() - new Date(ll).getTime()) < 86400000;
+                                            return (
+                                                <span className={isRecent ? 'text-green-600 font-medium' : 'text-slate-400'}>
+                                                    {txt}
+                                                </span>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                         {user.status === 'pending' && (

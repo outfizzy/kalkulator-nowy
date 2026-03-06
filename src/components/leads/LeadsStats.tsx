@@ -134,6 +134,27 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             }))
             .sort((a, b) => b.count - a.count);
 
+        // --- Lost By Stats (who marked leads as lost) ---
+        const lostByMap: Record<string, { name: string; count: number }> = {};
+        lostLeads.forEach(lead => {
+            const userId = lead.lostBy || lead.assignedTo || 'unknown';
+            const name = lead.lostByName
+                || (lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}`.trim() : '')
+                || 'Nieznany';
+            if (!lostByMap[userId]) {
+                lostByMap[userId] = { name, count: 0 };
+            }
+            lostByMap[userId].count++;
+        });
+        const lostByStats = Object.entries(lostByMap)
+            .map(([id, { name, count }]) => ({
+                id,
+                name,
+                count,
+                percentage: lostLeads.length > 0 ? ((count / lostLeads.length) * 100).toFixed(1) : '0.0'
+            }))
+            .sort((a, b) => b.count - a.count);
+
         return {
             total,
             won,
@@ -144,7 +165,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             uniqueAssignees: Object.keys(assigneeStats).length,
             detailedStats: tableData,
             sourceStats, // New
-            lostReasonStats // Lost reasons breakdown
+            lostReasonStats, // Lost reasons breakdown
+            lostByStats // Who marked leads as lost
         };
     }, [leads, fairs]);
 
@@ -247,6 +269,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                         <th className="px-6 py-3">Przedstawiciel</th>
                                         <th className="px-6 py-3 text-right">Razem</th>
                                         <th className="px-6 py-3 text-right text-green-600">Wygrane</th>
+                                        <th className="px-6 py-3 text-right text-red-500">Utracone</th>
                                         <th className="px-6 py-3 text-right">Skuteczność</th>
                                     </tr>
                                 </thead>
@@ -263,6 +286,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                             </td>
                                             <td className="px-6 py-3 text-right font-semibold">{rep.total}</td>
                                             <td className="px-6 py-3 text-right text-green-600 font-bold">{rep.won}</td>
+                                            <td className="px-6 py-3 text-right text-red-500 font-semibold">{rep.lost}</td>
                                             <td className="px-6 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <span>{rep.conversion}%</span>
@@ -400,6 +424,58 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Who Marked Leads as Lost */}
+            {stats.lostByStats.length > 0 && (
+                <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-amber-100 bg-amber-50">
+                        <h3 className="font-bold text-amber-800 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            Kto tracił leady?
+                        </h3>
+                        <p className="text-xs text-amber-600 mt-0.5">Który przedstawiciel oznaczył leady jako utracone</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-slate-500 font-medium bg-amber-50/50 border-b border-amber-100">
+                                <tr>
+                                    <th className="px-6 py-3">Przedstawiciel</th>
+                                    <th className="px-6 py-3 text-right">Utracone</th>
+                                    <th className="px-6 py-3 text-right">Udział</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {stats.lostByStats.map((item) => (
+                                    <tr key={item.id} className="hover:bg-amber-50/30">
+                                        <td className="px-6 py-3 font-medium text-slate-900">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-[10px] font-bold text-amber-700 border border-amber-200">
+                                                    {item.name[0]}
+                                                </div>
+                                                {item.name}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-3 text-right font-bold text-amber-600">{item.count}</td>
+                                        <td className="px-6 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span>{item.percentage}%</span>
+                                                <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-amber-500 rounded-full"
+                                                        style={{ width: `${Math.min(parseFloat(item.percentage), 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

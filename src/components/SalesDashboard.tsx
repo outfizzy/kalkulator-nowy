@@ -433,18 +433,23 @@ export const SalesDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Dynamic Col Span Logic based on occupied slots
-                    Total 4 slots.
-                    Tasks: 1
-                    Unsettled: 1 (if present)
-                    Stale: 1 (if present)
-                    Max Ringostat = 4 - occupied.
-                */}
-                <div className={`
-                    lg:col-span-${Math.max(1, 4 - 1 - (unsettledInstallations.length > 0 ? 1 : 0) - (staleLeads.length > 0 ? 1 : 0))} 
-                    md:col-span-2
-                `}>
-                    <RingostatWidget compact />
+            </div>
+
+            {/* Centrum Połączeń — full-width Ringostat section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center gap-3">
+                    <div className="p-2 bg-green-50 rounded-lg text-green-600">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-800">📞 Centrum Połączeń</h3>
+                        <p className="text-xs text-slate-400">Połączenia przychodzące, wychodzące, nieodebrane i oddzwonienia</p>
+                    </div>
+                </div>
+                <div className="p-4 sm:p-5">
+                    <RingostatWidget />
                 </div>
             </div>
 

@@ -19,6 +19,11 @@ export interface EmailConfig {
     openaiKey?: string; // For AI features
 }
 
+export interface MailboxConfig extends EmailConfig {
+    name: string;        // Display name, e.g. "Firmowa", "Prywatna"
+    color?: string;      // Badge color, e.g. "#6366f1"
+}
+
 export interface AppSettings {
     key: string;
     value: unknown;
@@ -50,6 +55,7 @@ export interface User {
     substituteUntil?: Date | null;
     preferredLanguage?: 'pl' | 'mo' | 'uk';
     emailConfig?: EmailConfig;
+    mailboxes?: MailboxConfig[];
     hourlyRate?: number;
     hourlyRateCurrency?: 'PLN' | 'EUR';
     commissionConfig?: CommissionConfig;
@@ -185,6 +191,9 @@ export interface Lead {
     aiScore?: number;
     aiSummary?: string;
     lostReason?: string;
+    lostBy?: string;        // User ID who marked the lead as lost
+    lostByName?: string;    // Display name (joined from profiles)
+    lostAt?: Date;          // When the lead was marked as lost
     attachments?: { name: string; url: string; type: string; size: number }[];
 }
 
@@ -290,6 +299,9 @@ export interface ProductConfig {
         secondaryWidth: number;      // mm — width of the second wing
         secondaryProjection: number; // mm — depth of the second wing
     };
+
+    // Combined Construction Split Point
+    splitPoint?: number; // Position (mm) where the split post goes. E.g., 5000 means segment1=5000mm, segment2=width-5000mm
 
     // Post Positioning
     postOffsets?: number[]; // Manual offset (mm) for each post from its default equidistant position.
@@ -611,6 +623,7 @@ export interface Installation {
         address: string;
         postalCode?: string;
         phone: string;
+        email?: string;
         coordinates?: {
             lat: number;
             lng: number;
@@ -639,6 +652,21 @@ export interface Installation {
     hotelCost?: number;
     consumablesCost?: number;
     additionalCosts?: number;
+    // Measurement tasks assigned by manager for installers
+    measurementTasks?: Array<{
+        id: string;
+        description: string;
+        completed: boolean;
+        completedAt?: string;
+        completedBy?: string;
+    }>;
+    // Completion Report (filled by manager after installation)
+    completionReport?: {
+        completedAt: string;
+        completedBy: string;
+        notes: string;
+        followUpItems: Array<{ name: string; description: string }>;
+    };
 }
 
 export interface InstallationWorkLog {
@@ -728,6 +756,7 @@ export interface Contract {
     clientWillContactAt?: Date;
     completedAt?: Date;
     installation_days_estimate?: number; // Estimated number of days for installation, set by Sales Rep
+    installationNotes?: string; // Team-specific notes for installation crew
 }
 
 // Centralized photo storage tied to offer

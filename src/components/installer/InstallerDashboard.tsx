@@ -348,6 +348,40 @@ export const InstallerDashboard: React.FC = () => {
                                             </span>
                                         )}
                                     </div>
+
+                                    {/* Measurement Tasks */}
+                                    {todayInstallation.measurementTasks && todayInstallation.measurementTasks.length > 0 && (
+                                        <div className="bg-amber-500/20 border border-amber-300/30 rounded-lg p-3">
+                                            <p className="font-bold text-amber-200 flex items-center gap-2 mb-2">
+                                                📐 ZADANIA DO DOMIERZENIA
+                                            </p>
+                                            <div className="space-y-2">
+                                                {todayInstallation.measurementTasks.map((task: any) => (
+                                                    <label key={task.id} className="flex items-start gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={task.completed || false}
+                                                            onChange={async () => {
+                                                                try {
+                                                                    const updated = todayInstallation.measurementTasks!.map((t: any) =>
+                                                                        t.id === task.id
+                                                                            ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined }
+                                                                            : t
+                                                                    );
+                                                                    await DatabaseService.updateInstallation(todayInstallation.id, { measurementTasks: updated } as any);
+                                                                    setTodayInstallation(prev => prev ? { ...prev, measurementTasks: updated } : null);
+                                                                } catch (err) {
+                                                                    console.error('Error updating task:', err);
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 mt-0.5 text-amber-500 rounded focus:ring-amber-400"
+                                                        />
+                                                        <span className={`text-sm ${task.completed ? 'line-through opacity-60' : ''}`}>{task.description}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

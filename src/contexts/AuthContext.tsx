@@ -11,6 +11,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     isAdmin: () => boolean;
     hasPermission: (moduleKey: string) => boolean;
+    refreshUser: () => Promise<void>;
     loading: boolean;
 }
 
@@ -149,8 +150,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     companyName: data.company_name || undefined,
                     nip: data.nip || undefined,
                     partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined,
-                    emailConfig: data.email_config || undefined
+                    emailConfig: (() => {
+                        const raw = data.email_config || {};
+                        const { __mailboxes, ...cleanConfig } = raw;
+                        return Object.keys(cleanConfig).length > 0 ? cleanConfig : undefined;
+                    })(),
+                    // Mailboxes will be loaded from DB below (centralized)
+                    mailboxes: []
                 };
+
+                // Fetch centralized mailboxes assigned to this user
+                try {
+                    // Step 1: Get mailbox IDs assigned to user
+                    const { data: assignments } = await supabase
+                        .from('mailbox_users')
+                        .select('mailbox_id')
+                        .eq('user_id', userId);
+
+                    if (assignments && assignments.length > 0) {
+                        const mailboxIds = assignments.map((a: any) => a.mailbox_id);
+
+                        // Step 2: Fetch full mailbox configs
+                        const { data: mbData } = await supabase
+                            .from('mailboxes')
+                            .select('*')
+                            .in('id', mailboxIds)
+                            .eq('is_active', true);
+
+                        if (mbData && mbData.length > 0) {
+                            profile.mailboxes = mbData.map((mb: any) => ({
+                                name: mb.name,
+                                color: mb.color,
+                                smtpHost: mb.smtp_host,
+                                smtpPort: mb.smtp_port,
+                                smtpUser: mb.smtp_user,
+                                smtpPassword: mb.smtp_password,
+                                imapHost: mb.imap_host,
+                                imapPort: mb.imap_port,
+                                imapUser: mb.imap_user,
+                                imapPassword: mb.imap_password,
+                                signature: mb.signature || '',
+                            }));
+                        }
+                    }
+
+                } catch (mbErr) {
+                    console.warn('Failed to load centralized mailboxes:', mbErr);
+                }
 
                 // Block non-active users
                 if (profile.status === 'pending') {
@@ -260,6 +306,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { error };
     };
 
+    const refreshUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            await fetchProfile(session.user.id, session.user.email!);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -269,7 +322,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     return (
-        <AuthContext.Provider value={{ currentUser, login, verifyOtp, register, logout, isAdmin, hasPermission, loading }}>
+        <AuthContext.Provider value={{ currentUser, login, verifyOtp, register, logout, isAdmin, hasPermission, refreshUser, loading }}>
             {children}
         </AuthContext.Provider>
     );

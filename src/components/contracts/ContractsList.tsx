@@ -18,6 +18,8 @@ export const ContractsList: React.FC = () => {
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 25;
 
     // Role checks
     const userRole = currentUser?.role;
@@ -99,6 +101,14 @@ export const ContractsList: React.FC = () => {
         return getNum(b.contractNumber) - getNum(a.contractNumber);
     });
 
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filteredContracts.length / ITEMS_PER_PAGE));
+    const safePage = Math.min(currentPage, totalPages);
+    const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+    const paginatedContracts = filteredContracts.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+    const showingFrom = filteredContracts.length === 0 ? 0 : startIdx + 1;
+    const showingTo = Math.min(startIdx + ITEMS_PER_PAGE, filteredContracts.length);
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'signed': return 'bg-green-100 text-green-700';
@@ -170,7 +180,7 @@ export const ContractsList: React.FC = () => {
                                 type="text"
                                 placeholder="Szukaj po numerze, nazwisku lub mieście..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                             />
                             <svg className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -203,7 +213,7 @@ export const ContractsList: React.FC = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredContracts.map((contract) => (
+                                    paginatedContracts.map((contract) => (
                                         <tr key={contract.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-900">
                                                 {contract.contractNumber}
@@ -305,6 +315,55 @@ export const ContractsList: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination Controls */}
+                    {filteredContracts.length > ITEMS_PER_PAGE && (
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <span className="text-sm text-slate-500">
+                                Pokazuje {showingFrom}–{showingTo} z {filteredContracts.length} umów
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={safePage <= 1}
+                                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    ← Wstecz
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                                    .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                                        if (i > 0 && p - (arr[i - 1]) > 1) acc.push('...');
+                                        acc.push(p);
+                                        return acc;
+                                    }, [])
+                                    .map((p, i) =>
+                                        p === '...' ? (
+                                            <span key={`dots-${i}`} className="px-2 text-slate-400">…</span>
+                                        ) : (
+                                            <button
+                                                key={p}
+                                                onClick={() => setCurrentPage(p)}
+                                                className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${p === safePage
+                                                        ? 'bg-accent text-white shadow-sm'
+                                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        )
+                                    )
+                                }
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safePage >= totalPages}
+                                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Dalej →
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

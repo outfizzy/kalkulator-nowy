@@ -94,6 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             disposition: string;
             billsec: number;
             recording: string;
+            [key: string]: any;
         }
 
         const rawCalls: CallData[] = await response.json();
@@ -114,6 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             internal_extension: string;
             client_number: string;
             disposition: string;
+            employee_caller_id?: string;
+            utm_source?: string;
+            utm_medium?: string;
+            wait_time?: number;
+            uniqueid?: string;
         }> = [];
 
         for (const call of rawCalls) {
@@ -149,7 +155,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 recording: call.recording || undefined,
                 internal_extension: isInternal(internalNum) ? internalNum : '',
                 client_number: clientNum,
-                disposition: call.disposition
+                disposition: call.disposition,
+                employee_caller_id: call.employee_caller_id || undefined,
+                utm_source: call.utm_source || undefined,
+                utm_medium: call.utm_medium || undefined,
+                wait_time: call.wait_time || undefined,
+                uniqueid: call.uniqueid || undefined
             });
         }
 
@@ -369,7 +380,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 status: c.status,
                 direction: c.direction,
                 recording: c.recording,
-                disposition: c.disposition
+                disposition: c.disposition,
+                employee_caller_id: c.employee_caller_id,
+                internal_extension: c.internal_extension,
+                client_number: c.client_number,
+                utm_source: c.utm_source,
+                utm_medium: c.utm_medium,
+                wait_time: c.wait_time
             })),
             sync: doSync ? syncResult : undefined
         };

@@ -6,6 +6,7 @@ import { CustomerEditForm } from '../components/crm/CustomerEditForm';
 import { CommunicationTimeline } from '../components/crm/CommunicationTimeline';
 import { VoiceConfirmationButton } from '../components/voice/VoiceConfirmationButton';
 import { CustomerDashboard } from '../components/crm/CustomerDashboard';
+import { EmailHistoryWidget } from '../components/common/EmailHistoryWidget';
 import { supabase } from '../lib/supabase';
 import { getModelDisplayName } from '../config/modelImages';
 
@@ -476,15 +477,23 @@ export const CustomerDetailsPage: React.FC = () => {
                         )}
 
                         {activeTab === 'communications' && (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-[calc(100vh-12rem)] flex flex-col">
-                                <CommunicationTimeline
-                                    communications={communications}
-                                    customerId={customer.id!}
-                                    onAdd={() => {
-                                        // Simple refresh
-                                        if (customer.id) DatabaseService.getCommunications(customer.id).then(setCommunications);
-                                    }}
-                                />
+                            <div className="space-y-6">
+                                {/* Live Email History from Mailboxes */}
+                                {customer.email && (
+                                    <EmailHistoryWidget customerEmail={customer.email} maxItems={20} />
+                                )}
+
+                                {/* Existing CRM Communication Timeline */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col" style={{ maxHeight: 'calc(100vh - 20rem)' }}>
+                                    <CommunicationTimeline
+                                        communications={communications}
+                                        customerId={customer.id!}
+                                        onAdd={() => {
+                                            // Simple refresh
+                                            if (customer.id) DatabaseService.getCommunications(customer.id).then(setCommunications);
+                                        }}
+                                    />
+                                </div>
                             </div>
                         )}
 

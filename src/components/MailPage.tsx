@@ -4,8 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { LeadForm } from './leads/LeadForm';
 import { RefreshCw } from 'lucide-react';
+import { MailboxManager } from './admin/MailboxManager';
 
-import type { Lead, Offer, EmailConfig } from '../types';
+import type { Lead, Offer, EmailConfig, MailboxConfig } from '../types';
 
 // Mock Email Data
 // Mock Email Data Removed for Production
@@ -37,32 +38,16 @@ interface AttachmentFile {
 }
 
 export const MailPage: React.FC = () => {
-    const { currentUser } = useAuth();
-    const [selectedAccount, setSelectedAccount] = useState<'personal' | 'buero'>('personal');
-    const [bueroConfig, setBueroConfig] = useState<EmailConfig | null>(null);
-
-    // Load shared config
-    React.useEffect(() => {
-        const loadSharedConfig = async () => {
-            try {
-                const { SettingsService } = await import('../services/database/settings.service');
-                const config = await SettingsService.getBueroEmailConfig();
-                if (config) setBueroConfig(config);
-            } catch (e) {
-                console.error('Failed to load shared email config', e);
-            }
-        };
-        loadSharedConfig();
-    }, []);
+    const { currentUser, refreshUser } = useAuth();
+    // Initialize from saved primary mailbox preference
+    const savedPrimaryIdx = (currentUser?.emailConfig as any)?.__primaryMailboxIndex;
+    const [selectedMailboxIdx, setSelectedMailboxIdx] = useState<number>(typeof savedPrimaryIdx === 'number' ? savedPrimaryIdx : 0);
 
     const [activeTab, setActiveTab] = useState<MailTab>('inbox');
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
     const [convertedMessageIds, setConvertedMessageIds] = useState<Set<string>>(new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    // New State for Scan Logic
-    const [isScanning, setIsScanning] = useState(false);
-    const [scanProgress, setScanProgress] = useState<{ processed: number, remaining: number | null }>({ processed: 0, remaining: null });
-    const [scanRange, setScanRange] = useState<number>(0); // 0 = New/Unseen Only
+    // Scanning removed per user request
 
     // Selection state
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
@@ -109,6 +94,7 @@ export const MailPage: React.FC = () => {
     const [showAiPresets, setShowAiPresets] = useState(false);
     const [showOfferSelector, setShowOfferSelector] = useState(false);
     const [recentOffers, setRecentOffers] = useState<Offer[]>([]);
+    const [showMailboxAdmin, setShowMailboxAdmin] = useState(false);
 
     // Template State (Moved to top to fix React #310)
     const [showTemplateSelector, setShowTemplateSelector] = useState(false);
@@ -250,12 +236,20 @@ export const MailPage: React.FC = () => {
 
 
 
-    // Determine active config based on selection
-    const activeConfig = selectedAccount === 'personal' ? currentUser?.emailConfig : bueroConfig;
-    const isConfigured = !!activeConfig?.smtpHost;
+    // Determine active config based on selection — dynamic from mailboxes
+    const userMailboxes: MailboxConfig[] = currentUser?.mailboxes || [];
+    const activeConfig: EmailConfig | null | undefined = userMailboxes[selectedMailboxIdx] || currentUser?.emailConfig;
+    const isConfigured = !!activeConfig?.smtpHost || !!activeConfig?.imapHost;
+
+    // Auto-select first mailbox
+    React.useEffect(() => {
+        if (selectedMailboxIdx >= userMailboxes.length && userMailboxes.length > 0) {
+            setSelectedMailboxIdx(0);
+        }
+    }, [userMailboxes.length]);
 
     const boxName = activeTab === 'sent' ? 'Sent' : 'INBOX';
-    const CACHE_KEY = `cached_emails_${selectedAccount}_${currentUser?.id}_${boxName}`;
+    const CACHE_KEY = `cached_emails_${selectedMailboxIdx}_${currentUser?.id}_${boxName}`;
 
     // Fetch Emails Effect
     React.useEffect(() => {
@@ -429,17 +423,83 @@ export const MailPage: React.FC = () => {
         const [firstName, ...lastNameParts] = name.split(' ');
         const lastName = lastNameParts.join(' ');
 
+        // --- Smart Body Parsing for common contact form patterns ---
+        const body = selectedEmail.text || '';
+        let parsedFirstName = firstName || '';
+        let parsedLastName = lastName || '';
+        let parsedEmail = email || '';
+        let parsedPhone = '';
+        let parsedPostalCode = '';
+        let parsedCity = '';
+        let parsedAddress = '';
+        let parsedCompany = '';
+
+        // Pattern: "Name und Vorname: Weinberger, Kevin" or "Name: Kevin Weinberger"
+        const nameMatch = body.match(/(?:Name\s*(?:und\s*Vorname)?|Imię\s*i\s*nazwisko|Vor-?\s*und\s*Nachname)\s*:\s*(.+)/i);
+        if (nameMatch) {
+            const raw = nameMatch[1].trim();
+            if (raw.includes(',')) {
+                // "Weinberger, Kevin" → lastName, firstName
+                const [last, first] = raw.split(',').map(s => s.trim());
+                parsedLastName = last;
+                parsedFirstName = first;
+            } else {
+                const parts = raw.split(/\s+/);
+                parsedFirstName = parts[0] || '';
+                parsedLastName = parts.slice(1).join(' ');
+            }
+        }
+
+        // Pattern: "Email: xxx@xxx.xx" or "E-Mail: xxx"
+        const emailMatch = body.match(/(?:E-?Mail|Email)\s*:\s*([^\s,\n]+@[^\s,\n]+)/i);
+        if (emailMatch) {
+            parsedEmail = emailMatch[1].trim();
+        }
+
+        // Pattern: "Mobil: 015222875965" or "Telefon: ..." or "Tel: ..."  
+        const phoneMatch = body.match(/(?:Mobil|Telefon|Tel|Phone|Handy)\s*:\s*([+\d\s/-]+)/i);
+        if (phoneMatch) {
+            parsedPhone = phoneMatch[1].trim();
+        }
+
+        // Pattern: "Postleitzahl: 04895" or "PLZ: 04895" or "Kod pocztowy: 00-000"
+        const plzMatch = body.match(/(?:Postleitzahl|PLZ|Kod\s*pocztowy)\s*:\s*([0-9\s-]+)/i);
+        if (plzMatch) {
+            parsedPostalCode = plzMatch[1].trim();
+        }
+
+        // Pattern: "Ort: München" or "Stadt: ..." or "Miasto: ..."
+        const cityMatch = body.match(/(?:Ort|Stadt|Miasto|City)\s*:\s*(.+)/i);
+        if (cityMatch) {
+            parsedCity = cityMatch[1].trim();
+        }
+
+        // Pattern: "Straße: ..." or "Adresse: ..." or "Adres: ..."
+        const addressMatch = body.match(/(?:Straße|Strasse|Adresse|Adres|Address)\s*:\s*(.+)/i);
+        if (addressMatch) {
+            parsedAddress = addressMatch[1].trim();
+        }
+
+        // Pattern: "Firma: ..." or "Unternehmen: ..." or "Company: ..."
+        const companyMatch = body.match(/(?:Firma|Unternehmen|Company)\s*:\s*(.+)/i);
+        if (companyMatch) {
+            parsedCompany = companyMatch[1].trim();
+        }
+
         setLeadInitialData({
             customerData: {
-                firstName: firstName || '',
-                lastName: lastName || '',
-                email: email,
-                companyName: '',
-                phone: '',
+                firstName: parsedFirstName,
+                lastName: parsedLastName,
+                email: parsedEmail,
+                phone: parsedPhone,
+                companyName: parsedCompany,
+                postalCode: parsedPostalCode,
+                city: parsedCity,
+                address: parsedAddress,
             },
             source: 'email',
             emailMessageId: selectedEmail.id,
-            notes: `Utworzono z wiadomości e-mail: "${selectedEmail.subject}" z dnia ${new Date(selectedEmail.date).toLocaleDateString()}`,
+            notes: `Utworzono z wiadomości e-mail: "${selectedEmail.subject}" z dnia ${new Date(selectedEmail.date).toLocaleDateString()}\n\n--- Pełna treść wiadomości ---\nOd: ${selectedEmail.from}\nTemat: ${selectedEmail.subject}\nData: ${new Date(selectedEmail.date).toLocaleString()}\n\n${selectedEmail.text || '(brak treści tekstowej)'}`,
             attachments: uploadedAttachments
         });
         setShowLeadForm(true);
@@ -623,7 +683,7 @@ export const MailPage: React.FC = () => {
     const handleAnalyzeSelected = async () => {
         if (selectedEmailIds.size === 0) return;
         const ids = Array.from(selectedEmailIds);
-        setIsScanning(true);
+        setLoading(true);
         const toastId = toast.loading(`Analizuję ${ids.length} wiadomości...`);
 
         try {
@@ -665,133 +725,219 @@ export const MailPage: React.FC = () => {
             console.error("Manual Analysis Error:", err);
             toast.error(`Błąd: ${err.message}`, { id: toastId });
         } finally {
-            setIsScanning(false);
+            setLoading(false);
         }
     };
 
-    // AI Extraction Handler
+    // AI Extraction Handler (with Price Estimation)
     const handleAiExtract = async () => {
         if (!selectedEmail) return;
 
         const toastId = toast.loading('AI analizuje wiadomość...');
 
         try {
-            // Combine subject and body for analysis
-            const fullText = `Temat: ${selectedEmail.subject}\nOd: ${selectedEmail.from}\n\n${selectedEmail.text || ''}`;
+            // --- Regex-based body parsing (always runs as fallback) ---
+            const body = selectedEmail.text || '';
+            const from = selectedEmail.from;
+            let regexFirstName = '';
+            let regexLastName = '';
+            let regexEmail = '';
+            let regexPhone = '';
+            let regexPostalCode = '';
+            let regexCity = '';
+            let regexAddress = '';
+            let regexCompany = '';
 
-            const { supabase } = await import('../lib/supabase');
-            const { data, error } = await supabase.functions.invoke('extract-lead-info', {
-                body: {
-                    text: fullText,
-                    apiKey: activeConfig?.openaiKey
-                }
-            });
-
-            if (error) {
-                console.error("Supabase Invoke Error:", error);
-                throw new Error(error.message || 'Error invoking AI function');
-            }
-
-            // Edge function returns { leadData: ... } or just the object depending on implementation.
-            // My implementation returns { leadData }.
-            const extracted = data.leadData;
-            console.log('AI Extracted Data:', extracted);
-
-            if (extracted) {
-                // Upload attachments from the email
-                const uploadedAttachments = await uploadAttachments(selectedEmail);
-                console.log('[AI Lead] Email attachments count:', selectedEmail.attachments?.length || 0);
-                console.log('[AI Lead] Uploaded attachments count:', uploadedAttachments.length);
-                console.log('[AI Lead] Uploaded attachments:', uploadedAttachments);
-
-                setLeadInitialData({
-                    customerData: {
-                        firstName: extracted.firstName || '',
-                        lastName: extracted.lastName || '',
-                        companyName: extracted.companyName || '',
-                        phone: extracted.phone || '',
-                        email: extracted.email || '', // extract email from body if found
-                        address: extracted.address || '',
-                        postalCode: extracted.postalCode || '',
-                        city: extracted.city || '',
-                    },
-                    source: 'email',
-                    emailMessageId: selectedEmail.id,
-                    notes: extracted.notes || `Utworzono z wiadomości e-mail: "${selectedEmail.subject}"`,
-                    attachments: uploadedAttachments
-                });
-                setShowLeadForm(true);
-
-                // Dismiss loading toast with success message
-                const attMsg = uploadedAttachments.length > 0
-                    ? ` + ${uploadedAttachments.length} załącznik(ów)`
-                    : '';
-                toast.success(`AI wypełniło formularz${attMsg}`, { id: toastId });
+            // Parse "From" field
+            if (from.includes('<')) {
+                const parts = from.split('<');
+                const fromName = parts[0].trim().replace(/^"|"$/g, '');
+                regexEmail = parts[1].replace('>', '').trim();
+                const [fn, ...lnParts] = fromName.split(' ');
+                regexFirstName = fn || '';
+                regexLastName = lnParts.join(' ');
             } else {
-                toast.error('AI nie mogło wyodrębnić danych z tej wiadomości.', { id: toastId });
+                regexEmail = from.trim();
             }
+
+            // Pattern: "Name und Vorname: Weinberger, Kevin" or "Name: Kevin Weinberger"
+            const nameMatch = body.match(/(?:Name\s*(?:und\s*Vorname)?|Imię\s*i\s*nazwisko|Vor-?\s*und\s*Nachname)\s*:\s*(.+)/i);
+            if (nameMatch) {
+                const raw = nameMatch[1].trim();
+                if (raw.includes(',')) {
+                    const [last, first] = raw.split(',').map(s => s.trim());
+                    regexLastName = last;
+                    regexFirstName = first;
+                } else {
+                    const parts = raw.split(/\s+/);
+                    regexFirstName = parts[0] || '';
+                    regexLastName = parts.slice(1).join(' ');
+                }
+            }
+
+            const emailMatch = body.match(/(?:E-?Mail|Email)\s*:\s*([^\s,\n]+@[^\s,\n]+)/i);
+            if (emailMatch) regexEmail = emailMatch[1].trim();
+
+            const phoneMatch = body.match(/(?:Mobil|Telefon|Tel|Phone|Handy)\s*:\s*([+\d\s/-]+)/i);
+            if (phoneMatch) regexPhone = phoneMatch[1].trim();
+
+            const plzMatch = body.match(/(?:Postleitzahl|PLZ|Kod\s*pocztowy)\s*:\s*([0-9\s-]+)/i);
+            if (plzMatch) regexPostalCode = plzMatch[1].trim();
+
+            const cityMatch = body.match(/(?:Ort|Stadt|Miasto|City)\s*:\s*(.+)/i);
+            if (cityMatch) regexCity = cityMatch[1].trim();
+
+            const addressMatch = body.match(/(?:Straße|Strasse|Adresse|Adres|Address)\s*:\s*(.+)/i);
+            if (addressMatch) regexAddress = addressMatch[1].trim();
+
+            const companyMatch = body.match(/(?:Firma|Unternehmen|Company)\s*:\s*(.+)/i);
+            if (companyMatch) regexCompany = companyMatch[1].trim();
+
+            console.log('[AI Lead] Regex fallback parsed:', { regexFirstName, regexLastName, regexEmail, regexPhone, regexPostalCode, regexCity });
+
+            // --- AI extraction (may enhance or override regex) ---
+            let extracted: any = null;
+            const fullText = `Temat: ${selectedEmail.subject}\nOd: ${selectedEmail.from}\n\n${body}`;
+            // Use user-level openaiKey (not per-mailbox config which doesn't store it)
+            const userOpenaiKey = currentUser?.emailConfig?.openaiKey;
+
+            try {
+                const { supabase } = await import('../lib/supabase');
+                const { data, error } = await supabase.functions.invoke('extract-lead-info', {
+                    body: {
+                        text: fullText,
+                        apiKey: userOpenaiKey
+                    }
+                });
+
+                if (error) {
+                    console.error("Supabase Invoke Error:", error);
+                    // Don't throw — we still have regex results
+                } else {
+                    extracted = data?.leadData;
+                    console.log('AI Extracted Data:', extracted);
+                }
+            } catch (aiErr) {
+                console.error('[AI Lead] AI extraction failed, using regex fallback:', aiErr);
+            }
+
+            // Merge: AI takes priority over regex, but regex fills in any gaps
+            const finalFirstName = extracted?.firstName || regexFirstName;
+            const finalLastName = extracted?.lastName || regexLastName;
+            const finalEmail = extracted?.email || regexEmail;
+            const finalPhone = extracted?.phone || regexPhone;
+            const finalPostalCode = extracted?.postalCode || regexPostalCode;
+            const finalCity = extracted?.city || regexCity;
+            const finalAddress = extracted?.address || regexAddress;
+            const finalCompany = extracted?.companyName || regexCompany;
+
+            console.log('[AI Lead] Final merged data:', { finalFirstName, finalLastName, finalEmail, finalPhone, finalPostalCode, finalCity });
+
+            // Upload attachments from the email
+            const uploadedAttachments = await uploadAttachments(selectedEmail);
+            console.log('[AI Lead] Email attachments count:', selectedEmail.attachments?.length || 0);
+            console.log('[AI Lead] Uploaded attachments count:', uploadedAttachments.length);
+
+            // --- AI Price Estimation ---
+            let priceEstimateNote = '';
+            let estimatedPrice: number | undefined;
+
+            if (extracted?.suggestedModel || extracted?.suggestedWidth || extracted?.suggestedDepth) {
+                try {
+                    const { PricingService } = await import('../services/pricing.service');
+
+                    const modelCode = (extracted.suggestedModel || 'trendstyle').toLowerCase().replace(/\s+/g, '_');
+                    const width = extracted.suggestedWidth || 4000;
+                    const depth = extracted.suggestedDepth || 3000;
+                    const coverType = extracted.suggestedRoofType === 'glass' ? 'glass_clear' : 'poly_clear';
+                    const constructionType: 'wall' | 'free' = extracted.suggestedInstallationType === 'freestanding' || extracted.suggestedInstallationType === 'free' ? 'free' : 'wall';
+
+                    console.log('[AI Price] Looking up:', { modelCode, width, depth, coverType, constructionType });
+
+                    const priceResult = await PricingService.findBasePrice({
+                        modelFamily: modelCode,
+                        constructionType,
+                        coverType,
+                        zone: 1,
+                        width,
+                        depth
+                    });
+
+                    if (priceResult && priceResult.price > 0) {
+                        estimatedPrice = priceResult.price;
+                        const formattedPrice = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(priceResult.price);
+                        const modelDisplay = extracted.suggestedModel || modelCode;
+                        const constructionLabel = constructionType === 'free' ? 'wolnostojące' : 'ścienne';
+                        const coverLabel = extracted.suggestedRoofType === 'glass' ? 'szkło' : 'poliwęglan';
+
+                        priceEstimateNote = `\n\n--- 💰 Wstępna wycena AI ---\nModel: ${modelDisplay}\nWymiary: ${width} x ${depth} mm (${(width / 1000).toFixed(1)} x ${(depth / 1000).toFixed(1)} m)\nTyp: ${constructionLabel}, ${coverLabel}\nCena UPE netto: ${formattedPrice}\n(cena orientacyjna — strefa 1, bez marży, bez dodatków)`;
+                    } else {
+                        priceEstimateNote = `\n\n--- 💰 Wstępna wycena AI ---\nModel: ${extracted.suggestedModel || '(nieznany)'}\nWymiary: ${width} x ${depth} mm\n⚠️ Nie znaleziono ceny w bazie dla tego modelu/wymiarów.`;
+                    }
+                } catch (priceErr) {
+                    console.error('[AI Price] Error during price lookup:', priceErr);
+                    priceEstimateNote = '\n\n--- 💰 Wstępna wycena AI ---\n⚠️ Błąd podczas wyceny — sprawdź ręcznie w konfiguratorze.';
+                }
+            }
+
+            const fullNotes = `${extracted?.notes || ''}${priceEstimateNote}\n\n--- Pełna treść wiadomości ---\nOd: ${selectedEmail.from}\nTemat: ${selectedEmail.subject}\nData: ${new Date(selectedEmail.date).toLocaleString()}\n\n${selectedEmail.text || '(brak treści tekstowej)'}`;
+
+            setLeadInitialData({
+                customerData: {
+                    firstName: finalFirstName,
+                    lastName: finalLastName,
+                    companyName: finalCompany,
+                    phone: finalPhone,
+                    email: finalEmail,
+                    address: finalAddress,
+                    postalCode: finalPostalCode,
+                    city: finalCity,
+                },
+                source: 'email',
+                emailMessageId: selectedEmail.id,
+                notes: fullNotes,
+                attachments: uploadedAttachments,
+                estimatedPrice
+            } as any);
+            setShowLeadForm(true);
+
+            // Dismiss loading toast with success message
+            const attMsg = uploadedAttachments.length > 0
+                ? ` + ${uploadedAttachments.length} załącznik(ów)`
+                : '';
+            const priceMsg = estimatedPrice
+                ? ` + wycena ${new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(estimatedPrice)}`
+                : '';
+            const aiMsg = extracted ? 'AI wypełniło formularz' : 'Formularz wypełniony z treści maila';
+            toast.success(`${aiMsg}${attMsg}${priceMsg}`, { id: toastId });
         } catch (e: any) {
             console.error(e);
             toast.error(`Błąd AI: ${e.message}`, { id: toastId });
         }
     };
 
-    // Manual Scan Trigger
+    // Scan Leads functionality removed per user request
 
-
-    // Recursive Batch Scanning
-    const runBatchScan = async (processedSoFar = 0): Promise<void> => {
-        try {
-            setIsScanning(true);
-            setScanProgress({ processed: processedSoFar, remaining: null });
-
-            const { supabase } = await import('../lib/supabase');
-            // Identify target email to prevent scanning everyone's mailbox
-            const targetEmail = activeConfig?.imapUser || activeConfig?.smtpUser || currentUser?.email;
-
-            const { data, error } = await supabase.functions.invoke('scan-emails', {
-                body: {
-                    batchSize: 5,
-                    days: scanRange, // Pass the selected range
-                    offset: processedSoFar, // Pass offset for pagination
-                    userEmail: targetEmail // Filter by user
-                }
-            });
-
-            if (error) {
-                console.error("Supabase Invoke Error:", error);
-                throw new Error(error.message || 'Error invoking scan function');
-            }
-
-            const currentProcessed = data.processedCount || 0;
-            const remaining = data.remaining || 0;
-            const total = processedSoFar + currentProcessed;
-
-            if (remaining > 0) {
-                setScanProgress({ processed: total, remaining: remaining });
-                await runBatchScan(total);
-            } else {
-                setScanProgress({ processed: 0, remaining: null });
-                toast.success(`Zakończono skanowanie. Przeanalizowano łącznie ${total} wiadomości.`);
-                setRefreshTrigger(prev => prev + 1);
-            }
-
-        } catch (error: any) {
-            console.error('Scan error:', error);
-            toast.error("Błąd skanowania: " + error.message);
-            setScanProgress({ processed: 0, remaining: null });
-        } finally {
-            setIsScanning(false);
-        }
+    // Reply handler
+    const handleReply = () => {
+        if (!selectedEmail) return;
+        setActiveTab('compose');
+        setComposeData({
+            to: selectedEmail.from.includes('<') ? selectedEmail.from.match(/<(.+?)>/)?.[1] || selectedEmail.from : selectedEmail.from,
+            subject: selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`,
+            body: `\n\n--- Oryginalna wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString()}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
+        });
     };
 
-    const handleScanEmails = async () => {
-        setIsScanning(true);
-        try {
-            await runBatchScan(0);
-        } finally {
-            setIsScanning(false);
-        }
+    // Forward handler
+    const handleForward = () => {
+        if (!selectedEmail) return;
+        setActiveTab('compose');
+        setComposeData({
+            to: '',
+            subject: selectedEmail.subject.startsWith('Fwd:') ? selectedEmail.subject : `Fwd: ${selectedEmail.subject}`,
+            body: `\n\n--- Przekazana wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString()}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
+        });
     };
 
     // Template Logic - Moved to top
@@ -878,23 +1024,35 @@ export const MailPage: React.FC = () => {
 
             {/* 1. Sidebar (Navigation) - Fixed width */}
             <div className="w-full md:w-48 flex flex-col gap-2 flex-shrink-0">
-                <div className="mb-2">
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                <div className="mb-2 space-y-1">
+                    {/* Dynamic Mailbox Selector */}
+                    {userMailboxes.map((mb, idx) => (
                         <button
-                            onClick={() => setSelectedAccount('personal')}
-                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedAccount === 'personal' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            key={idx}
+                            onClick={() => setSelectedMailboxIdx(idx)}
+                            className={`w-full py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${selectedMailboxIdx === idx
+                                ? 'bg-white shadow-sm border'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                                 }`}
+                            style={selectedMailboxIdx === idx ? { borderColor: mb.color || '#3b82f6', color: mb.color || '#3b82f6' } : {}}
                         >
-                            Osobista
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: mb.color || '#3b82f6' }} />
+                            <span className="truncate">{mb.name}</span>
                         </button>
+                    ))}
+                    {/* Admin: Manage Mailboxes */}
+                    {currentUser?.role === 'admin' && (
                         <button
-                            onClick={() => setSelectedAccount('buero')}
-                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedAccount === 'buero' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                }`}
+                            onClick={() => setShowMailboxAdmin(true)}
+                            className="w-full py-1.5 px-2 text-[11px] font-medium rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 mt-1 border border-dashed border-slate-200"
                         >
-                            Biuro
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Zarządzaj skrzynkami
                         </button>
-                    </div>
+                    )}
                 </div>
 
                 <button
@@ -966,11 +1124,11 @@ export const MailPage: React.FC = () => {
                                         <div className="flex gap-1">
                                             <button
                                                 onClick={handleAnalyzeSelected}
-                                                disabled={isScanning}
+                                                disabled={loading}
                                                 className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 flex items-center gap-1"
                                                 title="Analizuj zaznaczone (AI)"
                                             >
-                                                {isScanning ? (
+                                                {loading ? (
                                                     <RefreshCw className="w-4 h-4 animate-spin" />
                                                 ) : (
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1023,92 +1181,7 @@ export const MailPage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* AI Sacnner Toolbar */}
-                        {activeTab === 'inbox' && (
-                            <div className="bg-purple-50 border-b border-purple-100 p-3">
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-1">
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                            </svg>
-                                            AI Skaner Leadów
-                                        </span>
-                                        {isScanning && (
-                                            <span className="text-xs text-purple-600 font-medium animate-pulse">
-                                                Przetworzono: {scanProgress.processed}
-                                                {scanProgress.remaining ? ` / ~${scanProgress.processed + scanProgress.remaining}` : ''}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                        {[
-                                            { label: 'Nowe', val: 0 },
-                                            { label: '24h', val: 1 },
-                                            { label: '3 dni', val: 3 },
-                                            { label: '7 dni', val: 7 },
-                                            { label: '14 dni', val: 14 },
-                                        ].map(opt => (
-                                            <button
-                                                key={opt.val}
-                                                disabled={isScanning}
-                                                onClick={() => {
-                                                    setScanRange(opt.val);
-                                                    if (!isScanning) {
-                                                        // Update state but don't auto-run unless desired. 
-                                                        // User wants "choice", so let's select then run? 
-                                                        // Or instant run? Pattern "Select Range" -> Click Scan.
-                                                    }
-                                                }}
-                                                className={`
-                                                    px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border
-                                                    ${scanRange === opt.val
-                                                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300'
-                                                    }
-                                                `}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-
-                                        <div className="w-px h-6 bg-purple-200 mx-1"></div>
-
-                                        <button
-                                            onClick={handleScanEmails}
-                                            disabled={isScanning}
-                                            className={`
-                                                flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-white transition-all shadow-sm whitespace-nowrap
-                                                ${isScanning
-                                                    ? 'bg-slate-400 cursor-not-allowed'
-                                                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700'
-                                                }
-                                            `}
-                                        >
-                                            {isScanning ? (
-                                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                            ) : (
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                </svg>
-                                            )}
-                                            {isScanning ? 'Skanuję...' : 'Uruchom'}
-                                        </button>
-                                    </div>
-
-                                    {/* Progress Bar Visual */}
-                                    {isScanning && (
-                                        <div className="w-full h-1 bg-purple-200 rounded-full overflow-hidden mt-1">
-                                            <div
-                                                className="h-full bg-purple-600 animate-progress-indeterminate"
-                                                style={{ width: '100%' }} // Could be actual percentage if we knew total upfront
-                                            ></div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        {/* Scanner toolbar removed */}
                         {loading ? (
                             <div className="p-8 text-center text-slate-400">
                                 <svg className="w-8 h-8 animate-spin mx-auto mb-2" fill="none" viewBox="0 0 24 24">
@@ -1402,16 +1475,24 @@ export const MailPage: React.FC = () => {
                                                         <span className="hidden sm:inline">Utwórz Lead (AI)</span>
                                                     </button>
                                                     <button
-                                                        onClick={handleScanEmails}
-                                                        disabled={loading || isScanning}
-                                                        className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg ${loading || isScanning ? 'opacity-70 cursor-wait' : ''}`}
+                                                        onClick={handleReply}
+                                                        className="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                        title="Odpowiedz"
                                                     >
-                                                        <RefreshCw className={`w-4 h-4 ${(loading || isScanning) ? 'animate-spin' : ''}`} />
-                                                        <span className="hidden sm:inline">
-                                                            {(loading || isScanning) ?
-                                                                `Skanowanie... (${scanProgress.processed})`
-                                                                : 'Skanuj Leady (AI)'}
-                                                        </span>
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                        </svg>
+                                                        <span className="hidden sm:inline">Odpowiedz</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={handleForward}
+                                                        className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                        title="Przekaż dalej"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                                                        </svg>
+                                                        <span className="hidden sm:inline">Przekaż</span>
                                                     </button>
                                                     <button
                                                         onClick={handleCreateLead}
@@ -1496,6 +1577,7 @@ export const MailPage: React.FC = () => {
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto p-4">
                                                     <LeadForm
+                                                        key={JSON.stringify(leadInitialData)}
                                                         initialData={leadInitialData}
                                                         embedded={true}
                                                         onSuccess={() => {
@@ -1540,6 +1622,7 @@ export const MailPage: React.FC = () => {
                                             </div>
                                             <div className="flex-1 overflow-y-auto p-4">
                                                 <LeadForm
+                                                    key="empty-lead"
                                                     initialData={{}}
                                                     embedded={true}
                                                     onSuccess={() => setShowLeadForm(false)}
@@ -1554,6 +1637,31 @@ export const MailPage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Mailbox Admin Modal */}
+            {showMailboxAdmin && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">Zarządzanie skrzynkami pocztowymi</h2>
+                                <p className="text-sm text-slate-500 mt-0.5">Dodaj, edytuj skrzynki i przypisuj użytkowników</p>
+                            </div>
+                            <button
+                                onClick={() => setShowMailboxAdmin(false)}
+                                className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                            >
+                                <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-5">
+                            <MailboxManager onChange={refreshUser} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

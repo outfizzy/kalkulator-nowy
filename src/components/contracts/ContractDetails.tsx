@@ -5,6 +5,7 @@ import type { Contract, ContractComment, ContractAttachment, User, Installation,
 import { StorageService } from '../../services/database/storage.service';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { ContractService } from '../../services/database/contract.service';
 import { InstallationService } from '../../services/database/installation.service';
 import { UserService } from '../../services/database/user.service';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +21,8 @@ export const ContractDetails: React.FC = () => {
     const [contract, setContract] = useState<Contract | null>(null);
     const [newComment, setNewComment] = useState('');
     const [isEditing, setIsEditing] = useState(false);
+    const [costBreakdown, setCostBreakdown] = useState<any>(null);
+    const [costLoading, setCostLoading] = useState(false);
 
     // Installation State
     const [installation, setInstallation] = useState<Installation | null>(null);
@@ -52,6 +55,13 @@ export const ContractDetails: React.FC = () => {
 
         loadContract();
         InstallationService.getTeams().then(setTeams).catch(console.error);
+
+        // Load cost breakdown
+        setCostLoading(true);
+        ContractService.getContractCostBreakdown(id)
+            .then(setCostBreakdown)
+            .catch(err => console.error('Cost breakdown error:', err))
+            .finally(() => setCostLoading(false));
 
         if (isAdmin()) {
             UserService.getSalesReps().then(setSalesReps).catch(console.error);
@@ -188,13 +198,15 @@ export const ContractDetails: React.FC = () => {
                     postalCode: contract.client.postalCode,
                     address: `${contract.client.street} ${contract.client.houseNumber}`.trim(),
                     phone: contract.client.phone,
+                    email: contract.client.email || '',
                 },
                 productSummary: `${contract.product.modelId} ${contract.product.width}x${contract.product.projection} mm`,
                 notes: [
                     contract.requirements.constructionProject ? 'Projekt' : '',
                     contract.requirements.powerSupply ? 'Prąd' : '',
                     contract.requirements.foundation ? 'Fundament' : '',
-                    contract.requirements.other
+                    contract.requirements.other,
+                    contract.installationNotes ? `\n📋 NOTATKI DLA EKIPY:\n${contract.installationNotes}` : ''
                 ].filter(Boolean).join(', '),
                 expectedDuration: contract.installation_days_estimate || 1
             });
@@ -254,9 +266,9 @@ export const ContractDetails: React.FC = () => {
                             </select>
                         ) : (
                             <span className={`px-3 py-1 text-xs font-bold rounded-full ${contract.status === 'signed' ? 'bg-green-100 text-green-700' :
-                                    contract.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                                        contract.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                            'bg-slate-200 text-slate-700'
+                                contract.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                    contract.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                        'bg-slate-200 text-slate-700'
                                 }`}>
                                 {contract.status === 'signed' ? 'Podpisana' :
                                     contract.status === 'completed' ? 'Zakończona' :
@@ -453,6 +465,30 @@ export const ContractDetails: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* ── Notatki dla Ekipy Montażowej ── */}
+                    <div className="bg-white p-5 rounded-xl shadow-sm border border-orange-200">
+                        <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-xs uppercase tracking-wider">
+                            <span className="text-base">🔧</span>
+                            Notatki dla Ekipy Montażowej
+                        </h3>
+                        <p className="text-[10px] text-slate-400 mb-2">Te notatki pojawią się w kalendarzu montaży i w dashboardzie monterów.</p>
+                        {isEditing ? (
+                            <textarea
+                                value={contract.installationNotes || ''}
+                                onChange={e => setContract({ ...contract, installationNotes: e.target.value })}
+                                className="w-full p-3 border border-orange-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-orange-400 outline-none"
+                                rows={3}
+                                placeholder="Np. kod do bramy 1234, uwaga na psa, klient prosi o wcześniejszy kontakt, specjalne warunki..."
+                            />
+                        ) : contract.installationNotes ? (
+                            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 whitespace-pre-wrap">
+                                {contract.installationNotes}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">Brak notatek — kliknij "Edytuj" aby dodać</p>
+                        )}
+                    </div>
+
                     {/* Pomiary Techniczne */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                         <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-xs uppercase tracking-wider">
@@ -601,6 +637,170 @@ export const ContractDetails: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Bilans Kosztów */}
+                    {isAdmin() && (
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-xs uppercase tracking-wider">
+                                <span className="text-base">📊</span>
+                                Bilans Kosztów
+                            </h3>
+                            {costLoading ? (
+                                <div className="text-center text-slate-400 text-sm py-8">Ładowanie kosztów...</div>
+                            ) : costBreakdown ? (
+                                <div className="space-y-3">
+                                    {/* Logistics */}
+                                    <div className="py-2 border-b border-slate-100">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600 flex items-center gap-2">
+                                                <span className="text-base">📦</span> Towar (logistyka)
+                                            </span>
+                                            <span className={`font-bold ${costBreakdown.logistics.total > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                                {costBreakdown.logistics.total > 0 ? `-${costBreakdown.logistics.total.toFixed(2)} €` : '0.00 €'}
+                                            </span>
+                                        </div>
+                                        {costBreakdown.logistics.items.length > 0 && (
+                                            <div className="mt-1 pl-7 space-y-0.5">
+                                                {costBreakdown.logistics.items.map((item: any, i: number) => (
+                                                    <div key={i} className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>{item.name}</span>
+                                                        <span>{item.cost.toFixed(2)} €</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Measurement */}
+                                    <div className="py-2 border-b border-slate-100">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600 flex items-center gap-2">
+                                                <span className="text-base">📐</span> Koszty operacyjne (pomiary, materiały)
+                                            </span>
+                                            <span className={`font-bold ${costBreakdown.measurement.total > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                                {costBreakdown.measurement.total > 0 ? `-${costBreakdown.measurement.total.toFixed(2)} €` : '0.00 €'}
+                                            </span>
+                                        </div>
+                                        {costBreakdown.measurement.items.length > 0 && (
+                                            <div className="mt-1 pl-7 space-y-0.5">
+                                                {costBreakdown.measurement.items.map((item: any, i: number) => (
+                                                    <div key={i} className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>{item.description}</span>
+                                                        <span>{item.amount.toFixed(2)} €</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Measurement Trip Costs (km) */}
+                                    {costBreakdown.measurementTrip && costBreakdown.measurementTrip.total > 0 && (
+                                        <div className="py-2 border-b border-slate-100">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-600 flex items-center gap-2">
+                                                    <span className="text-base">🚗</span> Koszt dojazdu na pomiar
+                                                </span>
+                                                <span className="font-bold text-red-600">
+                                                    -{costBreakdown.measurementTrip.total.toFixed(2)} €
+                                                </span>
+                                            </div>
+                                            <div className="mt-1 pl-7 space-y-0.5">
+                                                {costBreakdown.measurementTrip.items.map((item: any, i: number) => (
+                                                    <div key={i} className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>{item.description}</span>
+                                                        <span>{item.amountPLN.toFixed(2)} PLN → {item.amount.toFixed(2)} €</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Commission */}
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
+                                        <span className="text-slate-600 flex items-center gap-2">
+                                            <span className="text-base">🤝</span> Prowizja
+                                        </span>
+                                        <span className={`font-bold ${costBreakdown.commission > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                            {costBreakdown.commission > 0 ? `-${costBreakdown.commission.toFixed(2)} €` : '0.00 €'}
+                                        </span>
+                                    </div>
+
+                                    {/* Installation */}
+                                    <div className="py-2 border-b border-slate-100">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600 flex items-center gap-2">
+                                                <span className="text-base">🔧</span> Montaż (realne koszty)
+                                            </span>
+                                            <span className={`font-bold ${costBreakdown.installation.total > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                                {costBreakdown.installation.total > 0 ? `-${costBreakdown.installation.total.toFixed(2)} €` : '0.00 €'}
+                                            </span>
+                                        </div>
+                                        {costBreakdown.installation.total > 0 && (
+                                            <div className="mt-1 pl-7 space-y-0.5">
+                                                {costBreakdown.installation.laborHours > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>Robocizna ({costBreakdown.installation.laborHours.toFixed(1)}h × 25€)</span>
+                                                        <span>{costBreakdown.installation.laborCost.toFixed(2)} €</span>
+                                                    </div>
+                                                )}
+                                                {costBreakdown.installation.fuelCost > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>Paliwo (dojazd)</span>
+                                                        <span>{costBreakdown.installation.fuelCost.toFixed(2)} €</span>
+                                                    </div>
+                                                )}
+                                                {costBreakdown.installation.hotelCost > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>Hotel / noclegi</span>
+                                                        <span>{costBreakdown.installation.hotelCost.toFixed(2)} €</span>
+                                                    </div>
+                                                )}
+                                                {costBreakdown.installation.consumablesCost > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>Materiały eksploatacyjne</span>
+                                                        <span>{costBreakdown.installation.consumablesCost.toFixed(2)} €</span>
+                                                    </div>
+                                                )}
+                                                {costBreakdown.installation.additionalCosts > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-slate-500">
+                                                        <span>Koszty dodatkowe</span>
+                                                        <span>{costBreakdown.installation.additionalCosts.toFixed(2)} €</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Grand Total */}
+                                    <div className="flex justify-between items-center py-3 bg-red-50 px-3 rounded-lg text-sm">
+                                        <span className="text-red-800 font-bold">SUMA KOSZTÓW</span>
+                                        <span className="font-bold text-red-700 text-base">
+                                            -{costBreakdown.grandTotal.toFixed(2)} €
+                                        </span>
+                                    </div>
+
+                                    {/* Profit/Loss */}
+                                    {(() => {
+                                        const profit = netPrice - costBreakdown.grandTotal;
+                                        const profitPercent = netPrice > 0 ? (profit / netPrice) * 100 : 0;
+                                        const isPositive = profit >= 0;
+                                        return (
+                                            <div className={`flex justify-between items-center py-3 px-3 rounded-lg text-sm ${isPositive ? 'bg-green-50' : 'bg-red-100'}`}>
+                                                <span className={`font-bold ${isPositive ? 'text-green-800' : 'text-red-800'}`}>
+                                                    {isPositive ? '✅ ZYSK' : '❌ STRATA'} ({profitPercent.toFixed(1)}%)
+                                                </span>
+                                                <span className={`font-bold text-base ${isPositive ? 'text-green-700' : 'text-red-700'}`}>
+                                                    {isPositive ? '+' : ''}{profit.toFixed(2)} €
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            ) : (
+                                <div className="text-center text-slate-400 text-xs py-4 italic">Brak danych kosztowych</div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* ─── RIGHT: Comments + Attachments + Installation ─── */}
@@ -721,43 +921,47 @@ export const ContractDetails: React.FC = () => {
             />
 
             {/* ── Installation Details Modal ── */}
-            {installation && (
-                <InstallationDetailsModal
-                    installation={installation}
-                    isOpen={isInstallationModalOpen}
-                    onClose={() => setIsInstallationModalOpen(false)}
-                    onUpdate={async () => {
-                        const fresh = await InstallationService.getInstallationByOfferId(contract.offerId);
-                        setInstallation(fresh);
-                    }}
-                    onSave={async (updated) => {
-                        await InstallationService.updateInstallation(updated.id, updated);
-                        const fresh = await InstallationService.getInstallationByOfferId(contract.offerId);
-                        setInstallation(fresh);
-                        setIsInstallationModalOpen(false);
-                        toast.success('Zaktualizowano montaż');
-                    }}
-                />
-            )}
+            {
+                installation && (
+                    <InstallationDetailsModal
+                        installation={installation}
+                        isOpen={isInstallationModalOpen}
+                        onClose={() => setIsInstallationModalOpen(false)}
+                        onUpdate={async () => {
+                            const fresh = await InstallationService.getInstallationByOfferId(contract.offerId);
+                            setInstallation(fresh);
+                        }}
+                        onSave={async (updated) => {
+                            await InstallationService.updateInstallation(updated.id, updated);
+                            const fresh = await InstallationService.getInstallationByOfferId(contract.offerId);
+                            setInstallation(fresh);
+                            setIsInstallationModalOpen(false);
+                            toast.success('Zaktualizowano montaż');
+                        }}
+                    />
+                )
+            }
 
             {/* ── Lightbox ── */}
-            {lightboxIndex !== null && (
-                <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setLightboxIndex(null)}>
-                    <button className="absolute top-4 right-4 text-white/50 hover:text-white p-2" onClick={() => setLightboxIndex(null)}>
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                    <button className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors" onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev !== null ? (prev - 1 + allImages.length) % allImages.length : 0); }}>
-                        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <button className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors" onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev !== null ? (prev + 1) % allImages.length : 0); }}>
-                        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                    <img src={allImages[lightboxIndex].url} alt="Preview" className="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} />
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
-                        {lightboxIndex + 1} / {allImages.length}
+            {
+                lightboxIndex !== null && (
+                    <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setLightboxIndex(null)}>
+                        <button className="absolute top-4 right-4 text-white/50 hover:text-white p-2" onClick={() => setLightboxIndex(null)}>
+                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        <button className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors" onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev !== null ? (prev - 1 + allImages.length) % allImages.length : 0); }}>
+                            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <button className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors" onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev !== null ? (prev + 1) % allImages.length : 0); }}>
+                            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                        <img src={allImages[lightboxIndex].url} alt="Preview" className="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} />
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
+                            {lightboxIndex + 1} / {allImages.length}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };

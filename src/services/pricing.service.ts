@@ -386,7 +386,8 @@ export const PricingService = {
         zone: number;
         width: number;
         depth: number;
-    }): Promise<{ price: number, variant_note?: string, properties?: { matchedWidth: number; matchedProjection: number; posts_count?: number; fields_count?: number, constructionType?: string } } | null> {
+        splitPoint?: number; // Custom split position in mm (e.g., 5000 = segment1: 5000mm, segment2: width-5000mm)
+    }): Promise<{ price: number, variant_note?: string, properties?: { matchedWidth: number; matchedProjection: number; posts_count?: number; fields_count?: number, constructionType?: string; splitSegments?: { width: number; price: number }[] } } | null> {
         console.log('🔍 Pricing Lookup:', criteria);
 
         // 0. NEW STRATEGY: Explicit Price Table Lookup (Matrix)
@@ -508,7 +509,43 @@ export const PricingService = {
             };
         }
 
-        // 3. Fallback: Oversized Width Logic (Split & Sum)
+        // 3a. Custom Split Point Logic
+        // If user specified a split point, split the construction there regardless of matrix availability
+        if (criteria.splitPoint && criteria.splitPoint > 0 && criteria.splitPoint < criteria.width) {
+            const seg1Width = criteria.splitPoint;
+            const seg2Width = criteria.width - criteria.splitPoint;
+            console.log(`✂️ Custom Split Point: ${seg1Width}mm + ${seg2Width}mm (total: ${criteria.width}mm)`);
+
+            const [seg1Price, seg2Price] = await Promise.all([
+                this.findBasePrice({ ...criteria, width: seg1Width, splitPoint: undefined }),
+                this.findBasePrice({ ...criteria, width: seg2Width, splitPoint: undefined })
+            ]);
+
+            if (seg1Price && seg2Price) {
+                const totalPrice = seg1Price.price + seg2Price.price;
+                const combinedPosts = (seg1Price.properties?.posts_count || 0) + (seg2Price.properties?.posts_count || 0);
+
+                return {
+                    price: totalPrice,
+                    variant_note: `Konstrukcja łączona: ${seg1Width}mm (${seg1Price.price.toFixed(2)}€) + ${seg2Width}mm (${seg2Price.price.toFixed(2)}€)`,
+                    properties: {
+                        matchedWidth: criteria.width,
+                        matchedProjection: seg1Price.properties?.matchedProjection || criteria.depth,
+                        posts_count: combinedPosts,
+                        constructionType: 'custom_split',
+                        splitSegments: [
+                            { width: seg1Width, price: seg1Price.price },
+                            { width: seg2Width, price: seg2Price.price }
+                        ]
+                    }
+                };
+            } else {
+                console.warn('❌ Custom split: could not price one or both segments');
+                // Fall through to auto-split
+            }
+        }
+
+        // 3b. Fallback: Oversized Width Logic (Split & Sum)
         // If we are here, it means we found NO single entry large enough.
         // Cases:
         // A. Depth is too large -> Fail (Return null)
@@ -735,7 +772,8 @@ export const PricingService = {
                 coverType,
                 zone,
                 width: product.width,
-                depth: product.projection
+                depth: product.projection,
+                splitPoint: product.splitPoint
             });
         } else {
             // Standard Lookup
@@ -745,7 +783,8 @@ export const PricingService = {
                 coverType,
                 zone,
                 width: product.width,
-                depth: product.projection
+                depth: product.projection,
+                splitPoint: product.splitPoint
             });
         }
 

@@ -34,7 +34,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
     const [useSignature, setUseSignature] = useState(true);
     const [useOfferTemplate, setUseOfferTemplate] = useState(false);
     const [selectedOffer, setSelectedOffer] = useState<Offer | undefined>(offer); // Local state for offer
-    const [senderIdentity, setSenderIdentity] = useState<'personal' | 'shared'>('personal'); // New: Sender Selection
+    const [selectedMailboxIdx, setSelectedMailboxIdx] = useState(0); // Index into currentUser.mailboxes
 
     // New: Template State
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -170,8 +170,12 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
 
         setLoading(true);
         try {
-            if (!currentUser?.emailConfig?.smtpHost) {
-                toast.error('Skonfiguruj najpierw skrzynkę pocztową w Ustawieniach');
+            const mailboxes = currentUser?.mailboxes || [];
+            const activeMailbox = mailboxes[selectedMailboxIdx];
+            const sendConfig = activeMailbox || currentUser?.emailConfig;
+
+            if (!sendConfig?.smtpHost) {
+                toast.error('Brak skonfigurowanej skrzynki pocztowej');
                 return;
             }
 
@@ -219,8 +223,8 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
             } else {
                 // Standard Body with Signature
                 finalBody = body.replace(/\n/g, '<br>');
-                if (useSignature && currentUser.emailConfig.signature) {
-                    const rawSig = currentUser.emailConfig.signature;
+                if (useSignature && sendConfig.signature) {
+                    const rawSig = sendConfig.signature;
                     const sigHtml = (rawSig.includes('<') && rawSig.includes('>'))
                         ? rawSig
                         : rawSig.replace(/\n/g, '<br>');
@@ -236,8 +240,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     to,
                     subject: emailSubject,
                     body: finalBody,
-                    config: currentUser.emailConfig,
-                    useSharedConfig: senderIdentity === 'shared', // Pass flag
+                    config: sendConfig,
                     leadId,     // Pass for logging
                     customerId, // Pass for logging
                     attachments // Pass attachments
@@ -319,35 +322,40 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                 <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Do:</label>
-                        <input
-                            type="text"
-                            disabled
-                            value={to}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-500"
-                        />
+                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                            </svg>
+                            <span className="font-mono text-sm font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{to}</span>
+                        </div>
                     </div>
 
-                    {/* NEW: Sender Selection */}
-                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 mb-2 flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-500 uppercase px-2">Nadawca:</span>
-                        <div className="flex bg-white rounded-md border border-slate-200 p-0.5">
-                            <button
-                                onClick={() => setSenderIdentity('personal')}
-                                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${senderIdentity === 'personal' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                {currentUser?.firstName || 'Osobiste'}
-                            </button>
-                            <button
-                                onClick={() => setSenderIdentity('shared')}
-                                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${senderIdentity === 'shared' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Biuro
-                            </button>
+                    {/* Sender / Mailbox Selection */}
+                    {currentUser?.mailboxes && currentUser.mailboxes.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Nadawca:</label>
+                            <div className="flex flex-wrap gap-2">
+                                {currentUser.mailboxes.map((mb: any, idx: number) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setSelectedMailboxIdx(idx)}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${selectedMailboxIdx === idx
+                                                ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
+                                                : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: mb.color || '#3b82f6' }} />
+                                            <span className="font-bold">{mb.name}</span>
+                                        </div>
+                                        <div className={`text-xs mt-0.5 font-mono ${selectedMailboxIdx === idx ? 'text-blue-200' : 'text-slate-400'}`}>
+                                            {mb.smtpUser}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <span className="text-xs text-slate-400">
-                            {senderIdentity === 'personal' ? currentUser?.email : 'buero@polendach24.de'}
-                        </span>
-                    </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Temat:</label>

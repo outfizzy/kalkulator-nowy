@@ -22,10 +22,10 @@ export const PRESET_PROMPTS: PresetPrompt[] = [
     {
         id: 'viz-topline-standard',
         category: 'visualizations',
-        title: 'TopLine - Wizualizacja',
+        title: 'Topstyle - Wizualizacja',
         icon: '🏗️',
-        description: 'Pergola aluminiowa TopLine',
-        prompt: `Wygeneruj profesjonalną wizualizację 3D pergoli aluminiowej TopLine:
+        description: 'Pergola aluminiowa Topstyle',
+        prompt: `Wygeneruj profesjonalną wizualizację 3D pergoli aluminiowej Topstyle:
 - Wymiary: 4x3 metry
 - Kolor: antracyt (RAL 7016)
 - Lamele regulowane
@@ -34,16 +34,16 @@ export const PRESET_PROMPTS: PresetPrompt[] = [
 - Styl: fotorealistyczny rendering architektoniczny
 - Widok: perspektywa 3/4
 
-TopLine to pergola z regulowanymi lamelami, dostępna w rozmiarach od 3x2m do 7x4m.`
+Topstyle to pergola z regulowanymi lamelami, dostępna w rozmiarach od 3x2m do 7x4m.`
     },
     {
         id: 'viz-trendline-zip',
         category: 'visualizations',
-        title: 'TrendLine z ZIP',
+        title: 'Trendstyle z ZIP',
         icon: '🏗️',
-        description: 'TrendLine z roletami ZIP',
-        prompt: `Wizualizuj pergolę TrendLine z systemem ZIP:
-- Model: TrendLine 4x3m
+        description: 'Trendstyle z roletami ZIP',
+        prompt: `Wizualizuj pergolę Trendstyle z systemem ZIP:
+- Model: Trendstyle 4x3m
 - Rolety ZIP na wszystkich stronach
 - Kolor konstrukcji: antracyt (RAL 7016)
 - Kolor tkaniny: szary
@@ -51,15 +51,15 @@ TopLine to pergola z regulowanymi lamelami, dostępna w rozmiarach od 3x2m do 7x
 - Nowoczesny ogród, popołudnie
 - Podkreślić funkcjonalność i ochronę
 
-TrendLine to model z możliwością pełnego zamknięcia roletami ZIP.`
+Trendstyle to model z możliwością pełnego zamknięcia roletami ZIP.`
     },
     {
         id: 'viz-skyline-glass',
         category: 'visualizations',
-        title: 'Skyline - Szkło',
+        title: 'Skystyle - Szkło',
         icon: '🏗️',
-        description: 'Zadaszenie szklane Skyline',
-        prompt: `Stwórz wizualizację premium zadaszenia Skyline:
+        description: 'Zadaszenie szklane Skystyle',
+        prompt: `Stwórz wizualizację premium zadaszenia Skystyle:
 - Wymiary: 5x4 metry
 - Szkło: hartowane, przezroczyste
 - Konstrukcja: aluminium biały (RAL 9016)
@@ -68,15 +68,15 @@ TrendLine to model z możliwością pełnego zamknięcia roletami ZIP.`
 - Styl: luksusowy, elegancki
 - Pokaż przezroczystość i grę światła
 
-Skyline to system szklanego zadaszenia bez słupów pośrednich.`
+Skystyle to system szklanego zadaszenia bez słupów pośrednich.`
     },
     {
         id: 'viz-designline',
         category: 'visualizations',
-        title: 'DesignLine Premium',
+        title: 'Designstyle Premium',
         icon: '🏗️',
-        description: 'Wizualizacja DesignLine',
-        prompt: `Wygeneruj wizualizację pergoli DesignLine:
+        description: 'Wizualizacja Designstyle',
+        prompt: `Wygeneruj wizualizację pergoli Designstyle:
 - Wymiary: 5x4 metry
 - Kolor: biały (RAL 9016)
 - Lamele premium z podświetleniem
@@ -85,7 +85,7 @@ Skyline to system szklanego zadaszenia bez słupów pośrednich.`
 - Styl: ultra-nowoczesny, premium
 - Widok: pokazujący elegancję i detale
 
-DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
+Designstyle to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
     },
     {
         id: 'viz-carport',
@@ -107,20 +107,20 @@ DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
     {
         id: 'calc-topline-basic',
         category: 'calculations',
-        title: 'Kalkulacja TopLine',
+        title: 'Kalkulacja Topstyle',
         icon: '🧮',
         description: 'Cena podstawowej pergoli',
         requiresData: true,
-        prompt: 'Oblicz cenę pergoli TopLine o wymiarach 4x3 metry w kolorze antracyt. Podaj cenę netto i brutto (VAT 23%). Użyj aktualnych cen z bazy danych.'
+        prompt: 'Oblicz cenę pergoli Topstyle o wymiarach 4x3 metry w kolorze antracyt. Podaj cenę netto i brutto (VAT 23%). Użyj aktualnych cen z bazy danych.'
     },
     {
         id: 'calc-compare-models',
         category: 'calculations',
         title: 'Porównanie Modeli',
         icon: '⚖️',
-        description: 'TopLine vs TrendLine vs DesignLine',
+        description: 'Topstyle vs Trendstyle vs Designstyle',
         requiresData: true,
-        prompt: 'Porównaj ceny i parametry dla rozmiaru 4x3m: TopLine, TrendLine, DesignLine, OrangeLine. Przedstaw w tabeli z cenami netto, różnicami funkcjonalnymi i rekomendacją dla różnych budżetów.'
+        prompt: 'Porównaj ceny i parametry dla rozmiaru 4x3m: Topstyle, Trendstyle, Designstyle, Orangestyle. Przedstaw w tabeli z cenami netto, różnicami funkcjonalnymi i rekomendacją dla różnych budżetów.'
     },
     {
         id: 'calc-with-extras',
@@ -129,7 +129,7 @@ DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
         icon: '💡',
         description: 'Cena z LED, ogrzewaniem, ZIP',
         requiresData: true,
-        prompt: 'Oblicz cenę pergoli TopLine 4x3m z dodatkami: oświetlenie LED, ogrzewanie podczerwienią (2 promienniki), rolety ZIP na 2 ścianach. Podaj szczegółowe zestawienie kosztów każdego elementu.'
+        prompt: 'Oblicz cenę pergoli Topstyle 4x3m z dodatkami: oświetlenie LED, ogrzewanie podczerwienią (2 promienniki), rolety ZIP na 2 ścianach. Podaj szczegółowe zestawienie kosztów każdego elementu.'
     },
     {
         id: 'calc-compare-sizes',
@@ -138,7 +138,7 @@ DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
         icon: '📊',
         description: 'Różne wymiary tego samego modelu',
         requiresData: true,
-        prompt: 'Porównaj ceny pergoli TopLine w rozmiarach: 3x3m, 4x3m, 5x4m, 6x4m. Przedstaw w tabeli z cenami netto, brutto i różnicą procentową względem najmniejszego rozmiaru.'
+        prompt: 'Porównaj ceny pergoli Topstyle w rozmiarach: 3x3m, 4x3m, 5x4m, 6x4m. Przedstaw w tabeli z cenami netto, brutto i różnicą procentową względem najmniejszego rozmiaru.'
     },
     {
         id: 'calc-skyline-vs-pergola',
@@ -147,26 +147,26 @@ DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
         icon: '⚖️',
         description: 'Szkło vs lamele',
         requiresData: true,
-        prompt: 'Porównaj cenę i funkcjonalność: Skyline 4x3m (szkło) vs TopLine 4x3m (lamele). Jakie są różnice w cenie, zastosowaniu, zaletach i wadach każdego rozwiązania?'
+        prompt: 'Porównaj cenę i funkcjonalność: Skystyle 4x3m (szkło) vs Topstyle 4x3m (lamele). Jakie są różnice w cenie, zastosowaniu, zaletach i wadach każdego rozwiązania?'
     },
 
     // Pomoc Techniczna
     {
         id: 'tech-topline-specs',
         category: 'technical',
-        title: 'Specyfikacja TopLine',
+        title: 'Specyfikacja Topstyle',
         icon: '📐',
         description: 'Parametry techniczne',
         requiresData: true,
-        prompt: 'Podaj pełną specyfikację techniczną pergoli TopLine: dostępne wymiary, grubość profili, maksymalne rozpiętości, obciążenie śniegiem i wiatrem, dostępne kolory RAL, typ lameli.'
+        prompt: 'Podaj pełną specyfikację techniczną pergoli Topstyle: dostępne wymiary, grubość profili, maksymalne rozpiętości, obciążenie śniegiem i wiatrem, dostępne kolory RAL, typ lameli.'
     },
     {
         id: 'tech-models-comparison',
         category: 'technical',
         title: 'Różnice Między Modelami',
         icon: '🔍',
-        description: 'TopLine, TrendLine, DesignLine, OrangeLine',
-        prompt: 'Wyjaśnij szczegółowo różnice techniczne między modelami: TopLine, TrendLine, DesignLine, OrangeLine. Kiedy polecić który model? Jakie są zalety i wady każdego? Dla jakiego klienta?'
+        description: 'Topstyle, Trendstyle, Designstyle, Orangestyle',
+        prompt: 'Wyjaśnij szczegółowo różnice techniczne między modelami: Topstyle, Trendstyle, Designstyle, Orangestyle. Kiedy polecić który model? Jakie są zalety i wady każdego? Dla jakiego klienta?'
     },
     {
         id: 'tech-colors-ral',
@@ -200,7 +200,7 @@ DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
         title: 'Email z Ofertą',
         icon: '📧',
         description: 'Profesjonalny email',
-        prompt: 'Napisz profesjonalny email do klienta z ofertą na pergolę TopLine 4x3m w kolorze antracyt z oświetleniem LED. Dołącz: krótki opis produktu, kluczowe zalety, cenę, zachętę do kontaktu, informację o darmowym pomiarze.'
+        prompt: 'Napisz profesjonalny email do klienta z ofertą na pergolę Topstyle 4x3m w kolorze antracyt z oświetleniem LED. Dołącz: krótki opis produktu, kluczowe zalety, cenę, zachętę do kontaktu, informację o darmowym pomiarze.'
     },
     {
         id: 'customer-presentation-points',
@@ -243,7 +243,7 @@ DesignLine to najwyższa linia pergoli z dodatkowymi funkcjami premium.`
         icon: '📋',
         description: 'Dokument dla klienta',
         requiresData: true,
-        prompt: 'Wygeneruj pełną specyfikację techniczną dla pergoli TopLine 4x3m z LED. Uwzględnij: wymiary dokładne, materiały, grubości profili, kolory, dodatki, parametry techniczne, normy, gwarancję, certyfikaty.'
+        prompt: 'Wygeneruj pełną specyfikację techniczną dla pergoli Topstyle 4x3m z LED. Uwzględnij: wymiary dokładne, materiały, grubości profili, kolory, dodatki, parametry techniczne, normy, gwarancję, certyfikaty.'
     },
     {
         id: 'doc-installation-guide',

@@ -22,6 +22,8 @@ export const CustomersList: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'contracts' | 'unsigned'>('all');
     const [showMergeModal, setShowMergeModal] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 25;
 
     const loadCustomers = async () => {
         setLoading(true);
@@ -139,6 +141,14 @@ export const CustomersList: React.FC = () => {
         return true;
     });
 
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE));
+    const safePage = Math.min(currentPage, totalPages);
+    const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+    const paginatedCustomers = filteredCustomers.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+    const showingFrom = filteredCustomers.length === 0 ? 0 : startIdx + 1;
+    const showingTo = Math.min(startIdx + ITEMS_PER_PAGE, filteredCustomers.length);
+
     if (loading) {
         return <div className="p-12 text-center text-slate-400">Ładowanie klientów...</div>;
     }
@@ -176,19 +186,19 @@ export const CustomersList: React.FC = () => {
             <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div className="flex bg-slate-100 p-1 rounded-lg">
                     <button
-                        onClick={() => setActiveTab('all')}
+                        onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Wszyscy
                     </button>
                     <button
-                        onClick={() => setActiveTab('contracts')}
+                        onClick={() => { setActiveTab('contracts'); setCurrentPage(1); }}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'contracts' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Umowy
                     </button>
                     <button
-                        onClick={() => setActiveTab('unsigned')}
+                        onClick={() => { setActiveTab('unsigned'); setCurrentPage(1); }}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'unsigned' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Niepodpisani
@@ -203,7 +213,7 @@ export const CustomersList: React.FC = () => {
                         type="text"
                         placeholder="Szukaj klientów..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                         className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
                     />
                 </div>
@@ -230,7 +240,7 @@ export const CustomersList: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {filteredCustomers.map((item, idx) => (
+                                {paginatedCustomers.map((item, idx) => (
                                     <tr key={item.customer.id || idx} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="font-medium text-slate-900">
@@ -313,6 +323,55 @@ export const CustomersList: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {filteredCustomers.length > ITEMS_PER_PAGE && (
+                    <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <span className="text-sm text-slate-500">
+                            Pokazuje {showingFrom}–{showingTo} z {filteredCustomers.length} klientów
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={safePage <= 1}
+                                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                ← Wstecz
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                                .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                                    if (i > 0 && p - (arr[i - 1]) > 1) acc.push('...');
+                                    acc.push(p);
+                                    return acc;
+                                }, [])
+                                .map((p, i) =>
+                                    p === '...' ? (
+                                        <span key={`dots-${i}`} className="px-2 text-slate-400">…</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            onClick={() => setCurrentPage(p)}
+                                            className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${p === safePage
+                                                    ? 'bg-accent text-white shadow-sm'
+                                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
+                                )
+                            }
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={safePage >= totalPages}
+                                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Dalej →
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

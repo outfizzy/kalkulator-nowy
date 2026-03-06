@@ -15,10 +15,13 @@ import type { Installation, InstallationTeam, Contract, ServiceTicket, TeamUnava
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { InstallationService } from '../../services/database/installation.service';
+import { FeedbackRequestWidget } from './FeedbackRequestWidget';
+import { useAuth } from '../../contexts/AuthContext';
 
 
 export const InstallationDashboard: React.FC = () => {
     const navigate = useNavigate();
+    const { currentUser } = useAuth();
     const [installations, setInstallations] = useState<Installation[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
@@ -337,6 +340,11 @@ export const InstallationDashboard: React.FC = () => {
                     </div>
                 ))}
             </div>
+
+            {/* Feedback Request Widget — only for admin/manager */}
+            {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                <FeedbackRequestWidget installations={installations} />
+            )}
 
             <div className="flex-1 flex gap-4 min-h-0">
                 {view === 'calendarV3' ? (

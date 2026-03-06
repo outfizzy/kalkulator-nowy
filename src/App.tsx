@@ -69,6 +69,8 @@ import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
 import { VisualizerPage } from './pages/VisualizerPage';
 import ServiceRequestPage from './pages/public/ServiceRequestPage';
 import ServiceClientFormPage from './pages/public/ServiceClientFormPage';
+import CustomerFeedbackPage from './pages/public/CustomerFeedbackPage';
+import { CustomerFeedbackDashboard } from './components/admin/CustomerFeedbackDashboard';
 import { ServiceTicketDetailsPage } from './components/service/ServiceTicketDetailsPage';
 import { PublicOfferPage } from './pages/PublicOfferPage';
 import { CallManager } from './components/telephony/CallManager';
@@ -159,6 +161,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/reklamation" element={<ServiceRequestPage />} />
             <Route path="/service-form/:ticketId" element={<ServiceClientFormPage />} />
+            <Route path="/feedback/:token" element={<CustomerFeedbackPage />} />
             <Route path="/partner/login" element={<Navigate to="/b2b/login" replace />} />
             <Route path="/partner/register" element={<PartnerRegisterPage />} />
             <Route path="/b2b/login" element={<B2BLoginPage />} />
@@ -223,6 +226,7 @@ function App() {
               <Route path="/admin/b2b/offers" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager', 'manager']}><B2BOffersAdminPage /></ProtectedRoute>} />
               <Route path="/admin/b2b/marketing" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager', 'manager']}><MarketingManagerPage /></ProtectedRoute>} />
               <Route path="/admin/error-reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorReportsPage /></ProtectedRoute>} />
+              <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><CustomerFeedbackDashboard /></ProtectedRoute>} />
               <Route path="/fairs" element={<FairDashboard />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
               <Route path="/service" element={<ServiceDashboard />} />

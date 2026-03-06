@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import type { User, EmailConfig } from '../types';
+import type { User, EmailConfig, MailboxConfig } from '../types';
+import { MailboxManager } from './admin/MailboxManager';
 import { DatabaseService } from '../services/database';
 import { SettingsService } from '../services/database/settings.service';
+
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { supabase } from '../services/database/base.service';
@@ -10,7 +12,7 @@ import { LogisticsSettingsManager } from './admin/LogisticsSettings';
 import { LegacyImportModal } from './contracts/LegacyImportModal';
 
 export const SettingsPage: React.FC = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, refreshUser } = useAuth();
     const [dbError, setDbError] = useState(false);
     const [profile, setProfile] = useState<Partial<User>>({
         firstName: '',
@@ -25,6 +27,10 @@ export const SettingsPage: React.FC = () => {
 
     // Legacy Import State
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [mailboxes, setMailboxes] = useState<MailboxConfig[]>([]);
+    const [expandedMailbox, setExpandedMailbox] = useState<number | null>(null);
+    const [settingsTab, setSettingsTab] = useState<'profile' | 'email' | 'admin' | 'security'>('profile');
+    const [primaryMailboxIdx, setPrimaryMailboxIdx] = useState(0);
 
     // Global Settings (Admin Only)
     const [bueroConfig, setBueroConfig] = useState<EmailConfig>({
@@ -85,6 +91,24 @@ export const SettingsPage: React.FC = () => {
                     substituteUserId: currentUser.substituteUserId || null,
                     substituteUntil: currentUser.substituteUntil ? new Date(currentUser.substituteUntil) : null
                 });
+
+                // Load mailboxes: from user.mailboxes or migrate legacy emailConfig
+                if (currentUser.mailboxes && currentUser.mailboxes.length > 0) {
+                    setMailboxes(currentUser.mailboxes);
+                } else if (currentConfig.smtpHost || currentConfig.imapHost) {
+                    // Migrate single emailConfig to first mailbox
+                    setMailboxes([{
+                        name: 'Osobista',
+                        color: '#3b82f6',
+                        ...defaultConfig
+                    }]);
+                }
+
+                // Restore primary mailbox index
+                const savedPrimaryIdx = (currentConfig as any)?.__primaryMailboxIndex;
+                if (typeof savedPrimaryIdx === 'number') {
+                    setPrimaryMailboxIdx(savedPrimaryIdx);
+                }
             }
 
             // 3. Load Sales Reps
@@ -151,12 +175,33 @@ export const SettingsPage: React.FC = () => {
 
     const handleSave = async () => {
         try {
-            await DatabaseService.updateUserProfile(profile);
+            // Use selected primary mailbox for backward compat
+            const safeIdx = Math.min(primaryMailboxIdx, mailboxes.length - 1);
+            const primaryMailbox = mailboxes[Math.max(0, safeIdx)];
+            const emailConfig = primaryMailbox ? {
+                smtpHost: primaryMailbox.smtpHost,
+                smtpPort: primaryMailbox.smtpPort,
+                smtpUser: primaryMailbox.smtpUser,
+                smtpPassword: primaryMailbox.smtpPassword,
+                imapHost: primaryMailbox.imapHost,
+                imapPort: primaryMailbox.imapPort,
+                imapUser: primaryMailbox.imapUser,
+                imapPassword: primaryMailbox.imapPassword,
+                signature: primaryMailbox.signature,
+                openaiKey: primaryMailbox.openaiKey || profile.emailConfig?.openaiKey,
+                __primaryMailboxIndex: safeIdx,
+            } : profile.emailConfig;
+
+            await DatabaseService.updateUserProfile({
+                ...profile,
+                emailConfig,
+                mailboxes
+            });
             await DatabaseService.updateSubstitution(
                 profile.substituteUserId || null,
                 profile.substituteUntil || null
             );
-            toast.success('Profil i ustawienia delegacji zapisane pomyślnie');
+            toast.success('Profil i ustawienia zapisane pomyślnie');
             window.location.reload();
         } catch (error) {
             console.error('Error saving profile:', JSON.stringify(error, null, 2));
@@ -235,580 +280,246 @@ export const SettingsPage: React.FC = () => {
         }
     };
 
+    const isAdmin = currentUser?.role === 'admin';
+    const tabs = [
+        { id: 'profile' as const, label: 'Profil', icon: '👤' },
+        { id: 'email' as const, label: 'Poczta', icon: '📧' },
+        ...(isAdmin ? [{ id: 'admin' as const, label: 'Administracja', icon: '⚙️' }] : []),
+        { id: 'security' as const, label: 'Bezpieczeństwo', icon: '🔒' },
+    ];
+
     return (
-        <div className="space-y-8">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-6">Ustawienia Profilu</h2>
+        <div className="max-w-4xl mx-auto">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-slate-900">Ustawienia</h1>
+                <p className="text-slate-500 mt-1">Zarządzaj swoim profilem, pocztą i ustawieniami systemowymi</p>
+            </div>
 
-                {dbError && (
-                    <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-6 text-red-800 animate-pulse">
-                        <div className="flex items-center gap-3 mb-3">
-                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            <h3 className="text-lg font-bold">Błąd Krytyczny Bazy Danych</h3>
-                        </div>
-                        <p className="mb-4 font-semibold">
-                            Twoja baza danych nie posiada wymaganych kolumn (email_config, monthly_target lub phone).
-                        </p>
-                        <p className="mb-2 text-sm">Wykonaj poniższe polecenie w Supabase SQL Editor, aby naprawić problem:</p>
-                        <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-xs overflow-x-auto select-all cursor-text relative group">
-                            <code className="block">
-                                ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_config JSONB DEFAULT '{ }'::jsonb;
-                                ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS monthly_target NUMERIC DEFAULT 50000;
-                                ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
-                                NOTIFY pgrst, 'reload config';
-                            </code>
-                        </div>
-                        <p className="mt-2 text-xs text-red-600 font-bold">Po wykonaniu odśwież tę stronę (F5).</p>
+            {dbError && (
+                <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-6 text-red-800 animate-pulse">
+                    <div className="flex items-center gap-3 mb-3">
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        <h3 className="text-lg font-bold">Błąd Krytyczny Bazy Danych</h3>
                     </div>
-                )}
+                    <p className="mb-4 font-semibold">Twoja baza danych nie posiada wymaganych kolumn.</p>
+                    <p className="mt-2 text-xs text-red-600 font-bold">Uruchom migrację SQL i odśwież stronę (F5).</p>
+                </div>
+            )}
 
-                {/* Global Email Configuration (Admin Only) */}
-                {currentUser?.role === 'admin' && (
-                    <div className="space-y-8">
-                        <LogisticsSettingsManager />
-                        <GlobalSettingsPanel />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl border-l-4 border-l-purple-500">
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">Skrzynka Globalna: Biuro</h3>
-                                    <p className="text-sm text-slate-500 font-mono">buero@polendach24.de</p>
-                                </div>
-                                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">ADMIN ONLY</span>
+            {/* Tab Navigation */}
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 overflow-x-auto">
+                {tabs.map(tab => (
+                    <button key={tab.id} onClick={() => setSettingsTab(tab.id)} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${settingsTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}`}>
+                        <span>{tab.icon}</span>{tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* TAB: PROFILE */}
+            {settingsTab === 'profile' && (
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                             </div>
-
-                            <div className="bg-purple-50 p-4 rounded-lg text-sm text-purple-800 mb-6">
-                                <p>Te ustawienia dotyczą wspólnej skrzynki pocztowej widocznej dla wszystkich handlowców w zakładce "Biuro (Wspólna)".</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
-                                    <input
-                                        type="text"
-                                        value={bueroConfig.smtpHost || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpHost: e.target.value }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Port SMTP</label>
-                                    <input
-                                        type="number"
-                                        value={bueroConfig.smtpPort || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpPort: parseInt(e.target.value) || 587 }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik SMTP</label>
-                                    <input
-                                        type="text"
-                                        value={bueroConfig.smtpUser || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpUser: e.target.value }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Hasło SMTP</label>
-                                    <input
-                                        type="password"
-                                        value={bueroConfig.smtpPassword || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, smtpPassword: e.target.value }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-
-                                <div className="md:col-span-2 border-t pt-4 mt-2">
-                                    <h4 className="text-sm font-bold text-slate-700 mb-3">Odbieranie (IMAP)</h4>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Host IMAP</label>
-                                    <input
-                                        type="text"
-                                        value={bueroConfig.imapHost || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapHost: e.target.value }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Port IMAP</label>
-                                    <input
-                                        type="number"
-                                        value={bueroConfig.imapPort || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapPort: parseInt(e.target.value) || 993 }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik IMAP</label>
-                                    <input
-                                        type="text"
-                                        value={bueroConfig.imapUser || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapUser: e.target.value }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Hasło IMAP</label>
-                                    <input
-                                        type="password"
-                                        value={bueroConfig.imapPassword || ''}
-                                        onChange={(e) => setBueroConfig(prev => ({ ...prev, imapPassword: e.target.value }))}
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mt-8 flex justify-end">
-                                <button
-                                    onClick={handleSaveGlobal}
-                                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-lg shadow-purple-600/20 transition-colors"
-                                >
-                                    Zapisz Ustawienia Biura
-                                </button>
-                            </div>
+                            <div><h3 className="text-lg font-bold text-slate-800">Dane Osobowe</h3><p className="text-sm text-slate-500">Twoje podstawowe dane kontaktowe</p></div>
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Imię</label><input type="text" name="firstName" value={profile.firstName || ''} onChange={handleChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none" /></div>
+                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Nazwisko</label><input type="text" name="lastName" value={profile.lastName || ''} onChange={handleChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none" /></div>
+                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Email</label><input type="email" name="email" value={profile.email || ''} disabled className="w-full p-2.5 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 outline-none cursor-not-allowed" /></div>
+                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label><input type="tel" name="phone" value={profile.phone || ''} onChange={handleChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none" /></div>
+                        </div>
+                        <div className="mt-6 flex justify-end"><button onClick={handleSave} className="bg-accent text-white px-6 py-2.5 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors">Zapisz Dane</button></div>
                     </div>
-                )}
 
-                {/* Contract Settings (Admin Only) */}
-                {currentUser?.role === 'admin' && (
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl border-l-4 border-l-blue-500">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-800">Numeracja Umów</h3>
-                                <p className="text-sm text-slate-500">Konfiguracja automatycznego nadawania numerów</p>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                             </div>
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">ADMIN ONLY</span>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Rozpocznij numerację od (Numer Bieżący / Startowy)
-                                </label>
-                                <div className="flex gap-4 items-center">
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={contractStartNumber}
-                                        onChange={(e) => setContractStartNumber(parseInt(e.target.value) || 1)}
-                                        className="w-32 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center font-bold"
-                                    />
-                                    <span className="text-sm text-slate-500">
-                                        Następna umowa otrzyma numer: <strong>UM/{new Date().getFullYear()}/{String(Math.max(contractStartNumber, 1)).padStart(3, '0')}</strong> (przybliżenie)
-                                    </span>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-2">
-                                    Jeśli w danym roku istnieją już umowy z wyższym numerem, system automatycznie użyje kolejnego wolnego numeru.
-                                    To ustawienie wymusza "przeskok" w górę, np. na 500.
-                                </p>
-                            </div>
-
-                            <div className="flex justify-end pt-2">
-                                <button
-                                    onClick={handleSaveContractSettings}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-700 shadow-sm"
-                                >
-                                    Zapisz Numerację
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* DANGER ZONE (Admin Only) */}
-                {currentUser?.role === 'admin' && (
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 max-w-2xl border-l-4 border-l-red-600">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-red-800">Strefa Niebezpieczna</h3>
-                                <p className="text-sm text-red-600">Operacje tutaj są nieodwracalne.</p>
-                            </div>
-                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded animate-pulse">DANGER</span>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
-                                <div>
-                                    <h4 className="font-bold text-red-900">Import Umów Archiwalnych</h4>
-                                    <p className="text-xs text-red-700">Ręczne wprowadzanie starych umów (tworzy klienta, ofertę i umowę).</p>
-                                </div>
-                                <button
-                                    onClick={() => setIsImportModalOpen(true)}
-                                    className="px-4 py-2 bg-white border border-red-300 text-red-700 rounded hover:bg-red-100 font-bold text-sm"
-                                >
-                                    Otwórz Import
-                                </button>
-                            </div>
-
-                            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
-                                <div>
-                                    <h4 className="font-bold text-red-900">SYSTEM RESET (WIPE)</h4>
-                                    <p className="text-xs text-red-700">Usuwa WSZYSTKIE dane (Klienci, Oferty, Umowy, Leady). Zachowuje Użytkowników i Produkty.</p>
-                                </div>
-                                <button
-                                    onClick={handleSystemReset}
-                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold text-sm shadow-lg shadow-red-500/30"
-                                >
-                                    WYCZYŚĆ SYSTEM
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Dane Osobowe</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Imię</label>
-                            <input
-                                type="text"
-                                name="firstName"
-                                value={profile.firstName || ''}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
+                            <div><h3 className="text-lg font-bold text-slate-800">Cel Sprzedażowy</h3><p className="text-sm text-slate-500">Miesięczny cel używany na Dashboardzie</p></div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Nazwisko</label>
-                            <input
-                                type="text"
-                                name="lastName"
-                                value={profile.lastName || ''}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={profile.email || ''}
-                                onChange={handleChange}
-                                disabled
-                                className="w-full p-2 border rounded-lg bg-slate-50 text-slate-500 outline-none cursor-not-allowed"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
-                            <input
-                                type="tel"
-                                name="phone"
-                                value={profile.phone || ''}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-slate-700 mb-1">Miesięczny Cel Sprzedażowy (EUR)</label>
-                            <input
-                                type="number"
-                                name="monthlyTarget"
-                                value={profile.monthlyTarget || 50000}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
+                            <input type="number" name="monthlyTarget" value={profile.monthlyTarget || 50000} onChange={handleChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none max-w-xs" />
                             <p className="text-xs text-slate-500 mt-1">Ten cel będzie używany do obliczania paska postępu na Dashboardzie.</p>
                         </div>
+                        <div className="mt-4 flex justify-end"><button onClick={handleSave} className="bg-accent text-white px-6 py-2.5 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors">Zapisz Cel</button></div>
                     </div>
 
-                    <div className="mt-8 flex justify-end">
-                        <button
-                            onClick={handleSave}
-                            className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors"
-                        >
-                            Zapisz Dane
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Vacation / Substitution Mode */}
-            <div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="bg-orange-100 p-2 rounded-lg">
-                            <svg className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            </div>
+                            <div><h3 className="text-lg font-bold text-slate-800">Delegacja / Tryb Urlopowy</h3><p className="text-sm text-slate-500">Przekaż dostęp do swoich leadów i ofert innemu przedstawicielowi</p></div>
                         </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-700">Delegacja / Tryb Urlopowy</h3>
-                            <p className="text-sm text-slate-500">Przekaż dostęp do swoich leadów i ofert innemu przedstawicielowi.</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Zastępca (Kto otrzyma dostęp?)</label>
-                            <select
-                                value={profile.substituteUserId || ''}
-                                onChange={(e) => setProfile(prev => ({ ...prev, substituteUserId: e.target.value || null }))}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white"
-                            >
-                                <option value="">-- Brak zastępstwa --</option>
-                                {availableSubstitutes.map(user => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.firstName} {user.lastName} ({user.email})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {profile.substituteUserId && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Zastępstwo ważne do (włącznie)</label>
-                                <input
-                                    type="date"
-                                    value={profile.substituteUntil ? new Date(profile.substituteUntil).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => setProfile(prev => ({ ...prev, substituteUntil: e.target.value ? new Date(e.target.value) : null }))}
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white"
-                                />
-                                <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    Wybrana osoba będzie miała pełny podgląd Twoich leadów i ofert do wskazanego dnia.
-                                </p>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Zastępca (Kto otrzyma dostęp?)</label>
+                                <select value={profile.substituteUserId || ''} onChange={(e) => setProfile(prev => ({ ...prev, substituteUserId: e.target.value || null }))} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white">
+                                    <option value="">-- Brak zastępstwa --</option>
+                                    {availableSubstitutes.map(user => (<option key={user.id} value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>))}
+                                </select>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="mt-4 flex justify-end">
-                        <button
-                            onClick={handleSave}
-                            className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors"
-                        >
-                            Zapisz Ustawienia
-                        </button>
+                            {profile.substituteUserId && (
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Zastępstwo ważne do (włącznie)</label>
+                                    <input type="date" value={profile.substituteUntil ? new Date(profile.substituteUntil).toISOString().split('T')[0] : ''} onChange={(e) => setProfile(prev => ({ ...prev, substituteUntil: e.target.value ? new Date(e.target.value) : null }))} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white" />
+                                    <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                        Wybrana osoba będzie miała pełny podgląd Twoich leadów i ofert do wskazanego dnia.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-4 flex justify-end"><button onClick={handleSave} className="bg-accent text-white px-6 py-2.5 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors">Zapisz Zastępstwo</button></div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Email Configuration */}
-            <div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Konfiguracja Poczty (SMTP/IMAP)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm mb-4">
-                                <p className="font-bold">Informacja:</p>
-                                <p>Wprowadź dane serwera pocztowego, aby wysyłać i odbierać wiadomości bezpośrednio z aplikacji.</p>
+            {/* TAB: EMAIL */}
+            {settingsTab === 'email' && (
+                <div className="space-y-6">
+                    {/* Primary Mailbox Selector */}
+                    {mailboxes.length > 1 && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-amber-400">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                                    <span className="text-lg">⭐</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800">Główna Skrzynka</h3>
+                                    <p className="text-sm text-slate-500">Wybierz domyślną skrzynkę do wysyłania i odbierania maili</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {mailboxes.map((mb, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => setPrimaryMailboxIdx(idx)}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${primaryMailboxIdx === idx
+                                                ? 'border-amber-400 bg-amber-50 shadow-sm'
+                                                : 'border-slate-200 bg-white hover:border-slate-300'
+                                            }`}
+                                    >
+                                        <div
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                                            style={{ backgroundColor: (mb.color || '#3b82f6') + '20', color: mb.color || '#3b82f6' }}
+                                        >
+                                            {primaryMailboxIdx === idx ? '⭐' : '✉️'}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-slate-800">{mb.name || `Skrzynka ${idx + 1}`}</p>
+                                            <p className="text-xs text-slate-400 font-mono truncate">{mb.smtpUser || mb.imapUser || '-'}</p>
+                                        </div>
+                                        {primaryMailboxIdx === idx && (
+                                            <span className="ml-auto text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full uppercase shrink-0">Główna</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="mt-3 flex justify-end">
+                                <button onClick={handleSave} className="bg-amber-500 text-white px-5 py-2 rounded-lg hover:bg-amber-600 font-bold text-sm shadow-sm transition-colors">Zapisz wybór</button>
                             </div>
                         </div>
+                    )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
-                            <input
-                                type="text"
-                                value={profile.emailConfig?.smtpHost || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, smtpHost: e.target.value }
-                                }))}
-                                placeholder="np. smtp.gmail.com"
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Port SMTP</label>
-                            <input
-                                type="text"
-                                value={profile.emailConfig?.smtpPort || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, smtpPort: parseInt(e.target.value) || 587 }
-                                }))}
-                                placeholder="np. 587"
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik SMTP</label>
-                            <input
-                                type="text"
-                                value={profile.emailConfig?.smtpUser || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, smtpUser: e.target.value }
-                                }))}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Hasło SMTP</label>
-                            <input
-                                type="password"
-                                value={profile.emailConfig?.smtpPassword || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, smtpPassword: e.target.value }
-                                }))}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <MailboxManager onChange={refreshUser} />
+                    </div>
 
-                        <div className="md:col-span-2 border-t pt-4 mt-2">
-                            <h4 className="text-sm font-bold text-slate-700 mb-3">Ustawienia Odbierania (IMAP)</h4>
+                    {/* OpenAI Key */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center"><span className="text-lg">🤖</span></div>
+                            <div><h3 className="text-lg font-bold text-slate-800">Klucz AI (OpenAI)</h3><p className="text-sm text-slate-500">Opcjonalny klucz dla funkcji AI w module poczty</p></div>
                         </div>
+                        <input type="password" value={profile.emailConfig?.openaiKey || ''} onChange={(e) => setProfile(prev => ({ ...prev, emailConfig: { ...prev.emailConfig, openaiKey: e.target.value } }))} placeholder="sk-proj-..." className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono text-sm" />
+                        <div className="mt-4 flex justify-end"><button onClick={handleSave} className="bg-accent text-white px-6 py-2.5 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors">Zapisz Klucz</button></div>
+                    </div>
+                </div>
+            )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Host IMAP</label>
-                            <input
-                                type="text"
-                                value={profile.emailConfig?.imapHost || ''}
-                                onChange={(e) => setProfile(prev => ({ ...prev, imapHost: e.target.value }))}
-                                placeholder="np. imap.gmail.com"
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Port IMAP</label>
-                            <input
-                                type="text"
-                                value={profile.emailConfig?.imapPort || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, imapPort: parseInt(e.target.value) || 993 }
-                                }))}
-                                placeholder="np. 993"
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Użytkownik IMAP</label>
-                            <input
-                                type="text"
-                                value={profile.emailConfig?.imapUser || ''}
-                                onChange={(e) => setProfile(prev => ({ ...prev, imapUser: e.target.value }))}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Hasło IMAP</label>
-                            <input
-                                type="password"
-                                value={profile.emailConfig?.imapPassword || ''}
-                                onChange={(e) => setProfile(prev => ({ ...prev, imapPassword: e.target.value }))}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                            />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Stopka (Podpis)</label>
-                            <textarea
-                                value={profile.emailConfig?.signature || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, signature: e.target.value }
-                                }))}
-                                rows={4}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono text-sm"
-                                placeholder="Tutaj wpisz treść swojej stopki (możesz używać HTML)..."
-                            />
-                        </div>
+            {/* TAB: ADMIN */}
+            {settingsTab === 'admin' && isAdmin && (
+                <div className="space-y-6">
+                    <LogisticsSettingsManager />
+                    <GlobalSettingsPanel />
 
 
-                        <div className="md:col-span-2 border-t pt-4 mt-2">
-                            <h4 className="text-sm font-bold text-slate-700 mb-3">Konfiguracja AI (Opcjonalne)</h4>
-                            <div className="bg-purple-50 text-purple-800 p-3 rounded-lg text-sm mb-3">
-                                <p>Dodaj klucz API OpenAI, aby korzystać z asystenta pisania wiadomości.</p>
+
+                    {/* Contract Numbering */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                            </div>
+                            <div><h3 className="text-lg font-bold text-slate-800">Numeracja Umów</h3><p className="text-sm text-slate-500">Konfiguracja automatycznego nadawania numerów</p></div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Rozpocznij numerację od</label>
+                            <div className="flex gap-4 items-center">
+                                <input type="number" min="1" value={contractStartNumber} onChange={(e) => setContractStartNumber(parseInt(e.target.value) || 1)} className="w-32 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center font-bold" />
+                                <span className="text-sm text-slate-500">Następna: <strong>UM/{new Date().getFullYear()}/{String(Math.max(contractStartNumber, 1)).padStart(3, '0')}</strong></span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">System automatycznie użyje kolejnego wolnego numeru jeśli istnieją wyższe.</p>
+                        </div>
+                        <div className="mt-4 flex justify-end"><button onClick={handleSaveContractSettings} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-700 shadow-sm">Zapisz Numerację</button></div>
+                    </div>
+
+                    {/* Danger Zone */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 border-l-4 border-l-red-600">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <div><h3 className="text-lg font-bold text-red-800">Strefa Niebezpieczna</h3><p className="text-sm text-red-600">Operacje nieodwracalne</p></div>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                                <div><h4 className="font-bold text-red-900">Import Umów Archiwalnych</h4><p className="text-xs text-red-700">Ręczne wprowadzanie starych umów.</p></div>
+                                <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2 bg-white border border-red-300 text-red-700 rounded hover:bg-red-100 font-bold text-sm">Otwórz Import</button>
+                            </div>
+                            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                                <div><h4 className="font-bold text-red-900">SYSTEM RESET (WIPE)</h4><p className="text-xs text-red-700">Usuwa WSZYSTKIE dane. Zachowuje Użytkowników i Produkty.</p></div>
+                                <button onClick={handleSystemReset} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold text-sm shadow-lg shadow-red-500/30">WYCZYŚĆ SYSTEM</button>
                             </div>
                         </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Klucz API OpenAI (sk-proj-...)</label>
-                            <input
-                                type="password"
-                                value={profile.emailConfig?.openaiKey || ''}
-                                onChange={(e) => setProfile(prev => ({
-                                    ...prev,
-                                    emailConfig: { ...prev.emailConfig, openaiKey: e.target.value }
-                                }))}
-                                placeholder="sk-..."
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono text-sm"
-                            />
-                        </div>
-                    </div>
-                    <div className="mt-8 flex justify-end">
-                        <button
-                            onClick={handleSave}
-                            className="bg-accent text-white px-6 py-2 rounded-lg hover:bg-accent-dark font-bold shadow-lg shadow-accent/20 transition-colors"
-                        >
-                            Zapisz Konfigurację
-                        </button>
                     </div>
                 </div>
-            </div>
+            )}
 
-            <div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Zmiana Hasła</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Obecne Hasło</label>
-                            <input
-                                type="password"
-                                name="currentPassword"
-                                value={passwordData.currentPassword}
-                                onChange={handlePasswordChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                                placeholder="Wprowadź obecne hasło"
-                            />
+            {/* TAB: SECURITY */}
+            {settingsTab === 'security' && (
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            </div>
+                            <div><h3 className="text-lg font-bold text-slate-800">Zmiana Hasła</h3><p className="text-sm text-slate-500">Zaktualizuj swoje hasło logowania</p></div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Nowe Hasło</label>
-                            <input
-                                type="password"
-                                name="newPassword"
-                                value={passwordData.newPassword}
-                                onChange={handlePasswordChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                                placeholder="Min. 6 znaków"
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700 mb-1">Obecne Hasło</label><input type="password" name="currentPassword" value={passwordData.currentPassword} onChange={handlePasswordChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none" placeholder="Wprowadź obecne hasło" /></div>
+                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Nowe Hasło</label><input type="password" name="newPassword" value={passwordData.newPassword} onChange={handlePasswordChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none" placeholder="Min. 6 znaków" /></div>
+                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Potwierdź Nowe Hasło</label><input type="password" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent outline-none" placeholder="Powtórz nowe hasło" /></div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Potwierdź Nowe Hasło</label>
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                value={passwordData.confirmPassword}
-                                onChange={handlePasswordChange}
-                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                                placeholder="Powtórz nowe hasło"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="mt-8 flex justify-end">
-                        <button
-                            onClick={handleUpdatePassword}
-                            className="bg-slate-800 text-white px-6 py-2 rounded-lg hover:bg-slate-700 font-bold shadow-lg shadow-slate-800/20 transition-colors"
-                        >
-                            Zmień Hasło
-                        </button>
+                        <div className="mt-6 flex justify-end"><button onClick={handleUpdatePassword} className="bg-slate-800 text-white px-6 py-2.5 rounded-lg hover:bg-slate-700 font-bold shadow-lg shadow-slate-800/20 transition-colors">Zmień Hasło</button></div>
                     </div>
                 </div>
-            </div>
+            )}
 
+            {/* Footer */}
             <div className="text-center text-xs text-slate-300 mt-8 pb-4">
                 <p>System ID: {import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || 'Unknown'}</p>
                 <p>Version: 1.0.2</p>
             </div>
 
-            {/* Modals */}
-            <LegacyImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                onSuccess={() => toast.success('Import zakończony sukcesem')}
-            />
+            <LegacyImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onSuccess={() => toast.success('Import zakończony sukcesem')} />
         </div>
     );
 };

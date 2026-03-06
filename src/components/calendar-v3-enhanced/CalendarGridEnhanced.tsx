@@ -18,6 +18,7 @@ interface CalendarGridEnhancedProps {
     unavailability: TeamUnavailability[];
     onRefresh: () => void;
     onEditInstallation?: (installation: Installation) => void;
+    onReportClick?: (installation: Installation) => void;
     weatherData?: Map<string, LocationForecast>;
 }
 
@@ -29,6 +30,7 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
     unavailability,
     onRefresh,
     onEditInstallation,
+    onReportClick,
     weatherData
 }) => {
     return (
@@ -40,6 +42,7 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
                     teams={teams}
                     unavailability={unavailability}
                     onEditInstallation={onEditInstallation}
+                    onReportClick={onReportClick}
                     weatherData={weatherData}
                 />
             )}

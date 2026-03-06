@@ -8,6 +8,7 @@ interface InstallationCardEnhancedProps {
     installation: Installation;
     team: InstallationTeam;
     onEdit?: (installation: Installation) => void;
+    onReportClick?: (installation: Installation) => void;
     weather?: DailyForecast;
 }
 
@@ -15,6 +16,7 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
     installation,
     team,
     onEdit,
+    onReportClick,
     weather
 }) => {
     const {
@@ -39,178 +41,122 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
 
     const isService = installation.sourceType === 'service';
     const isFollowUp = installation.sourceType === 'followup';
+    const needsReport = (installation.status === 'completed' || installation.status === 'verification') && !installation.completionReport;
 
-    const getStatusBadge = (status: string) => {
+    const getStatusDot = (status: string) => {
         switch (status) {
-            case 'scheduled':
-                return { label: 'Zaplanowany', bg: 'bg-blue-500', text: 'text-white' };
-            case 'in_progress':
-                return { label: 'W trakcie', bg: 'bg-yellow-500', text: 'text-white' };
-            case 'verification':
-                return { label: 'Weryfikacja', bg: 'bg-purple-500', text: 'text-white' };
-            case 'completed':
-                return { label: 'Zakończony', bg: 'bg-green-500', text: 'text-white' };
-            default:
-                return { label: status, bg: 'bg-slate-400', text: 'text-white' };
+            case 'scheduled': return 'bg-blue-500';
+            case 'in_progress': return 'bg-amber-500';
+            case 'verification': return 'bg-purple-500';
+            case 'completed': return 'bg-emerald-500';
+            default: return 'bg-slate-400';
         }
     };
 
-    const getPartsStatusBadge = (partsStatus?: string, partsReady?: boolean) => {
-        if (partsReady) return { label: '✅ Części OK', color: 'text-green-700 bg-green-50' };
-        switch (partsStatus) {
-            case 'all_delivered':
-                return { label: '✅ Części OK', color: 'text-green-700 bg-green-50' };
-            case 'partial':
-                return { label: '⚠️ Częściowo', color: 'text-amber-700 bg-amber-50' };
-            case 'pending':
-                return { label: '⏳ Oczekuje', color: 'text-orange-700 bg-orange-50' };
-            case 'none':
-                return { label: '❌ Brak', color: 'text-red-700 bg-red-50' };
-            default:
-                return null;
-        }
-    };
-
-    const statusBadge = getStatusBadge(installation.status);
-    const partsBadge = getPartsStatusBadge(installation.partsStatus, installation.partsReady);
-
-    // Border color: service = orange, weather-based for regular installations
-    const getBorderClass = () => {
-        if (isService) return 'border-l-4 border-l-orange-400';
-        if (isFollowUp) return 'border-l-4 border-l-amber-400';
-        if (!weather) return 'border-l-4 border-l-slate-200';
-        switch (weather.info.severity) {
-            case 'bad': return 'border-l-4 border-l-red-400';
-            case 'moderate': return 'border-l-4 border-l-amber-400';
-            default: return 'border-l-4 border-l-sky-400';
-        }
-    };
+    const clientName = installation.client?.name
+        || `${installation.client?.firstName || ''} ${installation.client?.lastName || ''}`.trim()
+        || 'Brak klienta';
 
     return (
         <div
             ref={setNodeRef}
-            style={style}
+            style={{
+                ...style,
+                borderLeftColor: team.color || '#6366f1'
+            }}
             {...attributes}
             {...listeners}
-            className={`bg-white rounded-lg shadow-sm border border-slate-200 cursor-move transition-all ${getBorderClass()} ${isDragging
-                ? 'opacity-50 scale-95 shadow-2xl z-50'
-                : 'hover:shadow-md hover:border-slate-300'
+            onClick={() => onEdit?.(installation)}
+            className={`rounded-md border-l-[3px] bg-white shadow-sm cursor-pointer transition-all w-full overflow-hidden
+                ${isDragging
+                    ? 'opacity-30 scale-95'
+                    : 'hover:shadow-md'
                 }`}
         >
-            {/* Header: Client Name + Service Badge / Weather */}
-            <div className="px-3 pt-2.5 pb-1.5 flex items-start justify-between gap-1.5">
-                <div className="flex-1 min-w-0">
-                    {/* Service / Follow-Up Badge */}
-                    {isService && (
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px] font-bold mb-1 ring-1 ring-orange-200">
-                            🔧 Serwis
-                        </div>
-                    )}
-                    {isFollowUp && (
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold mb-1 ring-1 ring-amber-200">
-                            🔄 Dokończ.
-                        </div>
-                    )}
-                    <h4 className="font-bold text-[13px] text-slate-900 truncate leading-tight">
-                        {installation.client?.name || `${installation.client?.firstName || ''} ${installation.client?.lastName || ''}`}
-                    </h4>
-                    <p className="text-[11px] text-slate-500 truncate leading-tight mt-0.5">
-                        📍 {installation.client?.city}{installation.client?.address ? `, ${installation.client.address}` : ''}
-                    </p>
-                </div>
-                {/* Weather Badge */}
-                {weather && (
-                    <div
-                        className={`flex-shrink-0 flex items-center gap-0.5 px-1.5 py-1 rounded-lg text-xs font-semibold ${weather.info.severity === 'bad' ? 'bg-red-50 text-red-700 ring-1 ring-red-200' :
-                            weather.info.severity === 'moderate' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' :
-                                'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
-                            }`}
-                        title={`${weather.info.label} — ${weather.tempMin}°/${weather.tempMax}°C`}
-                    >
-                        <span className="text-base leading-none">{weather.info.icon}</span>
-                        <span className="text-[11px] font-bold">{weather.tempMax}°</span>
-                    </div>
+            {/* Badges row */}
+            <div className="px-1.5 pt-1 flex items-center gap-0.5 flex-wrap">
+                {isService && (
+                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded">🔧 Serwis</span>
                 )}
-                {onEdit && (
+                {isFollowUp && (
+                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 rounded">🔄 Dokończ.</span>
+                )}
+                {needsReport && (
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(installation);
-                        }}
-                        className="flex-shrink-0 p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600"
+                        onClick={(e) => { e.stopPropagation(); onReportClick?.(installation); }}
+                        className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1 rounded animate-pulse hover:bg-orange-200"
                     >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
+                        📋 Raport
                     </button>
+                )}
+                {installation.completionReport && (
+                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">✅</span>
+                )}
+                {weather && (
+                    <span className={`ml-auto text-[9px] font-semibold px-1 rounded
+                        ${weather.info.severity === 'bad' ? 'text-red-500 bg-red-50'
+                            : weather.info.severity === 'moderate' ? 'text-amber-500 bg-amber-50'
+                                : 'text-sky-500 bg-sky-50'}`}
+                        title={weather.info.label}
+                    >
+                        {weather.info.icon} {weather.tempMax}°
+                    </span>
                 )}
             </div>
 
-            {/* Contract & Product / Service Description */}
-            <div className="px-3 pb-1.5">
-                {isService || isFollowUp ? (
-                    <>
-                        {installation.notes && (
-                            <div className="text-[11px] text-orange-700 font-medium line-clamp-2 mt-0.5 bg-orange-50 p-1.5 rounded border border-orange-100">
-                                {installation.notes}
-                            </div>
-                        )}
-                        {installation.productSummary && (
-                            <div className="text-[11px] text-slate-600 line-clamp-1 mt-0.5">
-                                📋 {installation.productSummary}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        {installation.contractNumber && (
-                            <div className="text-[11px] text-slate-500 font-mono">
-                                📝 {installation.contractNumber}
-                            </div>
-                        )}
-                        {installation.productSummary && (
-                            <div className="text-[11px] text-slate-700 font-medium line-clamp-1 mt-0.5">
-                                📦 {installation.productSummary}
-                            </div>
-                        )}
-                    </>
+            {/* Client name */}
+            <div className="px-1.5 py-0.5">
+                <div className="font-bold text-[11px] text-slate-900 truncate leading-tight">
+                    {clientName}
+                </div>
+                {installation.client?.city && (
+                    <div className="text-[9px] text-slate-400 truncate leading-tight">
+                        📍 {installation.client.city}
+                    </div>
+                )}
+            </div>
+
+            {/* Contract / product */}
+            <div className="px-1.5 pb-0.5">
+                {installation.contractNumber && (
+                    <div className="text-[9px] text-slate-500 font-mono truncate">
+                        {installation.contractNumber}
+                    </div>
+                )}
+                {installation.productSummary && !isFollowUp && (
+                    <div className="text-[9px] text-slate-500 truncate">
+                        {installation.productSummary}
+                    </div>
+                )}
+                {(isService || isFollowUp) && installation.notes && (
+                    <div className="text-[9px] text-orange-700 truncate">
+                        {installation.notes}
+                    </div>
                 )}
             </div>
 
             {/* Phone */}
             {installation.client?.phone && (
-                <div className="px-3 pb-1">
+                <div className="px-1.5 pb-0.5">
                     <a
                         href={`tel:${installation.client.phone}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline"
+                        className="text-[9px] text-indigo-500 hover:underline"
                     >
                         📞 {installation.client.phone}
                     </a>
                 </div>
             )}
 
-            {/* Footer: Team + Status + Parts */}
-            <div className="px-3 pb-2.5 pt-1 flex items-center justify-between gap-1 flex-wrap border-t border-slate-100">
-                <div className="flex items-center gap-1.5">
-                    <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: team.color }}
-                    />
-                    <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[80px]">
-                        {team.name}
-                    </span>
+            {/* Footer: team + status */}
+            <div className="px-1.5 pb-1 pt-0.5 flex items-center justify-between border-t border-slate-50">
+                <div className="flex items-center gap-1 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
+                    <span className="text-[9px] text-slate-400 truncate">{team.name}</span>
                 </div>
-                <div className="flex items-center gap-1 flex-wrap justify-end">
-                    {!isService && partsBadge && (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${partsBadge.color}`}>
-                            {partsBadge.label}
-                        </span>
-                    )}
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${statusBadge.bg} ${statusBadge.text}`}>
-                        {statusBadge.label}
-                    </span>
-                </div>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusDot(installation.status)}`}
+                    title={installation.status}
+                />
             </div>
         </div>
     );

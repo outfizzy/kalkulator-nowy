@@ -12,6 +12,7 @@ import { TaskModal } from '../tasks/TaskModal';
 import { NotesList } from '../common/NotesList';
 import { AssigneeSelector } from '../common/AssigneeSelector';
 import { CustomerActivityTimeline } from '../common/CustomerActivityTimeline';
+import { EmailHistoryWidget } from '../common/EmailHistoryWidget';
 import { ScheduleMeasurementModal } from './ScheduleMeasurementModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -36,6 +37,7 @@ export const LeadDetailsPage: React.FC = () => {
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [isAssigning, setIsAssigning] = useState(false);
     const [isMeasurementModalOpen, setIsMeasurementModalOpen] = useState(false);
+    const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string; type?: string } | null>(null);
 
     useEffect(() => {
         const fetchLead = async () => {
@@ -541,88 +543,74 @@ export const LeadDetailsPage: React.FC = () => {
                                                 </svg>
                                                 Załączniki ({lead.attachments.length})
                                             </h3>
-                                            <div className="space-y-3">
-                                                {lead.attachments.map((att, idx) => (
-                                                    <a
-                                                        key={idx}
-                                                        href={att.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors"
-                                                    >
-                                                        <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs uppercase shrink-0">
-                                                            {att.name.split('.').pop()}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {lead.attachments.map((att, idx) => {
+                                                    const ext = att.name.split('.').pop()?.toLowerCase() || '';
+                                                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext) || att.type?.startsWith('image/');
+                                                    const isPdf = ext === 'pdf' || att.type === 'application/pdf';
+                                                    const canPreview = isImage || isPdf;
+                                                    const sizeLabel = att.size > 1024 * 1024 ? `${(att.size / 1024 / 1024).toFixed(1)} MB` : `${(att.size / 1024).toFixed(1)} KB`;
+
+                                                    return (
+                                                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-sm transition-all group">
+                                                            {/* Thumbnail / Icon */}
+                                                            {isImage ? (
+                                                                <img
+                                                                    src={att.url}
+                                                                    alt={att.name}
+                                                                    className="w-12 h-12 rounded-lg object-cover border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                                                                    onClick={() => setPreviewAttachment({ url: att.url, name: att.name, type: 'image' })}
+                                                                />
+                                                            ) : (
+                                                                <div className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xs uppercase shrink-0 ${isPdf ? 'bg-red-100 text-red-600 border border-red-200' : 'bg-blue-100 text-blue-600 border border-blue-200'
+                                                                    }`}>
+                                                                    {isPdf ? '📄' : ext}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Info */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-medium text-sm text-slate-900 truncate" title={att.name}>{att.name}</div>
+                                                                <div className="text-[10px] text-slate-400">{sizeLabel} • {ext.toUpperCase()}</div>
+                                                            </div>
+
+                                                            {/* Action Buttons */}
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                {canPreview && (
+                                                                    <button
+                                                                        onClick={() => setPreviewAttachment({ url: att.url, name: att.name, type: isImage ? 'image' : 'pdf' })}
+                                                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                        title="Podgląd"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                )}
+                                                                <a
+                                                                    href={att.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                    title="Pobierz / Otwórz"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                    </svg>
+                                                                </a>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="font-medium text-slate-900 truncate" title={att.name}>{att.name}</div>
-                                                            <div className="text-xs text-slate-500">{(att.size / 1024).toFixed(1)} KB</div>
-                                                        </div>
-                                                        <div className="text-slate-400">
-                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                            </svg>
-                                                        </div>
-                                                    </a>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Email & Communication Widget (Expanded) */}
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                                        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                                            <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                            </svg>
-                                            Historia E-mail i Komunikacja
-                                        </h3>
-                                        <div className="space-y-4">
-                                            {(() => {
-                                                const emails = communications.filter(c => c.type === 'email' || c.userId === 'client');
-                                                if (emails.length === 0) return <div className="text-sm text-slate-400 italic">Brak wiadomości e-mail.</div>;
-
-                                                return emails.slice(0, 5).map((comm) => (
-                                                    <div key={comm.id} className={`flex gap-3 items-start p-3 rounded-lg border ${comm.direction === 'inbound' || comm.userId === 'client' ? 'bg-purple-50 border-purple-100' : 'bg-slate-50 border-slate-100'}`}>
-                                                        <div className="mt-1">
-                                                            {comm.direction === 'inbound' || comm.userId === 'client' ? (
-                                                                <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                                </svg>
-                                                            ) : (
-                                                                <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-center mb-0.5">
-                                                                <div className="text-xs font-bold uppercase tracking-wider opacity-70">
-                                                                    {(comm.direction === 'inbound' || comm.userId === 'client') ? 'Otrzymana' : 'Wysłana'}
-                                                                </div>
-                                                                <div className="text-xs text-slate-500">
-                                                                    {new Date(comm.createdAt).toLocaleDateString()}
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-slate-800 truncate">
-                                                                {comm.subject || '(Bez tematu)'}
-                                                            </div>
-                                                            <div className="text-sm text-slate-600 line-clamp-2">
-                                                                {comm.content}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ));
-                                            })()}
-                                        </div>
-                                        {communications.some(c => c.type === 'email' || c.userId === 'client') && (
-                                            <button
-                                                onClick={() => setActiveTab('communications')}
-                                                className="w-full text-center text-sm text-purple-600 font-medium hover:underline mt-4"
-                                            >
-                                                Pokaż wszystkie wiadomości
-                                            </button>
-                                        )}
-                                    </div>
+                                    {/* Live Email History from Mailbox */}
+                                    {lead.customerData.email && (
+                                        <EmailHistoryWidget customerEmail={lead.customerData.email} maxItems={10} />
+                                    )}
 
                                     {/* Notes Section with new NotesList */}
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
@@ -943,6 +931,60 @@ export const LeadDetailsPage: React.FC = () => {
                     city: lead.customerData.city
                 }}
             />
+
+            {/* Attachment Preview Lightbox */}
+            {previewAttachment && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+                    onClick={() => setPreviewAttachment(null)}
+                >
+                    {/* Header Bar */}
+                    <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 z-10">
+                        <div className="bg-black/50 text-white px-4 py-2 rounded-lg text-sm font-medium truncate max-w-[60%]">
+                            📎 {previewAttachment.name}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <a
+                                href={previewAttachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Pobierz
+                            </a>
+                            <button
+                                onClick={() => setPreviewAttachment(null)}
+                                className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                        {previewAttachment.type === 'image' ? (
+                            <img
+                                src={previewAttachment.url}
+                                alt={previewAttachment.name}
+                                className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain"
+                            />
+                        ) : previewAttachment.type === 'pdf' ? (
+                            <iframe
+                                src={previewAttachment.url}
+                                title={previewAttachment.name}
+                                className="w-[85vw] h-[85vh] rounded-xl shadow-2xl bg-white"
+                            />
+                        ) : null}
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../lib/supabase';
 import { ServiceService } from '../../services/database/service.service';
 import { InstallationService } from '../../services/database/installation.service';
 import type { ServiceTicket, InstallationTeam, ServiceTicketTask, ServiceTicketHistory, ServiceTicketStatus, ServiceTicketPriority, ServiceTicketType } from '../../types';
@@ -53,6 +54,11 @@ export const ServiceTicketDetailsPage = () => {
     // Resolution photo upload
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const photoInputRef = useRef<HTMLInputElement>(null);
+
+    // Email send modal
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [emailTo, setEmailTo] = useState('');
+    const [sendingEmail, setSendingEmail] = useState(false);
 
     const loadData = useCallback(async (ticketId: string) => {
         setLoading(true);
@@ -212,6 +218,115 @@ export const ServiceTicketDetailsPage = () => {
         }
     };
 
+    // ======= EMAIL SEND HANDLER =======
+    const handleOpenEmailModal = () => {
+        setEmailTo(ticket?.client?.email || '');
+        setIsEmailModalOpen(true);
+    };
+
+    const handleSendFormEmail = async () => {
+        if (!ticket || !emailTo.trim()) return;
+        setSendingEmail(true);
+        try {
+            const formUrl = `${window.location.origin}/service-form/${ticket.id}`;
+            const clientName = ticket.client ? `${ticket.client.firstName || ''} ${ticket.client.lastName || ''}`.trim() : 'Kunde';
+            const ticketNr = ticket.ticketNumber;
+
+            const htmlTemplate = `
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:24px;">
+    <!-- Header -->
+    <div style="background:#1a1a1a;border-radius:16px 16px 0 0;padding:28px 32px;text-align:center;">
+      <img src="https://polendach24.de/wp-content/uploads/2025/06/logo-1024x197.png" alt="PolenDach24" width="220" style="display:inline-block;border:0;max-width:220px;height:auto;" />
+      <p style="color:rgba(255,255,255,0.6);margin:10px 0 0;font-size:12px;letter-spacing:2px;text-transform:uppercase;">Kundenservice</p>
+    </div>
+
+    <!-- Body -->
+    <div style="background:white;padding:32px;border-radius:0 0 16px 16px;border:1px solid #e2e8f0;border-top:none;">
+      <p style="font-size:16px;color:#1e293b;margin:0 0 8px;">Sehr geehrte/r <strong>${clientName}</strong>,</p>
+      <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 20px;">
+        vielen Dank für Ihre Kontaktaufnahme. Für Ihre Service-Anfrage
+        <strong style="color:#1e40af;">${ticketNr}</strong>
+        haben wir ein Formular vorbereitet, das Sie bitte ausfüllen möchten.
+      </p>
+
+      <!-- Info Box -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:20px;margin:0 0 24px;">
+        <p style="font-size:13px;color:#1e40af;font-weight:700;margin:0 0 8px;">Bitte helfen Sie uns mit folgenden Informationen:</p>
+        <ul style="margin:0;padding:0 0 0 20px;font-size:13px;color:#3b82f6;line-height:2;">
+          <li>Genaue Beschreibung des Problems</li>
+          <li>Art und Ort der St\u00f6rung</li>
+          <li>Ihre aktuellen Kontaktdaten</li>
+          <li><strong>So viele Fotos wie m\u00f6glich</strong> \u2014 verschiedene Blickwinkel helfen uns enorm!</li>
+          <li>Gew\u00fcnschter Termin f\u00fcr den Service</li>
+        </ul>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:0 0 24px;">
+        <a href="${formUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#2563eb,#4f46e5);color:white;text-decoration:none;padding:16px 40px;border-radius:12px;font-weight:700;font-size:15px;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(37,99,235,0.4);">
+          Service-Formular \u00f6ffnen
+        </a>
+      </div>
+
+      <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 24px;">
+        Falls der Button nicht funktioniert, kopieren Sie diesen Link:<br/>
+        <a href="${formUrl}" style="color:#3b82f6;word-break:break-all;">${formUrl}</a>
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;"/>
+
+      <p style="font-size:14px;color:#475569;line-height:1.6;">
+        Sollten Sie Fragen haben, können Sie sich jederzeit telefonisch oder per E-Mail an uns wenden.
+      </p>
+      <p style="font-size:14px;color:#1e293b;margin:16px 0 4px;">
+        Mit freundlichen Grüßen,<br/>
+        <strong>Ihr Polendach24 Service-Team</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center;padding:20px;">
+      <p style="font-size:11px;color:#94a3b8;margin:0;">
+        &copy; ${new Date().getFullYear()} Polendach24 GmbH &middot; Terrassenüberdachungen &amp; mehr
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: {
+                    to: emailTo.trim(),
+                    subject: `Service-Formular — Ticket ${ticketNr} | Polendach24`,
+                    html: htmlTemplate
+                }
+            });
+
+            if (error) throw error;
+            if (data && !data.success) throw new Error(data.error || 'Email send failed');
+
+            toast.success(`E-Mail gesendet an ${emailTo}`);
+            setIsEmailModalOpen(false);
+
+            // Log in history
+            await ServiceService.updateTicketWithHistory(
+                ticket.id,
+                {},
+                `Service-Formular per E-Mail gesendet an: ${emailTo}`
+            );
+            ServiceService.getTicketHistory(ticket.id).then(setHistory).catch(console.error);
+        } catch (err: any) {
+            console.error('Email send error:', err);
+            toast.error(`Błąd wysyłki: ${err.message || 'Nieznany błąd'}`);
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
     // ======= HELPERS =======
     const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
     const getPriorityOption = (priority: string) => PRIORITY_OPTIONS.find(p => p.value === priority) || PRIORITY_OPTIONS[1];
@@ -242,7 +357,14 @@ export const ServiceTicketDetailsPage = () => {
                         </span>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                    <button
+                        onClick={handleOpenEmailModal}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-sm shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        Wyślij formularz mailem
+                    </button>
                     <button
                         onClick={() => {
                             const url = `${window.location.origin}/service-form/${ticket.id}`;
@@ -251,13 +373,15 @@ export const ServiceTicketDetailsPage = () => {
                         }}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-blue-700 font-medium text-sm"
                     >
-                        🔗 Link dla klienta
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                        Kopiuj link
                     </button>
                     <button
                         onClick={() => generateServiceProtocol(ticket)}
                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm"
                     >
-                        📄 Pobierz Protokół
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Pobierz Protokół
                     </button>
                 </div>
             </div>
@@ -660,6 +784,87 @@ export const ServiceTicketDetailsPage = () => {
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
                             >
                                 Zapisz
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* === EMAIL SEND MODAL === */}
+            {isEmailModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+                        <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                Wyślij formularz serwisowy
+                            </h3>
+                            <p className="text-green-100 text-sm mt-1">Link do formularza zostanie wysłany na podany e-mail</p>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail klienta *</label>
+                                <input
+                                    type="email"
+                                    value={emailTo}
+                                    onChange={(e) => setEmailTo(e.target.value)}
+                                    placeholder="client@example.de"
+                                    className="w-full border border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 text-sm px-3 py-2"
+                                />
+                                {ticket.client?.email && emailTo !== ticket.client.email && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEmailTo(ticket.client?.email || '')}
+                                        className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+                                    >
+                                        Użyj e-mail klienta: {ticket.client.email}
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Email Preview */}
+                            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Podgląd wiadomości (DE)</div>
+                                <div className="text-sm text-gray-700 space-y-2">
+                                    <p><strong>Temat:</strong> Service-Formular — Ticket {ticket.ticketNumber} | Polendach24</p>
+                                    <hr className="border-gray-200" />
+                                    <p>
+                                        Sehr geehrte/r <strong>{ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'Kunde'}</strong>,
+                                    </p>
+                                    <p className="text-gray-600">
+                                        vielen Dank für Ihre Kontaktaufnahme. Wir bitten Sie, das Service-Formular mit einer Problembeschreibung und Fotos auszufüllen.
+                                    </p>
+                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800">
+                                        <p className="font-semibold mb-1">Wir bitten um:</p>
+                                        <ul className="list-disc list-inside space-y-1 text-blue-600">
+                                            <li>Problembeschreibung</li>
+                                            <li>So viele Fotos wie möglich</li>
+                                            <li>Kontaktdaten & Wunschtermin</li>
+                                        </ul>
+                                    </div>
+                                    <p className="text-gray-500 italic text-xs">Mit freundlichen Grüßen, Ihr Polendach24 Service-Team</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsEmailModalOpen(false)}
+                                className="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm font-medium"
+                            >
+                                Anuluj
+                            </button>
+                            <button
+                                onClick={handleSendFormEmail}
+                                disabled={!emailTo.trim() || sendingEmail}
+                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium text-sm flex items-center gap-2"
+                            >
+                                {sendingEmail ? (
+                                    <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Wysyłanie...</>
+                                ) : (
+                                    <>Wyślij e-mail</>
+                                )}
                             </button>
                         </div>
                     </div>

@@ -138,12 +138,14 @@ export const OfferService = {
 
         // [AUTOMATION] Calculate Commission for Sales Reps
         let calculatedCommission = offer.commission;
-        if (profile?.commission_rate && profile.commission_rate > 0) {
-            // Commission = Net Price * Rate (e.g. 0.05)
-            // Ensure sellingPriceNet exists and is correct relative to totalCost
-            const netPrice = offer.pricing.sellingPriceNet || (offer.pricing.totalCost / 1.23); // Fallback to 23% VAT reverse if net missing
-            calculatedCommission = Math.round(netPrice * profile.commission_rate * 100) / 100;
-            console.log(`[Commission] Auto-calculated: ${calculatedCommission} (${profile.commission_rate * 100}% of ${netPrice})`);
+        if (profile?.commission_rate) {
+            const rate = Number(profile.commission_rate);
+            if (rate > 0) {
+                // Commission = Net Price * Rate (e.g. 0.05)
+                const netPrice = offer.pricing.sellingPriceNet || (offer.pricing.totalCost / 1.23);
+                calculatedCommission = Math.round(netPrice * rate * 100) / 100;
+                console.log(`[Commission] Auto-calculated: ${calculatedCommission} (${rate * 100}% of ${netPrice})`);
+            }
         }
 
         // Ensure customer exists in customers table
@@ -296,9 +298,12 @@ export const OfferService = {
                     }
 
                     // [AUTOMATION] Recalculate Commission on Pricing Change
-                    if (profile.commission_rate && profile.commission_rate > 0) {
-                        const netPrice = updates.pricing.sellingPriceNet || (updates.pricing.totalCost / 1.23);
-                        updates.commission = Math.round(netPrice * profile.commission_rate * 100) / 100;
+                    if (profile.commission_rate) {
+                        const rate = Number(profile.commission_rate);
+                        if (rate > 0) {
+                            const netPrice = updates.pricing.sellingPriceNet || (updates.pricing.totalCost / 1.23);
+                            updates.commission = Math.round(netPrice * rate * 100) / 100;
+                        }
                     }
                 }
             }

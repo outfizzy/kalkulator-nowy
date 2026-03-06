@@ -415,6 +415,8 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
         const updateData: any = {
             lostReason: reason,
+            lostBy: currentUser?.id || null,
+            lostAt: new Date(),
             notes: notes ? (leads.find(l => l.id === pendingLostLeadId)?.notes + '\n\n[Utrata]: ' + notes) : undefined
         };
 

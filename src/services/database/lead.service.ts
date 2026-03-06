@@ -85,8 +85,7 @@ export const LeadService = {
                 source: lead.source,
                 customer_data: lead.customerData,
                 customer_id: customerId,
-                // [Fix 2026-01-12] New leads should be unassigned by default. 
-                // Only assign if explicit or status is NOT 'new'.
+                // Leads with status 'new' have no owner until manually assigned
                 assigned_to: lead.assignedTo || (lead.status === 'new' ? null : user.id),
                 email_message_id: lead.emailMessageId,
                 notes: lead.notes,
@@ -127,6 +126,26 @@ export const LeadService = {
         if (updates.aiScore !== undefined) dbUpdates.ai_score = updates.aiScore;
         if (updates.aiSummary !== undefined) dbUpdates.ai_summary = updates.aiSummary;
         if (updates.lostReason !== undefined) dbUpdates.lost_reason = updates.lostReason;
+        if (updates.lostBy !== undefined) dbUpdates.lost_by = updates.lostBy;
+        if (updates.lostAt !== undefined) dbUpdates.lost_at = updates.lostAt instanceof Date ? updates.lostAt.toISOString() : updates.lostAt;
+
+        // --- Auto-Assignment: When moving out of 'new' with no owner, assign current user ---
+        if (updates.status && updates.status !== 'new' && updates.assignedTo === undefined) {
+            // Check if lead currently has no owner
+            const { data: currentLead } = await supabase
+                .from('leads')
+                .select('assigned_to, status')
+                .eq('id', id)
+                .single();
+
+            if (currentLead && !currentLead.assigned_to) {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    dbUpdates.assigned_to = user.id;
+                    console.log(`[LeadService] Lead ${id}: Auto-assigned to ${user.id} (status ${currentLead.status} → ${updates.status})`);
+                }
+            }
+        }
 
         // --- Assignment Protection Logic ---
         if (updates.assignedTo !== undefined) {
@@ -268,26 +287,32 @@ export const LeadService = {
             throw error;
         }
 
-        // Manually fetch assignees
-        const assigneeIds = Array.from(new Set((data || []).map(l => l.assigned_to).filter(Boolean)));
-        const assigneeMap = new Map<string, { first_name?: string; last_name?: string }>();
+        // Manually fetch assignees and lost_by profiles
+        const allUserIds = new Set<string>();
+        (data || []).forEach(l => {
+            if (l.assigned_to) allUserIds.add(l.assigned_to);
+            if (l.lost_by) allUserIds.add(l.lost_by);
+        });
+        const assigneeMap = new Map<string, { first_name?: string; last_name?: string; full_name?: string }>();
 
-        if (assigneeIds.length > 0) {
+        if (allUserIds.size > 0) {
             const { data: profiles } = await supabase
                 .from('profiles')
                 .select('id, full_name')
-                .in('id', assigneeIds);
+                .in('id', Array.from(allUserIds));
 
             if (profiles) {
                 profiles.forEach(p => assigneeMap.set(p.id, {
                     first_name: (p.full_name || '').split(' ')[0],
-                    last_name: (p.full_name || '').split(' ').slice(1).join(' ')
+                    last_name: (p.full_name || '').split(' ').slice(1).join(' '),
+                    full_name: p.full_name || ''
                 }));
             }
         }
 
         return (data || []).map((lead) => {
             const assigneeProfile = lead.assigned_to ? assigneeMap.get(lead.assigned_to) : null;
+            const lostByProfile = lead.lost_by ? assigneeMap.get(lead.lost_by) : null;
             return {
                 ...lead,
                 id: lead.id,
@@ -301,6 +326,9 @@ export const LeadService = {
                 clientWillContactAt: lead.client_will_contact_at ? new Date(lead.client_will_contact_at) : undefined,
                 customerData: lead.customer_data,
                 lostReason: lead.lost_reason,
+                lostBy: lead.lost_by || undefined,
+                lostByName: lostByProfile?.full_name || undefined,
+                lostAt: lead.lost_at ? new Date(lead.lost_at) : undefined,
                 salesRep: undefined,
                 assignee: assigneeProfile ? {
                     firstName: assigneeProfile.first_name || '',
