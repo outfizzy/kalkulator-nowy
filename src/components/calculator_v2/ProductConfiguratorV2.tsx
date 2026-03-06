@@ -341,8 +341,8 @@ export const ProductConfiguratorV2: React.FC = () => {
         fixedAngle?: number; postWidth: number;
         label: string; hint: string;
     }> = {
-        'Orangeline': { defaultH3: 2200, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, fixedAngle: 8, postWidth: 110, label: 'Orangestyle', hint: 'Fester Neigungswinkel 8°, nur H3 + Tiefe' },
-        'Orangeline+': { defaultH3: 2200, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, fixedAngle: 8, postWidth: 110, label: 'Orangestyle+', hint: 'Fester Neigungswinkel 8°, nur H3 + Tiefe' },
+        'Orangeline': { defaultH3: 2200, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, fixedAngle: 8, postWidth: 110, label: 'Orangestyle', hint: '8% Gefälle (fest), nur H3 + Tiefe' },
+        'Orangeline+': { defaultH3: 2200, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, fixedAngle: 8, postWidth: 110, label: 'Orangestyle+', hint: '8% Gefälle (fest), nur H3 + Tiefe' },
         'Trendline': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 110, label: 'Trendstyle', hint: 'Profilhöhe 47.5mm, Neigung berechnet aus H3/H1/Tiefe' },
         'Trendline+': { defaultH3: 2200, defaultH1: 2700, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 110, label: 'Trendstyle+', hint: 'Profilhöhe 57.5mm, verstärkt, Neigung berechnet' },
         'Topline': { defaultH3: 2200, defaultH1: 2796, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 149, label: 'Topstyle', hint: 'Profilhöhe 93.2mm, massive Konstruktion' },
@@ -361,6 +361,8 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     // === WALL CONFIG ===
     const [wallProduct, setWallProduct] = useState<string>('Side Wall (Glass)');
+    const [wallPlacement, setWallPlacement] = useState<'left' | 'right' | 'front'>('left');
+    const [keilfensterSide, setKeilfensterSide] = useState<'left' | 'right'>('left');
     const [wallWidth, setWallWidth] = useState<number>(2000);
     const [wallHeight, setWallHeight] = useState<number>(2200);
     const [wallTab, setWallTab] = useState<'walls' | 'awnings' | 'led' | 'materials' | 'wpc' | 'aluminum'>('walls');
@@ -503,11 +505,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                 h1: modelDrConfig.needsH1 ? dachH1 : undefined,
                 width: width,
                 overhang: modelDrConfig.needsOverhang ? dachOverhang : undefined,
+                postCount: structuralMetadata?.posts_count || 2,
             });
         } catch {
             return null;
         }
-    }, [model, projection, width, dachH3, dachH1, dachOverhang, modelDrConfig]);
+    }, [model, projection, width, dachH3, dachH1, dachOverhang, modelDrConfig, structuralMetadata]);
 
     // Auto-fill wall dimensions from Dachrechner when product changes
     useEffect(() => {
@@ -518,42 +521,32 @@ export const ProductConfiguratorV2: React.FC = () => {
         const isFront = wallProduct.includes('Front');
         const isSchiebetur = wallProduct.includes('Schiebetür');
         const isPanorama = wallProduct.includes('Panorama');
+        const isFrontPlacement = wallPlacement === 'front';
+
+        // Width calculation: front → full width, side → innerWidth between posts
+        const sideWidth = dachrechnerResults.innerWidth ? Math.round(dachrechnerResults.innerWidth) : (dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null);
+        const frontWidth = width; // full roof width for front
+        const postHeight = dachH3; // H3 = post height for all wall products
 
         if (isWedge) {
-            // Keilfenster Breite D1 = fensterF2 (depth between posts)
+            // Keilfenster: width = fensterF2, height auto from K1/K2
             if (dachrechnerResults.fensterF2) {
                 setWallWidth(Math.round(dachrechnerResults.fensterF2));
             }
-        } else if (isSide) {
-            // Side wall: width = depth between posts, height = post height (h3)
-            if (dachrechnerResults.fensterF2) {
-                setWallWidth(Math.round(dachrechnerResults.fensterF2));
+            // Height = K1 (gutter side) for display – actual K1/K2 shown in summary
+            if (dachrechnerResults.keilhoeheK1) {
+                setWallHeight(Math.round(dachrechnerResults.keilhoeheK1));
             }
-            if (dachrechnerResults.h3) {
-                setWallHeight(Math.round(dachrechnerResults.h3));
-            }
-        } else if (isFront) {
-            // Front wall: width = roof width, height = post height
-            setWallWidth(width);
-            if (dachrechnerResults.h3) {
-                setWallHeight(Math.round(dachrechnerResults.h3));
-            }
-        } else if (isSchiebetur) {
-            // Schiebetür: width = depth between posts (side), height = h3
-            if (dachrechnerResults.fensterF2) {
-                setWallWidth(Math.round(dachrechnerResults.fensterF2));
-            }
-            if (dachrechnerResults.h3) {
-                setWallHeight(Math.round(dachrechnerResults.h3));
-            }
-        } else if (isPanorama) {
-            // Panorama: width = roof width (front), height = h3
-            setWallWidth(width);
-            if (dachrechnerResults.h3) {
-                setWallHeight(Math.round(dachrechnerResults.h3));
-            }
+        } else if (isSide || (isSchiebetur && !isFrontPlacement)) {
+            // Side wall / side Schiebetür: width = innerWidth, height = H3
+            if (sideWidth) setWallWidth(sideWidth);
+            setWallHeight(postHeight);
+        } else if (isFront || (isSchiebetur && isFrontPlacement) || isPanorama) {
+            // Front wall / front Schiebetür / Panorama: width = full roof width, height = H3
+            setWallWidth(isFrontPlacement || isFront || isPanorama ? frontWidth : (sideWidth || frontWidth));
+            setWallHeight(postHeight);
         }
-    }, [wallProduct, dachrechnerResults, wallDimsAuto]);
+    }, [wallProduct, wallPlacement, dachrechnerResults, wallDimsAuto, width, dachH3]);
 
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -2940,6 +2933,43 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             {/* LEFT COLUMN - CONTROLS */}
                                             <div className="lg:col-span-2 space-y-6">
 
+                                                {/* 0. Wall Placement Selector */}
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                                                    <h5 className="text-sm font-bold text-slate-700 mb-3">📍 Umiejscowienie ściany</h5>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {([
+                                                            { id: 'left' as const, label: 'Lewa', icon: '◀', desc: 'Ściana boczna lewa' },
+                                                            { id: 'right' as const, label: 'Prawa', icon: '▶', desc: 'Ściana boczna prawa' },
+                                                            { id: 'front' as const, label: 'Front', icon: '⬛', desc: 'Ściana frontowa' },
+                                                        ]).map(p => (
+                                                            <button
+                                                                key={p.id}
+                                                                onClick={() => setWallPlacement(p.id)}
+                                                                className={`p-3 rounded-xl border-2 text-center transition-all ${wallPlacement === p.id
+                                                                    ? 'border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-200'
+                                                                    : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'}`}
+                                                            >
+                                                                <div className="text-2xl mb-1">{p.icon}</div>
+                                                                <div className="font-bold text-sm text-slate-800">{p.label}</div>
+                                                                <div className="text-[10px] text-slate-400 mt-0.5">{p.desc}</div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {/* Dimension badge */}
+                                                    {dachrechnerResults && (
+                                                        <div className="mt-3 flex items-center gap-2 text-xs bg-blue-50 rounded-lg p-2 border border-blue-200">
+                                                            <span className="text-blue-600 font-bold">📐</span>
+                                                            <span className="text-blue-800">
+                                                                {wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Lewa strona' : 'Prawa strona'}:
+                                                                {' '}<strong>{wallWidth} × {wallHeight} mm</strong>
+                                                                {wallPlacement !== 'front' && dachrechnerResults.innerWidth && (
+                                                                    <span className="text-blue-500 ml-1">(innerWidth: {Math.round(dachrechnerResults.innerWidth)} mm)</span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
                                                 {/* 1. Category Selector */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                                     <div className="flex border-b border-slate-100">
@@ -2992,6 +3022,45 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 {/* WEDGE GLASS OPTIONS */}
                                                                 {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
                                                                     <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
+                                                                        {/* Keilfenster Side Selector */}
+                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">📐 Strona Keilfenster</h4>
+                                                                        <div className="grid grid-cols-2 gap-2 mb-4">
+                                                                            {([
+                                                                                { id: 'left' as const, label: 'Lewy', icon: '◀', desc: 'Keilfenster po lewej' },
+                                                                                { id: 'right' as const, label: 'Prawy', icon: '▶', desc: 'Keilfenster po prawej' },
+                                                                            ]).map(s => (
+                                                                                <button
+                                                                                    key={s.id}
+                                                                                    onClick={() => setKeilfensterSide(s.id)}
+                                                                                    className={`p-3 rounded-lg border-2 text-center transition-all ${keilfensterSide === s.id
+                                                                                        ? 'border-orange-500 bg-white shadow-sm ring-1 ring-orange-300'
+                                                                                        : 'border-orange-100 bg-white/50 hover:border-orange-300'}`}
+                                                                                >
+                                                                                    <div className="text-xl mb-0.5">{s.icon}</div>
+                                                                                    <div className="font-bold text-xs text-slate-800">{s.label}</div>
+                                                                                    <div className="text-[9px] text-slate-400">{s.desc}</div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+
+                                                                        {/* K1/K2 Dimension Preview */}
+                                                                        {dachrechnerResults && (dachrechnerResults.keilhoeheK1 || dachrechnerResults.keilhoeheK2) && (
+                                                                            <div className="grid grid-cols-3 gap-2 mb-4 text-xs">
+                                                                                <div className="bg-white rounded-lg p-2 text-center border border-orange-200">
+                                                                                    <span className="block text-orange-500 uppercase text-[9px] font-bold">K1 (Rinne)</span>
+                                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.keilhoeheK1 ? Math.round(dachrechnerResults.keilhoeheK1) : '–'} mm</span>
+                                                                                </div>
+                                                                                <div className="bg-white rounded-lg p-2 text-center border border-orange-200">
+                                                                                    <span className="block text-orange-500 uppercase text-[9px] font-bold">K2 (Wand)</span>
+                                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.keilhoeheK2 ? Math.round(dachrechnerResults.keilhoeheK2) : '–'} mm</span>
+                                                                                </div>
+                                                                                <div className="bg-white rounded-lg p-2 text-center border border-orange-200">
+                                                                                    <span className="block text-orange-500 uppercase text-[9px] font-bold">Breite (F2)</span>
+                                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : '–'} mm</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
                                                                         <h4 className="text-sm font-bold text-orange-800 mb-3">Rodzaj Szkła (Keilfenster)</h4>
                                                                         <div className="grid grid-cols-3 gap-2">
                                                                             {[
