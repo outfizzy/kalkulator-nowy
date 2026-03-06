@@ -2470,9 +2470,103 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* H3 / H1 Construction Heights */}
+                                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                        <label className="flex justify-between mb-2">
+                                            <span className="font-bold text-slate-700">H3 – Pfostenhöhe (mm)</span>
+                                            <span className="text-indigo-600 font-black text-xl">{dachH3} mm</span>
+                                        </label>
+                                        <p className="text-xs text-slate-400 mb-3">Unterkante Rinne – Höhe der Pfosten</p>
+                                        <input
+                                            type="number"
+                                            value={dachH3}
+                                            onChange={e => setDachH3(Number(e.target.value))}
+                                            className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                        />
+                                        <div className="flex gap-2 mt-2">
+                                            {[2000, 2200, 2400, 2600].map(h => (
+                                                <button key={h} onClick={() => setDachH3(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachH3 === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                        <label className="flex justify-between mb-2">
+                                            <span className="font-bold text-slate-700">H1 – Wandanschluss (mm)</span>
+                                            <span className="text-indigo-600 font-black text-xl">{dachH1} mm</span>
+                                        </label>
+                                        <p className="text-xs text-slate-400 mb-3">Oberkante Wandprofil – Montagehöhe an der Hauswand</p>
+                                        <input
+                                            type="number"
+                                            value={dachH1}
+                                            onChange={e => setDachH1(Number(e.target.value))}
+                                            className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                        />
+                                        <div className="flex gap-2 mt-2">
+                                            {[2500, 2700, 2796, 3000].map(h => (
+                                                <button key={h} onClick={() => setDachH1(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachH1 === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="border-t border-slate-100 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Dachrechner Results Preview */}
+                                {dachrechnerResults && (
+                                    <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
+                                        <h5 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">📐 Dachrechner – Berechnete Werte</h5>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                            {dachrechnerResults.angleAlpha != null && (
+                                                <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">α Neigung</span>
+                                                    <span className="font-bold text-blue-900 text-sm">{dachrechnerResults.angleAlpha.toFixed(1)}°</span>
+                                                </div>
+                                            )}
+                                            {dachrechnerResults.inclinationMmM != null && (
+                                                <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">Gefälle</span>
+                                                    <span className="font-bold text-blue-900 text-sm">{dachrechnerResults.inclinationMmM.toFixed(0)} mm/m</span>
+                                                </div>
+                                            )}
+                                            {dachrechnerResults.heightH2 != null && (
+                                                <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">H2 Oberkante</span>
+                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.heightH2)} mm</span>
+                                                </div>
+                                            )}
+                                            {dachrechnerResults.fensterF2 != null && (
+                                                <div className="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-200">
+                                                    <span className="block text-emerald-600 uppercase text-[9px] font-bold">Fensterbreite</span>
+                                                    <span className="font-bold text-emerald-900">{Math.round(dachrechnerResults.fensterF2)} mm</span>
+                                                </div>
+                                            )}
+                                            {dachrechnerResults.depthD2 != null && (
+                                                <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">D2 + Rinne</span>
+                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.depthD2)} mm</span>
+                                                </div>
+                                            )}
+                                            {dachrechnerResults.sparrenMitte != null && (
+                                                <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">Sparren Mitte</span>
+                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.sparrenMitte)} mm</span>
+                                                </div>
+                                            )}
+                                            {dachrechnerResults.sparrenAussen != null && (
+                                                <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">Sparren Außen</span>
+                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.sparrenAussen)} mm</span>
+                                                </div>
+                                            )}
+                                            <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                <span className="block text-blue-500 uppercase text-[9px] font-bold">Pfostenbreite</span>
+                                                <span className="font-bold text-blue-900">{({ 'Orangeline': 110, 'Orangeline+': 110, 'Trendline': 110, 'Trendline+': 110, 'Topline': 149, 'Topline XL': 196, 'Designline': 196, 'Ultraline': 196, 'Skyline': 160, 'Carport': 160 } as Record<string, number>)[model] || '–'} mm</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Construction Type */}
                                     <div>
                                         <label className="block text-sm font-bold text-slate-600 mb-3">Typ Montażu</label>
@@ -3126,182 +3220,63 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Structural Heights (Dachrechner) Card */}
-                                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-200 p-4">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">
-                                                            📐 Dachrechner – Technische Daten
-                                                        </h5>
-                                                        <button
-                                                            onClick={() => setWallDimsAuto(!wallDimsAuto)}
-                                                            className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${wallDimsAuto
-                                                                ? 'bg-green-500 text-white'
-                                                                : 'bg-slate-200 text-slate-600'}`}
-                                                        >
-                                                            {wallDimsAuto ? '⚡ Auto' : '✏️ Manuell'}
-                                                        </button>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">H3 – Unterkante Rinne (mm)</label>
-                                                            <input
-                                                                type="number"
-                                                                value={dachH3}
-                                                                onChange={e => setDachH3(Number(e.target.value))}
-                                                                className="w-full p-2 rounded-lg border border-blue-200 font-bold text-slate-800 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                            />
+                                                {/* Compact Dachrechner Summary + Auto/Manual toggle */}
+                                                {dachrechnerResults && (
+                                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-200 p-3">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <h5 className="text-xs font-bold text-blue-800">📐 Maße aus Dachrechner</h5>
+                                                            <button
+                                                                onClick={() => setWallDimsAuto(!wallDimsAuto)}
+                                                                className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${wallDimsAuto
+                                                                    ? 'bg-green-500 text-white'
+                                                                    : 'bg-slate-200 text-slate-600'}`}
+                                                            >
+                                                                {wallDimsAuto ? '⚡ Auto' : '✏️ Manuell'}
+                                                            </button>
                                                         </div>
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">H1 – Wandhöhe (mm)</label>
-                                                            <input
-                                                                type="number"
-                                                                value={dachH1}
-                                                                onChange={e => setDachH1(Number(e.target.value))}
-                                                                className="w-full p-2 rounded-lg border border-blue-200 font-bold text-slate-800 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                            />
+                                                        <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+                                                            <div className="bg-white/60 rounded p-1.5 text-center">
+                                                                <span className="block text-blue-400 uppercase text-[8px]">H3</span>
+                                                                <span className="font-bold text-blue-900">{dachH3}</span>
+                                                            </div>
+                                                            <div className="bg-white/60 rounded p-1.5 text-center">
+                                                                <span className="block text-blue-400 uppercase text-[8px]">H1</span>
+                                                                <span className="font-bold text-blue-900">{dachH1}</span>
+                                                            </div>
+                                                            {dachrechnerResults.fensterF2 != null && (
+                                                                <div className="bg-emerald-50 rounded p-1.5 text-center border border-emerald-200">
+                                                                    <span className="block text-emerald-500 uppercase text-[8px]">Breite</span>
+                                                                    <span className="font-bold text-emerald-900">{Math.round(dachrechnerResults.fensterF2)}</span>
+                                                                </div>
+                                                            )}
+                                                            {dachrechnerResults.angleAlpha != null && (
+                                                                <div className="bg-white/60 rounded p-1.5 text-center">
+                                                                    <span className="block text-blue-400 uppercase text-[8px]">α</span>
+                                                                    <span className="font-bold text-blue-900">{dachrechnerResults.angleAlpha.toFixed(1)}°</span>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    </div>
-                                                    {dachrechnerResults && (() => {
-                                                        const r = dachrechnerResults;
-                                                        const drModelId = getDachrechnerModelId(model);
-                                                        const postW = drModelId ? (calculateDachrechner as any).__models?.[drModelId]?.postWidth : null;
-                                                        // Get post width from ROOF_MODELS mapping
-                                                        const postWidthMap: Record<string, number> = {
-                                                            'Orangeline': 110, 'Orangeline+': 110,
-                                                            'Trendline': 110, 'Trendline+': 110,
-                                                            'Topline': 149, 'Topline XL': 196,
-                                                            'Designline': 196, 'Ultraline': 196,
-                                                            'Skyline': 160, 'Carport': 160,
-                                                        };
-                                                        const modelPostWidth = postWidthMap[model] || null;
-                                                        const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
-
-                                                        return (
-                                                            <div className="mt-3 pt-3 border-t border-blue-200 space-y-3">
-                                                                {/* Row 1: Angles & Inclination */}
-                                                                <div className="grid grid-cols-3 gap-2 text-xs">
-                                                                    {r.angleAlpha != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">α Neigung</span>
-                                                                            <span className="font-bold text-blue-900 text-sm">{r.angleAlpha.toFixed(1)}°</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.inclinationMmM != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">Gefälle</span>
-                                                                            <span className="font-bold text-blue-900 text-sm">{r.inclinationMmM.toFixed(0)} mm/m</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.angleBeta != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">β Glaswinkel</span>
-                                                                            <span className="font-bold text-blue-900 text-sm">{r.angleBeta.toFixed(1)}°</span>
-                                                                        </div>
-                                                                    )}
+                                                        {/* Keilfenster K1/K2 */}
+                                                        {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (dachrechnerResults.keilhoeheK1 != null || dachrechnerResults.keilhoeheK2 != null) && (
+                                                            <div className="mt-2 pt-2 border-t border-blue-200 grid grid-cols-3 gap-1.5 text-[10px]">
+                                                                <div className="bg-orange-50 rounded p-1.5 text-center border border-orange-200">
+                                                                    <span className="block text-orange-500 text-[8px]">K1</span>
+                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.keilhoeheK1 != null ? Math.round(dachrechnerResults.keilhoeheK1) : '–'}</span>
                                                                 </div>
-
-                                                                {/* Row 2: Heights */}
-                                                                <div className="grid grid-cols-3 gap-2 text-xs">
-                                                                    {r.heightH2 != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">H2 Oberkante</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.heightH2)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.fensterF1 != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">F1 Höhe Rinne</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.fensterF1)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.fensterF3 != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">F3 Höhe Wand</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.fensterF3)} mm</span>
-                                                                        </div>
-                                                                    )}
+                                                                <div className="bg-orange-50 rounded p-1.5 text-center border border-orange-200">
+                                                                    <span className="block text-orange-500 text-[8px]">K2</span>
+                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.keilhoeheK2 != null ? Math.round(dachrechnerResults.keilhoeheK2) : '–'}</span>
                                                                 </div>
-
-                                                                {/* Row 3: Depths */}
-                                                                <div className="grid grid-cols-4 gap-2 text-xs">
-                                                                    {r.fensterF2 != null && (
-                                                                        <div className="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-200">
-                                                                            <span className="block text-emerald-600 uppercase text-[9px] font-bold">Fensterbreite</span>
-                                                                            <span className="font-bold text-emerald-900">{Math.round(r.fensterF2)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.depthD2 != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">D2 + Rinne</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.depthD2)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.depthD4post != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">D4 Pfosten</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.depthD4post)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.depthD5 != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">D5 Freistand</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.depthD5)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-
-                                                                {/* Row 4: Rafter lengths & Post width */}
-                                                                <div className="grid grid-cols-3 gap-2 text-xs">
-                                                                    {r.sparrenMitte != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">S1 Sparren Mitte</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.sparrenMitte)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {r.sparrenAussen != null && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">S1a Sparren Außen</span>
-                                                                            <span className="font-bold text-blue-900">{Math.round(r.sparrenAussen)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {modelPostWidth && (
-                                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">Pfostenbreite</span>
-                                                                            <span className="font-bold text-blue-900">{modelPostWidth} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-
-                                                                {/* Keilfenster-specific: K1/K2 wedge heights */}
-                                                                {isWedge && (r.keilhoeheK1 != null || r.keilhoeheK2 != null) && (
-                                                                    <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
-                                                                        <span className="block text-orange-700 uppercase text-[9px] font-bold mb-2">📐 Keilfenster Maße</span>
-                                                                        <div className="grid grid-cols-3 gap-2 text-xs">
-                                                                            {r.keilhoeheK1 != null && (
-                                                                                <div className="text-center">
-                                                                                    <span className="block text-orange-500 text-[9px]">K1 Rinnenseite</span>
-                                                                                    <span className="font-bold text-orange-900">{Math.round(r.keilhoeheK1)} mm</span>
-                                                                                </div>
-                                                                            )}
-                                                                            {r.keilhoeheK2 != null && (
-                                                                                <div className="text-center">
-                                                                                    <span className="block text-orange-500 text-[9px]">K2 Hausseite</span>
-                                                                                    <span className="font-bold text-orange-900">{Math.round(r.keilhoeheK2)} mm</span>
-                                                                                </div>
-                                                                            )}
-                                                                            {r.fensterF2 != null && (
-                                                                                <div className="text-center">
-                                                                                    <span className="block text-orange-500 text-[9px]">Breite (D1)</span>
-                                                                                    <span className="font-bold text-orange-900">{Math.round(r.fensterF2)} mm</span>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
+                                                                {dachrechnerResults.fensterF2 != null && (
+                                                                    <div className="bg-orange-50 rounded p-1.5 text-center border border-orange-200">
+                                                                        <span className="block text-orange-500 text-[8px]">D1</span>
+                                                                        <span className="font-bold text-orange-900">{Math.round(dachrechnerResults.fensterF2)}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                        );
-                                                    })()}
-                                                </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 {/* Dimensions Card */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
