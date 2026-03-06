@@ -542,8 +542,12 @@ export const ProductConfiguratorV2: React.FC = () => {
             if (sideWidth) setWallWidth(sideWidth);
             setWallHeight(postHeight);
         } else if (isFront || (isSchiebetur && isFrontPlacement) || isPanorama) {
-            // Front wall / front Schiebetür / Panorama: width = full roof width, height = H3
-            setWallWidth(isFrontPlacement || isFront || isPanorama ? frontWidth : (sideWidth || frontWidth));
+            // Front wall / front Schiebetür / Panorama: each segment = innerWidth between posts
+            if (sideWidth) {
+                setWallWidth(sideWidth); // per-segment width (between posts)
+            } else {
+                setWallWidth(frontWidth);
+            }
             setWallHeight(postHeight);
         }
     }, [wallProduct, wallPlacement, dachrechnerResults, wallDimsAuto, width, dachH3]);
@@ -2956,18 +2960,34 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         ))}
                                                     </div>
                                                     {/* Dimension badge */}
-                                                    {dachrechnerResults && (
-                                                        <div className="mt-3 flex items-center gap-2 text-xs bg-blue-50 rounded-lg p-2 border border-blue-200">
-                                                            <span className="text-blue-600 font-bold">📐</span>
-                                                            <span className="text-blue-800">
-                                                                {wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Lewa strona' : 'Prawa strona'}:
-                                                                {' '}<strong>{wallWidth} × {wallHeight} mm</strong>
-                                                                {wallPlacement !== 'front' && dachrechnerResults.innerWidth && (
-                                                                    <span className="text-blue-500 ml-1">(innerWidth: {Math.round(dachrechnerResults.innerWidth)} mm)</span>
+                                                    {dachrechnerResults && (() => {
+                                                        const postsCount = structuralMetadata?.posts_count || 2;
+                                                        const frontSegments = postsCount - 1;
+                                                        const isFrontPlacement = wallPlacement === 'front';
+                                                        return (
+                                                            <div className="mt-3 text-xs bg-blue-50 rounded-lg p-2 border border-blue-200 space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-blue-600 font-bold">📐</span>
+                                                                    <span className="text-blue-800">
+                                                                        {isFrontPlacement ? 'Front' : wallPlacement === 'left' ? 'Lewa strona' : 'Prawa strona'}:
+                                                                        {' '}<strong>{wallWidth} × {wallHeight} mm</strong>
+                                                                        {' '}(per element)
+                                                                    </span>
+                                                                </div>
+                                                                {isFrontPlacement && (
+                                                                    <div className="flex items-center gap-2 bg-amber-50 rounded p-1.5 border border-amber-200">
+                                                                        <span className="text-amber-600 font-bold">⬛</span>
+                                                                        <span className="text-amber-800">
+                                                                            <strong>{frontSegments} {frontSegments === 1 ? 'segment' : 'segmentów'}</strong> między <strong>{postsCount} słupkami</strong>
+                                                                            {dachrechnerResults.innerWidth && (
+                                                                                <span className="text-amber-600 ml-1">(każdy: {Math.round(dachrechnerResults.innerWidth)} mm)</span>
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
                                                                 )}
-                                                            </span>
-                                                        </div>
-                                                    )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
 
                                                 {/* 1. Category Selector */}
@@ -3481,18 +3501,35 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
 
                                                     <div className="relative z-10 text-center space-y-4">
-                                                        <div>
-                                                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cena elementu</div>
-                                                            {wallPriceLoading ? (
-                                                                <div className="text-2xl font-bold text-white/50 animate-pulse">Obliczam...</div>
-                                                            ) : wallPrice !== null ? (
-                                                                <div className="text-4xl font-black text-emerald-400 tracking-tight">
-                                                                    {formatCurrency(wallPrice)}
+                                                        {(() => {
+                                                            const postsCount = structuralMetadata?.posts_count || 2;
+                                                            const frontSegments = postsCount - 1;
+                                                            const isFrontPlacement = wallPlacement === 'front';
+                                                            const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
+                                                            return (
+                                                                <div>
+                                                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                                                        {isFrontPlacement ? `Cena za 1 element (×${segmentMultiplier})` : 'Cena elementu'}
+                                                                    </div>
+                                                                    {wallPriceLoading ? (
+                                                                        <div className="text-2xl font-bold text-white/50 animate-pulse">Obliczam...</div>
+                                                                    ) : wallPrice !== null ? (
+                                                                        <>
+                                                                            <div className="text-4xl font-black text-emerald-400 tracking-tight">
+                                                                                {formatCurrency(wallPrice)}
+                                                                            </div>
+                                                                            {isFrontPlacement && segmentMultiplier > 1 && (
+                                                                                <div className="mt-1 text-sm font-bold text-amber-400">
+                                                                                    × {segmentMultiplier} = <span className="text-emerald-300 text-lg">{formatCurrency(wallPrice * segmentMultiplier)}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Niedostępne dla wymiaru</div>
+                                                                    )}
                                                                 </div>
-                                                            ) : (
-                                                                <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Niedostępne dla wymiaru</div>
-                                                            )}
-                                                        </div>
+                                                            );
+                                                        })()}
 
                                                         <div className="h-px bg-white/10 w-full"></div>
 
@@ -3532,7 +3569,18 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                         : displayName;
                                                                 }
 
-                                                                addToBasket(displayName, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
+                                                                const postsCount = structuralMetadata?.posts_count || 2;
+                                                                const frontSegments = postsCount - 1;
+                                                                const isFrontPlacement = wallPlacement === 'front';
+                                                                const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
+
+                                                                // For front: add all segments at once with placement info
+                                                                const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Lewa' : 'Prawa';
+                                                                const finalPrice = totalWithAccessories * segmentMultiplier;
+                                                                const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× segment)` : '';
+                                                                const dimNote = `${wallWidth}x${wallHeight}`;
+                                                                configStr = `${placementLabel}: ${configStr}${qtyNote}`;
+                                                                addToBasket(displayName, finalPrice, configStr, dimNote, 'wall');
 
                                                                 // Reset accessories after adding
                                                                 if (isWedge) {
@@ -4252,7 +4300,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                         )
                     }
                 </>
-            )}
+            )
+            }
         </div >
     );
 };
