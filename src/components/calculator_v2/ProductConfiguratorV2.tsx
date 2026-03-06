@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { Customer, Lead, Offer } from '../../types';
 import { generateOfferPDF } from '../../utils/pdfGenerator';
 import { CustomerForm } from '../CustomerForm';
+import { calculateDachrechner, type RoofModelId, type DachrechnerResults } from '../../services/dachrechner.service';
 
 // ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
@@ -332,6 +333,11 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [schiebeeinheitUnitPrice, setSchiebeeinheitUnitPrice] = useState<number>(0); // Price per field
     const [schiebeeinheitTotalPrice, setSchiebeeinheitTotalPrice] = useState<number>(0); // Total surcharge
 
+    // === DACHRECHNER / STRUCTURAL HEIGHTS ===
+    const [dachH3, setDachH3] = useState<number>(2200); // Unterkante Rinne (post bottom height)
+    const [dachH1, setDachH1] = useState<number>(2796); // Wandhöhe (wall mounting height)
+    const [wallDimsAuto, setWallDimsAuto] = useState<boolean>(true); // Auto-fill wall dims from Dachrechner
+
     // === WALL CONFIG ===
     const [wallProduct, setWallProduct] = useState<string>('Side Wall (Glass)');
     const [wallWidth, setWallWidth] = useState<number>(2000);
@@ -446,6 +452,86 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     // === CALCULATED VALUES ===
     const areaM2 = (width * projection) / 1_000_000; // Convert mm² to m²
+
+    // === DACHRECHNER INTEGRATION ===
+    // Map V2 model IDs to Dachrechner model keys
+    const getDachrechnerModelId = (v2ModelId: string): RoofModelId | null => {
+        const map: Record<string, RoofModelId> = {
+            'Orangeline': 'orangeline',
+            'Orangeline+': 'orangeline+',
+            'Trendline': 'trendline',
+            'Trendline+': 'trendline+',
+            'Topline': 'topline',
+            'Topline XL': 'topline_xl',
+            'Designline': 'designline',
+            'Ultraline': 'ultraline_classic',
+            'Skyline': 'skyline',
+            'Carport': 'carport',
+        };
+        return map[v2ModelId] || null;
+    };
+
+    // Run Dachrechner calculation whenever roof config changes
+    const dachrechnerResults = useMemo<DachrechnerResults | null>(() => {
+        const drModelId = getDachrechnerModelId(model);
+        if (!drModelId || !projection) return null;
+        try {
+            return calculateDachrechner(drModelId, {
+                h3: dachH3,
+                depth: projection,
+                h1: dachH1,
+                width: width,
+            });
+        } catch {
+            return null;
+        }
+    }, [model, projection, width, dachH3, dachH1]);
+
+    // Auto-fill wall dimensions from Dachrechner when product changes
+    useEffect(() => {
+        if (!wallDimsAuto || !dachrechnerResults) return;
+
+        const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
+        const isSide = wallProduct.includes('Side');
+        const isFront = wallProduct.includes('Front');
+        const isSchiebetur = wallProduct.includes('Schiebetür');
+        const isPanorama = wallProduct.includes('Panorama');
+
+        if (isWedge) {
+            // Keilfenster Breite D1 = fensterF2 (depth between posts)
+            if (dachrechnerResults.fensterF2) {
+                setWallWidth(Math.round(dachrechnerResults.fensterF2));
+            }
+        } else if (isSide) {
+            // Side wall: width = depth between posts, height = post height (h3)
+            if (dachrechnerResults.fensterF2) {
+                setWallWidth(Math.round(dachrechnerResults.fensterF2));
+            }
+            if (dachrechnerResults.h3) {
+                setWallHeight(Math.round(dachrechnerResults.h3));
+            }
+        } else if (isFront) {
+            // Front wall: width = roof width, height = post height
+            setWallWidth(width);
+            if (dachrechnerResults.h3) {
+                setWallHeight(Math.round(dachrechnerResults.h3));
+            }
+        } else if (isSchiebetur) {
+            // Schiebetür: width = depth between posts (side), height = h3
+            if (dachrechnerResults.fensterF2) {
+                setWallWidth(Math.round(dachrechnerResults.fensterF2));
+            }
+            if (dachrechnerResults.h3) {
+                setWallHeight(Math.round(dachrechnerResults.h3));
+            }
+        } else if (isPanorama) {
+            // Panorama: width = roof width (front), height = h3
+            setWallWidth(width);
+            if (dachrechnerResults.h3) {
+                setWallHeight(Math.round(dachrechnerResults.h3));
+            }
+        }
+    }, [wallProduct, dachrechnerResults, wallDimsAuto]);
 
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -3018,11 +3104,72 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     </div>
                                                 </div>
 
+                                                {/* Structural Heights (Dachrechner) Card */}
+                                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-200 p-4">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">
+                                                            📐 Konstruktionshöhen
+                                                        </h5>
+                                                        <button
+                                                            onClick={() => setWallDimsAuto(!wallDimsAuto)}
+                                                            className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${wallDimsAuto
+                                                                ? 'bg-green-500 text-white'
+                                                                : 'bg-slate-200 text-slate-600'}`}
+                                                        >
+                                                            {wallDimsAuto ? '⚡ Auto' : '✏️ Manuell'}
+                                                        </button>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">H3 – Unterkante Rinne (mm)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={dachH3}
+                                                                onChange={e => setDachH3(Number(e.target.value))}
+                                                                className="w-full p-2 rounded-lg border border-blue-200 font-bold text-slate-800 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">H1 – Wandhöhe (mm)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={dachH1}
+                                                                onChange={e => setDachH1(Number(e.target.value))}
+                                                                className="w-full p-2 rounded-lg border border-blue-200 font-bold text-slate-800 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    {dachrechnerResults && (
+                                                        <div className="mt-3 pt-3 border-t border-blue-200 grid grid-cols-3 gap-2 text-xs">
+                                                            {dachrechnerResults.fensterF2 && (
+                                                                <div className="text-center">
+                                                                    <span className="block text-blue-500 uppercase text-[9px]">Fensterbreite</span>
+                                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.fensterF2)} mm</span>
+                                                                </div>
+                                                            )}
+                                                            {dachrechnerResults.angleAlpha && (
+                                                                <div className="text-center">
+                                                                    <span className="block text-blue-500 uppercase text-[9px]">Neigung</span>
+                                                                    <span className="font-bold text-blue-900">{dachrechnerResults.angleAlpha.toFixed(1)}°</span>
+                                                                </div>
+                                                            )}
+                                                            {dachrechnerResults.depthD2alt && (
+                                                                <div className="text-center">
+                                                                    <span className="block text-blue-500 uppercase text-[9px]">Tiefe zw. Pfosten</span>
+                                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.depthD2alt)} mm</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
                                                 {/* Dimensions Card */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <h5 className="text-sm font-bold text-slate-700">Wymiary zabudowy</h5>
-                                                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Wybierz wymiar w mm</span>
+                                                        {wallDimsAuto && dachrechnerResults && (
+                                                            <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded-full font-bold">⚡ Automatisch berechnet</span>
+                                                        )}
                                                     </div>
 
                                                     <div className={`grid ${(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
@@ -3037,7 +3184,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                             <input
                                                                 type="number"
                                                                 value={wallWidth}
-                                                                onChange={e => setWallWidth(Number(e.target.value))}
+                                                                onChange={e => { setWallWidth(Number(e.target.value)); setWallDimsAuto(false); }}
                                                                 className="w-full p-3 rounded-lg border border-slate-200 font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
                                                             />
                                                             {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
@@ -3052,7 +3199,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 <input
                                                                     type="number"
                                                                     value={wallHeight}
-                                                                    onChange={e => setWallHeight(Number(e.target.value))}
+                                                                    onChange={e => { setWallHeight(Number(e.target.value)); setWallDimsAuto(false); }}
                                                                     className="w-full p-3 rounded-lg border border-slate-200 font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
                                                                 />
                                                             </div>
