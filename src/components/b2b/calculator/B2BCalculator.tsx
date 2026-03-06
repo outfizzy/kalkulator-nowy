@@ -882,14 +882,14 @@ export const B2BCalculator: React.FC = () => {
                     // Auto-constrain dimensions to valid range
                     let needsRerun = false;
 
-                    // Check WIDTH limits
+                    // Check WIDTH limits (allow up to 2x for combined constructions)
                     if (width < limits.minWidth) {
                         console.log(`[Price] Width ${width} < min ${limits.minWidth}, auto-adjusting`);
                         setWidth(limits.minWidth);
                         needsRerun = true;
-                    } else if (width > limits.maxWidth) {
-                        console.log(`[Price] Width ${width} > max ${limits.maxWidth}, auto-adjusting`);
-                        setWidth(limits.maxWidth);
+                    } else if (width > limits.maxWidth * 2) {
+                        console.log(`[Price] Width ${width} > max combined ${limits.maxWidth * 2}, auto-adjusting`);
+                        setWidth(limits.maxWidth * 2);
                         needsRerun = true;
                     }
 
