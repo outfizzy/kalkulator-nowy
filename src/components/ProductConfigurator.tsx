@@ -260,6 +260,15 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                         variant_note: result.structuralNote
                     });
 
+                    // Persist structural data onto config so it's saved with the offer
+                    if (result.numberOfPosts || result.numberOfFields) {
+                        setConfig(prev => ({
+                            ...prev,
+                            numberOfPosts: result.numberOfPosts,
+                            numberOfFields: result.numberOfFields
+                        }));
+                    }
+
                     setVariantNote(result.structuralNote || null);
                     setMarginData({
                         value: result.marginValue || 0,

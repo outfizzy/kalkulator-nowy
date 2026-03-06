@@ -307,7 +307,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // 3. PRODUCT HIGHLIGHTS (The "Selling" part)
     // Dark box with white text for high contrast "Tech Specs"
     doc.setFillColor(...THEME.primary);
-    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 30, 1, 1, 'F');
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), 48, 1, 1, 'F');
 
     doc.setTextColor(...THEME.secondary); // Gold Title
     doc.setFont(FONTS.bold, 'bold');
@@ -341,7 +341,33 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     const roof = translateForPDF(offer.product?.roofType || '', 'roofTypes');
     doc.text(roof, MARGIN + 8 + (colW * 2), specsY + 5);
 
-    y += 40;
+    // Row 2: Structural specs
+    const specsY2 = specsY + 14;
+    const p = offer.product as any;
+    const postCount = p?.numberOfPosts || Math.max(2, Math.ceil((p?.width || 3000) / 3500) + 1);
+    const fieldCount = p?.numberOfFields || Math.max(2, Math.ceil((p?.width || 3000) / 900));
+    const rafterCount = fieldCount + 1;
+    const montage = translateForPDF(p?.installationType || 'wall', 'installation');
+
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Montage:', MARGIN + 8, specsY2);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(montage, MARGIN + 8, specsY2 + 5);
+
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Pfosten / Sparren:', MARGIN + 8 + colW, specsY2);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${postCount} Pfosten / ${rafterCount} Sparren`, MARGIN + 8 + colW, specsY2 + 5);
+
+    // Combined construction info
+    if (p?.splitPoint && p?.width > 7000) {
+        doc.setFont(FONTS.normal, 'normal');
+        doc.text('Verbundkonstruktion:', MARGIN + 8 + (colW * 2), specsY2);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.text(`Teilung bei ${p.splitPoint} mm`, MARGIN + 8 + (colW * 2), specsY2 + 5);
+    }
+
+    y += 58;
 
     // 4. PRICING TABLE
     const bodyRows = [];
