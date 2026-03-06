@@ -523,23 +523,25 @@ export const ProductConfiguratorV2: React.FC = () => {
         const isPanorama = wallProduct.includes('Panorama');
         const isFrontPlacement = wallPlacement === 'front';
 
-        // Width calculation: front → full width, side → innerWidth between posts
-        const sideWidth = dachrechnerResults.innerWidth ? Math.round(dachrechnerResults.innerWidth) : (dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null);
-        const frontWidth = width; // full roof width for front
+        // Side wall width = fensterF2 (depth-based dimension from Dachrechner — between post and house wall)
+        // Front segment width = innerWidth (horizontal gap between posts from Dachrechner)
+        const sideWallWidth = dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null;
+        const frontSegmentWidth = dachrechnerResults.innerWidth ? Math.round(dachrechnerResults.innerWidth) : null;
+        const frontWidth = width; // full roof width for front display
         const postHeight = dachH3; // H3 = post height for all wall products
 
         if (isWedge) {
             // Keilfenster: width = fensterF2, height auto from K1/K2
-            if (dachrechnerResults.fensterF2) {
-                setWallWidth(Math.round(dachrechnerResults.fensterF2));
+            if (sideWallWidth) {
+                setWallWidth(sideWallWidth);
             }
             // Height = K1 (gutter side) for display – actual K1/K2 shown in summary
             if (dachrechnerResults.keilhoeheK1) {
                 setWallHeight(Math.round(dachrechnerResults.keilhoeheK1));
             }
         } else if (isSide || (isSchiebetur && !isFrontPlacement)) {
-            // Side wall / side Schiebetür: width = innerWidth, height = H3
-            if (sideWidth) setWallWidth(sideWidth);
+            // Side wall / side Schiebetür: width = fensterF2 (depth), height = H3
+            if (sideWallWidth) setWallWidth(sideWallWidth);
             setWallHeight(postHeight);
         } else if (isFront || (isSchiebetur && isFrontPlacement) || isPanorama) {
             // Front wall / front Schiebetür / Panorama: wallWidth = FULL roof width
