@@ -367,7 +367,153 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         doc.text(`Teilung bei ${p.splitPoint} mm`, MARGIN + 8 + (colW * 2), specsY2 + 5);
     }
 
-    y += 58;
+    // Row 3: Dachrechner Technical Data (if present)
+    let boxHeight = 48;
+    const dach = p?.dachrechnerData;
+    if (dach) {
+        const specsY3 = specsY2 + 14;
+        // Separator line
+        doc.setDrawColor(60, 80, 110);
+        doc.setLineWidth(0.2);
+        doc.line(MARGIN + 8, specsY3 - 4, pageWidth - MARGIN - 8, specsY3 - 4);
+
+        doc.setTextColor(...THEME.secondary);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.setFontSize(7);
+        doc.text('TECHNISCHE DATEN (DACHRECHNER)', MARGIN + 8, specsY3);
+
+        doc.setTextColor(200, 200, 200);
+        doc.setFont(FONTS.normal, 'normal');
+        doc.setFontSize(8);
+        const colW4 = (pageWidth - MARGIN * 2 - 16) / 4;
+        let tx = MARGIN + 8;
+        const ty3 = specsY3 + 6;
+
+        // Col 1
+        if (dach.angleAlpha != null) {
+            doc.text(`Neigung: ${dach.angleAlpha.toFixed(1)}deg`, tx, ty3);
+        }
+        // Col 2
+        if (dach.h3 != null) {
+            doc.text(`H3 Rinne: ${Math.round(dach.h3)} mm`, tx + colW4, ty3);
+        }
+        // Col 3
+        if (dach.fensterF2 != null) {
+            doc.text(`Fensterbreite: ${Math.round(dach.fensterF2)} mm`, tx + colW4 * 2, ty3);
+        }
+        // Col 4
+        if (dach.sparrenMitte != null) {
+            doc.text(`Sparren: ${Math.round(dach.sparrenMitte)} mm`, tx + colW4 * 3, ty3);
+        }
+
+        // Second sub-row
+        const ty4 = ty3 + 5;
+        if (dach.inclinationMmM != null) {
+            doc.text(`Gefaelle: ${dach.inclinationMmM.toFixed(0)} mm/m`, tx, ty4);
+        }
+        if (dach.h1 != null) {
+            doc.text(`H1 Wand: ${Math.round(dach.h1)} mm`, tx + colW4, ty4);
+        }
+        if (dach.depthD2 != null) {
+            doc.text(`D2 m. Rinne: ${Math.round(dach.depthD2)} mm`, tx + colW4 * 2, ty4);
+        }
+        if (p?.postWidth) {
+            doc.text(`Pfostenbreite: ${p.postWidth} mm`, tx + colW4 * 3, ty4);
+        }
+
+        // Keilfenster K1/K2 if present
+        if (dach.keilhoeheK1 != null || dach.keilhoeheK2 != null) {
+            const ty5 = ty4 + 5;
+            doc.setTextColor(...THEME.secondary);
+            doc.text(`K1 Rinnenseite: ${dach.keilhoeheK1 != null ? Math.round(dach.keilhoeheK1) + ' mm' : '-'}`, tx, ty5);
+            doc.text(`K2 Hausseite: ${dach.keilhoeheK2 != null ? Math.round(dach.keilhoeheK2) + ' mm' : '-'}`, tx + colW4, ty5);
+            if (dach.fensterF1 != null) {
+                doc.text(`F1/F3: ${Math.round(dach.fensterF1)}/${dach.fensterF3 != null ? Math.round(dach.fensterF3) : '-'} mm`, tx + colW4 * 2, ty5);
+            }
+            boxHeight = 82;
+        } else {
+            boxHeight = 72;
+        }
+    }
+
+    // Adjust box height
+    // Re-draw the box with correct height (draw over initial rect)
+    doc.setFillColor(...THEME.primary);
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), boxHeight, 1, 1, 'F');
+
+    // Re-render the header and specs since we redrew the box
+    doc.setTextColor(...THEME.secondary);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(9);
+    doc.text('IHRE KONFIGURATION', MARGIN + 8, y + 8);
+
+    // Re-render Row 1
+    doc.setTextColor(...THEME.white);
+    doc.setFontSize(10);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Dimensionen:', MARGIN + 8, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${offer.product?.width} x ${offer.product?.projection} mm`, MARGIN + 8, specsY + 5);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Farbe / Ausfuehrung:', MARGIN + 8 + colW, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(color, MARGIN + 8 + colW, specsY + 5);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Dacheindeckung:', MARGIN + 8 + (colW * 2), specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(roof, MARGIN + 8 + (colW * 2), specsY + 5);
+
+    // Re-render Row 2
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Montage:', MARGIN + 8, specsY2);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(montage, MARGIN + 8, specsY2 + 5);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Pfosten / Sparren:', MARGIN + 8 + colW, specsY2);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${postCount} Pfosten / ${rafterCount} Sparren`, MARGIN + 8 + colW, specsY2 + 5);
+    if (p?.splitPoint && p?.width > 7000) {
+        doc.setFont(FONTS.normal, 'normal');
+        doc.text('Verbundkonstruktion:', MARGIN + 8 + (colW * 2), specsY2);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.text(`Teilung bei ${p.splitPoint} mm`, MARGIN + 8 + (colW * 2), specsY2 + 5);
+    }
+
+    // Re-render Row 3 (Dachrechner) if present
+    if (dach) {
+        const specsY3 = specsY2 + 14;
+        doc.setDrawColor(60, 80, 110);
+        doc.setLineWidth(0.2);
+        doc.line(MARGIN + 8, specsY3 - 4, pageWidth - MARGIN - 8, specsY3 - 4);
+        doc.setTextColor(...THEME.secondary);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.setFontSize(7);
+        doc.text('TECHNISCHE DATEN (DACHRECHNER)', MARGIN + 8, specsY3);
+        doc.setTextColor(200, 200, 200);
+        doc.setFont(FONTS.normal, 'normal');
+        doc.setFontSize(8);
+        const colW4 = (pageWidth - MARGIN * 2 - 16) / 4;
+        let tx = MARGIN + 8;
+        const ty3 = specsY3 + 6;
+        if (dach.angleAlpha != null) doc.text(`Neigung: ${dach.angleAlpha.toFixed(1)}deg`, tx, ty3);
+        if (dach.h3 != null) doc.text(`H3 Rinne: ${Math.round(dach.h3)} mm`, tx + colW4, ty3);
+        if (dach.fensterF2 != null) doc.text(`Fensterbreite: ${Math.round(dach.fensterF2)} mm`, tx + colW4 * 2, ty3);
+        if (dach.sparrenMitte != null) doc.text(`Sparren: ${Math.round(dach.sparrenMitte)} mm`, tx + colW4 * 3, ty3);
+        const ty4 = ty3 + 5;
+        if (dach.inclinationMmM != null) doc.text(`Gefaelle: ${dach.inclinationMmM.toFixed(0)} mm/m`, tx, ty4);
+        if (dach.h1 != null) doc.text(`H1 Wand: ${Math.round(dach.h1)} mm`, tx + colW4, ty4);
+        if (dach.depthD2 != null) doc.text(`D2 m. Rinne: ${Math.round(dach.depthD2)} mm`, tx + colW4 * 2, ty4);
+        if (p?.postWidth) doc.text(`Pfostenbreite: ${p.postWidth} mm`, tx + colW4 * 3, ty4);
+        if (dach.keilhoeheK1 != null || dach.keilhoeheK2 != null) {
+            const ty5 = ty4 + 5;
+            doc.setTextColor(...THEME.secondary);
+            doc.text(`K1 Rinnenseite: ${dach.keilhoeheK1 != null ? Math.round(dach.keilhoeheK1) + ' mm' : '-'}`, tx, ty5);
+            doc.text(`K2 Hausseite: ${dach.keilhoeheK2 != null ? Math.round(dach.keilhoeheK2) + ' mm' : '-'}`, tx + colW4, ty5);
+            if (dach.fensterF1 != null) doc.text(`F1/F3: ${Math.round(dach.fensterF1)}/${dach.fensterF3 != null ? Math.round(dach.fensterF3) : '-'} mm`, tx + colW4 * 2, ty5);
+        }
+    }
+
+    y += boxHeight + 10;
 
     // 4. PRICING TABLE
     const bodyRows = [];

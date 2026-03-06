@@ -385,6 +385,108 @@ export const OfferPrintView: React.FC = () => {
                                                             </span>
                                                         </div>
                                                     )}
+                                                    {/* Dachrechner Technical Data */}
+                                                    {p.dachrechnerData && (() => {
+                                                        const d = p.dachrechnerData;
+                                                        return (
+                                                            <div className="col-span-3 pt-3 mt-2 border-t border-white/10">
+                                                                <span className="block text-[#6ba3d6] text-[10px] uppercase tracking-wide mb-3 font-bold">📐 Technische Daten (Dachrechner)</span>
+                                                                <div className="grid grid-cols-4 gap-y-3 gap-x-4 text-xs">
+                                                                    {d.angleAlpha != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">Neigung α</span>
+                                                                            <span className="font-bold text-white">{d.angleAlpha.toFixed(1)}°</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.inclinationMmM != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">Gefälle</span>
+                                                                            <span className="font-bold text-white">{d.inclinationMmM.toFixed(0)} mm/m</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.h3 != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">H3 Rinne</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.h3)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.h1 != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">H1 Wand</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.h1)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.heightH2 != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">H2 Oberkante</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.heightH2)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.fensterF2 != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">Fensterbreite</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.fensterF2)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.depthD2 != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">D2 m. Rinne</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.depthD2)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.depthD4post != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">D4 Pfosten</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.depthD4post)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.sparrenMitte != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">Sparren Mitte</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.sparrenMitte)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.sparrenAussen != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">Sparren Außen</span>
+                                                                            <span className="font-bold text-white">{Math.round(d.sparrenAussen)} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {p.postWidth && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">Pfostenbreite</span>
+                                                                            <span className="font-bold text-white">{p.postWidth} mm</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {d.angleBeta != null && (
+                                                                        <div>
+                                                                            <span className="block text-slate-400 text-[9px] uppercase">β Glaswinkel</span>
+                                                                            <span className="font-bold text-white">{d.angleBeta.toFixed(1)}°</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {/* Keilfenster K1/K2 if present */}
+                                                                {(d.keilhoeheK1 != null || d.keilhoeheK2 != null) && (
+                                                                    <div className="mt-3 pt-2 border-t border-white/10 grid grid-cols-3 gap-4 text-xs">
+                                                                        <div>
+                                                                            <span className="block text-[#d4a06a] text-[9px] uppercase">K1 Keilhöhe Rinne</span>
+                                                                            <span className="font-bold text-white">{d.keilhoeheK1 != null ? Math.round(d.keilhoeheK1) + ' mm' : '–'}</span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="block text-[#d4a06a] text-[9px] uppercase">K2 Keilhöhe Wand</span>
+                                                                            <span className="font-bold text-white">{d.keilhoeheK2 != null ? Math.round(d.keilhoeheK2) + ' mm' : '–'}</span>
+                                                                        </div>
+                                                                        {d.fensterF1 != null && (
+                                                                            <div>
+                                                                                <span className="block text-[#d4a06a] text-[9px] uppercase">F1/F3 Fensterhöhe</span>
+                                                                                <span className="font-bold text-white">{Math.round(d.fensterF1)} / {d.fensterF3 != null ? Math.round(d.fensterF3) : '–'} mm</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             );
                                         })()}
