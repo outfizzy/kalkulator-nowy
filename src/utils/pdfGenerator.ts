@@ -70,6 +70,33 @@ function translateForPDF(key: string, category: string): string {
     return translate(key, category as any);
 }
 
+// Translate internal addon/accessory names to German display names
+function translateAddonName(name: string): string {
+    const map: Record<string, string> = {
+        'Wedge (Glass)': 'Keilfenster (Glas)',
+        'Side Wall (Glass)': 'Seitenwand (Glas)',
+        'Front Wall (Glass)': 'Frontwand (Glas)',
+        'Side Wall (Poly)': 'Seitenwand (Polycarbonat)',
+        'Front Wall (Poly)': 'Frontwand (Polycarbonat)',
+        'Schiebetuer (Glass)': 'Schiebetuer (Glas)',
+        'Schiebetuer (Poly)': 'Schiebetuer (Polycarbonat)',
+        'Surcharge Matt': 'Zuschlag Mattglas',
+        'Surcharge Iso': 'Zuschlag Isolierglas',
+        'Surcharge Stopsol': 'Zuschlag Stopsol (Sonnenschutz)',
+        'LED Lighting': 'LED-Beleuchtung',
+        'LED Spot': 'LED-Spotbeleuchtung',
+        'Heating': 'Infrarot-Heizstrahler',
+        'ZIP Screen': 'ZIP-Markise',
+        'Awning': 'Markise',
+        'Panorama': 'Panorama Schiebewand',
+    };
+    if (map[name]) return map[name];
+    for (const [eng, de] of Object.entries(map)) {
+        if (name.includes(eng)) return name.replace(eng, de);
+    }
+    return name;
+}
+
 export async function generateOfferPDF(offer: Offer) {
     try {
         const doc = await createDocument(offer);
@@ -337,7 +364,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             if (item.name?.toLowerCase().includes(offer.product?.modelId)) return;
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
-                sanitizeText(item.name + (item.config ? `\n${item.config}` : '')),
+                sanitizeText(translateAddonName(item.name) + (item.config ? `\n${item.config}` : '')),
                 formatCurrency(item.price)
             ]);
         });
@@ -345,7 +372,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         offer.product.addons.forEach((a: any) => {
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
-                sanitizeText(a.name + (a.variant ? ` (${a.variant})` : '')),
+                sanitizeText(translateAddonName(a.name) + (a.variant ? ` (${a.variant})` : '')),
                 formatCurrency(a.price)
             ]);
         });

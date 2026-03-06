@@ -36,6 +36,39 @@ function translateForView(key: string, category: string): string {
     return translate(key, category as any);
 }
 
+// Translate internal addon/accessory names to German display names
+function translateAddonName(name: string): string {
+    const map: Record<string, string> = {
+        // Wall products
+        'Wedge (Glass)': 'Keilfenster (Glas)',
+        'Side Wall (Glass)': 'Seitenwand (Glas)',
+        'Front Wall (Glass)': 'Frontwand (Glas)',
+        'Side Wall (Poly)': 'Seitenwand (Polycarbonat)',
+        'Front Wall (Poly)': 'Frontwand (Polycarbonat)',
+        // Sliding doors
+        'Schiebetür (Glass)': 'Schiebetür (Glas)',
+        'Schiebetür (Poly)': 'Schiebetür (Polycarbonat)',
+        // Surcharges
+        'Surcharge Matt': 'Zuschlag Mattglas',
+        'Surcharge Iso': 'Zuschlag Isolierglas',
+        'Surcharge Stopsol': 'Zuschlag Stopsol (Sonnenschutz)',
+        // Common addons
+        'LED Lighting': 'LED-Beleuchtung',
+        'LED Spot': 'LED-Spotbeleuchtung',
+        'Heating': 'Infrarot-Heizstrahler',
+        'ZIP Screen': 'ZIP-Markise',
+        'Awning': 'Markise',
+        'Panorama': 'Panorama Schiebewand',
+    };
+    // Direct match
+    if (map[name]) return map[name];
+    // Partial match (for composite names like "Aluxe V2 - Wedge (Glass) Surcharge Matt")
+    for (const [eng, de] of Object.entries(map)) {
+        if (name.includes(eng)) return name.replace(eng, de);
+    }
+    return name;
+}
+
 export const OfferPrintView: React.FC = () => {
     const { token } = useParams<{ token: string }>();
     const [offer, setOffer] = useState<Offer | null>(null);
@@ -372,7 +405,7 @@ export const OfferPrintView: React.FC = () => {
                                                 <tr key={idx} className="print:bg-white break-inside-avoid">
                                                     <td className="py-2 px-3 text-center align-top text-slate-400">{2 + idx}</td>
                                                     <td className="py-2 px-3 align-top">
-                                                        <div className="text-slate-800">{addon.name}</div>
+                                                        <div className="text-slate-800">{translateAddonName(addon.name)}</div>
                                                         {addon.variant && <div className="text-[11px] text-slate-500">{addon.variant}</div>}
                                                     </td>
                                                     <td className="py-2 px-3 text-right align-top text-slate-800">{formatCurrency(addon.price)}</td>
@@ -383,7 +416,7 @@ export const OfferPrintView: React.FC = () => {
                                                 <tr key={`v2-${idx}`} className="print:bg-white break-inside-avoid">
                                                     <td className="py-2 px-3 text-center align-top text-slate-400">{(offer.product.addons?.length || 0) + 2 + idx}</td>
                                                     <td className="py-2 px-3 align-top">
-                                                        <div className="text-slate-800">{item.name}</div>
+                                                        <div className="text-slate-800">{translateAddonName(item.name)}</div>
                                                         {item.config && <div className="text-[11px] text-slate-500">{item.config}</div>}
                                                     </td>
                                                     <td className="py-2 px-3 text-right align-top text-slate-800">{formatCurrency(item.price)}</td>
