@@ -334,9 +334,30 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [schiebeeinheitTotalPrice, setSchiebeeinheitTotalPrice] = useState<number>(0); // Total surcharge
 
     // === DACHRECHNER / STRUCTURAL HEIGHTS ===
-    const [dachH3, setDachH3] = useState<number>(2200); // Unterkante Rinne (post bottom height)
-    const [dachH1, setDachH1] = useState<number>(2796); // Wandhöhe (wall mounting height)
-    const [wallDimsAuto, setWallDimsAuto] = useState<boolean>(true); // Auto-fill wall dims from Dachrechner
+    // Per-model Dachrechner configuration
+    const MODEL_DACHRECHNER_CONFIG: Record<string, {
+        defaultH3: number; defaultH1: number; defaultOverhang?: number;
+        needsH1: boolean; needsH3: boolean; needsOverhang: boolean;
+        fixedAngle?: number; postWidth: number;
+        label: string; hint: string;
+    }> = {
+        'Orangeline': { defaultH3: 2200, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, fixedAngle: 8, postWidth: 110, label: 'Orangestyle', hint: 'Fester Neigungswinkel 8°, nur H3 + Tiefe' },
+        'Orangeline+': { defaultH3: 2200, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, fixedAngle: 8, postWidth: 110, label: 'Orangestyle+', hint: 'Fester Neigungswinkel 8°, nur H3 + Tiefe' },
+        'Trendline': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 110, label: 'Trendstyle', hint: 'Profilhöhe 47.5mm, Neigung berechnet aus H3/H1/Tiefe' },
+        'Trendline+': { defaultH3: 2200, defaultH1: 2700, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 110, label: 'Trendstyle+', hint: 'Profilhöhe 57.5mm, verstärkt, Neigung berechnet' },
+        'Topline': { defaultH3: 2200, defaultH1: 2796, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 149, label: 'Topstyle', hint: 'Profilhöhe 93.2mm, massive Konstruktion' },
+        'Topline XL': { defaultH3: 2200, defaultH1: 2900, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 196, label: 'Topstyle XL', hint: 'Profilhöhe 117mm, Pfosten 196mm' },
+        'Designline': { defaultH3: 2200, defaultH1: 2796, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 196, label: 'Designstyle', hint: 'Pfosten 196mm, eleganter Anschluss' },
+        'Ultraline': { defaultH3: 2200, defaultH1: 2796, defaultOverhang: 300, needsH1: true, needsH3: false, needsOverhang: true, postWidth: 196, label: 'Ultrastyle', hint: 'Kein H3 erforderlich — Überstand + H1 + Tiefe' },
+        'Skyline': { defaultH3: 2400, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, postWidth: 160, label: 'Skystyle', hint: 'Flachdach, Glashöhe 95mm, nur H3 + Tiefe' },
+        'Carport': { defaultH3: 2400, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, postWidth: 160, label: 'Carport', hint: 'Flachdach, Glashöhe 28mm, nur H3 + Tiefe' },
+    };
+    const modelDrConfig = MODEL_DACHRECHNER_CONFIG[model] || MODEL_DACHRECHNER_CONFIG['Topline'];
+
+    const [dachH3, setDachH3] = useState<number>(modelDrConfig.defaultH3);
+    const [dachH1, setDachH1] = useState<number>(modelDrConfig.defaultH1);
+    const [dachOverhang, setDachOverhang] = useState<number>(modelDrConfig.defaultOverhang || 300);
+    const [wallDimsAuto, setWallDimsAuto] = useState<boolean>(true);
 
     // === WALL CONFIG ===
     const [wallProduct, setWallProduct] = useState<string>('Side Wall (Glass)');
@@ -477,15 +498,16 @@ export const ProductConfiguratorV2: React.FC = () => {
         if (!drModelId || !projection) return null;
         try {
             return calculateDachrechner(drModelId, {
-                h3: dachH3,
+                h3: modelDrConfig.needsH3 ? dachH3 : undefined,
                 depth: projection,
-                h1: dachH1,
+                h1: modelDrConfig.needsH1 ? dachH1 : undefined,
                 width: width,
+                overhang: modelDrConfig.needsOverhang ? dachOverhang : undefined,
             });
         } catch {
             return null;
         }
-    }, [model, projection, width, dachH3, dachH1]);
+    }, [model, projection, width, dachH3, dachH1, dachOverhang, modelDrConfig]);
 
     // Auto-fill wall dimensions from Dachrechner when product changes
     useEffect(() => {
@@ -2471,50 +2493,86 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* H3 / H1 Construction Heights */}
-                                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                                        <label className="flex justify-between mb-2">
-                                            <span className="font-bold text-slate-700">H3 – Pfostenhöhe (mm)</span>
-                                            <span className="text-indigo-600 font-black text-xl">{dachH3} mm</span>
-                                        </label>
-                                        <p className="text-xs text-slate-400 mb-3">Unterkante Rinne – Höhe der Pfosten</p>
-                                        <input
-                                            type="number"
-                                            value={dachH3}
-                                            onChange={e => setDachH3(Number(e.target.value))}
-                                            className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                                        />
-                                        <div className="flex gap-2 mt-2">
-                                            {[2000, 2200, 2400, 2600].map(h => (
-                                                <button key={h} onClick={() => setDachH3(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachH3 === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
-                                            ))}
+                                    {/* Model-specific Construction Heights */}
+                                    {modelDrConfig.needsH3 && (
+                                        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                            <label className="flex justify-between mb-2">
+                                                <span className="font-bold text-slate-700">H3 – Pfostenhöhe (mm)</span>
+                                                <span className="text-indigo-600 font-black text-xl">{dachH3} mm</span>
+                                            </label>
+                                            <p className="text-xs text-slate-400 mb-3">Unterkante Rinne – Höhe der Pfosten</p>
+                                            <input
+                                                type="number"
+                                                value={dachH3}
+                                                onChange={e => setDachH3(Number(e.target.value))}
+                                                className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                            />
+                                            <div className="flex gap-2 mt-2">
+                                                {(model === 'Skyline' || model === 'Carport' ? [2200, 2400, 2600, 2800] : [2000, 2200, 2400, 2600]).map(h => (
+                                                    <button key={h} onClick={() => setDachH3(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachH3 === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                                        <label className="flex justify-between mb-2">
-                                            <span className="font-bold text-slate-700">H1 – Wandanschluss (mm)</span>
-                                            <span className="text-indigo-600 font-black text-xl">{dachH1} mm</span>
-                                        </label>
-                                        <p className="text-xs text-slate-400 mb-3">Oberkante Wandprofil – Montagehöhe an der Hauswand</p>
-                                        <input
-                                            type="number"
-                                            value={dachH1}
-                                            onChange={e => setDachH1(Number(e.target.value))}
-                                            className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                                        />
-                                        <div className="flex gap-2 mt-2">
-                                            {[2500, 2700, 2796, 3000].map(h => (
-                                                <button key={h} onClick={() => setDachH1(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachH1 === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
-                                            ))}
+                                    {modelDrConfig.needsH1 && (
+                                        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                            <label className="flex justify-between mb-2">
+                                                <span className="font-bold text-slate-700">H1 – Wandanschluss (mm)</span>
+                                                <span className="text-indigo-600 font-black text-xl">{dachH1} mm</span>
+                                            </label>
+                                            <p className="text-xs text-slate-400 mb-3">Oberkante Wandprofil – Montagehöhe</p>
+                                            <input
+                                                type="number"
+                                                value={dachH1}
+                                                onChange={e => setDachH1(Number(e.target.value))}
+                                                className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                            />
+                                            <div className="flex gap-2 mt-2">
+                                                {(model === 'Topline XL' ? [2700, 2900, 3100, 3300] : [2500, 2700, 2796, 3000]).map(h => (
+                                                    <button key={h} onClick={() => setDachH1(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachH1 === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
+
+                                    {/* Ultraline Overhang */}
+                                    {modelDrConfig.needsOverhang && (
+                                        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                            <label className="flex justify-between mb-2">
+                                                <span className="font-bold text-slate-700">U1 – Dachüberstand (mm)</span>
+                                                <span className="text-indigo-600 font-black text-xl">{dachOverhang} mm</span>
+                                            </label>
+                                            <p className="text-xs text-slate-400 mb-3">Überstand vorne (nur Ultrastyle Classic)</p>
+                                            <input
+                                                type="number"
+                                                value={dachOverhang}
+                                                onChange={e => setDachOverhang(Number(e.target.value))}
+                                                className="w-full p-2 rounded-lg border border-slate-200 font-bold text-slate-800 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                            />
+                                            <div className="flex gap-2 mt-2">
+                                                {[200, 300, 400, 500].map(h => (
+                                                    <button key={h} onClick={() => setDachOverhang(h)} className={`px-2 py-1 text-xs border rounded transition-colors shadow-sm ${dachOverhang === h ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{h}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Dachrechner Results Preview */}
-                                {dachrechnerResults && (
-                                    <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
-                                        <h5 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">📐 Dachrechner – Berechnete Werte</h5>
+                                {/* Model Info Badge + Dachrechner Results */}
+                                <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">📐 {modelDrConfig.label} – Dachrechner</h5>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">Pfosten: {modelDrConfig.postWidth}mm</span>
+                                            {modelDrConfig.fixedAngle && (
+                                                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">α = {modelDrConfig.fixedAngle}° (fest)</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-blue-600 mb-3 italic">{modelDrConfig.hint}</p>
+
+                                    {dachrechnerResults ? (
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                                             {dachrechnerResults.angleAlpha != null && (
                                                 <div className="bg-white/60 rounded-lg p-2 text-center">
@@ -2560,11 +2618,15 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             )}
                                             <div className="bg-white/60 rounded-lg p-2 text-center">
                                                 <span className="block text-blue-500 uppercase text-[9px] font-bold">Pfostenbreite</span>
-                                                <span className="font-bold text-blue-900">{({ 'Orangeline': 110, 'Orangeline+': 110, 'Trendline': 110, 'Trendline+': 110, 'Topline': 149, 'Topline XL': 196, 'Designline': 196, 'Ultraline': 196, 'Skyline': 160, 'Carport': 160 } as Record<string, number>)[model] || '–'} mm</span>
+                                                <span className="font-bold text-blue-900">{modelDrConfig.postWidth} mm</span>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div className="text-center text-xs text-blue-400 py-4">
+                                            Bitte Maße eingeben um Berechnung zu starten...
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Construction Type */}
