@@ -2713,11 +2713,12 @@ export const B2BCalculator: React.FC = () => {
                                                                 }
 
                                                                 const totalWithAccessories = wallPrice + accessoriesTotal;
+                                                                const wallDisplayName = WALL_PRODUCTS.find(p => p.id === wallProduct)?.name || wallProduct;
                                                                 const configStr = isWedge && accessoriesNames.length > 0
-                                                                    ? `${wallProduct} + ${accessoriesNames.join(', ')}`
-                                                                    : wallProduct;
+                                                                    ? `${wallDisplayName} + ${accessoriesNames.join(', ')}`
+                                                                    : wallDisplayName;
 
-                                                                addToBasket(wallProduct, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
+                                                                addToBasket(wallDisplayName, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
 
                                                                 // Reset accessories after adding
                                                                 if (isWedge) {

@@ -1287,7 +1287,8 @@ export const ProductConfiguratorV2: React.FC = () => {
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
             (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}× (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
             (structureNote ? ` (${structureNote})` : '');
-        addToBasket(model, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
+        const roofDisplayName = ROOF_MODELS.find(m => m.id === model)?.name || model;
+        addToBasket(roofDisplayName, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
     };
 
     const handleAddAccessoryBatch = () => {
@@ -3123,7 +3124,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 const totalWithAccessories = wallPrice + accessoriesTotal;
 
                                                                 // Build display-friendly name
-                                                                let displayName = wallProduct;
+                                                                let displayName = WALL_PRODUCTS.find(p => p.id === wallProduct)?.name || wallProduct;
                                                                 let configStr = '';
                                                                 if (isSchiebetur) {
                                                                     const schiebaturProduct = SCHIEBETUR_PRODUCTS.find(p => p.id === wallProduct);
