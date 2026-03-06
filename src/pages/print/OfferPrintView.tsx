@@ -342,54 +342,52 @@ export const OfferPrintView: React.FC = () => {
                                                     </div>
                                                 )}
                                             </div>
-                                        ) : (
-                                        ): (() => {
+                                        ) : (() => {
                                             const p = offer.product as any;
-                                        // Post count: from saved Aluxe data or heuristic fallback
-                                        const postCount = p.numberOfPosts || Math.max(2, Math.ceil((p.width || 3000) / 3500) + 1);
-                                        // Rafter/field count: from saved data or heuristic
-                                        const fieldCount = p.numberOfFields || Math.max(2, Math.ceil((p.width || 3000) / 900));
-                                        const rafterCount = fieldCount + 1;
+                                            // Post count: from saved Aluxe data or heuristic fallback
+                                            const postCount = p.numberOfPosts || Math.max(2, Math.ceil((p.width || 3000) / 3500) + 1);
+                                            // Rafter/field count: from saved data or heuristic
+                                            const fieldCount = p.numberOfFields || Math.max(2, Math.ceil((p.width || 3000) / 900));
+                                            const rafterCount = fieldCount + 1;
                                             const isCombined = !!(p.splitPoint && p.width > 7000);
 
-                                        return (
-                                        <div className="grid grid-cols-3 gap-y-6 gap-x-8">
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Modellinie</span>
-                                                <span className="font-bold text-xl block tracking-tight">{model}</span>
-                                            </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Abmessungen (B × T)</span>
-                                                <span className="font-bold text-xl block tracking-tight">{p.width} × {p.projection} mm</span>
-                                            </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Farbgebung</span>
-                                                <span className="font-bold text-lg block">{translateForView(p.color || '', 'colors')}</span>
-                                            </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Dacheindeckung</span>
-                                                <span className="font-bold text-lg block">{translateForView(p.roofType || '', 'roofTypes')}</span>
-                                            </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Montage</span>
-                                                <span className="font-bold text-lg block">{translateForView(p.installationType || 'wall', 'installation')}</span>
-                                            </div>
-                                            <div>
-                                                <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Pfosten / Sparren</span>
-                                                <span className="font-bold text-lg block">{postCount} Pfosten · {rafterCount} Sparren</span>
-                                            </div>
-                                            {isCombined && (
-                                                <div className="col-span-3 pt-2 border-t border-white/10">
-                                                    <span className="block text-[#c5a065] text-[10px] uppercase tracking-wide mb-1">✂️ Verbundkonstruktion</span>
-                                                    <span className="font-bold text-base block">
-                                                        Teilungspfosten bei {p.splitPoint} mm — Segment 1: {p.splitPoint} mm · Segment 2: {p.width - p.splitPoint} mm
-                                                    </span>
+                                            return (
+                                                <div className="grid grid-cols-3 gap-y-6 gap-x-8">
+                                                    <div>
+                                                        <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Modellinie</span>
+                                                        <span className="font-bold text-xl block tracking-tight">{model}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Abmessungen (B × T)</span>
+                                                        <span className="font-bold text-xl block tracking-tight">{p.width} × {p.projection} mm</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Farbgebung</span>
+                                                        <span className="font-bold text-lg block">{translateForView(p.color || '', 'colors')}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Dacheindeckung</span>
+                                                        <span className="font-bold text-lg block">{translateForView(p.roofType || '', 'roofTypes')}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Montage</span>
+                                                        <span className="font-bold text-lg block">{translateForView(p.installationType || 'wall', 'installation')}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-slate-400 text-[10px] uppercase tracking-wide mb-1">Pfosten / Sparren</span>
+                                                        <span className="font-bold text-lg block">{postCount} Pfosten · {rafterCount} Sparren</span>
+                                                    </div>
+                                                    {isCombined && (
+                                                        <div className="col-span-3 pt-2 border-t border-white/10">
+                                                            <span className="block text-[#c5a065] text-[10px] uppercase tracking-wide mb-1">✂️ Verbundkonstruktion</span>
+                                                            <span className="font-bold text-base block">
+                                                                Teilungspfosten bei {p.splitPoint} mm — Segment 1: {p.splitPoint} mm · Segment 2: {p.width - p.splitPoint} mm
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                        );
+                                            );
                                         })()}
-                                        )}
                                     </div>
 
                                     {/* FOOTER NOTE PAGE 1 */}
