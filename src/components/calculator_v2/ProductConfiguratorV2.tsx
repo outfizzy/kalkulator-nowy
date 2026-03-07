@@ -1745,6 +1745,7 @@ export const ProductConfiguratorV2: React.FC = () => {
         };
 
         const handleGenerateEmail = async () => {
+            console.log('[EMAIL] handleGenerateEmail called', { currentUser: !!currentUser, savedOffer: !!savedOffer });
             if (!currentUser) {
                 toast.error('Nicht angemeldet — bitte erneut einloggen');
                 return;
@@ -1788,8 +1789,9 @@ E-Mail: buero@polendach24.de`;
                 setEmailBody(body);
                 setEmailSubject(`Angebot ${offerNr} — Terrassenüberdachung ${modelLabel}`);
                 setShowEmailModal(true);
+                console.log('[EMAIL] Modal opened successfully');
             } catch (error) {
-                console.error('Email generation failed', error);
+                console.error('[EMAIL] Generation FAILED:', error);
                 toast.error('Fehler beim Generieren der E-Mail');
             } finally {
                 setIsGeneratingEmail(false);
@@ -1859,6 +1861,7 @@ E-Mail: buero@polendach24.de`;
         };
 
         const handleSendOfferEmail = async () => {
+            console.log('[EMAIL] handleSendOfferEmail called');
             const toEmail = customerState?.email;
             if (!toEmail) { toast.error('Keine E-Mail-Adresse des Kunden'); return; }
             setIsSendingEmail(true);
@@ -1866,9 +1869,11 @@ E-Mail: buero@polendach24.de`;
                 // Build PDF
                 let pdfAttachment: { filename: string; content: string; contentType: string } | undefined;
                 if (attachPDF) {
+                    console.log('[EMAIL] Generating PDF attachment...');
                     const pdfData = buildPDFData();
                     const { base64, filename } = generateOfferPDFBase64(pdfData);
                     pdfAttachment = { filename, content: base64, contentType: 'application/pdf' };
+                    console.log('[EMAIL] PDF ready:', filename, 'base64 length:', base64.length);
                 }
 
                 // Determine SMTP config — always fetch from DB mailboxes
@@ -1904,6 +1909,7 @@ E-Mail: buero@polendach24.de`;
                             : box.name;
                     }
                 }
+                console.log('[EMAIL] SMTP config resolved:', { emailSender, hasConfig: !!smtpConfig, host: smtpConfig?.smtpHost, user: smtpConfig?.smtpUser });
 
                 // Call edge function
                 // Convert plain text body to styled HTML email
@@ -1913,6 +1919,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 <p style="font-size:11px;color:#999">Polendach24 — Terrassenüberdachungen &amp; Carports<br/>buero@polendach24.de | +49 176 47453883</p>
 </body></html>`;
 
+                console.log('[EMAIL] Calling edge function send-email...', { to: toEmail, hasConfig: !!smtpConfig, hasAttachments: !!pdfAttachment });
                 const { data: emailResult, error } = await supabase.functions.invoke('send-email', {
                     body: {
                         to: toEmail,
