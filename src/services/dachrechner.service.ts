@@ -197,6 +197,7 @@ export interface DachrechnerResults {
 
     // Widths
     innerWidth: number | null;       // Säulen Innen-Innen (Szerokość między słupami)
+    postWidth: number;               // Model-specific post width (mm)
 }
 
 // Helper functions
@@ -237,6 +238,8 @@ export function calculateDachrechner(
         fensterF3: null,
         keilhoeheK1: null,
         keilhoeheK2: null,
+        innerWidth: null,
+        postWidth: model.postWidth,
     };
 
     switch (model.category) {
@@ -277,6 +280,7 @@ export function calculateDachrechner(
     if (inputs.width) {
         const posts = inputs.postCount || 2;
         const postWidth = model.postWidth; // Model-specific post width
+        results.postWidth = postWidth;
         if (posts > 1) {
             results.innerWidth = (inputs.width - (posts * postWidth)) / (posts - 1);
         } else {

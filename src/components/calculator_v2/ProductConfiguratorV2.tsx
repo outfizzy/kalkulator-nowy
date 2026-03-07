@@ -541,17 +541,21 @@ export const ProductConfiguratorV2: React.FC = () => {
         const isFrontPlacement = wallPlacement === 'front';
 
         // Side wall width = fensterF2 (depth-based: distance from front post to house wall)
-        // Front segment width = innerWidth (horizontal gap between posts)
+        // Front segment width = calculated from BASE posts only (extras are structural, not glass boundaries)
         const sideWallWidth = dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null;
-        const frontSegmentWidth = dachrechnerResults.innerWidth ? Math.round(dachrechnerResults.innerWidth) : null;
-        const postHeight = dachH3; // H3 = post height for all wall products
+        const basePosts = structuralMetadata?.posts_count || 2;
+        const pw = dachrechnerResults.postWidth || 120; // Model-specific post width from Dachrechner
+        // Glass systems span between BASE posts only — extra posts are structural reinforcement
+        const frontSegmentWidth = basePosts > 1
+            ? Math.round((width - basePosts * pw) / (basePosts - 1))
+            : (width ? Math.round(width - pw) : null);
+        const postHeight = dachH3;
 
         if (isWedge) {
-            // Keilfenster: always side-mounted, width = fensterF2, height auto from K1/K2
             if (sideWallWidth) setWallWidth(sideWallWidth);
             if (dachrechnerResults.keilhoeheK1) setWallHeight(Math.round(dachrechnerResults.keilhoeheK1));
         } else if (isFrontPlacement) {
-            // ANY product on front: width = innerWidth per segment, height = H3
+            // ANY product on front: width = segment between BASE posts, height = H3
             if (frontSegmentWidth) setWallWidth(frontSegmentWidth);
             setWallHeight(postHeight);
         } else {
@@ -3284,7 +3288,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     </div>
                                                     {/* Dimension badge */}
                                                     {dachrechnerResults && (() => {
-                                                        const postsCount = totalPostCount;
+                                                        const postsCount = structuralMetadata?.posts_count || 2;
                                                         const frontSegments = postsCount - 1;
                                                         const isFrontPlacement = wallPlacement === 'front';
                                                         return (
@@ -3823,7 +3827,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                                     <div className="relative z-10 text-center space-y-4">
                                                         {(() => {
-                                                            const postsCount = totalPostCount;
+                                                            const postsCount = structuralMetadata?.posts_count || 2;
                                                             const frontSegments = postsCount - 1;
                                                             const isFrontPlacement = wallPlacement === 'front';
                                                             const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
@@ -3890,7 +3894,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                         : displayName;
                                                                 }
 
-                                                                const postsCount = totalPostCount;
+                                                                const postsCount = structuralMetadata?.posts_count || 2;
                                                                 const frontSegments = postsCount - 1;
                                                                 const isFrontPlacement = wallPlacement === 'front';
                                                                 const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
