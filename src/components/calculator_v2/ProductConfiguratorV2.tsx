@@ -369,7 +369,20 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [wallPrice, setWallPrice] = useState<number | null>(null);
     const [wallPriceLoading, setWallPriceLoading] = useState(false);
     const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama'>('fixed');
-    const [structuralMetadata, setStructuralMetadata] = useState<{ posts_count: number } | null>(null);
+    const [structuralMetadata, setStructuralMetadata] = useState<{
+        posts_count: number;
+        fields_count: number;
+        rafter_type: string | null;
+    } | null>(null);
+
+    // === EXTRA POSTS (Zusatzpfosten) ===
+    const [extraPosts, setExtraPosts] = useState<number>(0);
+    const [extraPostHeight, setExtraPostHeight] = useState<2400 | 3000>(2400);
+    const EXTRA_POST_BASE_PRICE = 58.20; // per extra post, 2400mm
+    const EXTRA_POST_3000_SURCHARGE = 15.0; // per post surcharge for 3000mm — applies to ALL posts (base + extra)
+    const totalPostCount = (structuralMetadata?.posts_count || 2) + extraPosts;
+    const heightSurcharge = extraPostHeight === 3000 ? totalPostCount * EXTRA_POST_3000_SURCHARGE : 0;
+    const extraPostTotalPrice = (extraPosts * EXTRA_POST_BASE_PRICE) + heightSurcharge;
 
     // === SCHIEBETÜR OPTIONS ===
     const [schiebetuerHandle, setSchiebetuerHandle] = useState<string>('ACSL2042');
@@ -478,7 +491,10 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     // === DACHRECHNER INTEGRATION ===
     // Map V2 model IDs to Dachrechner model keys
-    const getDachrechnerModelId = (v2ModelId: string): RoofModelId | null => {
+    // Freestanding Skyline/Carport use separate calc functions (extra post subtracted)
+    const getDachrechnerModelId = (v2ModelId: string, constr: ConstructionType): RoofModelId | null => {
+        if (v2ModelId === 'Skyline') return constr === 'freestanding' ? 'skyline_freistand' : 'skyline';
+        if (v2ModelId === 'Carport') return constr === 'freestanding' ? 'carport_freistand' : 'carport';
         const map: Record<string, RoofModelId> = {
             'Orangeline': 'orangeline',
             'Orangeline+': 'orangeline+',
@@ -488,15 +504,13 @@ export const ProductConfiguratorV2: React.FC = () => {
             'Topline XL': 'topline_xl',
             'Designline': 'designline',
             'Ultraline': 'ultraline_classic',
-            'Skyline': 'skyline',
-            'Carport': 'carport',
         };
         return map[v2ModelId] || null;
     };
 
     // Run Dachrechner calculation whenever roof config changes
     const dachrechnerResults = useMemo<DachrechnerResults | null>(() => {
-        const drModelId = getDachrechnerModelId(model);
+        const drModelId = getDachrechnerModelId(model, construction);
         if (!drModelId || !projection) return null;
         try {
             return calculateDachrechner(drModelId, {
@@ -505,12 +519,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                 h1: modelDrConfig.needsH1 ? dachH1 : undefined,
                 width: width,
                 overhang: modelDrConfig.needsOverhang ? dachOverhang : undefined,
-                postCount: structuralMetadata?.posts_count || 2,
+                postCount: (structuralMetadata?.posts_count || 2) + extraPosts,
             });
         } catch {
             return null;
         }
-    }, [model, projection, width, dachH3, dachH1, dachOverhang, modelDrConfig, structuralMetadata]);
+    }, [model, construction, projection, width, dachH3, dachH1, dachOverhang, modelDrConfig, structuralMetadata, extraPosts]);
 
     // Auto-fill wall dimensions from Dachrechner when product changes
     useEffect(() => {
@@ -913,38 +927,71 @@ export const ProductConfiguratorV2: React.FC = () => {
     useEffect(() => {
         const fetchStructural = async () => {
             try {
-                // Determine table name for structural lookup
-                // We use the current configuration (Model + Cover + Zone)
-                // If it's pure structure, cover might not matter much but we need a valid table name
-                const tableName = buildTableName(model, cover, zone, construction);
+                const table = await findPriceTable(supabase, model, cover, zone, construction);
 
-                const { data: tables } = await supabase
-                    .from('price_tables')
-                    .select('id')
-                    .eq('name', tableName)
-                    .limit(1);
-
-                if (tables && tables.length > 0) {
-                    const { data: entries } = await supabase
+                if (table) {
+                    // Posts count depends primarily on width — find nearest width ≤ user's width
+                    // Also fetch fields_count and rafter_type for the exact width×projection if possible
+                    const { data: exactEntries } = await supabase
                         .from('price_matrix_entries')
-                        .select('posts_count')
-                        .eq('price_table_id', tables[0].id)
+                        .select('posts_count, fields_count, rafter_type, width_mm')
+                        .eq('price_table_id', table.id)
                         .eq('width_mm', width)
                         .eq('projection_mm', projection)
+                        .not('posts_count', 'is', null)
                         .limit(1);
 
-                    if (entries && entries.length > 0) {
-                        setStructuralMetadata({ posts_count: entries[0].posts_count });
+                    if (exactEntries && exactEntries.length > 0 && exactEntries[0].posts_count) {
+                        setStructuralMetadata({
+                            posts_count: exactEntries[0].posts_count,
+                            fields_count: exactEntries[0].fields_count || 0,
+                            rafter_type: exactEntries[0].rafter_type || null,
+                        });
                     } else {
-                        setStructuralMetadata(null);
+                        // Fallback: nearest width ≤ user's width for posts_count
+                        const { data: nearEntries } = await supabase
+                            .from('price_matrix_entries')
+                            .select('posts_count, fields_count, rafter_type, width_mm')
+                            .eq('price_table_id', table.id)
+                            .lte('width_mm', width)
+                            .eq('projection_mm', projection)
+                            .not('posts_count', 'is', null)
+                            .order('width_mm', { ascending: false })
+                            .limit(1);
+
+                        if (nearEntries && nearEntries.length > 0 && nearEntries[0].posts_count) {
+                            setStructuralMetadata({
+                                posts_count: nearEntries[0].posts_count,
+                                fields_count: nearEntries[0].fields_count || 0,
+                                rafter_type: nearEntries[0].rafter_type || null,
+                            });
+                        } else {
+                            // Fallback: if width is beyond max in table, get the highest width entry
+                            const { data: maxEntries } = await supabase
+                                .from('price_matrix_entries')
+                                .select('posts_count, fields_count, rafter_type, width_mm')
+                                .eq('price_table_id', table.id)
+                                .not('posts_count', 'is', null)
+                                .order('width_mm', { ascending: false })
+                                .limit(1);
+
+                            if (maxEntries && maxEntries.length > 0 && maxEntries[0].posts_count) {
+                                setStructuralMetadata({
+                                    posts_count: maxEntries[0].posts_count,
+                                    fields_count: maxEntries[0].fields_count || 0,
+                                    rafter_type: maxEntries[0].rafter_type || null,
+                                });
+                            } else {
+                                setStructuralMetadata(null);
+                            }
+                        }
                     }
+                } catch (e) {
+                    console.error('Structural fetch error:', e);
                 }
-            } catch (e) {
-                console.error('Structural fetch error:', e);
-            }
-        };
-        fetchStructural();
-    }, [model, cover, zone, construction, width, projection]);
+            };
+            fetchStructural();
+        }, [model, cover, zone, construction, width, projection]);
 
     // === CALCULATE SCHIEBEEINHEIT (Sliding Roof) PRICE FOR DESIGNLINE ===
     useEffect(() => {
@@ -1353,8 +1400,8 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const totalPrice = useMemo(() => {
         if (price === null) return null;
-        return price + freestandingSurchargePrice + variantSurchargePrice + sonderfarbenSurcharge + schiebeeinheitTotalPrice;
-    }, [price, freestandingSurchargePrice, variantSurchargePrice, sonderfarbenSurcharge, schiebeeinheitTotalPrice]);
+        return price + freestandingSurchargePrice + variantSurchargePrice + sonderfarbenSurcharge + schiebeeinheitTotalPrice + extraPostTotalPrice;
+    }, [price, freestandingSurchargePrice, variantSurchargePrice, sonderfarbenSurcharge, schiebeeinheitTotalPrice, extraPostTotalPrice]);
 
     const addToBasket = (itemName: string, itemPrice: number, configStr: string, dimStr: string, category: BasketItem['category']) => {
         const newItem: BasketItem = {
@@ -1380,6 +1427,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             (construction === 'freestanding' && includeFoundations ? ' + Fundamenty' : '') +
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
             (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}× (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
+            (extraPosts > 0 ? ` | Zusatzpfosten: ${extraPosts}× ${extraPostHeight}mm (+${formatCurrency(extraPostTotalPrice)})` : '') +
             (structureNote ? ` (${structureNote})` : '');
         const roofDisplayName = ROOF_MODELS.find(m => m.id === model)?.name || model;
         addToBasket(roofDisplayName, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
@@ -2619,6 +2667,115 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     )}
                                 </div>
 
+                                {/* Structural Info Panel + Zusatzpfosten */}
+                                {structuralMetadata && (
+                                    <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4">
+                                        <h5 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-3">
+                                            🏗️ Konstruktionsdaten
+                                        </h5>
+
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
+                                            {/* Posts in price */}
+                                            <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
+                                                <span className="block text-amber-600 uppercase text-[9px] font-bold">Pfosten (im Preis)</span>
+                                                <span className="font-black text-amber-900 text-lg">{structuralMetadata.posts_count}</span>
+                                            </div>
+                                            {/* Fields */}
+                                            {structuralMetadata.fields_count > 0 && (
+                                                <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
+                                                    <span className="block text-amber-600 uppercase text-[9px] font-bold">Felder</span>
+                                                    <span className="font-black text-amber-900 text-lg">{structuralMetadata.fields_count}</span>
+                                                </div>
+                                            )}
+                                            {/* Rafter type */}
+                                            {structuralMetadata.rafter_type && (
+                                                <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
+                                                    <span className="block text-amber-600 uppercase text-[9px] font-bold">Sparrentyp</span>
+                                                    <span className="font-bold text-amber-900 text-sm">{structuralMetadata.rafter_type}</span>
+                                                </div>
+                                            )}
+                                            {/* Inner width per segment */}
+                                            {dachrechnerResults?.innerWidth != null && (
+                                                <div className="bg-emerald-50 rounded-lg p-2.5 text-center border border-emerald-200">
+                                                    <span className="block text-emerald-600 uppercase text-[9px] font-bold">Breite/Segment</span>
+                                                    <span className="font-black text-emerald-900 text-lg">{Math.round(dachrechnerResults.innerWidth)}</span>
+                                                    <span className="text-emerald-600 text-[10px] ml-0.5">mm</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Zusatzpfosten control */}
+                                        <div className="bg-white/80 rounded-xl p-3 border border-amber-200">
+                                            <div className="flex items-center justify-between flex-wrap gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-slate-700">➕ Zusatzpfosten</span>
+                                                    <span className="text-[10px] text-slate-400">(dodatkowe słupki)</span>
+                                                </div>
+
+                                                <div className="flex items-center gap-3">
+                                                    {/* Height selector */}
+                                                    <div className="flex gap-1">
+                                                        {([2400, 3000] as const).map(h => (
+                                                            <button
+                                                                key={h}
+                                                                onClick={() => setExtraPostHeight(h)}
+                                                                className={`px-2 py-1 text-xs rounded-lg border font-bold transition-all ${extraPostHeight === h
+                                                                    ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
+                                                                    }`}
+                                                            >
+                                                                {h}mm
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* +/- control */}
+                                                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                                                        <button
+                                                            onClick={() => setExtraPosts(p => Math.max(0, p - 1))}
+                                                            disabled={extraPosts === 0}
+                                                            className="w-8 h-8 rounded-lg bg-white shadow-sm font-bold text-lg text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-30"
+                                                        >−</button>
+                                                        <span className="w-8 text-center font-black text-lg text-slate-800">{extraPosts}</span>
+                                                        <button
+                                                            onClick={() => setExtraPosts(p => p + 1)}
+                                                            className="w-8 h-8 rounded-lg bg-white shadow-sm font-bold text-lg text-slate-600 hover:bg-green-50 hover:text-green-600 transition-colors"
+                                                        >+</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Price info */}
+                                            <div className="mt-2 flex items-center justify-between text-xs flex-wrap gap-1">
+                                                <span className="text-slate-500">
+                                                    {extraPosts > 0 && <>{formatCurrency(EXTRA_POST_BASE_PRICE)} / Zusatzpfosten</>}
+                                                    {extraPostHeight === 3000 && (
+                                                        <span className="text-amber-600 ml-1">
+                                                            {extraPosts > 0 && ' + '}+{formatCurrency(EXTRA_POST_3000_SURCHARGE)}/Pfosten für 3000mm ({totalPostCount} Pfosten × {formatCurrency(EXTRA_POST_3000_SURCHARGE)} = {formatCurrency(heightSurcharge)})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                {extraPostTotalPrice > 0 && (
+                                                    <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                                        Σ {formatCurrency(extraPostTotalPrice)}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Total posts summary */}
+                                            {(extraPosts > 0 || extraPostHeight === 3000) && (
+                                                <div className="mt-2 text-xs bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-emerald-800">
+                                                    ✅ Gesamt: <strong>{totalPostCount} Pfosten</strong>
+                                                    {extraPosts > 0 && <> ({structuralMetadata.posts_count} im Preis + {extraPosts} extra)</>}
+                                                    {extraPostHeight === 3000 && <>, Höhe 3000mm</>}
+                                                    {dachrechnerResults?.innerWidth != null && (
+                                                        <span className="ml-2">→ <strong>{Math.round(dachrechnerResults.innerWidth)} mm</strong> pro Segment</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Construction Type */}
                                     <div>
