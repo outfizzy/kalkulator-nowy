@@ -477,6 +477,7 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [emailSender, setEmailSender] = useState<string>('buero'); // 'buero' or mailbox id
     const [isSendingEmail, setIsSendingEmail] = useState(false);
     const [attachPDF, setAttachPDF] = useState(true);
+    const [emailPreviewMode, setEmailPreviewMode] = useState(false);
     const [userMailboxes, setUserMailboxes] = useState<Array<{ id: string; name: string; smtp_host: string; smtp_port: number; smtp_user: string; smtp_password: string }>>([]);
 
     // === CUSTOM ITEMS (Manual Positions) ===
@@ -1818,11 +1819,18 @@ export const ProductConfiguratorV2: React.FC = () => {
                 }
 
                 // Call edge function
+                // Convert plain text body to styled HTML email
+                const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px">
+${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="margin:0 0 8px 0">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('\n')}
+<hr style="border:none;border-top:1px solid #ddd;margin:24px 0 12px"/>
+<p style="font-size:11px;color:#999">Polendach24 — Terrassenüberdachungen &amp; Carports<br/>buero@polendach24.de | +49 176 47453883</p>
+</body></html>`;
+
                 const { error } = await supabase.functions.invoke('send-email', {
                     body: {
                         to: toEmail,
                         subject: emailSubject,
-                        html: emailBody,
+                        html: htmlBody,
                         config: smtpConfig,
                         fromName,
                         attachments: pdfAttachment ? [pdfAttachment] : undefined
@@ -4587,80 +4595,127 @@ export const ProductConfiguratorV2: React.FC = () => {
                     {
                         showEmailModal && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                                <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                        <h3 className="text-xl font-bold text-slate-800">✉️ Angebot per E-Mail senden</h3>
-                                        <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+                                <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-0 animate-in fade-in zoom-in duration-200 max-h-[92vh] overflow-hidden flex flex-col">
+                                    {/* Header */}
+                                    <div className="flex justify-between items-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 rounded-t-2xl">
+                                        <h3 className="text-lg font-bold text-white flex items-center gap-2">✉️ Angebot per E-Mail senden</h3>
+                                        <button onClick={() => setShowEmailModal(false)} className="text-white/70 hover:text-white text-xl transition-colors">✕</button>
                                     </div>
 
-                                    {/* Sender Selection */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Absender</label>
-                                        <select
-                                            value={emailSender}
-                                            onChange={(e) => setEmailSender(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                        >
-                                            <option value="buero">📧 buero@polendach24.de (Hauptpostfach)</option>
-                                            {userMailboxes.map(mb => (
-                                                <option key={mb.id} value={mb.id}>📬 {mb.smtp_user} ({mb.name})</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    <div className="overflow-y-auto flex-1 p-6 space-y-4">
+                                        {/* Sender + Recipient row */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Absender</label>
+                                                <select
+                                                    value={emailSender}
+                                                    onChange={(e) => setEmailSender(e.target.value)}
+                                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                >
+                                                    <option value="buero">📧 buero@polendach24.de</option>
+                                                    {userMailboxes.map(mb => (
+                                                        <option key={mb.id} value={mb.id}>📬 {mb.smtp_user}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empfänger</label>
+                                                <input
+                                                    readOnly
+                                                    value={customerState?.email || '(Keine E-Mail)'}
+                                                    className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600"
+                                                />
+                                            </div>
+                                        </div>
 
-                                    {/* Recipient */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Empfänger</label>
-                                        <input
-                                            readOnly
-                                            value={customerState?.email || '(Keine E-Mail)'}
-                                            className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-600"
-                                        />
-                                    </div>
-
-                                    {/* Subject */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
-                                        <input
-                                            value={emailSubject}
-                                            onChange={(e) => setEmailSubject(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                        />
-                                    </div>
-
-                                    {/* Body */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nachricht</label>
-                                        <textarea
-                                            value={emailBody}
-                                            onChange={(e) => setEmailBody(e.target.value)}
-                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm leading-relaxed"
-                                            rows={10}
-                                        />
-                                    </div>
-
-                                    {/* PDF Attachment Toggle */}
-                                    <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                                        <input
-                                            type="checkbox"
-                                            checked={attachPDF}
-                                            onChange={(e) => setAttachPDF(e.target.checked)}
-                                            className="w-5 h-5 rounded border-amber-300 text-amber-500 focus:ring-amber-400"
-                                        />
+                                        {/* Subject */}
                                         <div>
-                                            <p className="text-sm font-bold text-amber-800">📎 PDF-Angebot anhängen</p>
-                                            <p className="text-xs text-amber-600">Das Angebots-PDF wird als Anhang mitgesendet</p>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Betreff</label>
+                                            <input
+                                                value={emailSubject}
+                                                onChange={(e) => setEmailSubject(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                placeholder="Angebot ..."
+                                            />
+                                        </div>
+
+                                        {/* Body — Edit / Preview toggle */}
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nachricht</label>
+                                                <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs">
+                                                    <button
+                                                        onClick={() => setEmailPreviewMode(false)}
+                                                        className={`px-3 py-1 rounded-md transition-all font-medium ${!emailPreviewMode ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                                                    >✏️ Bearbeiten</button>
+                                                    <button
+                                                        onClick={() => setEmailPreviewMode(true)}
+                                                        className={`px-3 py-1 rounded-md transition-all font-medium ${emailPreviewMode ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                                                    >👁️ Vorschau</button>
+                                                </div>
+                                            </div>
+                                            {emailPreviewMode ? (
+                                                <div className="border border-slate-200 rounded-xl bg-white p-5 min-h-[200px] max-h-[320px] overflow-y-auto">
+                                                    {/* Preview header */}
+                                                    <div className="mb-4 pb-3 border-b border-slate-100 text-xs text-slate-500 space-y-1">
+                                                        <div><strong>Von:</strong> {emailSender === 'buero' ? 'buero@polendach24.de' : (userMailboxes.find(m => m.id === emailSender)?.smtp_user || emailSender)}</div>
+                                                        <div><strong>An:</strong> {customerState?.email || '—'}</div>
+                                                        <div><strong>Betreff:</strong> <span className="font-semibold text-slate-700">{emailSubject}</span></div>
+                                                    </div>
+                                                    {/* Rendered HTML body */}
+                                                    <div
+                                                        className="text-sm leading-relaxed text-slate-800 prose prose-sm max-w-none"
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: emailBody
+                                                                .replace(/&/g, '&amp;')
+                                                                .replace(/</g, '&lt;')
+                                                                .replace(/>/g, '&gt;')
+                                                                .replace(/\n\n/g, '</p><p style="margin:0 0 12px 0">')
+                                                                .replace(/\n/g, '<br/>')
+                                                                .replace(/^/, '<p style="margin:0 0 12px 0">')
+                                                                .replace(/$/, '</p>')
+                                                        }}
+                                                    />
+                                                    {attachPDF && (
+                                                        <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400 flex items-center gap-1.5">
+                                                            📎 <span className="font-medium">PDF-Angebot angehängt</span>
+                                                            <span>({savedOffer?.offerNumber ? `Angebot_${savedOffer.offerNumber}.pdf` : 'Angebot.pdf'})</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <textarea
+                                                    value={emailBody}
+                                                    onChange={(e) => setEmailBody(e.target.value)}
+                                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm leading-relaxed font-mono"
+                                                    rows={10}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* PDF Attachment Toggle */}
+                                        <div className="flex items-center gap-3 p-3 bg-amber-50/70 border border-amber-100 rounded-xl">
+                                            <input
+                                                type="checkbox"
+                                                checked={attachPDF}
+                                                onChange={(e) => setAttachPDF(e.target.checked)}
+                                                className="w-5 h-5 rounded border-amber-300 text-amber-500 focus:ring-amber-400"
+                                            />
+                                            <div>
+                                                <p className="text-sm font-bold text-amber-800">📎 PDF-Angebot anhängen</p>
+                                                <p className="text-xs text-amber-600">Das Angebots-PDF wird als Anhang mitgesendet</p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Actions */}
-                                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                    {/* Actions footer */}
+                                    <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
                                         <button
                                             onClick={() => {
                                                 navigator.clipboard.writeText(emailBody);
                                                 toast.success('In die Zwischenablage kopiert');
                                             }}
-                                            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium"
+                                            className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 font-medium transition-colors"
                                         >
                                             📋 Kopieren
                                         </button>
@@ -4674,9 +4729,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             <button
                                                 onClick={handleSendOfferEmail}
                                                 disabled={isSendingEmail || !customerState?.email}
-                                                className={`px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-2 ${isSendingEmail || !customerState?.email
+                                                className={`px-6 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${isSendingEmail || !customerState?.email
                                                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200 hover:shadow-blue-300'
                                                     }`}
                                             >
                                                 {isSendingEmail ? (

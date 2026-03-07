@@ -2,7 +2,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface OfferPDFData {
-    // Customer
     customer: {
         salutation?: string;
         firstName?: string;
@@ -16,7 +15,6 @@ interface OfferPDFData {
         phone?: string;
         email?: string;
     };
-    // Technical specs (optional — not shown for manual mode)
     technical?: {
         model: string;
         width: number;
@@ -30,14 +28,12 @@ interface OfferPDFData {
         extraPostHeight?: number;
         rafterType?: string | null;
     };
-    // Positions (basket items + custom items)
     positions: Array<{
         name: string;
         description: string;
         dimensions?: string;
         price: number;
     }>;
-    // Pricing breakdown
     pricing: {
         subtotal: number;
         marginPercent: number;
@@ -50,124 +46,145 @@ interface OfferPDFData {
         finalPriceGross: number;
         purchaseDiscount?: number;
     };
-    // Meta
     offerNumber?: string;
     offerDate?: string;
     salesPerson?: string;
 }
 
-const PRIMARY_COLOR: [number, number, number] = [30, 58, 95];
-const ACCENT_COLOR: [number, number, number] = [59, 130, 246];
-const LIGHT_BG: [number, number, number] = [245, 247, 250];
+// ──── COLORS ────
+const NAVY: [number, number, number] = [15, 30, 55];
+const BLUE: [number, number, number] = [40, 100, 210];
+const DARK_GRAY: [number, number, number] = [60, 60, 65];
+const MED_GRAY: [number, number, number] = [120, 120, 125];
+const LIGHT_GRAY: [number, number, number] = [200, 200, 205];
+const ZEBRA_BG: [number, number, number] = [245, 247, 252];
+const WHITE: [number, number, number] = [255, 255, 255];
 
-const formatEUR = (val: number): string => {
-    return val.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
-};
+const formatEUR = (val: number): string =>
+    val.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
+// ──── DOCUMENT BUILDER ────
 const buildOfferDoc = (data: OfferPDFData): { doc: jsPDF; filename: string } => {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    const marginLeft = 15;
-    const marginRight = 15;
-    const contentWidth = pageWidth - marginLeft - marginRight;
-    let cursorY = 0;
+    const W = doc.internal.pageSize.width;   // 210
+    const H = doc.internal.pageSize.height;  // 297
+    const ML = 18;   // margin left
+    const MR = 18;   // margin right
+    const CW = W - ML - MR;                 // content width (174)
+    let Y = 0;
 
-    const addFooter = () => {
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setFontSize(7);
-            doc.setTextColor(150, 150, 150);
-            doc.text(`Seite ${i} von ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
-            doc.text(`Erstellt am ${new Date().toLocaleDateString('de-DE')} • Angebot freibleibend`, pageWidth / 2, pageHeight - 4, { align: 'center' });
-        }
+    // ── helpers ──
+    const pageBreak = (need: number) => {
+        if (Y + need > H - 28) { doc.addPage(); Y = 22; }
     };
-
-    const checkPageBreak = (neededHeight: number): void => {
-        if (cursorY + neededHeight > pageHeight - 25) {
-            doc.addPage();
-            cursorY = 20;
-        }
+    const separator = (y: number, color: [number, number, number] = LIGHT_GRAY) => {
+        doc.setDrawColor(...color);
+        doc.setLineWidth(0.3);
+        doc.line(ML, y, W - MR, y);
     };
-
-    // 1. HEADER
-    cursorY = 20;
-    doc.setFontSize(18);
-    doc.setTextColor(...PRIMARY_COLOR);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ALUXE', marginLeft, cursorY);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(120, 120, 120);
-    doc.text('Terrassenüberdachungen & Carports', marginLeft, cursorY + 5);
-
-    doc.setFontSize(10);
-    doc.setTextColor(...PRIMARY_COLOR);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ANGEBOT', pageWidth - marginRight, cursorY, { align: 'right' });
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    if (data.offerNumber) {
-        doc.text(`Nr.: ${data.offerNumber}`, pageWidth - marginRight, cursorY + 5, { align: 'right' });
-    }
-    doc.text(`Datum: ${data.offerDate || new Date().toLocaleDateString('de-DE')}`, pageWidth - marginRight, cursorY + 10, { align: 'right' });
-    if (data.salesPerson) {
-        doc.text(`Berater: ${data.salesPerson}`, pageWidth - marginRight, cursorY + 15, { align: 'right' });
-    }
-
-    cursorY += 22;
-    doc.setDrawColor(...ACCENT_COLOR);
-    doc.setLineWidth(0.5);
-    doc.line(marginLeft, cursorY, pageWidth - marginRight, cursorY);
-    cursorY += 8;
-
-    // 2. KUNDENDATEN
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...PRIMARY_COLOR);
-    doc.text('Kundendaten', marginLeft, cursorY);
-    cursorY += 6;
-
-    const c = data.customer;
-    const customerLines: string[][] = [];
-    const fullName = [c.salutation, c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
-    if (fullName) customerLines.push(['Name:', fullName]);
-    if (c.companyName) customerLines.push(['Firma:', c.companyName]);
-    const address = [c.street, c.houseNumber].filter(Boolean).join(' ');
-    const cityLine = [c.postalCode, c.city].filter(Boolean).join(' ');
-    if (address || cityLine) customerLines.push(['Adresse:', [address, cityLine].filter(Boolean).join(', ')]);
-    if (c.phone) customerLines.push(['Telefon:', c.phone]);
-    if (c.email) customerLines.push(['E-Mail:', c.email]);
-
-    autoTable(doc, {
-        startY: cursorY,
-        head: [],
-        body: customerLines,
-        theme: 'plain',
-        styles: { fontSize: 9, cellPadding: { top: 1, bottom: 1, left: 2, right: 2 } },
-        columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 25, textColor: [80, 80, 80] },
-            1: { cellWidth: 'auto' }
-        },
-        margin: { left: marginLeft }
-    });
-    cursorY = (doc as any).lastAutoTable.finalY + 8;
-
-    // 3. TECHNISCHE DATEN
-    if (data.technical) {
-        checkPageBreak(45);
+    const sectionTitle = (title: string) => {
+        pageBreak(18);
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...PRIMARY_COLOR);
-        doc.text('Produktkonfiguration', marginLeft, cursorY);
-        cursorY += 6;
+        doc.setTextColor(...NAVY);
+        doc.text(title.toUpperCase(), ML, Y);
+        Y += 1.5;
+        separator(Y, BLUE);
+        Y += 5;
+    };
+    const addFooter = () => {
+        const pages = doc.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i);
+            // Thin line
+            doc.setDrawColor(...LIGHT_GRAY);
+            doc.setLineWidth(0.2);
+            doc.line(ML, H - 16, W - MR, H - 16);
+            // Left — company
+            doc.setFontSize(6.5);
+            doc.setTextColor(...MED_GRAY);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Polendach24 — Terrassenüberdachungen & Carports', ML, H - 12);
+            doc.text('Tel: +49 176 47453883 | buero@polendach24.de', ML, H - 8.5);
+            // Right — page number
+            doc.text(`Seite ${i} / ${pages}`, W - MR, H - 12, { align: 'right' });
+            doc.text(`Erstellt: ${new Date().toLocaleDateString('de-DE')}`, W - MR, H - 8.5, { align: 'right' });
+        }
+    };
 
+    // ═══════════════════════════════════════
+    // 1. HEADER BAR
+    // ═══════════════════════════════════════
+    // Dark navy strip
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, W, 32, 'F');
+
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('POLENDACH24', ML, 14);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(180, 200, 230);
+    doc.text('Terrassenüberdachungen & Carports — Qualität aus Aluminium', ML, 20);
+
+    // Right side — Offer meta
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ANGEBOT', W - MR, 12, { align: 'right' });
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    if (data.offerNumber) {
+        doc.text(`Nr.: ${data.offerNumber}`, W - MR, 17, { align: 'right' });
+    }
+    doc.text(`Datum: ${data.offerDate || new Date().toLocaleDateString('de-DE')}`, W - MR, 22, { align: 'right' });
+    if (data.salesPerson) {
+        doc.text(`Berater: ${data.salesPerson}`, W - MR, 27, { align: 'right' });
+    }
+
+    Y = 42;
+
+    // ═══════════════════════════════════════
+    // 2. KUNDENDATEN
+    // ═══════════════════════════════════════
+    sectionTitle('Kundendaten');
+
+    const c = data.customer;
+    const fullName = [c.salutation, c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+    const customerRows: string[][] = [];
+    if (fullName) customerRows.push(['Name:', fullName]);
+    if (c.companyName) customerRows.push(['Firma:', c.companyName]);
+    const addr = [c.street, c.houseNumber].filter(Boolean).join(' ');
+    const city = [c.postalCode, c.city].filter(Boolean).join(' ');
+    if (addr || city) customerRows.push(['Adresse:', [addr, city].filter(Boolean).join(', ')]);
+    if (c.phone) customerRows.push(['Telefon:', c.phone]);
+    if (c.email) customerRows.push(['E-Mail:', c.email]);
+
+    if (customerRows.length > 0) {
+        autoTable(doc, {
+            startY: Y,
+            body: customerRows,
+            theme: 'plain',
+            styles: { fontSize: 9, cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 } },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 22, textColor: DARK_GRAY },
+                1: { cellWidth: 'auto', textColor: [30, 30, 30] }
+            },
+            margin: { left: ML }
+        });
+        Y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ═══════════════════════════════════════
+    // 3. PRODUKTKONFIGURATION
+    // ═══════════════════════════════════════
+    if (data.technical) {
+        sectionTitle('Produktkonfiguration');
         const t = data.technical;
-        const techData: string[][] = [
+        const techRows: string[][] = [
             ['Modell:', t.model],
             ['Abmessungen:', `${t.width} × ${t.projection} mm (B × T)`],
             ['Eindeckung:', `${t.cover} — ${t.variant}`],
@@ -175,122 +192,161 @@ const buildOfferDoc = (data: OfferPDFData): { doc: jsPDF; filename: string } => 
             ['Farbe:', t.color],
         ];
         if (t.postsCount) {
-            const totalPosts = t.postsCount + (t.extraPosts || 0);
-            let postDesc = `${totalPosts} Stück`;
-            if (t.extraPosts && t.extraPosts > 0) postDesc += ` (${t.postsCount} inkl. + ${t.extraPosts} Zusatzpfosten)`;
-            if (t.extraPostHeight === 3000) postDesc += ' — Höhe 3000mm';
-            techData.push(['Pfosten:', postDesc]);
+            const total = t.postsCount + (t.extraPosts || 0);
+            let desc = `${total} Stück`;
+            if (t.extraPosts && t.extraPosts > 0) desc += ` (${t.postsCount} inkl. + ${t.extraPosts} Zusatzpfosten)`;
+            if (t.extraPostHeight === 3000) desc += ' — Höhe 3000 mm';
+            techRows.push(['Pfosten:', desc]);
         }
-        if (t.rafterType) techData.push(['Sparrentyp:', t.rafterType]);
+        if (t.rafterType) techRows.push(['Sparrentyp:', t.rafterType]);
 
         autoTable(doc, {
-            startY: cursorY,
-            head: [],
-            body: techData,
+            startY: Y,
+            body: techRows,
             theme: 'plain',
-            styles: { fontSize: 9, cellPadding: { top: 1.2, bottom: 1.2, left: 2, right: 2 } },
+            styles: { fontSize: 9, cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 } },
             columnStyles: {
-                0: { fontStyle: 'bold', cellWidth: 30, textColor: [80, 80, 80] },
-                1: { cellWidth: 'auto' }
+                0: { fontStyle: 'bold', cellWidth: 28, textColor: DARK_GRAY },
+                1: { cellWidth: 'auto', textColor: [30, 30, 30] }
             },
-            margin: { left: marginLeft }
+            margin: { left: ML }
         });
-        cursorY = (doc as any).lastAutoTable.finalY + 10;
+        Y = (doc as any).lastAutoTable.finalY + 8;
     }
 
+    // ═══════════════════════════════════════
     // 4. POSITIONSTABELLE
-    checkPageBreak(30);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...PRIMARY_COLOR);
-    doc.text('Positionen', marginLeft, cursorY);
-    cursorY += 6;
+    // ═══════════════════════════════════════
+    sectionTitle('Positionen');
 
     const posBody = data.positions.map((pos, i) => [
-        String(i + 1), pos.name, pos.description, pos.dimensions || '', formatEUR(pos.price)
+        String(i + 1),
+        pos.name,
+        pos.description,
+        pos.dimensions || '',
+        formatEUR(pos.price)
     ]);
 
     autoTable(doc, {
-        startY: cursorY,
-        head: [['Nr.', 'Bezeichnung', 'Beschreibung', 'Maße', 'Preis (netto)']],
+        startY: Y,
+        head: [['Nr.', 'Bezeichnung', 'Beschreibung', 'Maße', 'Preis netto']],
         body: posBody,
         theme: 'grid',
-        headStyles: { fillColor: PRIMARY_COLOR, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
-        styles: { fontSize: 8.5, cellPadding: { top: 3, bottom: 3, left: 3, right: 3 }, overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.2 },
-        alternateRowStyles: { fillColor: LIGHT_BG },
-        columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 35, fontStyle: 'bold' },
-            2: { cellWidth: 'auto' },
-            3: { cellWidth: 28, halign: 'center', fontSize: 7.5 },
-            4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
+        headStyles: {
+            fillColor: NAVY,
+            textColor: WHITE,
+            fontStyle: 'bold',
+            fontSize: 8,
+            cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
         },
-        margin: { left: marginLeft, right: marginRight },
+        styles: {
+            fontSize: 8,
+            cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+            overflow: 'linebreak',
+            lineColor: [210, 210, 215],
+            lineWidth: 0.15,
+            textColor: [30, 30, 30],
+        },
+        alternateRowStyles: { fillColor: ZEBRA_BG },
+        columnStyles: {
+            0: { cellWidth: 10, halign: 'center', textColor: MED_GRAY },
+            1: { cellWidth: 34, fontStyle: 'bold' },
+            2: { cellWidth: 'auto' },
+            3: { cellWidth: 30, halign: 'center', fontSize: 7, textColor: DARK_GRAY },
+            4: { cellWidth: 26, halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: ML, right: MR },
         rowPageBreak: 'avoid',
         showHead: 'everyPage',
     });
-    cursorY = (doc as any).lastAutoTable.finalY + 10;
+    Y = (doc as any).lastAutoTable.finalY + 10;
 
+    // ═══════════════════════════════════════
     // 5. PREISZUSAMMENFASSUNG
-    checkPageBreak(60);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...PRIMARY_COLOR);
-    doc.text('Preiszusammenfassung', marginLeft, cursorY);
-    cursorY += 6;
+    // ═══════════════════════════════════════
+    sectionTitle('Preiszusammenfassung');
 
     const p = data.pricing;
     const priceRows: (string | { content: string; styles?: any })[][] = [];
-    priceRows.push(['Zwischensumme (Katalogpreis)', formatEUR(p.subtotal)]);
-    if (p.marginPercent > 0) priceRows.push([`Aufschlag (${p.marginPercent}%)`, `+ ${formatEUR(p.marginValue)}`]);
-    if (p.discountPercent > 0) priceRows.push([`Rabatt (${p.discountPercent}%)`, `- ${formatEUR(p.discountValue)}`]);
-    if (p.extraPostTotal > 0) priceRows.push(['Zusatzpfosten / Höhenaufschlag', `+ ${formatEUR(p.extraPostTotal)}`]);
-    if (p.montagePrice > 0) priceRows.push(['Montage', `+ ${formatEUR(p.montagePrice)}`]);
 
+    priceRows.push(['Zwischensumme (Katalogpreis)', formatEUR(p.subtotal)]);
+    if (p.marginPercent > 0)
+        priceRows.push([`Aufschlag ${p.marginPercent}%`, `+ ${formatEUR(p.marginValue)}`]);
+    if (p.discountPercent > 0)
+        priceRows.push([`Rabatt ${p.discountPercent}%`, `− ${formatEUR(p.discountValue)}`]);
+    if (p.extraPostTotal > 0)
+        priceRows.push(['Zusatzpfosten / Höhenaufschlag', `+ ${formatEUR(p.extraPostTotal)}`]);
+    if (p.montagePrice > 0)
+        priceRows.push(['Montage', `+ ${formatEUR(p.montagePrice)}`]);
+
+    // Netto total
     priceRows.push([
-        { content: 'Gesamtbetrag netto', styles: { fontStyle: 'bold', fontSize: 10 } },
-        { content: formatEUR(p.finalPriceNet), styles: { fontStyle: 'bold', fontSize: 10, halign: 'right' } }
+        { content: 'Gesamtbetrag netto', styles: { fontStyle: 'bold', fontSize: 10, textColor: NAVY } },
+        { content: formatEUR(p.finalPriceNet), styles: { fontStyle: 'bold', fontSize: 10, halign: 'right', textColor: NAVY } }
     ]);
-    priceRows.push(['zzgl. 19% MwSt.', `+ ${formatEUR(p.finalPriceGross - p.finalPriceNet)}`]);
+    // MwSt
+    priceRows.push(['zzgl. 19 % MwSt.', `+ ${formatEUR(p.finalPriceGross - p.finalPriceNet)}`]);
+    // Brutto total
     priceRows.push([
-        { content: 'Gesamtbetrag brutto', styles: { fontStyle: 'bold', fontSize: 11, textColor: PRIMARY_COLOR } },
-        { content: formatEUR(p.finalPriceGross), styles: { fontStyle: 'bold', fontSize: 11, halign: 'right', textColor: PRIMARY_COLOR } }
+        { content: 'Gesamtbetrag brutto', styles: { fontStyle: 'bold', fontSize: 12, textColor: NAVY } },
+        { content: formatEUR(p.finalPriceGross), styles: { fontStyle: 'bold', fontSize: 12, halign: 'right', textColor: NAVY } }
     ]);
 
     autoTable(doc, {
-        startY: cursorY,
-        head: [],
+        startY: Y,
         body: priceRows,
         theme: 'plain',
-        styles: { fontSize: 9, cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 4 } },
+        styles: { fontSize: 9, cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 4 }, textColor: DARK_GRAY },
         columnStyles: {
-            0: { cellWidth: contentWidth - 40 },
-            1: { cellWidth: 40, halign: 'right' }
+            0: { cellWidth: CW - 38 },
+            1: { cellWidth: 38, halign: 'right' }
         },
-        margin: { left: marginLeft, right: marginRight },
+        margin: { left: ML, right: MR },
         didDrawCell: (hookData: any) => {
+            // Separator line before netto total
             if (hookData.row.index === priceRows.length - 3 && hookData.column.index === 0 && hookData.section === 'body') {
-                doc.setDrawColor(...ACCENT_COLOR);
+                doc.setDrawColor(...BLUE);
                 doc.setLineWidth(0.4);
-                doc.line(marginLeft, hookData.cell.y, pageWidth - marginRight, hookData.cell.y);
+                doc.line(ML, hookData.cell.y, W - MR, hookData.cell.y);
+            }
+            // Highlight brutto row with light blue background
+            if (hookData.row.index === priceRows.length - 1 && hookData.section === 'body') {
+                doc.setFillColor(235, 240, 252);
+                doc.rect(hookData.cell.x, hookData.cell.y, hookData.cell.width, hookData.cell.height, 'F');
+                // Re-draw text over fill
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...NAVY);
+                if (hookData.column.index === 0) {
+                    doc.text('Gesamtbetrag brutto', hookData.cell.x + 4, hookData.cell.y + hookData.cell.height / 2 + 1.5);
+                } else {
+                    doc.text(formatEUR(p.finalPriceGross), hookData.cell.x + hookData.cell.width - 4, hookData.cell.y + hookData.cell.height / 2 + 1.5, { align: 'right' });
+                }
             }
         }
     });
-    cursorY = (doc as any).lastAutoTable.finalY + 15;
+    Y = (doc as any).lastAutoTable.finalY + 14;
 
-    // 6. HINWEIS
-    checkPageBreak(25);
-    doc.setFontSize(8);
-    doc.setTextColor(120, 120, 120);
+    // ═══════════════════════════════════════
+    // 6. HINWEISE
+    // ═══════════════════════════════════════
+    pageBreak(28);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MED_GRAY);
     doc.setFont('helvetica', 'normal');
-    const hinweis = [
+    const notes = [
         'Dieses Angebot ist 30 Tage gültig. Alle Preise verstehen sich zzgl. der gesetzlichen Mehrwertsteuer.',
         'Technische Änderungen und Irrtümer vorbehalten. Lieferzeit nach Auftragsbestätigung: ca. 4–6 Wochen.',
-        'Farb- und Materialabweichungen aufgrund der Druckdarstellung sind möglich.'
+        'Farb- und Materialabweichungen aufgrund der Druckdarstellung sind möglich.',
+        'Mit freundlichen Grüßen — Ihr Polendach24 Team'
     ];
-    hinweis.forEach((line, i) => { doc.text(line, marginLeft, cursorY + (i * 4)); });
+    notes.forEach((line, i) => {
+        doc.text(line, ML, Y + i * 4);
+    });
 
+    // ═══════════════════════════════════════
     // 7. FOOTER
+    // ═══════════════════════════════════════
     addFooter();
 
     const filename = data.offerNumber
@@ -300,6 +356,7 @@ const buildOfferDoc = (data: OfferPDFData): { doc: jsPDF; filename: string } => 
     return { doc, filename };
 };
 
+// ── Public API ──
 export const generateOfferPDF = (data: OfferPDFData) => {
     const { doc, filename } = buildOfferDoc(data);
     doc.save(filename);
@@ -307,9 +364,7 @@ export const generateOfferPDF = (data: OfferPDFData) => {
 
 export const generateOfferPDFBase64 = (data: OfferPDFData): { base64: string; filename: string } => {
     const { doc, filename } = buildOfferDoc(data);
-    // datauristring gives "data:application/pdf;base64,XXXXX" — extract just the base64 part
     const dataUri = doc.output('datauristring');
     const base64 = dataUri.split(',')[1];
     return { base64, filename };
 };
-
