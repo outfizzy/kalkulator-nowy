@@ -1768,7 +1768,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {basket.map((item) => (
                                     <tr key={item.id} className="border-b border-slate-50 last:border-0">
                                         <td className="py-3 font-medium">{item.name}</td>
-                                        <td className="py-3 text-slate-600 text-xs max-w-[200px] truncate">{item.config}</td>
+                                        <td className="py-3 text-slate-600 text-xs max-w-[200px]">
+                                            <div className="truncate">{item.config}</div>
+                                            {item.dimensions && (
+                                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">📐 {item.dimensions}</div>
+                                            )}
+                                        </td>
                                         <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
                                         <td className="py-3 text-center">
                                             <button
@@ -3561,14 +3566,26 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 const isFrontPlacement = wallPlacement === 'front';
                                                                 const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
 
+                                                                // Build rich dimensions string for client visibility
+                                                                let techDims = `${wallWidth} × ${wallHeight} mm`;
+                                                                if (isWedge && dachrechnerResults) {
+                                                                    const k1 = dachrechnerResults.keilhoeheK1 ? Math.round(dachrechnerResults.keilhoeheK1) : null;
+                                                                    const k2 = dachrechnerResults.keilhoeheK2 ? Math.round(dachrechnerResults.keilhoeheK2) : null;
+                                                                    const f2 = dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null;
+                                                                    techDims = `F2: ${f2 || wallWidth} mm`;
+                                                                    if (k1) techDims += ` | K1 (Rinne): ${k1} mm`;
+                                                                    if (k2) techDims += ` | K2 (Wand): ${k2} mm`;
+                                                                }
+                                                                if (isFrontPlacement && segmentMultiplier > 1) {
+                                                                    techDims = `${segmentMultiplier}× ${wallWidth} × ${wallHeight} mm`;
+                                                                }
+
                                                                 // For front: add all segments at once with placement info
                                                                 const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Lewa' : 'Prawa';
                                                                 const finalPrice = totalWithAccessories * segmentMultiplier;
-                                                                const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× segment)` : '';
-                                                                const perSegWidth = wallWidth;
-                                                                const dimNote = `${perSegWidth}x${wallHeight}`;
+                                                                const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× odcinek)` : '';
                                                                 configStr = `${placementLabel}: ${configStr}${qtyNote}`;
-                                                                addToBasket(displayName, finalPrice, configStr, dimNote, 'wall');
+                                                                addToBasket(displayName, finalPrice, configStr, techDims, 'wall');
 
                                                                 // Reset accessories after adding
                                                                 if (isWedge) {
@@ -4218,6 +4235,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="text-xs text-slate-400 truncate pr-4">{item.config}</div>
+                                                    {item.dimensions && (
+                                                        <div className="text-[10px] text-slate-400/70 font-mono truncate pr-4">📐 {item.dimensions}</div>
+                                                    )}
                                                 </div>
                                             ))}
                                             {basket.length === 0 && <p className="text-center text-slate-400 text-xs py-2">Pusty koszyk</p>}
