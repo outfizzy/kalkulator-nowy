@@ -517,37 +517,25 @@ export const ProductConfiguratorV2: React.FC = () => {
         if (!wallDimsAuto || !dachrechnerResults) return;
 
         const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
-        const isSide = wallProduct.includes('Side');
-        const isFront = wallProduct.includes('Front');
-        const isSchiebetur = wallProduct.includes('Schiebetür');
-        const isPanorama = wallProduct.includes('Panorama');
         const isFrontPlacement = wallPlacement === 'front';
 
-        // Side wall width = fensterF2 (depth-based dimension from Dachrechner — between post and house wall)
-        // Front segment width = innerWidth (horizontal gap between posts from Dachrechner)
+        // Side wall width = fensterF2 (depth-based: distance from front post to house wall)
+        // Front segment width = innerWidth (horizontal gap between posts)
         const sideWallWidth = dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null;
         const frontSegmentWidth = dachrechnerResults.innerWidth ? Math.round(dachrechnerResults.innerWidth) : null;
-        const frontWidth = width; // full roof width for front display
         const postHeight = dachH3; // H3 = post height for all wall products
 
         if (isWedge) {
-            // Keilfenster: width = fensterF2, height auto from K1/K2
-            if (sideWallWidth) {
-                setWallWidth(sideWallWidth);
-            }
-            // Height = K1 (gutter side) for display – actual K1/K2 shown in summary
-            if (dachrechnerResults.keilhoeheK1) {
-                setWallHeight(Math.round(dachrechnerResults.keilhoeheK1));
-            }
-        } else if (isSide || (isSchiebetur && !isFrontPlacement)) {
-            // Side wall / side Schiebetür: width = fensterF2 (depth), height = H3
+            // Keilfenster: always side-mounted, width = fensterF2, height auto from K1/K2
             if (sideWallWidth) setWallWidth(sideWallWidth);
+            if (dachrechnerResults.keilhoeheK1) setWallHeight(Math.round(dachrechnerResults.keilhoeheK1));
+        } else if (isFrontPlacement) {
+            // ANY product on front: width = innerWidth per segment, height = H3
+            if (frontSegmentWidth) setWallWidth(frontSegmentWidth);
             setWallHeight(postHeight);
-        } else if (isFront || (isSchiebetur && isFrontPlacement) || isPanorama) {
-            // Front wall / front Schiebetür / Panorama: width = innerWidth (per segment between posts)
-            if (frontSegmentWidth) {
-                setWallWidth(frontSegmentWidth);
-            }
+        } else {
+            // ANY product on side (left/right): width = fensterF2, height = H3
+            if (sideWallWidth) setWallWidth(sideWallWidth);
             setWallHeight(postHeight);
         }
     }, [wallProduct, wallPlacement, dachrechnerResults, wallDimsAuto, width, dachH3]);
