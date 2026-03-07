@@ -4,6 +4,8 @@ import { getSnowZone } from '../utils/snowZones';
 import { DatabaseService } from '../services/database';
 import { UserService } from '../services/database/user.service';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { toast } from 'react-hot-toast';
 
 interface CustomerFormProps {
     onComplete: (customer: Customer, snowZone: any) => void;
@@ -52,6 +54,8 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
     const [users, setUsers] = useState<User[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
+    const [aiSnowZone, setAiSnowZone] = useState<{ zone: number; label: string } | null>(null);
+    const [plzLookupLoading, setPlzLookupLoading] = useState(false);
 
     // Load previous customers and users on mount
     useEffect(() => {
@@ -100,6 +104,10 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         setCustomer(prev => ({ ...prev, [name]: value }));
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
+        }
+        // Reset AI snow zone when postal code changes
+        if (name === 'postalCode') {
+            setAiSnowZone(null);
         }
     };
 
@@ -164,7 +172,11 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
             return;
         }
 
-        onComplete(customer, snowZone || { id: 'II', value: 0.85, description: 'Domyślna strefa' });
+        // Use AI-determined zone if available, otherwise fall back to static
+        const finalSnowZone = aiSnowZone
+            ? { id: String(aiSnowZone.zone), value: aiSnowZone.zone === 1 ? 0.65 : aiSnowZone.zone === 2 ? 0.85 : 1.10, description: aiSnowZone.label }
+            : (snowZone || { id: 'II', value: 0.85, description: 'Domyślna strefa' });
+        onComplete(customer, finalSnowZone);
     };
 
     return (
@@ -395,17 +407,81 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         </div>
 
                         {/* Snow Zone Info */}
-                        {snowZone && (
-                            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl border-2 border-blue-200 flex items-start gap-3">
-                                <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="font-bold text-blue-900">Wykryto Strefę Śniegową: {snowZone.id}</p>
-                                    <p className="text-sm text-accent-dark mt-1">Obciążenie: {snowZone.value} kN/m²</p>
-                                </div>
+                        {customer.postalCode && customer.postalCode.length === 5 && (
+                            <div className="space-y-3">
+                                {/* Static zone detection */}
+                                {snowZone && (
+                                    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl border-2 border-blue-200 flex items-start gap-3">
+                                        <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-blue-900">
+                                                {aiSnowZone
+                                                    ? `✅ Schneelastzone ${aiSnowZone.zone} (AI-geprüft, DIN EN 1991-1-3/NA)`
+                                                    : `Schneelastzone: ${snowZone.id} (Schätzung)`
+                                                }
+                                            </p>
+                                            <p className="text-sm text-blue-700 mt-1">
+                                                {aiSnowZone
+                                                    ? aiSnowZone.label
+                                                    : `Obciążenie: ${snowZone.value} kN/m² — Grobe Einschätzung anhand PLZ`
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* AI Lookup Button */}
+                                {!aiSnowZone && (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            setPlzLookupLoading(true);
+                                            try {
+                                                const { data, error } = await supabase.functions.invoke('ai-assistant', {
+                                                    body: {
+                                                        messages: [{
+                                                            role: 'user',
+                                                            content: `Für die deutsche Postleitzahl ${customer.postalCode}: Welche Schneelastzone nach DIN EN 1991-1-3/NA gilt dort? Antworte NUR mit einer einzelnen Zahl: 1, 2 oder 3. Keine weiteren Erklärungen.`
+                                                        }]
+                                                    }
+                                                });
+                                                if (error) throw error;
+                                                const content = data?.content || '';
+                                                const match = content.match(/[123]/);
+                                                if (match) {
+                                                    const detectedZone = parseInt(match[0]);
+                                                    setAiSnowZone({
+                                                        zone: detectedZone,
+                                                        label: `PLZ ${customer.postalCode} → Zone ${detectedZone} (${detectedZone === 1 ? '0,65 kN/m²' : detectedZone === 2 ? '0,85 kN/m²' : '1,10 kN/m²'})`
+                                                    });
+                                                    toast.success(`Schneelastzone ${detectedZone} für PLZ ${customer.postalCode} erkannt`);
+                                                } else {
+                                                    toast.error('Schneelastzone konnte nicht ermittelt werden');
+                                                }
+                                            } catch (err: any) {
+                                                console.error('PLZ AI lookup error:', err);
+                                                toast.error('Fehler bei der PLZ-Abfrage');
+                                            } finally {
+                                                setPlzLookupLoading(false);
+                                            }
+                                        }}
+                                        disabled={plzLookupLoading}
+                                        className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all border-2 ${plzLookupLoading
+                                            ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-wait'
+                                            : 'border-blue-300 bg-white text-blue-700 hover:bg-blue-50 hover:border-blue-400'
+                                            }`}
+                                    >
+                                        {plzLookupLoading ? (
+                                            <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></span> Schneelastzone wird geprüft (AI)...</>
+                                        ) : (
+                                            <>🔍 Schneelastzone per AI prüfen (DIN EN 1991-1-3/NA)</>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

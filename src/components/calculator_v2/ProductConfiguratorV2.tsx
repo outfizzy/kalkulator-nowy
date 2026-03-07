@@ -3119,78 +3119,14 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                         )}
                                     </div>
 
-                                    {/* Zone with PLZ Lookup */}
+                                    {/* Zone */}
                                     <div>
                                         <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
-                                        {/* PLZ Input for auto-detection */}
-                                        <div className="mb-3">
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={plzInput}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 5);
-                                                        setPlzInput(val);
-                                                        setPlzZoneResult(null);
-                                                    }}
-                                                    placeholder="PLZ eingeben..."
-                                                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                                                    maxLength={5}
-                                                />
-                                                <button
-                                                    onClick={async () => {
-                                                        if (plzInput.length !== 5) {
-                                                            toast.error('Bitte 5-stellige PLZ eingeben');
-                                                            return;
-                                                        }
-                                                        setPlzLoading(true);
-                                                        setPlzZoneResult(null);
-                                                        try {
-                                                            const { data, error } = await supabase.functions.invoke('ai-assistant', {
-                                                                body: {
-                                                                    messages: [{
-                                                                        role: 'user',
-                                                                        content: `Für die deutsche Postleitzahl ${plzInput}: Welche Schneelastzone nach DIN EN 1991-1-3/NA gilt dort? Antworte NUR mit einer einzelnen Zahl: 1, 2 oder 3. Keine weiteren Erklärungen.`
-                                                                    }]
-                                                                }
-                                                            });
-                                                            if (error) throw error;
-                                                            const content = data?.content || '';
-                                                            const match = content.match(/[123]/);
-                                                            if (match) {
-                                                                const detectedZone = parseInt(match[0]);
-                                                                setZone(detectedZone);
-                                                                setPlzZoneResult(`Zone ${detectedZone} (PLZ ${plzInput})`);
-                                                                toast.success(`Schneelastzone ${detectedZone} für PLZ ${plzInput} erkannt`);
-                                                            } else {
-                                                                toast.error('Schneelastzone konnte nicht ermittelt werden');
-                                                            }
-                                                        } catch (err: any) {
-                                                            console.error('PLZ lookup error:', err);
-                                                            toast.error('Fehler bei der PLZ-Abfrage');
-                                                        } finally {
-                                                            setPlzLoading(false);
-                                                        }
-                                                    }}
-                                                    disabled={plzLoading || plzInput.length !== 5}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1 ${plzLoading || plzInput.length !== 5
-                                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                                                        }`}
-                                                >
-                                                    {plzLoading ? (
-                                                        <><span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span> Prüft...</>
-                                                    ) : (
-                                                        <>🔍 Prüfen</>
-                                                    )}
-                                                </button>
-                                            </div>
-                                            {plzZoneResult && (
-                                                <p className="mt-1.5 text-xs text-green-600 font-medium flex items-center gap-1">
-                                                    ✅ {plzZoneResult}
-                                                </p>
-                                            )}
-                                        </div>
+                                        {plzZoneResult && (
+                                            <p className="mb-2 text-xs text-green-600 font-medium flex items-center gap-1">
+                                                ✅ {plzZoneResult}
+                                            </p>
+                                        )}
                                         <div className="flex gap-2">
                                             {[1, 2, 3].map(z => (
                                                 <button
