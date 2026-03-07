@@ -1717,9 +1717,38 @@ export const ProductConfiguratorV2: React.FC = () => {
             if (!savedOffer || !currentUser) return;
             setIsGeneratingEmail(true);
             try {
-                const content = await AiService.generateEmail(savedOffer as any, currentUser, publicLink || undefined);
-                setEmailBody(content);
-                setEmailSubject(`Angebot ${savedOffer?.offerNumber || ''} — Terrassenüberdachung`);
+                const customerName = savedOffer.customer?.lastName
+                    ? `${savedOffer.customer.firstName || ''} ${savedOffer.customer.lastName}`.trim()
+                    : savedOffer.customer?.company || 'Kunde';
+                const salutation = savedOffer.customer?.lastName
+                    ? `Sehr geehrte/r ${savedOffer.customer?.gender === 'female' ? 'Frau' : 'Herr'} ${savedOffer.customer.lastName}`
+                    : `Sehr geehrte Damen und Herren`;
+                const modelLabel = ROOF_MODELS.find(m => m.id === model)?.name || model;
+                const dims = `${width} mm × ${projection} mm`;
+                const offerNr = savedOffer?.offerNumber || '';
+                const repName = currentUser?.firstName
+                    ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
+                    : 'PolenDach24 Team';
+
+                const body = `${salutation},
+
+vielen Dank für Ihr Interesse an unseren hochwertigen Terrassenüberdachungen.
+
+Anbei erhalten Sie Ihr individuelles Angebot${offerNr ? ` Nr. ${offerNr}` : ''} für das Modell ${modelLabel} in den Maßen ${dims}.
+
+${publicLink ? `Ihr persönliches Angebot finden Sie hier:\n${publicLink}\n` : ''}Wir sind überzeugt, dass diese Lösung Ihren Außenbereich optimal aufwertet und Ihnen viele Jahre Freude bereiten wird.
+
+Sollten Sie Fragen haben oder eine persönliche Beratung wünschen, stehe ich Ihnen jederzeit gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+
+${repName}
+Polendach24
+Tel: +49 176 47453883
+E-Mail: buero@polendach24.de`;
+
+                setEmailBody(body);
+                setEmailSubject(`Angebot ${offerNr} — Terrassenüberdachung ${modelLabel}`);
                 setShowEmailModal(true);
             } catch (error) {
                 console.error('Email generation failed', error);
