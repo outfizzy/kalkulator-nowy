@@ -1745,7 +1745,14 @@ export const ProductConfiguratorV2: React.FC = () => {
         };
 
         const handleGenerateEmail = async () => {
-            if (!savedOffer || !currentUser) return;
+            if (!currentUser) {
+                toast.error('Nicht angemeldet — bitte erneut einloggen');
+                return;
+            }
+            if (!savedOffer) {
+                toast.error('Angebot muss zuerst gespeichert werden');
+                return;
+            }
             setIsGeneratingEmail(true);
             try {
                 const customerName = savedOffer.customer?.lastName
@@ -1916,7 +1923,11 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                         attachments: pdfAttachment ? [pdfAttachment] : undefined
                     }
                 });
-                if (error) throw error;
+                console.log('Edge function response:', { emailResult, error });
+                if (error) {
+                    console.error('Edge function error details:', error);
+                    throw new Error(error.message || 'Edge Function Fehler');
+                }
                 // Edge function returns 200 even for errors — check response body
                 if (emailResult && emailResult.success === false) {
                     throw new Error(emailResult.error || 'E-Mail konnte nicht gesendet werden');
