@@ -327,6 +327,9 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [model, setModel] = useState<string>('Trendline');
     const [cover, setCover] = useState<CoverType>('Poly');
     const [zone, setZone] = useState<number>(1);
+    const [plzInput, setPlzInput] = useState<string>('');
+    const [plzLoading, setPlzLoading] = useState(false);
+    const [plzZoneResult, setPlzZoneResult] = useState<string | null>(null);
     const [construction, setConstruction] = useState<ConstructionType>('wall');
     const [width, setWidth] = useState<number>(3000);
     const [projection, setProjection] = useState<number>(3000);
@@ -1750,21 +1753,29 @@ export const ProductConfiguratorV2: React.FC = () => {
                 toast.error('Nicht angemeldet — bitte erneut einloggen');
                 return;
             }
+            // Auto-save the offer if not yet saved
             if (!savedOffer) {
-                toast.error('Angebot muss zuerst gespeichert werden');
-                return;
+                console.log('[EMAIL] No saved offer — auto-saving first...');
+                try {
+                    await handleSaveOffer();
+                } catch (saveErr) {
+                    console.error('[EMAIL] Auto-save failed:', saveErr);
+                    toast.error('Angebot konnte nicht gespeichert werden');
+                    return;
+                }
+                // After save, savedOffer should be set. Wait a tick for state update.
+                await new Promise(r => setTimeout(r, 100));
             }
             setIsGeneratingEmail(true);
             try {
-                const customerName = savedOffer.customer?.lastName
-                    ? `${savedOffer.customer.firstName || ''} ${savedOffer.customer.lastName}`.trim()
-                    : savedOffer.customer?.company || 'Kunde';
-                const salutation = savedOffer.customer?.lastName
-                    ? `Sehr geehrte/r ${savedOffer.customer?.gender === 'female' ? 'Frau' : 'Herr'} ${savedOffer.customer.lastName}`
+                const lastName = customerState?.lastName || customerState?.name || '';
+                const firstName = customerState?.firstName || '';
+                const salutation = lastName
+                    ? `Sehr geehrte/r ${customerState?.salutation === 'Frau' ? 'Frau' : 'Herr'} ${lastName}`
                     : `Sehr geehrte Damen und Herren`;
                 const modelLabel = ROOF_MODELS.find(m => m.id === model)?.name || model;
                 const dims = `${width} mm × ${projection} mm`;
-                const offerNr = savedOffer?.offerNumber || '';
+                const offerNr = savedOffer?.offerNumber || savedOfferId || '';
                 const repName = currentUser?.firstName
                     ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
                     : 'PolenDach24 Team';
@@ -2330,16 +2341,28 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                         </div>
 
                     ) : (
-                        <button
-                            onClick={handleSaveOffer}
-                            disabled={savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
-                            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
-                                }`}
-                        >
-                            {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
-                        </button>
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                onClick={handleSaveOffer}
+                                disabled={savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
+                                className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
+                                    }`}
+                            >
+                                {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
+                            </button>
+                            <button
+                                onClick={handleGenerateEmail}
+                                disabled={isGeneratingEmail || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
+                                className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${isGeneratingEmail || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
+                                    }`}
+                            >
+                                {isGeneratingEmail ? 'Wird generiert...' : '✉️ E-Mail senden'}
+                            </button>
+                        </div>
                     )}
                 </div >
             </div >
@@ -3096,14 +3119,86 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                         )}
                                     </div>
 
-                                    {/* Zone */}
+                                    {/* Zone with PLZ Lookup */}
                                     <div>
                                         <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
+                                        {/* PLZ Input for auto-detection */}
+                                        <div className="mb-3">
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={plzInput}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                                                        setPlzInput(val);
+                                                        setPlzZoneResult(null);
+                                                    }}
+                                                    placeholder="PLZ eingeben..."
+                                                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                                                    maxLength={5}
+                                                />
+                                                <button
+                                                    onClick={async () => {
+                                                        if (plzInput.length !== 5) {
+                                                            toast.error('Bitte 5-stellige PLZ eingeben');
+                                                            return;
+                                                        }
+                                                        setPlzLoading(true);
+                                                        setPlzZoneResult(null);
+                                                        try {
+                                                            const { data, error } = await supabase.functions.invoke('ai-assistant', {
+                                                                body: {
+                                                                    messages: [{
+                                                                        role: 'user',
+                                                                        content: `Für die deutsche Postleitzahl ${plzInput}: Welche Schneelastzone nach DIN EN 1991-1-3/NA gilt dort? Antworte NUR mit einer einzelnen Zahl: 1, 2 oder 3. Keine weiteren Erklärungen.`
+                                                                    }]
+                                                                }
+                                                            });
+                                                            if (error) throw error;
+                                                            const content = data?.content || '';
+                                                            const match = content.match(/[123]/);
+                                                            if (match) {
+                                                                const detectedZone = parseInt(match[0]);
+                                                                setZone(detectedZone);
+                                                                setPlzZoneResult(`Zone ${detectedZone} (PLZ ${plzInput})`);
+                                                                toast.success(`Schneelastzone ${detectedZone} für PLZ ${plzInput} erkannt`);
+                                                            } else {
+                                                                toast.error('Schneelastzone konnte nicht ermittelt werden');
+                                                            }
+                                                        } catch (err: any) {
+                                                            console.error('PLZ lookup error:', err);
+                                                            toast.error('Fehler bei der PLZ-Abfrage');
+                                                        } finally {
+                                                            setPlzLoading(false);
+                                                        }
+                                                    }}
+                                                    disabled={plzLoading || plzInput.length !== 5}
+                                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1 ${plzLoading || plzInput.length !== 5
+                                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                                        }`}
+                                                >
+                                                    {plzLoading ? (
+                                                        <><span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span> Prüft...</>
+                                                    ) : (
+                                                        <>🔍 Prüfen</>
+                                                    )}
+                                                </button>
+                                            </div>
+                                            {plzZoneResult && (
+                                                <p className="mt-1.5 text-xs text-green-600 font-medium flex items-center gap-1">
+                                                    ✅ {plzZoneResult}
+                                                </p>
+                                            )}
+                                        </div>
                                         <div className="flex gap-2">
                                             {[1, 2, 3].map(z => (
                                                 <button
                                                     key={z}
-                                                    onClick={() => setZone(z)}
+                                                    onClick={() => {
+                                                        setZone(z);
+                                                        setPlzZoneResult(null);
+                                                    }}
                                                     className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${zone === z
                                                         ? 'border-blue-500 bg-blue-50 text-blue-700'
                                                         : 'border-slate-200 hover:border-slate-300 text-slate-500'
