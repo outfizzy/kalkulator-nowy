@@ -1804,10 +1804,26 @@ export const ProductConfiguratorV2: React.FC = () => {
                     pdfAttachment = { filename, content: base64, contentType: 'application/pdf' };
                 }
 
-                // Determine SMTP config
+                // Determine SMTP config — always fetch from DB mailboxes
                 let smtpConfig: any = undefined;
                 let fromName = 'Polendach24';
-                if (emailSender !== 'buero') {
+                if (emailSender === 'buero') {
+                    // Fetch buero mailbox SMTP from DB
+                    const { data: bueroBox } = await supabase
+                        .from('mailboxes')
+                        .select('smtp_host, smtp_port, smtp_user, smtp_password')
+                        .eq('smtp_user', 'buero@polendach24.de')
+                        .limit(1)
+                        .single();
+                    if (bueroBox) {
+                        smtpConfig = {
+                            smtpHost: bueroBox.smtp_host,
+                            smtpPort: bueroBox.smtp_port,
+                            smtpUser: bueroBox.smtp_user,
+                            smtpPassword: bueroBox.smtp_password
+                        };
+                    }
+                } else {
                     const box = userMailboxes.find(m => m.id === emailSender);
                     if (box) {
                         smtpConfig = {
@@ -1830,7 +1846,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 <p style="font-size:11px;color:#999">Polendach24 — Terrassenüberdachungen &amp; Carports<br/>buero@polendach24.de | +49 176 47453883</p>
 </body></html>`;
 
-                const { error } = await supabase.functions.invoke('send-email', {
+                const { data: emailResult, error } = await supabase.functions.invoke('send-email', {
                     body: {
                         to: toEmail,
                         subject: emailSubject,
@@ -1841,6 +1857,10 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                     }
                 });
                 if (error) throw error;
+                // Edge function returns 200 even for errors — check response body
+                if (emailResult && emailResult.success === false) {
+                    throw new Error(emailResult.error || 'E-Mail konnte nicht gesendet werden');
+                }
 
                 // Update lead status to offer_sent
                 if (savedOffer?.leadId) {
