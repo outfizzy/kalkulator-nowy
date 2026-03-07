@@ -9,7 +9,7 @@ import { DatabaseService } from '../../services/database';
 import { LeadService } from '../../services/database/lead.service';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Customer, Lead, Offer } from '../../types';
-import { generateOfferPDF } from '../../utils/offerPDF';
+import { generateOfferPDF, generateOfferPDFBase64 } from '../../utils/offerPDF';
 import { CustomerForm } from '../CustomerForm';
 import { calculateDachrechner, type RoofModelId, type DachrechnerResults } from '../../services/dachrechner.service';
 
@@ -473,6 +473,11 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
     const [emailBody, setEmailBody] = useState('');
     const [showEmailModal, setShowEmailModal] = useState(false);
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailSender, setEmailSender] = useState<string>('buero'); // 'buero' or mailbox id
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [attachPDF, setAttachPDF] = useState(true);
+    const [userMailboxes, setUserMailboxes] = useState<Array<{ id: string; name: string; smtp_host: string; smtp_port: number; smtp_user: string; smtp_password: string }>>([]);
 
     // === CUSTOM ITEMS (Manual Positions) ===
     const [customItems, setCustomItems] = useState<{ id: string; name: string; price: number }[]>([]);
@@ -485,6 +490,28 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     // === MONTAGE (INSTALLATION) ===
     const [montagePrice, setMontagePrice] = useState<number>(0);
+
+    // === FETCH USER MAILBOXES ===
+    useEffect(() => {
+        const fetchMailboxes = async () => {
+            if (!currentUser) return;
+            try {
+                const { data } = await supabase
+                    .from('mailbox_users')
+                    .select('mailbox_id, mailboxes(id, name, smtp_host, smtp_port, smtp_user, smtp_password)')
+                    .eq('user_id', currentUser.id);
+                if (data) {
+                    const boxes = data
+                        .map((mu: any) => mu.mailboxes)
+                        .filter(Boolean);
+                    setUserMailboxes(boxes);
+                }
+            } catch (e) {
+                console.error('Failed to fetch mailboxes:', e);
+            }
+        };
+        fetchMailboxes();
+    }, [currentUser]);
 
     // === CALCULATED VALUES ===
     const areaM2 = (width * projection) / 1_000_000; // Convert mm² to m²
@@ -1558,7 +1585,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             if (!lead) {
                 // No existing lead found — create a new one
                 lead = await DatabaseService.createLead({
-                    status: 'negotiation',
+                    status: 'offer_sent',
                     source: 'calculator_v2',
                     customerData: customerData,
                     customerId: customerState.id,
@@ -1684,19 +1711,78 @@ export const ProductConfiguratorV2: React.FC = () => {
             if (!savedOffer || !currentUser) return;
             setIsGeneratingEmail(true);
             try {
-                // Use the saved offer object for email generation
                 const content = await AiService.generateEmail(savedOffer as any, currentUser, publicLink || undefined);
                 setEmailBody(content);
+                setEmailSubject(`Angebot ${savedOffer?.offerNumber || ''} — Terrassenüberdachung`);
                 setShowEmailModal(true);
             } catch (error) {
-                console.error("Email generation failed", error);
-                toast.error("Błąd generowania treści maila");
+                console.error('Email generation failed', error);
+                toast.error('Fehler beim Generieren der E-Mail');
             } finally {
                 setIsGeneratingEmail(false);
             }
         };
 
-        const handleGeneratePDF = () => {
+        const handleSendOfferEmail = async () => {
+            const toEmail = customerState?.email;
+            if (!toEmail) { toast.error('Keine E-Mail-Adresse des Kunden'); return; }
+            setIsSendingEmail(true);
+            try {
+                // Build PDF
+                let pdfAttachment: { filename: string; content: string; contentType: string } | undefined;
+                if (attachPDF) {
+                    const pdfData = buildPDFData();
+                    const { base64, filename } = generateOfferPDFBase64(pdfData);
+                    pdfAttachment = { filename, content: base64, contentType: 'application/pdf' };
+                }
+
+                // Determine SMTP config
+                let smtpConfig: any = undefined;
+                let fromName = 'Polendach24';
+                if (emailSender !== 'buero') {
+                    const box = userMailboxes.find(m => m.id === emailSender);
+                    if (box) {
+                        smtpConfig = {
+                            smtpHost: box.smtp_host,
+                            smtpPort: box.smtp_port,
+                            smtpUser: box.smtp_user,
+                            smtpPassword: box.smtp_password
+                        };
+                        fromName = currentUser?.firstName
+                            ? `${currentUser.firstName} ${currentUser.lastName || ''} — Polendach24`.trim()
+                            : box.name;
+                    }
+                }
+
+                // Call edge function
+                const { error } = await supabase.functions.invoke('send-email', {
+                    body: {
+                        to: toEmail,
+                        subject: emailSubject,
+                        html: emailBody,
+                        config: smtpConfig,
+                        fromName,
+                        attachments: pdfAttachment ? [pdfAttachment] : undefined
+                    }
+                });
+                if (error) throw error;
+
+                // Update lead status to offer_sent
+                if (savedOffer?.leadId) {
+                    await LeadService.updateLead(savedOffer.leadId, { status: 'offer_sent' as any });
+                }
+
+                toast.success('E-Mail wurde erfolgreich gesendet!');
+                setShowEmailModal(false);
+            } catch (e: any) {
+                console.error('Send email error:', e);
+                toast.error(e.message || 'Fehler beim Senden der E-Mail');
+            } finally {
+                setIsSendingEmail(false);
+            }
+        };
+
+        const buildPDFData = () => {
             const positions = [
                 ...basket.map(b => ({
                     name: b.name,
@@ -1711,8 +1797,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     price: ci.price
                 }))
             ];
-
-            generateOfferPDF({
+            return {
                 customer: {
                     salutation: customerState?.salutation || '',
                     firstName: customerState?.firstName || '',
@@ -1756,7 +1841,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                 offerNumber: savedOffer?.offerNumber || `V2-${Date.now()}`,
                 offerDate: new Date().toLocaleDateString('de-DE'),
                 salesPerson: currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : undefined
-            });
+            };
+        };
+
+        const handleGeneratePDF = () => {
+            generateOfferPDF(buildPDFData());
             toast.success('PDF wurde erstellt');
         };
 
@@ -2108,10 +2197,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {isGeneratingEmail ? (
                                         <>
                                             <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                                            Generuję...
+                                            Wird generiert...
                                         </>
                                     ) : (
-                                        <>✉️ Treść E-Maila (AI)</>
+                                        <>✉️ E-Mail senden</>
                                     )}
                                 </button>
                                 <button
@@ -4493,46 +4582,109 @@ export const ProductConfiguratorV2: React.FC = () => {
                             </div>
                         )
                     }
-                    {/* Email Modal */}
+                    {/* Email Send Dialog */}
                     {
                         showEmailModal && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                                <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
+                                <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                                     <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                        <h3 className="text-xl font-bold text-slate-800">Wygenerowana Treść Maila</h3>
-                                        <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                        <h3 className="text-xl font-bold text-slate-800">✉️ Angebot per E-Mail senden</h3>
+                                        <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
                                     </div>
 
-                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 mb-2">
-                                        💡 Ta treść została wygenerowana automatycznie. Możesz ją edytować przed wysłaniem.
+                                    {/* Sender Selection */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Absender</label>
+                                        <select
+                                            value={emailSender}
+                                            onChange={(e) => setEmailSender(e.target.value)}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                        >
+                                            <option value="buero">📧 buero@polendach24.de (Hauptpostfach)</option>
+                                            {userMailboxes.map(mb => (
+                                                <option key={mb.id} value={mb.id}>📬 {mb.smtp_user} ({mb.name})</option>
+                                            ))}
+                                        </select>
                                     </div>
 
-                                    <textarea
-                                        value={emailBody}
-                                        onChange={(e) => setEmailBody(e.target.value)}
-                                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-mono leading-relaxed"
-                                        rows={12}
-                                    />
+                                    {/* Recipient */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Empfänger</label>
+                                        <input
+                                            readOnly
+                                            value={customerState?.email || '(Keine E-Mail)'}
+                                            className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-600"
+                                        />
+                                    </div>
 
-                                    <div className="flex justify-end gap-3 pt-2">
+                                    {/* Subject */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
+                                        <input
+                                            value={emailSubject}
+                                            onChange={(e) => setEmailSubject(e.target.value)}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Body */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nachricht</label>
+                                        <textarea
+                                            value={emailBody}
+                                            onChange={(e) => setEmailBody(e.target.value)}
+                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm leading-relaxed"
+                                            rows={10}
+                                        />
+                                    </div>
+
+                                    {/* PDF Attachment Toggle */}
+                                    <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                                        <input
+                                            type="checkbox"
+                                            checked={attachPDF}
+                                            onChange={(e) => setAttachPDF(e.target.checked)}
+                                            className="w-5 h-5 rounded border-amber-300 text-amber-500 focus:ring-amber-400"
+                                        />
+                                        <div>
+                                            <p className="text-sm font-bold text-amber-800">📎 PDF-Angebot anhängen</p>
+                                            <p className="text-xs text-amber-600">Das Angebots-PDF wird als Anhang mitgesendet</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                                         <button
                                             onClick={() => {
                                                 navigator.clipboard.writeText(emailBody);
-                                                toast.success('Skopiowano do schowka');
+                                                toast.success('In die Zwischenablage kopiert');
                                             }}
-                                            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm"
+                                            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium"
                                         >
-                                            Kopiuj
+                                            📋 Kopieren
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                const subject = `Angebot ${savedOffer?.offerNumber || savedOfferId || 'V2'} - PolenDach24`;
-                                                window.open(`mailto:${customerState?.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`);
-                                            }}
-                                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-lg shadow-blue-200 flex items-center gap-2"
-                                        >
-                                            ↗️ Otwórz w Poczcie
-                                        </button>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => setShowEmailModal(false)}
+                                                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm"
+                                            >
+                                                Abbrechen
+                                            </button>
+                                            <button
+                                                onClick={handleSendOfferEmail}
+                                                disabled={isSendingEmail || !customerState?.email}
+                                                className={`px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-2 ${isSendingEmail || !customerState?.email
+                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
+                                                    }`}
+                                            >
+                                                {isSendingEmail ? (
+                                                    <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span> Wird gesendet...</>
+                                                ) : (
+                                                    <>📤 E-Mail senden</>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

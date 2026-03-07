@@ -19,6 +19,12 @@ interface EmailRequest {
         smtpPassword?: string;
         smtpPass?: string; // Compatibility
     };
+    attachments?: Array<{
+        filename: string;
+        content: string; // base64
+        contentType?: string;
+    }>;
+    fromName?: string; // Custom sender display name
     page?: string; // For tracking source
 }
 
@@ -29,7 +35,7 @@ serve(async (req) => {
     }
 
     try {
-        const { to, subject, html, config } = await req.json() as EmailRequest;
+        const { to, subject, html, config, attachments, fromName } = await req.json() as EmailRequest;
 
         // Determine SMTP Credentials (Config > Env)
         const smtpHost = config?.smtpHost || Deno.env.get('SMTP_HOST');
@@ -55,11 +61,20 @@ serve(async (req) => {
                 }
             });
 
+            // Build nodemailer attachments from base64
+            const mailAttachments = (attachments || []).map(a => ({
+                filename: a.filename,
+                content: a.content,
+                encoding: 'base64' as const,
+                contentType: a.contentType || 'application/pdf'
+            }));
+
             await transporter.sendMail({
-                from: `System Polendach <${smtpUser}>`, // Use authenticated user
+                from: `${fromName || 'System Polendach'} <${smtpUser}>`,
                 to: to,
                 subject: subject,
                 html: html,
+                attachments: mailAttachments.length > 0 ? mailAttachments : undefined,
             });
 
             return new Response(
