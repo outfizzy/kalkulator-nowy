@@ -1723,65 +1723,6 @@ export const ProductConfiguratorV2: React.FC = () => {
             }
         };
 
-        const handleSendOfferEmail = async () => {
-            const toEmail = customerState?.email;
-            if (!toEmail) { toast.error('Keine E-Mail-Adresse des Kunden'); return; }
-            setIsSendingEmail(true);
-            try {
-                // Build PDF
-                let pdfAttachment: { filename: string; content: string; contentType: string } | undefined;
-                if (attachPDF) {
-                    const pdfData = buildPDFData();
-                    const { base64, filename } = generateOfferPDFBase64(pdfData);
-                    pdfAttachment = { filename, content: base64, contentType: 'application/pdf' };
-                }
-
-                // Determine SMTP config
-                let smtpConfig: any = undefined;
-                let fromName = 'Polendach24';
-                if (emailSender !== 'buero') {
-                    const box = userMailboxes.find(m => m.id === emailSender);
-                    if (box) {
-                        smtpConfig = {
-                            smtpHost: box.smtp_host,
-                            smtpPort: box.smtp_port,
-                            smtpUser: box.smtp_user,
-                            smtpPassword: box.smtp_password
-                        };
-                        fromName = currentUser?.firstName
-                            ? `${currentUser.firstName} ${currentUser.lastName || ''} — Polendach24`.trim()
-                            : box.name;
-                    }
-                }
-
-                // Call edge function
-                const { error } = await supabase.functions.invoke('send-email', {
-                    body: {
-                        to: toEmail,
-                        subject: emailSubject,
-                        html: emailBody,
-                        config: smtpConfig,
-                        fromName,
-                        attachments: pdfAttachment ? [pdfAttachment] : undefined
-                    }
-                });
-                if (error) throw error;
-
-                // Update lead status to offer_sent
-                if (savedOffer?.leadId) {
-                    await LeadService.updateLead(savedOffer.leadId, { status: 'offer_sent' as any });
-                }
-
-                toast.success('E-Mail wurde erfolgreich gesendet!');
-                setShowEmailModal(false);
-            } catch (e: any) {
-                console.error('Send email error:', e);
-                toast.error(e.message || 'Fehler beim Senden der E-Mail');
-            } finally {
-                setIsSendingEmail(false);
-            }
-        };
-
         const buildPDFData = () => {
             const positions = [
                 ...basket.map(b => ({
@@ -1842,6 +1783,65 @@ export const ProductConfiguratorV2: React.FC = () => {
                 offerDate: new Date().toLocaleDateString('de-DE'),
                 salesPerson: currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : undefined
             };
+        };
+
+        const handleSendOfferEmail = async () => {
+            const toEmail = customerState?.email;
+            if (!toEmail) { toast.error('Keine E-Mail-Adresse des Kunden'); return; }
+            setIsSendingEmail(true);
+            try {
+                // Build PDF
+                let pdfAttachment: { filename: string; content: string; contentType: string } | undefined;
+                if (attachPDF) {
+                    const pdfData = buildPDFData();
+                    const { base64, filename } = generateOfferPDFBase64(pdfData);
+                    pdfAttachment = { filename, content: base64, contentType: 'application/pdf' };
+                }
+
+                // Determine SMTP config
+                let smtpConfig: any = undefined;
+                let fromName = 'Polendach24';
+                if (emailSender !== 'buero') {
+                    const box = userMailboxes.find(m => m.id === emailSender);
+                    if (box) {
+                        smtpConfig = {
+                            smtpHost: box.smtp_host,
+                            smtpPort: box.smtp_port,
+                            smtpUser: box.smtp_user,
+                            smtpPassword: box.smtp_password
+                        };
+                        fromName = currentUser?.firstName
+                            ? `${currentUser.firstName} ${currentUser.lastName || ''} — Polendach24`.trim()
+                            : box.name;
+                    }
+                }
+
+                // Call edge function
+                const { error } = await supabase.functions.invoke('send-email', {
+                    body: {
+                        to: toEmail,
+                        subject: emailSubject,
+                        html: emailBody,
+                        config: smtpConfig,
+                        fromName,
+                        attachments: pdfAttachment ? [pdfAttachment] : undefined
+                    }
+                });
+                if (error) throw error;
+
+                // Update lead status to offer_sent
+                if (savedOffer?.leadId) {
+                    await LeadService.updateLead(savedOffer.leadId, { status: 'offer_sent' as any });
+                }
+
+                toast.success('E-Mail wurde erfolgreich gesendet!');
+                setShowEmailModal(false);
+            } catch (e: any) {
+                console.error('Send email error:', e);
+                toast.error(e.message || 'Fehler beim Senden der E-Mail');
+            } finally {
+                setIsSendingEmail(false);
+            }
         };
 
         const handleGeneratePDF = () => {
@@ -4674,8 +4674,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 onClick={handleSendOfferEmail}
                                                 disabled={isSendingEmail || !customerState?.email}
                                                 className={`px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-2 ${isSendingEmail || !customerState?.email
-                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
+                                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
                                                     }`}
                                             >
                                                 {isSendingEmail ? (
