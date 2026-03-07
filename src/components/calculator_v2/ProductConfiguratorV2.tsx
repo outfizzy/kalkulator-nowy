@@ -986,12 +986,13 @@ export const ProductConfiguratorV2: React.FC = () => {
                             }
                         }
                     }
-                } catch (e) {
-                    console.error('Structural fetch error:', e);
                 }
-            };
-            fetchStructural();
-        }, [model, cover, zone, construction, width, projection]);
+            } catch (e) {
+                console.error('Structural fetch error:', e);
+            }
+        };
+        fetchStructural();
+    }, [model, cover, zone, construction, width, projection]);
 
     // === CALCULATE SCHIEBEEINHEIT (Sliding Roof) PRICE FOR DESIGNLINE ===
     useEffect(() => {
