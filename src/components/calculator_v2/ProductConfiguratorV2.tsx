@@ -3276,7 +3276,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     </div>
                                                     {/* Dimension badge */}
                                                     {dachrechnerResults && (() => {
-                                                        const postsCount = structuralMetadata?.posts_count || 2;
+                                                        const postsCount = totalPostCount;
                                                         const frontSegments = postsCount - 1;
                                                         const isFrontPlacement = wallPlacement === 'front';
                                                         return (
@@ -3815,7 +3815,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                                                     <div className="relative z-10 text-center space-y-4">
                                                         {(() => {
-                                                            const postsCount = structuralMetadata?.posts_count || 2;
+                                                            const postsCount = totalPostCount;
                                                             const frontSegments = postsCount - 1;
                                                             const isFrontPlacement = wallPlacement === 'front';
                                                             const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
@@ -3882,7 +3882,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                         : displayName;
                                                                 }
 
-                                                                const postsCount = structuralMetadata?.posts_count || 2;
+                                                                const postsCount = totalPostCount;
                                                                 const frontSegments = postsCount - 1;
                                                                 const isFrontPlacement = wallPlacement === 'front';
                                                                 const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
