@@ -9,7 +9,7 @@ import { DatabaseService } from '../../services/database';
 import { LeadService } from '../../services/database/lead.service';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Customer, Lead, Offer } from '../../types';
-import { generateOfferPDF } from '../../utils/pdfGenerator';
+import { generateOfferPDF } from '../../utils/offerPDF';
 import { CustomerForm } from '../CustomerForm';
 import { calculateDachrechner, type RoofModelId, type DachrechnerResults } from '../../services/dachrechner.service';
 
@@ -1696,6 +1696,70 @@ export const ProductConfiguratorV2: React.FC = () => {
             }
         };
 
+        const handleGeneratePDF = () => {
+            const positions = [
+                ...basket.map(b => ({
+                    name: b.name,
+                    description: b.config,
+                    dimensions: b.dimensions || '',
+                    price: b.price
+                })),
+                ...customItems.map(ci => ({
+                    name: ci.name,
+                    description: 'Manuelle Position',
+                    dimensions: '',
+                    price: ci.price
+                }))
+            ];
+
+            generateOfferPDF({
+                customer: {
+                    salutation: customerState?.salutation || '',
+                    firstName: customerState?.firstName || '',
+                    lastName: customerState?.lastName || customerState?.name || '',
+                    companyName: customerState?.companyName || '',
+                    street: customerState?.street || '',
+                    houseNumber: customerState?.houseNumber || '',
+                    postalCode: customerState?.postalCode || '',
+                    city: customerState?.city || '',
+                    phone: customerState?.phone || '',
+                    email: customerState?.email || ''
+                },
+                technical: isManualMode ? undefined : {
+                    model: ROOF_MODELS.find(m => m.id === model)?.name || model,
+                    width,
+                    projection,
+                    cover,
+                    variant: cover === 'Glass'
+                        ? (GLASS_VARIANTS.find(v => v.id === glassVariant)?.name || glassVariant)
+                        : (POLY_VARIANTS.find(v => v.id === polyVariant)?.name || polyVariant),
+                    construction,
+                    color,
+                    postsCount: structuralMetadata?.posts_count,
+                    extraPosts,
+                    extraPostHeight,
+                    rafterType: structuralMetadata?.rafter_type
+                },
+                positions,
+                pricing: {
+                    subtotal,
+                    marginPercent: margin,
+                    marginValue,
+                    discountPercent: discount,
+                    discountValue,
+                    montagePrice,
+                    extraPostTotal: extraPostTotalPrice,
+                    finalPriceNet: finalPrice,
+                    finalPriceGross: finalPrice * 1.19,
+                    purchaseDiscount
+                },
+                offerNumber: savedOffer?.offerNumber || `V2-${Date.now()}`,
+                offerDate: new Date().toLocaleDateString('de-DE'),
+                salesPerson: currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : undefined
+            });
+            toast.success('PDF wurde erstellt');
+        };
+
         return (
             <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
                 <div className="max-w-4xl mx-auto space-y-6">
@@ -1852,8 +1916,27 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 ))}
                             </tbody>
                             <tfoot>
+                                {montagePrice > 0 && (
+                                    <tr className="border-t border-slate-100 bg-blue-50">
+                                        <td className="py-3 font-medium text-blue-700">🔧 Montage</td>
+                                        <td className="py-3 text-slate-600 text-xs">Montagekosten (netto, ohne Aufschlag)</td>
+                                        <td className="py-3 text-right font-bold text-blue-700">{formatCurrency(montagePrice)}</td>
+                                        <td></td>
+                                    </tr>
+                                )}
+                                {extraPostTotalPrice > 0 && (
+                                    <tr className="border-t border-slate-100 bg-amber-50">
+                                        <td className="py-3 font-medium text-amber-700">🏗️ Zusatzpfosten</td>
+                                        <td className="py-3 text-slate-600 text-xs">
+                                            {extraPosts > 0 && `${extraPosts}× Zusatzpfosten`}
+                                            {extraPostHeight === 3000 && ` + Höhenaufschlag 3000mm (${totalPostCount} Pfosten)`}
+                                        </td>
+                                        <td className="py-3 text-right font-bold text-amber-700">{formatCurrency(extraPostTotalPrice)}</td>
+                                        <td></td>
+                                    </tr>
+                                )}
                                 <tr className="border-t-2 border-slate-200">
-                                    <td colSpan={2} className="py-3 font-bold">Suma częściowa</td>
+                                    <td colSpan={2} className="py-3 font-bold">Zwischensumme</td>
                                     <td className="py-3 text-right font-bold">{formatCurrency(subtotal)}</td>
                                     <td></td>
                                 </tr>
@@ -2032,20 +2115,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     )}
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        if (publicLink) {
-                                            const printUrl = publicLink.replace('/p/offer/', '/print/offer/');
-                                            window.open(printUrl, '_blank');
-                                        } else if (savedOffer?.publicToken) {
-                                            window.open(`/print/offer/${savedOffer.publicToken}`, '_blank');
-                                        } else {
-                                            toast.error("Proszę najpierw zapisać ofertę");
-                                        }
-                                    }}
-                                    disabled={!savedOffer}
-                                    className={`px-4 py-3 border rounded-xl font-bold ${savedOffer ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                    onClick={handleGeneratePDF}
+                                    className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
                                 >
-                                    📄 Drukuj / PDF
+                                    📄 PDF herunterladen
                                 </button>
                                 <button
                                     onClick={() => navigate('/dashboard')}
