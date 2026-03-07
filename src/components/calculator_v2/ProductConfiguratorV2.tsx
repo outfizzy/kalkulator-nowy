@@ -55,11 +55,11 @@ const ROOF_MODELS: RoofModel[] = [
     { id: 'Trendline', name: 'Trendstyle', description: 'Klasyczny profil 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg' },
     { id: 'Trendline+', name: 'Trendstyle+', description: 'Klasyczny Plus 70mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-plus.jpg' },
     { id: 'Topline', name: 'Topstyle', description: 'Premium profil 80mm • od 2500mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg' },
-    { id: 'Topline XL', name: 'Topstyle XL', description: 'Extra duża konstrukcja XL', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/topline-xl.jpg' },
-    { id: 'Designline', name: 'Designstyle', description: 'Elegancki design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
-    { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa 100mm • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
+    { id: 'Topline XL', name: 'Topstyle XL', description: 'Extra große XL-Konstruktion', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/topline-xl.jpg' },
+    { id: 'Designline', name: 'Designstyle', description: 'Elegantes Design • nur Glas', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
+    { id: 'Ultraline', name: 'Ultrastyle', description: 'Premium 100mm • nur Glas', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
     { id: 'Skyline', name: 'Skystyle', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
-    { id: 'Carport', name: 'Carport', description: 'Wiata garażowa z blachą', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
+    { id: 'Carport', name: 'Carport', description: 'Carport mit Stahlblech', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
 ];
 
 // Glass variant options
@@ -122,49 +122,49 @@ const SCHIEBETUR_OPENING = [
 
 // Auto-calculate panel count from width (from Aluxe pricelist, Feldbreite max 1500mm)
 function getSchiebetuerPanelCount(widthMm: number): { count: string; maxWidth: number } {
-    if (widthMm <= 2500) return { count: '2-skrzydłowe', maxWidth: 2620 };
-    if (widthMm <= 3000) return { count: '2-3 skrzydłowe', maxWidth: 2620 };
-    if (widthMm <= 3500) return { count: '3-skrzydłowe', maxWidth: 2620 };
-    if (widthMm <= 4500) return { count: '3-4 skrzydłowe', maxWidth: 2620 };
-    if (widthMm <= 5000) return { count: '4-skrzydłowe', maxWidth: 2620 };
-    if (widthMm <= 6000) return { count: '4-6 skrzydłowe', maxWidth: 2620 };
-    return { count: '6+ skrzydłowe', maxWidth: 2620 };
+    if (widthMm <= 2500) return { count: '2-Flügel', maxWidth: 2620 };
+    if (widthMm <= 3000) return { count: '2-3 Flügel', maxWidth: 2620 };
+    if (widthMm <= 3500) return { count: '3-Flügel', maxWidth: 2620 };
+    if (widthMm <= 4500) return { count: '3-4 Flügel', maxWidth: 2620 };
+    if (widthMm <= 5000) return { count: '4-Flügel', maxWidth: 2620 };
+    if (widthMm <= 6000) return { count: '4-6 Flügel', maxWidth: 2620 };
+    return { count: '6+ Flügel', maxWidth: 2620 };
 }
 
 // Panorama - frameless sliding glass systems
 const PANORAMA_PRODUCTS = [
     // AL22 - flat track
-    { id: 'Panorama AL22 (3-Tor)', name: 'AL22 3-Tor', description: 'Płaska szyna, 3 tory', icon: '⊞', tracks: 3 },
-    { id: 'Panorama AL22 (5-Tor)', name: 'AL22 5-Tor', description: 'Płaska szyna, 5 torów', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL22 (3-Tor)', name: 'AL22 3-Tor', description: 'Flachschiene, 3 Spuren', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL22 (5-Tor)', name: 'AL22 5-Tor', description: 'Flachschiene, 5 Spuren', icon: '⊟', tracks: 5 },
     // AL23 - high track
-    { id: 'Panorama AL23 (3-Tor)', name: 'AL23 3-Tor', description: 'Wysoka szyna, 3 tory', icon: '⊞', tracks: 3 },
-    { id: 'Panorama AL23 (4-Tor)', name: 'AL23 4-Tor', description: 'Wysoka szyna, 4 tory', icon: '⊞', tracks: 4 },
-    { id: 'Panorama AL23 (5-Tor)', name: 'AL23 5-Tor', description: 'Wysoka szyna, 5 torów', icon: '⊟', tracks: 5 },
-    { id: 'Panorama AL23 (6-Tor)', name: 'AL23 6-Tor', description: 'Wysoka szyna, 6 torów', icon: '⊟', tracks: 6 },
-    { id: 'Panorama AL23 (7-Tor)', name: 'AL23 7-Tor', description: 'Wysoka szyna, 7 torów', icon: '⊞', tracks: 7 },
+    { id: 'Panorama AL23 (3-Tor)', name: 'AL23 3-Tor', description: 'Hochschiene, 3 Spuren', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL23 (4-Tor)', name: 'AL23 4-Tor', description: 'Hochschiene, 4 Spuren', icon: '⊞', tracks: 4 },
+    { id: 'Panorama AL23 (5-Tor)', name: 'AL23 5-Tor', description: 'Hochschiene, 5 Spuren', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL23 (6-Tor)', name: 'AL23 6-Tor', description: 'Hochschiene, 6 Spuren', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL23 (7-Tor)', name: 'AL23 7-Tor', description: 'Hochschiene, 7 Spuren', icon: '⊞', tracks: 7 },
     // AL24
-    { id: 'Panorama AL24 (3-Tor)', name: 'AL24 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
-    { id: 'Panorama AL24 (4-Tor)', name: 'AL24 4-Tor', description: '4 tory', icon: '⊞', tracks: 4 },
-    { id: 'Panorama AL24 (5-Tor)', name: 'AL24 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
-    { id: 'Panorama AL24 (6-Tor)', name: 'AL24 6-Tor', description: '6 torów', icon: '⊟', tracks: 6 },
-    { id: 'Panorama AL24 (7-Tor)', name: 'AL24 7-Tor', description: '7 torów', icon: '⊞', tracks: 7 },
+    { id: 'Panorama AL24 (3-Tor)', name: 'AL24 3-Tor', description: '3 Spuren', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL24 (4-Tor)', name: 'AL24 4-Tor', description: '4 Spuren', icon: '⊞', tracks: 4 },
+    { id: 'Panorama AL24 (5-Tor)', name: 'AL24 5-Tor', description: '5 Spuren', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL24 (6-Tor)', name: 'AL24 6-Tor', description: '6 Spuren', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL24 (7-Tor)', name: 'AL24 7-Tor', description: '7 Spuren', icon: '⊞', tracks: 7 },
     // AL25
-    { id: 'Panorama AL25 (3-Tor)', name: 'AL25 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
-    { id: 'Panorama AL25 (4-Tor)', name: 'AL25 4-Tor', description: '4 tory', icon: '⊞', tracks: 4 },
-    { id: 'Panorama AL25 (5-Tor)', name: 'AL25 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
-    { id: 'Panorama AL25 (6-Tor)', name: 'AL25 6-Tor', description: '6 torów', icon: '⊟', tracks: 6 },
-    { id: 'Panorama AL25 (7-Tor)', name: 'AL25 7-Tor', description: '7 torów', icon: '⊞', tracks: 7 },
+    { id: 'Panorama AL25 (3-Tor)', name: 'AL25 3-Tor', description: '3 Spuren', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL25 (4-Tor)', name: 'AL25 4-Tor', description: '4 Spuren', icon: '⊞', tracks: 4 },
+    { id: 'Panorama AL25 (5-Tor)', name: 'AL25 5-Tor', description: '5 Spuren', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL25 (6-Tor)', name: 'AL25 6-Tor', description: '6 Spuren', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL25 (7-Tor)', name: 'AL25 7-Tor', description: '7 Spuren', icon: '⊞', tracks: 7 },
     // AL26
-    { id: 'Panorama AL26 (3-Tor)', name: 'AL26 3-Tor', description: '3 tory', icon: '⊞', tracks: 3 },
-    { id: 'Panorama AL26 (4-Tor)', name: 'AL26 4-Tor', description: '4 tory', icon: '⊞', tracks: 4 },
-    { id: 'Panorama AL26 (5-Tor)', name: 'AL26 5-Tor', description: '5 torów', icon: '⊟', tracks: 5 },
-    { id: 'Panorama AL26 (6-Tor)', name: 'AL26 6-Tor', description: '6 torów', icon: '⊟', tracks: 6 },
-    { id: 'Panorama AL26 (7-Tor)', name: 'AL26 7-Tor', description: '7 torów', icon: '⊞', tracks: 7 },
+    { id: 'Panorama AL26 (3-Tor)', name: 'AL26 3-Tor', description: '3 Spuren', icon: '⊞', tracks: 3 },
+    { id: 'Panorama AL26 (4-Tor)', name: 'AL26 4-Tor', description: '4 Spuren', icon: '⊞', tracks: 4 },
+    { id: 'Panorama AL26 (5-Tor)', name: 'AL26 5-Tor', description: '5 Spuren', icon: '⊟', tracks: 5 },
+    { id: 'Panorama AL26 (6-Tor)', name: 'AL26 6-Tor', description: '6 Spuren', icon: '⊟', tracks: 6 },
+    { id: 'Panorama AL26 (7-Tor)', name: 'AL26 7-Tor', description: '7 Spuren', icon: '⊞', tracks: 7 },
 ];
 
 const PANORAMA_MODELS = [
-    { id: 'AL22', name: 'AL22', description: 'Płaska szyna (Flat Track)', icon: '⊞', validTracks: [3, 5] },
-    { id: 'AL23', name: 'AL23', description: 'Wysoka szyna (High Track)', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
+    { id: 'AL22', name: 'AL22', description: 'Flachschiene (Flat Track)', icon: '⊞', validTracks: [3, 5] },
+    { id: 'AL23', name: 'AL23', description: 'Hochschiene (High Track)', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
     { id: 'AL24', name: 'AL24', description: 'Standard', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
     { id: 'AL25', name: 'AL25', description: 'Premium', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
     { id: 'AL26', name: 'AL26', description: 'Exclusive', icon: '⊞', validTracks: [3, 4, 5, 6, 7] },
@@ -1146,7 +1146,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                 }
 
                 if (!table) {
-                    setError(`Brak cennika bazowego: ${tableName} lub ${buildDbTableName(model, cover, zone)}`);
+                    setError(`Preisliste nicht gefunden: ${tableName} oder ${buildDbTableName(model, cover, zone)}`);
                     setLoading(false);
                     return;
                 }
@@ -1201,7 +1201,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     setStructureCount(combinedResult.structureCount);
                     setStructureNote(combinedResult.note);
                 } else {
-                    setError(`Wymiar niedostępny w cenniku bazowym`);
+                    setError(`Maß nicht in der Preisliste verfügbar`);
                     setLoading(false);
                     return;
                 }
@@ -1487,7 +1487,7 @@ export const ProductConfiguratorV2: React.FC = () => {
         const variantName = cover === 'Glass'
             ? GLASS_VARIANTS.find(v => v.id === glassVariant)?.name || glassVariant
             : POLY_VARIANTS.find(v => v.id === polyVariant)?.name || polyVariant;
-        const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${zone}, ${construction === 'wall' ? 'Przyścienna' : 'Wolnostojąca'}` +
+        const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${zone}, ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}` +
             (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
             (construction === 'freestanding' && includeFoundations ? ' + Fundamenty' : '') +
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
@@ -1520,7 +1520,7 @@ export const ProductConfiguratorV2: React.FC = () => {
         }
         setBasket(prev => [...prev, ...items]);
         setAccessoryQuantities({});
-        toast.success(`Dodano ${items.length} dodatków`);
+        toast.success(`${items.length} Zubehörteile hinzugefügt`);
     };
 
     const basketTotal = useMemo(() => basket.reduce((sum, item) => sum + item.price, 0), [basket]);
@@ -1570,7 +1570,7 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === SAVE OFFER HANDLER ===
     const handleSaveOffer = async () => {
         if (!currentUser) {
-            toast.error('Musisz być zalogowany');
+            toast.error('Bitte einloggen');
             return;
         }
         // In manual mode, check customItems instead of basket
@@ -1584,7 +1584,7 @@ export const ProductConfiguratorV2: React.FC = () => {
         }
         // Validation using customerState
         if (!customerState || (!customerState.name && !customerState.lastName)) {
-            toast.error('Brak danych klienta');
+            toast.error('Kundendaten fehlen');
             return;
         }
 
@@ -1720,7 +1720,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
         } catch (e: any) {
             console.error('Save offer error:', e);
-            toast.error(e.message || 'Błąd zapisu oferty');
+            toast.error(e.message || 'Fehler beim Speichern');
         } finally {
             setSavingOffer(false);
         }
@@ -2084,7 +2084,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                 {customItems.map((item) => (
                                     <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
                                         <td className="py-3 font-medium text-blue-700">📝 {item.name}</td>
-                                        <td className="py-3 text-slate-600 text-xs">Dodano ręcznie</td>
+                                        <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
                                         <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
                                         <td className="py-3 text-center">
                                             <button
@@ -2140,7 +2140,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     type="number"
                                     value={newItemPrice}
                                     onChange={e => setNewItemPrice(e.target.value)}
-                                    placeholder="Cena €"
+                                    placeholder="Preis €"
                                     className="w-32 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
                                 />
                                 <button
@@ -2166,7 +2166,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                 </div>
                                 <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                    <span>Cena zakupu:</span>
+                                    <span>Einkaufspreis:</span>
                                     <span className="font-bold">{formatCurrency(purchasePrice)}</span>
                                 </div>
                             </div>
@@ -2201,7 +2201,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                         {/* MONTAGE PRICE */}
                         <div className="mt-4 pt-4 border-t border-slate-100">
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montaż (netto)</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
                             <div className="flex items-center gap-3">
                                 <input
                                     type="number"
@@ -2214,7 +2214,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                 />
                                 <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1">Kwota dodawana do ceny końcowej (nie podlega marży ani rabatowi)</p>
+                            <p className="text-xs text-slate-400 mt-1">Wird zum Endpreis addiert (keine Marge/Rabatt)</p>
                         </div>
                     </div>
 
@@ -2222,9 +2222,9 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
                         <div className="flex justify-between items-center">
                             <div>
-                                <p className="text-indigo-200 text-sm">Cena końcowa (netto)</p>
+                                <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
                                 <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                {montagePrice > 0 && <p className="text-indigo-200 text-xs">w tym montaż: {formatCurrency(montagePrice)}</p>}
+                                {montagePrice > 0 && <p className="text-indigo-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
                                 <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
                             </div>
                             {!isManualMode && (
@@ -2242,7 +2242,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                             <div className="flex items-center gap-3 text-green-700">
                                 <span className="text-2xl">✅</span>
                                 <div>
-                                    <p className="font-bold">Oferta zapisana pomyślnie!</p>
+                                    <p className="font-bold">Angebot erfolgreich gespeichert!</p>
                                     <p className="text-xs text-green-600">ID: {savedOfferId}</p>
                                 </div>
                             </div>
@@ -2306,7 +2306,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     onClick={() => navigate('/dashboard')}
                                     className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
                                 >
-                                    Wyjdź
+                                    Beenden
                                 </button>
                             </div>
                         </div>
@@ -2563,7 +2563,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                 </div>
                                 <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                    <span>Cena zakupu:</span>
+                                    <span>Einkaufspreis:</span>
                                     <span className="font-bold">{formatCurrency(purchasePrice)}</span>
                                 </div>
                             </div>
@@ -2670,7 +2670,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                 onClick={() => setView('customer')}
                                 className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
                             >
-                                Zmień
+                                Ändern
                             </button>
                         </div>
 
@@ -2726,7 +2726,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             <div className="flex gap-1 flex-wrap">
                                                 {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
                                                 {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
-                                                {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Wolnostojące</span>}
+                                                {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Freistehend</span>}
                                             </div>
                                             {model === m.id && (
                                                 <div className="absolute top-3 right-3 text-indigo-600">
@@ -2750,7 +2750,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     {/* Width */}
                                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                                         <label className="flex justify-between mb-4">
-                                            <span className="font-bold text-slate-700">Szerokość (mm)</span>
+                                            <span className="font-bold text-slate-700">Breite (mm)</span>
                                             <span className="text-indigo-600 font-black text-xl">{width} mm</span>
                                         </label>
                                         <input
@@ -2768,7 +2768,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     {/* Projection */}
                                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                                         <label className="flex justify-between mb-4">
-                                            <span className="font-bold text-slate-700">Głębokość (mm)</span>
+                                            <span className="font-bold text-slate-700">Tiefe (mm)</span>
                                             <span className="text-indigo-600 font-black text-xl">{projection} mm</span>
                                         </label>
                                         <input
@@ -2783,7 +2783,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                         </div>
                                         {dimensionLimits && (
                                             <div className="mt-3 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                                                ⚠️ Max głębokość dla tego modelu: <strong>{dimensionLimits.maxDepth} mm</strong>
+                                                ⚠️ Max. Tiefe für dieses Modell: <strong>{dimensionLimits.maxDepth} mm</strong>
                                             </div>
                                         )}
                                     </div>
@@ -2965,7 +2965,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             <div className="flex items-center justify-between flex-wrap gap-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-bold text-slate-700">➕ Zusatzpfosten</span>
-                                                    <span className="text-[10px] text-slate-400">(dodatkowe słupki)</span>
+                                                    <span className="text-[10px] text-slate-400">(zusätzliche Pfosten)</span>
                                                 </div>
 
                                                 <div className="flex items-center gap-3">
@@ -3035,11 +3035,11 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                 <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Construction Type */}
                                     <div>
-                                        <label className="block text-sm font-bold text-slate-600 mb-3">Typ Montażu</label>
+                                        <label className="block text-sm font-bold text-slate-600 mb-3">Montagetyp</label>
                                         <div className="flex gap-3">
                                             {[
-                                                { id: 'wall', label: 'Przyścienny', icon: '🏠' },
-                                                { id: 'freestanding', label: 'Wolnostojący', icon: '⛺' }
+                                                { id: 'wall', label: 'Wandmontage', icon: '🏠' },
+                                                { id: 'freestanding', label: 'Freistehend', icon: '⛺' }
                                             ].map(t => (
                                                 <button
                                                     key={t.id}
@@ -3066,10 +3066,10 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                                                     </div>
                                                     <span className="text-sm font-medium text-slate-700">
-                                                        Uwzględnij Fundamenty
+                                                        Fundamente berücksichtigen
                                                         {['Orangeline', 'Orangeline+', 'Trendline', 'Trendline+', 'Topline', 'Topline XL', 'Designline'].includes(model) && (
                                                             <span className="text-xs text-indigo-600 block font-normal">
-                                                                (Automatyczna dopłata wg cennika)
+                                                                (Automatischer Aufpreis lt. Preisliste)
                                                             </span>
                                                         )}
                                                     </span>
@@ -3080,7 +3080,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                     {/* Zone */}
                                     <div>
-                                        <label className="block text-sm font-bold text-slate-600 mb-3">Strefa Śniegowa</label>
+                                        <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
                                         <div className="flex gap-2">
                                             {[1, 2, 3].map(z => (
                                                 <button
@@ -3122,8 +3122,8 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             }`}
                                                     >
                                                         <div>
-                                                            <div className="font-bold text-slate-900">Poliwęglan 16mm</div>
-                                                            <div className="text-xs text-slate-500">Lekki, wytrzymały, ekonomiczny</div>
+                                                            <div className="font-bold text-slate-900">Polycarbonat 16mm</div>
+                                                            <div className="text-xs text-slate-500">Leicht, robust, wirtschaftlich</div>
                                                         </div>
                                                         {cover === 'Poly' && <span className="text-indigo-600 text-xl">✓</span>}
                                                     </button>
@@ -3137,8 +3137,8 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             }`}
                                                     >
                                                         <div>
-                                                            <div className="font-bold text-slate-900">Szkło Bezpieczne VSG</div>
-                                                            <div className="text-xs text-slate-500">Premium, maksymalne światło</div>
+                                                            <div className="font-bold text-slate-900">Sicherheitsglas VSG</div>
+                                                            <div className="text-xs text-slate-500">Premium, maximales Licht</div>
                                                         </div>
                                                         {cover === 'Glass' && <span className="text-indigo-600 text-xl">✓</span>}
                                                     </button>
@@ -3148,7 +3148,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             {/* Variant Selector */}
                                             {cover === 'Glass' && currentModel?.hasGlass && (
                                                 <div className="mt-4 p-4 bg-cyan-50 rounded-xl border border-cyan-200">
-                                                    <h4 className="text-sm font-bold text-cyan-800 mb-3">Rodzaj Szkła</h4>
+                                                    <h4 className="text-sm font-bold text-cyan-800 mb-3">Glasart</h4>
                                                     <div className="grid grid-cols-3 gap-2">
                                                         {GLASS_VARIANTS.map(v => (
                                                             <button
@@ -3169,7 +3169,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             )}
                                             {cover === 'Poly' && currentModel?.hasPoly && (
                                                 <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                                    <h4 className="text-sm font-bold text-blue-800 mb-3">Rodzaj Poliwęglanu</h4>
+                                                    <h4 className="text-sm font-bold text-blue-800 mb-3">Polycarbonat-Typ</h4>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         {POLY_VARIANTS.map(v => (
                                                             <button
@@ -3221,7 +3221,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 />
                                                 <div className="flex-1">
                                                     <span className="font-bold text-amber-800">Sonderfarben</span>
-                                                    <span className="ml-2 text-sm text-amber-600">(+20% dopłata)</span>
+                                                    <span className="ml-2 text-sm text-amber-600">(+20% Aufpreis)</span>
                                                 </div>
                                                 {sonderfarbenSurcharge > 0 && (
                                                     <span className="text-sm font-bold text-amber-700">
@@ -3230,7 +3230,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 )}
                                             </label>
                                             <p className="text-xs text-amber-600 mt-2">
-                                                Kolor specjalny RAL na zamówienie - czas realizacji +3 tygodnie
+                                                Sonderfarbe RAL auf Anfrage - Lieferzeit +3 Wochen
                                             </p>
                                         </div>
 
@@ -3239,15 +3239,15 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
                                                 <h4 className="font-bold text-indigo-800 mb-3 flex items-center gap-2">
                                                     <span className="text-lg">🔄</span>
-                                                    Schiebeeinheit (Przesuwne Szyby Dachowe)
+                                                    Schiebeeinheit (Dach-Schiebeglas)
                                                 </h4>
                                                 <p className="text-xs text-indigo-600 mb-4">
-                                                    Przesuwne szyby umożliwiają otwieranie dachu. Cena za każde pole przesuwne.
+                                                    Schiebbare Glasflächen ermöglichen das Öffnen des Dachs. Preis pro Schiebefeld.
                                                 </p>
 
                                                 <div className="flex items-center gap-4">
                                                     <label className="text-sm font-medium text-indigo-700">
-                                                        Ilość pól przesuwnych:
+                                                        Anzahl Schiebefelder:
                                                     </label>
                                                     <div className="flex items-center gap-2">
                                                         <button
@@ -3385,8 +3385,8 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                     <div className="flex items-center gap-2 bg-amber-50 rounded p-1.5 border border-amber-200">
                                                                         <span className="text-amber-600 font-bold">⬛</span>
                                                                         <span className="text-amber-800">
-                                                                            <strong>{frontSegments} {frontSegments === 1 ? 'odcinek' : 'odcinków'}</strong> między <strong>{postsCount} słupkami</strong>
-                                                                            <span className="text-amber-600 ml-1">→ każdy: <strong>{wallWidth} × {wallHeight} mm</strong></span>
+                                                                            <strong>{frontSegments} {frontSegments === 1 ? 'Segment' : 'Segmente'}</strong> zwischen <strong>{postsCount} Pfosten</strong>
+                                                                            <span className="text-amber-600 ml-1">→ je: <strong>{wallWidth} × {wallHeight} mm</strong></span>
                                                                         </span>
                                                                     </div>
                                                                 )}
@@ -3400,7 +3400,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     <div className="flex border-b border-slate-100">
                                                         {[
                                                             { id: 'fixed', label: 'Festverglasung', icon: '🧱' },
-                                                            { id: 'sliding', label: 'Drzwi Przesuwne', icon: '🚪' },
+                                                            { id: 'sliding', label: 'Schiebetür', icon: '🚪' },
                                                             { id: 'panorama', label: 'Panorama', icon: '🌅' },
                                                         ].map(cat => (
                                                             <button
@@ -3509,7 +3509,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                             </div>
                                                                         )}
 
-                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">Rodzaj Szkła (Keilfenster)</h4>
+                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">Glasart (Keilfenster)</h4>
                                                                         <div className="grid grid-cols-3 gap-2">
                                                                             {[
                                                                                 { id: 'clear', name: 'Klar (VSG 44.2)', icon: '🪟', price: 'Standard' },
@@ -3599,13 +3599,13 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                         <div className="flex items-center justify-between">
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="text-lg">📐</span>
-                                                                                <span className="text-sm font-bold text-indigo-800">Ilość skrzydeł</span>
+                                                                                <span className="text-sm font-bold text-indigo-800">Anzahl Flügel</span>
                                                                             </div>
                                                                             <span className="text-sm font-black text-indigo-700 bg-white px-3 py-1 rounded-lg shadow-sm">
                                                                                 {getSchiebetuerPanelCount(wallWidth).count}
                                                                             </span>
                                                                         </div>
-                                                                        <p className="text-[10px] text-indigo-500 mt-1">Automatycznie na podstawie szerokości (maks. szerokość skrzydła: 1500mm)</p>
+                                                                        <p className="text-[10px] text-indigo-500 mt-1">Automatisch nach Breite (max. Flügelbreite: 1500mm)</p>
                                                                     </div>
                                                                 )}
 
@@ -3663,7 +3663,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                         <strong className="block mb-1">✅ W cenie zawarte:</strong>
                                                                         <ul className="list-disc list-inside space-y-0.5">
                                                                             <li>Uszczelki (Dichtung) 44.2 VSG klar</li>
-                                                                            <li>Nakładki odwadniające (Entwässerungskappen)</li>
+                                                                            <li>Entwässerungskappen</li>
                                                                             <li>Kolor standardowy: RAL 7016 / 9007 / 9010 / 9016 / 9005 / DB703</li>
                                                                         </ul>
                                                                     </div>
@@ -3729,7 +3729,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                                     ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
                                                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
                                                                             >
-                                                                                ↔ Środkowe
+                                                                                ↔ Mittig
                                                                             </button>
                                                                         </div>
                                                                     </div>
@@ -3759,7 +3759,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                                                     {/* Glass Type */}
                                                                     <div>
-                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Typ szkła</label>
+                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Glasart</label>
                                                                         <div className="grid grid-cols-2 gap-2">
                                                                             <button
                                                                                 onClick={() => setPanoramaGlassType('klar')}
@@ -3872,8 +3872,8 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                 {wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')
                                                                     ? 'Breite D1'
                                                                     : wallProduct.includes('Side')
-                                                                        ? 'Głębokość'
-                                                                        : 'Szerokość'} (mm)
+                                                                        ? 'Tiefe'
+                                                                        : 'Breite'} (mm)
                                                             </label>
                                                             <input
                                                                 type="number"
@@ -3889,7 +3889,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         </div>
                                                         {!(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
                                                             <div>
-                                                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Wysokość (mm)</label>
+                                                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Höhe (mm)</label>
                                                                 <input
                                                                     type="number"
                                                                     value={wallHeight}
@@ -3917,7 +3917,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     {structuralMetadata && (
                                                         <div className="flex justify-center mt-2 gap-4 text-xs font-bold text-slate-500">
                                                             <span className="bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
-                                                                Słupy: {structuralMetadata.posts_count}
+                                                                Pfosten: {structuralMetadata.posts_count}
                                                             </span>
                                                         </div>
                                                     )}
@@ -3937,7 +3937,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             return (
                                                                 <div>
                                                                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                                                        {isFrontPlacement ? `Cena za 1 element (×${segmentMultiplier})` : 'Cena elementu'}
+                                                                        {isFrontPlacement ? `Preis pro Element (×${segmentMultiplier})` : 'Elementpreis'}
                                                                     </div>
                                                                     {wallPriceLoading ? (
                                                                         <div className="text-2xl font-bold text-white/50 animate-pulse">Obliczam...</div>
@@ -3953,7 +3953,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                             )}
                                                                         </>
                                                                     ) : (
-                                                                        <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Niedostępne dla wymiaru</div>
+                                                                        <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Nicht verfügbar für dieses Maß</div>
                                                                     )}
                                                                 </div>
                                                             );
@@ -4047,8 +4047,8 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                                 {/* Helper Text */}
                                                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-700 leading-relaxed">
-                                                    <strong className="block mb-1">💡 Wskazówka:</strong>
-                                                    Wybierz typ zabudowy z listy po lewej. Wizualizacja powyżej pokazuje podgląd wybranego rozwiązania w kontekście konstrukcji.
+                                                    <strong className="block mb-1">💡 Hinweis:</strong>
+                                                    Wählen Sie den Verglasungstyp aus der Liste links. Die Vorschau zeigt die gewählte Lösung im Kontext der Konstruktion.
                                                 </div>
                                             </div>
                                         </div>
@@ -4092,7 +4092,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     {/* Dimensions Inputs */}
                                                     <div className="space-y-4">
                                                         <div>
-                                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Szerokość (mm)</label>
+                                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Breite (mm)</label>
                                                             <div className="relative">
                                                                 <input
                                                                     type="number"
@@ -4107,7 +4107,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">{awningType === 'zip' ? 'Wysokość' : 'Wysięg'} (mm)</label>
+                                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">{awningType === 'zip' ? 'Höhe' : 'Ausfall'} (mm)</label>
                                                             <div className="relative">
                                                                 <input
                                                                     type="number"
@@ -4125,7 +4125,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         {/* Motor Count Selector - only for aufdach/unterdach */}
                                                         {awningType !== 'zip' && (
                                                             <div>
-                                                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Ilość motorów</label>
+                                                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Anzahl Motoren</label>
                                                                 <div className="grid grid-cols-2 gap-2">
                                                                     <button
                                                                         onClick={() => setAwningMotorCount(1)}
@@ -4157,7 +4157,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         <div className="text-center mb-3">
                                                             {awningPrice !== null ? (
                                                                 <>
-                                                                    <div className="text-slate-500 text-xs uppercase font-bold mb-1">Cena netto</div>
+                                                                    <div className="text-slate-500 text-xs uppercase font-bold mb-1">Nettopreis</div>
                                                                     <div className="text-3xl font-black text-slate-800">{formatCurrency(awningPrice)}</div>
                                                                 </>
                                                             ) : (
@@ -4192,7 +4192,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                                 <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                     {loadingAccessories ? (
-                                                        <div className="text-center py-8 text-slate-400">Ładowanie cennika...</div>
+                                                        <div className="text-center py-8 text-slate-400">Preisliste wird geladen...</div>
                                                     ) : (
                                                         accessories.filter(a => a.category === 'led' || a.category === 'other').map(acc => {
                                                             const qty = accessoryQuantities[acc.id] || 0;
@@ -4241,7 +4241,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     {wallTab === 'materials' && (
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                                                <span className="text-indigo-900 font-medium">Materiały dla modelu:</span>
+                                                <span className="text-indigo-900 font-medium">Materialien für Modell:</span>
                                                 <span className="font-bold text-indigo-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-indigo-200 shadow-sm">{model}</span>
                                             </div>
 
@@ -4254,7 +4254,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     </h5>
                                                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                                         {loadingMaterials ? (
-                                                            <div className="text-center py-8 text-slate-400">Ładowanie...</div>
+                                                            <div className="text-center py-8 text-slate-400">Laden...</div>
                                                         ) : materials.filter(m => m.category === 'profile').map(mat => {
                                                             const qty = materialQuantities[mat.id] || 0;
                                                             return (
@@ -4278,7 +4278,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
                                                         <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm">🔩</span>
-                                                        Pozostałe Materiały
+                                                        Sonstige Materialien
                                                     </h5>
                                                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                                         {materials.filter(m => m.category !== 'profile').map(mat => {
@@ -4327,8 +4327,8 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     {wallTab === 'wpc' && (
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-amber-50 p-4 rounded-xl border border-amber-100">
-                                                <span className="text-amber-900 font-medium">🪵 Podłoga WPC (Taras)</span>
-                                                <span className="font-bold text-amber-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-amber-200 shadow-sm">Cena za m²</span>
+                                                <span className="text-amber-900 font-medium">🪵 WPC-Boden (Terrasse)</span>
+                                                <span className="font-bold text-amber-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-amber-200 shadow-sm">Preis pro m²</span>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4356,9 +4356,9 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             />
                                                         </div>
                                                         <div className="bg-slate-50 p-3 rounded-lg text-sm text-slate-600">
-                                                            <strong>Wskazówka:</strong> Oblicz m² jako szerokość × głębokość w metrach
+                                                            <strong>Hinweis:</strong> Berechne m² als Breite × Tiefe in Metern
                                                             <div className="mt-2 text-xs text-slate-400">
-                                                                Przykład: dach {width}mm × {projection}mm = {((width * projection) / 1000000).toFixed(2)} m²
+                                                                Beispiel: Dach {width}mm × {projection}mm = {((width * projection) / 1000000).toFixed(2)} m²
                                                             </div>
                                                             <button
                                                                 onClick={() => {
@@ -4368,7 +4368,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                 }}
                                                                 className="mt-2 text-xs text-amber-600 hover:text-amber-800 font-bold"
                                                             >
-                                                                → Użyj wymiarów dachu
+                                                                → Dachmaße verwenden
                                                             </button>
                                                         </div>
                                                     </div>
@@ -4401,7 +4401,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 <button
                                                     onClick={() => {
                                                         if (wpcArea > 0 && wpcTotal > 0) {
-                                                            addToBasket('Podłoga WPC', wpcTotal, 'Taras WPC', `${wpcArea.toFixed(2)} m²`, 'accessory');
+                                                            addToBasket('WPC-Boden', wpcTotal, 'Terrasse WPC', `${wpcArea.toFixed(2)} m²`, 'accessory');
                                                             setWpcArea(0);
                                                             setWpcTotal(0);
                                                         }
@@ -4417,7 +4417,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             </div>
 
                                             <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-700 border border-blue-100">
-                                                <strong>💡 Uwaga:</strong> Cena WPC jest ustawiana w panelu Admin → Cenniki V2 → Podłogi WPC.
+                                                <strong>💡 Hinweis:</strong> WPC-Preis wird unter Admin → Preislisten V2 → WPC-Böden eingestellt.
                                             </div>
                                         </div>
                                     )}
@@ -4427,7 +4427,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-slate-100 p-4 rounded-xl border border-slate-200">
                                                 <span className="text-slate-900 font-medium">🔲 Aluminium-Wände</span>
-                                                <span className="font-bold text-slate-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-slate-300 shadow-sm">Pełne / Lamelowe</span>
+                                                <span className="font-bold text-slate-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-slate-300 shadow-sm">Vollwand / Lamellen</span>
                                             </div>
 
                                             {/* Wall Type Selector */}
@@ -4461,7 +4461,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div>
                                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                                                                {aluWallType === 'lamellar' ? 'Długość (mb)' : 'Szerokość (mm)'}
+                                                                {aluWallType === 'lamellar' ? 'Länge (m)' : 'Breite (mm)'}
                                                             </label>
                                                             <input
                                                                 type="number"
@@ -4471,7 +4471,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Wysokość (mm)</label>
+                                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Höhe (mm)</label>
                                                             <input
                                                                 type="number"
                                                                 value={aluWallHeight}
@@ -4482,7 +4482,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     </div>
                                                     {aluWallType === 'lamellar' && (
                                                         <div className="mt-4 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
-                                                            <strong>Formula:</strong> Cena = cena_za_mb × długość_mb × (wysokość_mm / 1000)
+                                                            <strong>Formel:</strong> Preis = Preis_pro_m × Länge_m × (Höhe_mm / 1000)
                                                         </div>
                                                     )}
                                                 </div>
@@ -4491,7 +4491,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
                                                         <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">💰</span>
-                                                        Cena
+                                                        Preis
                                                     </h5>
                                                     {aluWallPriceLoading ? (
                                                         <div className="flex items-center justify-center py-12">
@@ -4501,21 +4501,21 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         <div className="space-y-4">
                                                             <div className="flex justify-between items-center py-3 border-b border-slate-100">
                                                                 <span className="text-slate-500">Typ:</span>
-                                                                <span className="font-bold">{aluWallType === 'full' ? 'Pełna' : 'Lamelowa'}</span>
+                                                                <span className="font-bold">{aluWallType === 'full' ? 'Vollwand' : 'Lamellen'}</span>
                                                             </div>
                                                             <div className="flex justify-between items-center py-3 border-b border-slate-100">
                                                                 <span className="text-slate-500">Wymiary:</span>
                                                                 <span className="font-bold">{aluWallWidth} × {aluWallHeight} mm</span>
                                                             </div>
                                                             <div className="flex justify-between items-center py-3 bg-slate-100 rounded-lg px-3">
-                                                                <span className="text-slate-900 font-bold">Cena:</span>
+                                                                <span className="text-slate-900 font-bold">Preis:</span>
                                                                 <span className="font-black text-2xl text-slate-800">{formatCurrency(aluWallPrice)}</span>
                                                             </div>
                                                         </div>
                                                     ) : (
                                                         <div className="text-center py-8 text-slate-400">
                                                             <div className="text-3xl mb-2">📊</div>
-                                                            <p>Brak ceny dla wybranych wymiarów</p>
+                                                            <p>Kein Preis für gewählte Maße</p>
                                                             <p className="text-xs mt-2">Preisliste ergänzen: Admin → Preislisten V2 → Alu-Wände</p>
                                                         </div>
                                                     )}
@@ -4551,9 +4551,9 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     {wallTab === 'led' && (
                                         <div className="text-center py-12">
                                             <div className="text-4xl mb-4">✨</div>
-                                            <p className="text-slate-500 mb-4">LED i akcesoria zostały przeniesione do zakładki "Komfort"</p>
+                                            <p className="text-slate-500 mb-4">LED und Zubehör wurden in den Tab "Komfort" verschoben</p>
                                             <button onClick={() => setWallTab('awnings')} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold">
-                                                Przejdź do Komfort →
+                                                Weiter zu Komfort →
                                             </button>
                                         </div>
                                     )}
@@ -4599,9 +4599,9 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             <span className="font-bold text-slate-800">{width} × {projection}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-500">Montaż</span>
+                                            <span className="text-slate-500">Montage</span>
                                             <span className={`font-bold ${construction === 'freestanding' ? 'text-amber-600' : 'text-slate-800'}`}>
-                                                {construction === 'wall' ? 'Przyścienny' : `Wolnostojący ${freestandingSurchargePrice > 0 ? '(+' + formatCurrency(freestandingSurchargePrice) + ')' : ''}`}
+                                                {construction === 'wall' ? 'Wandmontage' : `Freistehend ${freestandingSurchargePrice > 0 ? '(+' + formatCurrency(freestandingSurchargePrice) + ')' : ''}`}
                                             </span>
                                         </div>
                                         {model === 'Designline' && schiebeeinheitCount > 0 && (
@@ -4619,10 +4619,10 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             {price ? (
                                                 <>
                                                     <div className="text-3xl font-black text-slate-900">{formatCurrency(totalPrice || 0)}</div>
-                                                    <div className="text-[10px] text-slate-400 font-medium mt-1">Cena netto (bez VAT)</div>
+                                                    <div className="text-[10px] text-slate-400 font-medium mt-1">Nettopreis (ohne MwSt.)</div>
                                                     {structureCount > 1 && (
                                                         <div className="text-xs text-amber-600 font-medium mt-2 bg-amber-50 rounded-lg py-1.5 px-3 inline-block">
-                                                            🔗 {structureCount}× konstrukcja łączona
+                                                            🔗 {structureCount}× Verbundkonstruktion
                                                         </div>
                                                     )}
                                                 </>
@@ -4664,7 +4664,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                             <button
                                                                 onClick={() => removeFromBasket(item.id)}
                                                                 className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 text-xs transition-opacity"
-                                                                title="Usuń"
+                                                                title="Entfernen"
                                                             >
                                                                 ✕
                                                             </button>
@@ -4692,7 +4692,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                             }`}
                                     >
-                                        Przejdź do oferty →
+                                        Weiter zum Angebot →
                                     </button>
                                 </div>
                             </div>
