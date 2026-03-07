@@ -491,27 +491,6 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === MONTAGE (INSTALLATION) ===
     const [montagePrice, setMontagePrice] = useState<number>(0);
 
-    // === FETCH USER MAILBOXES ===
-    useEffect(() => {
-        const fetchMailboxes = async () => {
-            if (!currentUser) return;
-            try {
-                const { data } = await supabase
-                    .from('mailbox_users')
-                    .select('mailbox_id, mailboxes(id, name, smtp_host, smtp_port, smtp_user, smtp_password)')
-                    .eq('user_id', currentUser.id);
-                if (data) {
-                    const boxes = data
-                        .map((mu: any) => mu.mailboxes)
-                        .filter(Boolean);
-                    setUserMailboxes(boxes);
-                }
-            } catch (e) {
-                console.error('Failed to fetch mailboxes:', e);
-            }
-        };
-        fetchMailboxes();
-    }, [currentUser]);
 
     // === CALCULATED VALUES ===
     const areaM2 = (width * projection) / 1_000_000; // Convert mm² to m²
@@ -583,6 +562,28 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+
+    // === FETCH USER MAILBOXES ===
+    useEffect(() => {
+        const fetchMailboxes = async () => {
+            if (!currentUser) return;
+            try {
+                const { data } = await supabase
+                    .from('mailbox_users')
+                    .select('mailbox_id, mailboxes(id, name, smtp_host, smtp_port, smtp_user, smtp_password)')
+                    .eq('user_id', currentUser.id);
+                if (data) {
+                    const boxes = data
+                        .map((mu: any) => mu.mailboxes)
+                        .filter(Boolean);
+                    setUserMailboxes(boxes);
+                }
+            } catch (e) {
+                console.error('Failed to fetch mailboxes:', e);
+            }
+        };
+        fetchMailboxes();
+    }, [currentUser]);
 
     // === AUTO-SWITCH COVER TYPE FOR GLASS-ONLY OR SPECIAL MODELS ===
     useEffect(() => {
