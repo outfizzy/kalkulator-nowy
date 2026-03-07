@@ -64,53 +64,60 @@ const ROOF_MODELS: RoofModel[] = [
 
 // Glass variant options
 const GLASS_VARIANTS = [
-    { id: 'klar', name: 'Klar (VSG)', description: 'Przezroczyste szkło hartowane', icon: '🟢' },
-    { id: 'matt', name: 'Matt (VSG)', description: 'Szkło matowe, prywatność', icon: '⚪' },
-    { id: 'stopsol', name: 'Stopsol', description: 'Szkło z filtrem słonecznym', icon: '🔶' },
+    { id: 'klar', name: 'Klar (VSG)', description: 'Klares Sicherheitsglas', icon: '🟢' },
+    { id: 'matt', name: 'Matt (VSG)', description: 'Satiniert, Sichtschutz', icon: '⚪' },
+    { id: 'stopsol', name: 'Stopsol', description: 'Sonnenschutzglas', icon: '🔶' },
 ];
 
 // Polycarbonate variant options (per Excel: klar/opal share price, IR Gold is surcharge)
 const POLY_VARIANTS = [
-    { id: 'opal', name: 'Opal', description: 'Mleczny, rozpraszający światło', icon: '⚪' },
-    { id: 'klar', name: 'Klar', description: 'Przezroczysty poliwęglan', icon: '🟢' },
-    { id: 'ir-gold', name: 'IR Gold', description: 'Ochrona przed promieniowaniem IR', icon: '🟡' },
+    { id: 'opal', name: 'Opal', description: 'Lichtstreuend, milchig', icon: '⚪' },
+    { id: 'klar', name: 'Klar', description: 'Transparent', icon: '🟢' },
+    { id: 'ir-gold', name: 'IR Gold', description: 'IR-Wärmeschutz', icon: '🟡' },
 ];
 
 const WALL_PRODUCTS = [
-    { id: 'Side Wall (Glass)', name: 'Ściana Boczna', icon: '🔲', description: 'Szklana ściana boczna' },
-    { id: 'Front Wall (Glass)', name: 'Ściana Frontowa', icon: '⬛', description: 'Szklana ściana frontowa' },
-    { id: 'Wedge (Glass)', name: 'Keilfenster', icon: '📐', description: 'Szyba klinowa trójkątna' },
+    { id: 'Side Wall (Glass)', name: 'Seitenwand (Glas)', icon: '🔲', description: 'Aluminium-Seitenwand mit VSG-Verglasung' },
+    { id: 'Front Wall (Glass)', name: 'Frontwand (Glas)', icon: '⬛', description: 'Aluminium-Frontwand mit VSG-Verglasung' },
+    { id: 'Wedge (Glass)', name: 'Keilfenster', icon: '📐', description: 'Dreieckiges Keilfenster' },
 ];
 
 // Keilfenster (Wedge) accessories from Aluxe pricelist
 const KEILFENSTER_ACCESSORIES = [
-    { id: 'uProfil', name: 'U-Profil 55x29mm', price: 38.40, icon: '📏', description: 'Ausgleichs U Profil für Fenster' },
-    { id: 'schraubenSet', name: 'Schrauben-Set', price: 15.32, icon: '🔩', description: 'Montage-Schrauben Set' },
-    { id: 'kippFenster', name: 'Kipp-Fenster', price: 564.75, icon: '🪟', description: 'Uchylne okno w klinie' },
-    { id: 'abdeckungEL891', name: 'Abdeckung EL891', price: 20.07, icon: '🔳', description: 'Osłona 3200mm' },
+    { id: 'uProfil', name: 'U-Profil 55x29mm', price: 38.40, icon: '📏', description: 'Ausgleichs-U-Profil für Fenster' },
+    { id: 'schraubenSet', name: 'Schrauben-Set', price: 15.32, icon: '🔩', description: 'Montage-Schrauben-Set' },
+    { id: 'kippFenster', name: 'Kipp-Fenster', price: 564.75, icon: '🪟', description: 'Dreh-Kipp-Fenster im Keil' },
+    { id: 'abdeckungEL891', name: 'Abdeckung EL891', price: 20.07, icon: '🔳', description: 'Abdeckung 3200mm' },
+];
+
+// Glass type options for Side/Front walls
+const WALL_GLASS_TYPES = [
+    { id: 'klar', name: 'Klar (VSG 44.2)', icon: '🪟', price: 'Standard' },
+    { id: 'matt', name: 'Matt (VSG 44.2)', icon: '🌫️', price: '+ Aufpreis' },
+    { id: 'iso', name: 'Isolierglas', icon: '🔥', price: '+ Aufpreis' },
 ];
 
 
 // Schiebetür - framed sliding doors
 const SCHIEBETUR_PRODUCTS = [
-    { id: 'Schiebetür (VSG klar)', name: 'Szkło przezroczyste (VSG klar)', icon: '🚪', description: 'Drzwi przesuwne aluminiowe – szkło hartowane czyste' },
-    { id: 'Schiebetür (VSG matt)', name: 'Szkło matowe (VSG matt)', icon: '🚪', description: 'Drzwi przesuwne aluminiowe – szkło matowe' },
-    { id: 'Schiebetür (Isolierglas)', name: 'Szkło izolacyjne (Isolierglas)', icon: '🚪', description: 'Drzwi przesuwne aluminiowe – szkło termoizolacyjne' },
+    { id: 'Schiebetür (VSG klar)', name: 'VSG klar', icon: '🚪', description: 'Alu-Schiebetür mit klarem Sicherheitsglas' },
+    { id: 'Schiebetür (VSG matt)', name: 'VSG matt', icon: '🚪', description: 'Alu-Schiebetür mit mattem Sicherheitsglas' },
+    { id: 'Schiebetür (Isolierglas)', name: 'Isolierglas', icon: '🚪', description: 'Alu-Schiebetür mit Wärmedämmglas' },
 ];
 
 // Schiebetür handle types (from Aluxe ACSL catalog)
 const SCHIEBETUR_HANDLES = [
-    { id: 'ACSL2042', name: 'Uchwyt płaski (wewnętrzny)', description: 'Handgriff flach (innen)', icon: '🔲' },
-    { id: 'ACSL2046', name: 'Uchwyt stały (zewnętrzny)', description: 'Handgriff fest (außen)', icon: '🔳' },
-    { id: 'ACSL2044', name: 'Uchwyt stały (wewnętrzny)', description: 'Handgriff fest (innen)', icon: '🔳' },
-    { id: 'ACSL2047', name: 'Uchwyt z zamkiem (zewnętrzny)', description: 'Handgriff mit Zylinder (außen)', icon: '🔐' },
+    { id: 'ACSL2042', name: 'Handgriff flach (innen)', description: 'Flacher Griff, Innenseite', icon: '🔲' },
+    { id: 'ACSL2046', name: 'Handgriff fest (außen)', description: 'Fester Griff, Außenseite', icon: '🔳' },
+    { id: 'ACSL2044', name: 'Handgriff fest (innen)', description: 'Fester Griff, Innenseite', icon: '🔳' },
+    { id: 'ACSL2047', name: 'Handgriff mit Zylinder (außen)', description: 'Abschließbarer Griff, Außenseite', icon: '🔐' },
 ];
 
 // Schiebetür opening directions
 const SCHIEBETUR_OPENING = [
-    { id: 'left', name: 'Lewo otwierające', description: 'Links öffnend', icon: '◀️' },
-    { id: 'right', name: 'Prawo otwierające', description: 'Rechts öffnend', icon: '▶️' },
-    { id: 'center', name: 'Środkowo otwierające', description: 'Mittig öffnend/schließend', icon: '↔️' },
+    { id: 'left', name: 'Links öffnend', description: 'Öffnung nach links', icon: '◀️' },
+    { id: 'right', name: 'Rechts öffnend', description: 'Öffnung nach rechts', icon: '▶️' },
+    { id: 'center', name: 'Mittig öffnend', description: 'Mittig öffnend/schließend', icon: '↔️' },
 ];
 
 // Auto-calculate panel count from width (from Aluxe pricelist, Feldbreite max 1500mm)
@@ -369,6 +376,7 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [wallPrice, setWallPrice] = useState<number | null>(null);
     const [wallPriceLoading, setWallPriceLoading] = useState(false);
     const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama'>('fixed');
+    const [wallGlassType, setWallGlassType] = useState<'klar' | 'matt' | 'iso'>('klar');
     const [structuralMetadata, setStructuralMetadata] = useState<{
         posts_count: number;
         fields_count: number;
@@ -922,6 +930,29 @@ export const ProductConfiguratorV2: React.FC = () => {
                             finalPrice += surcharge;
                         }
 
+                        // SIDE/FRONT WALL SURCHARGES (Matt / Iso)
+                        if ((isSideWall || (!isWedge && !isSchiebetur)) && finalPrice !== null && wallGlassType !== 'klar') {
+                            const wallTypeName = isSideWall ? 'Side Wall' : 'Front Wall';
+                            const surchargeType = wallGlassType === 'matt' ? 'Surcharge Matt' : 'Surcharge Iso';
+                            const surchargeName = `Aluxe V2 - ${wallTypeName} (Glass) ${surchargeType}`;
+                            const { data: surchargeTables } = await supabase
+                                .from('price_tables')
+                                .select('id')
+                                .eq('name', surchargeName)
+                                .limit(1);
+                            if (surchargeTables?.[0]) {
+                                const surchargePrice = await PricingService.calculateMatrixPrice(
+                                    surchargeTables[0].id,
+                                    lookupWidth,
+                                    lookupProjection
+                                );
+                                if (surchargePrice) {
+                                    console.log(`Wall glass surcharge (${surchargeName}): +${surchargePrice.toFixed(2)}`);
+                                    finalPrice += surchargePrice;
+                                }
+                            }
+                        }
+
                         // Schiebetür: full price already included in per-glass-type table, no surcharge needed
                     }
 
@@ -938,7 +969,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
         const t = setTimeout(fetchWallPrice, 300);
         return () => clearTimeout(t);
-    }, [wallProduct, wallWidth, wallHeight, projection, wedgeGlassType, panoramaOpeningType, panoramaHandleType, panoramaGlassType, panoramaSteelLook, wallPlacement]);
+    }, [wallProduct, wallWidth, wallHeight, projection, wedgeGlassType, wallGlassType, panoramaOpeningType, panoramaHandleType, panoramaGlassType, panoramaSteelLook, wallPlacement]);
 
     // === AUTO-CALCULATE PANORAMA TRACKS ===
     useEffect(() => {
@@ -1448,7 +1479,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             quantity: 1
         };
         setBasket(prev => [...prev, newItem]);
-        toast.success(`Dodano do koszyka: ${itemName}`);
+        toast.success(`Hinzugefügt: ${itemName}`);
     };
 
     const handleAddRoofToBasket = () => {
@@ -1496,7 +1527,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const removeFromBasket = (itemId: string) => {
         setBasket(prev => prev.filter(item => item.id !== itemId));
-        toast.success('Usunięto z koszyka');
+        toast.success('Entfernt');
     };
 
 
@@ -1544,11 +1575,11 @@ export const ProductConfiguratorV2: React.FC = () => {
         }
         // In manual mode, check customItems instead of basket
         if (!isManualMode && basket.length === 0) {
-            toast.error('Koszyk jest pusty');
+            toast.error('Keine Positionen vorhanden');
             return;
         }
         if (isManualMode && customItems.length === 0) {
-            toast.error('Dodaj co najmniej jedną pozycję');
+            toast.error('Bitte mindestens eine Position hinzufügen');
             return;
         }
         // Validation using customerState
@@ -2043,7 +2074,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                             <button
                                                 onClick={() => removeFromBasket(item.id)}
                                                 className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
-                                                title="Usuń z koszyka"
+                                                title="Entfernen"
                                             >
                                                 ✕
                                             </button>
@@ -2096,13 +2127,13 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                         {/* Add Custom Item */}
                         <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Dodaj pozycję</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Position hinzufügen</p>
                             <div className="flex gap-2">
                                 <input
                                     type="text"
                                     value={newItemName}
                                     onChange={e => setNewItemName(e.target.value)}
-                                    placeholder="Opis pozycji..."
+                                    placeholder="Beschreibung..."
                                     className="flex-1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
                                 />
                                 <input
@@ -2117,7 +2148,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     disabled={!newItemName.trim()}
                                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50"
                                 >
-                                    + Dodaj
+                                    + Hinzufügen
                                 </button>
                             </div>
                         </div>
@@ -2125,7 +2156,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                     {/* Margin & Discount */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">💰 Marża & Rabat</h2>
+                        <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
 
                         {/* Purchase Discount Info (from Admin) */}
                         {purchaseDiscount > 0 && (
@@ -2143,7 +2174,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                         <div className="grid grid-cols-2 gap-6">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marża (%)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
                                 <input
                                     type="number"
                                     value={margin}
@@ -2523,7 +2554,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                     {/* Margin & Discount */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">💰 Marża & Rabat</h2>
+                        <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
 
                         {purchaseDiscount > 0 && (
                             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -3073,14 +3104,14 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                         {activeStep === 2 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">⚙️</span> Specyfikacja
+                                    📋 Konfiguration
                                 </h2>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     {/* Cover */}
                                     {(currentModel?.hasPoly || currentModel?.hasGlass) && (
                                         <div>
-                                            <h3 className="font-bold text-slate-700 mb-4">Pokrycie Dachu</h3>
+                                            <h3 className="font-bold text-slate-700 mb-4">Dacheindeckung</h3>
                                             <div className="space-y-3">
                                                 {currentModel?.hasPoly && (
                                                     <button
@@ -3162,7 +3193,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                     {/* Color */}
                                     <div>
-                                        <h3 className="font-bold text-slate-700 mb-4">Kolor Konstrukcji</h3>
+                                        <h3 className="font-bold text-slate-700 mb-4">Farbe</h3>
                                         <div className="grid grid-cols-2 gap-3">
                                             {['RAL 7016', 'RAL 9016', 'RAL 9005', 'RAL 9007'].map(c => (
                                                 <button
@@ -3255,7 +3286,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 {schiebeeinheitCount > 0 && (
                                                     <div className="mt-3 p-3 bg-indigo-100 rounded-lg">
                                                         <div className="flex justify-between text-sm">
-                                                            <span className="text-indigo-700">Dopłata za przesuwne szyby:</span>
+                                                            <span className="text-indigo-700">Aufpreis Schiebeglas:</span>
                                                             <span className="font-bold text-indigo-900">
                                                                 +{formatCurrency(schiebeeinheitTotalPrice)}
                                                             </span>
@@ -3276,19 +3307,19 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                 <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl">🧩</div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">Dodatki i Akcesoria</h3>
-                                        <p className="text-slate-300 text-sm">Wybierz zabudowę, markizy i akcesoria</p>
+                                        <h3 className="text-xl font-bold text-white">Zubehör & Optionen</h3>
+                                        <p className="text-slate-300 text-sm">Verglasung, Markisen & mehr</p>
                                     </div>
                                 </div>
 
                                 {/* Main Category Tabs */}
                                 <div className="flex border-b border-slate-200 bg-slate-50">
                                     {[
-                                        { id: 'walls', label: 'Zabudowa', icon: '🏗️', desc: 'Ściany, Szyby' },
-                                        { id: 'awnings', label: 'Komfort', icon: '☀️', desc: 'Markizy, LED' },
-                                        { id: 'wpc', label: 'Podłoga WPC', icon: '🪵', desc: 'Tarasy' },
-                                        { id: 'aluminum', label: 'Ściany Alu', icon: '🔲', desc: 'Pełne, Lamele' },
-                                        { id: 'materials', label: 'Materiały', icon: '🔧', desc: 'Komponenty' },
+                                        { id: 'walls', label: 'Verglasung', icon: '🏗️', desc: 'Wände & Glas' },
+                                        { id: 'awnings', label: 'Komfort', icon: '☀️', desc: 'Markisen, LED' },
+                                        { id: 'wpc', label: 'WPC-Boden', icon: '🪵', desc: 'Terrassen' },
+                                        { id: 'aluminum', label: 'Alu-Wände', icon: '🔲', desc: 'Voll, Lamellen' },
+                                        { id: 'materials', label: 'Material', icon: '🔧', desc: 'Komponenten' },
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
@@ -3315,12 +3346,12 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                                 {/* 0. Wall Placement Selector */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                                                    <h5 className="text-sm font-bold text-slate-700 mb-3">📍 Umiejscowienie ściany</h5>
+                                                    <h5 className="text-sm font-bold text-slate-700 mb-3">📍 Platzierung</h5>
                                                     <div className="grid grid-cols-3 gap-2">
                                                         {([
-                                                            { id: 'left' as const, label: 'Lewa', icon: '◀', desc: 'Ściana boczna lewa' },
-                                                            { id: 'right' as const, label: 'Prawa', icon: '▶', desc: 'Ściana boczna prawa' },
-                                                            { id: 'front' as const, label: 'Front', icon: '⬛', desc: 'Ściana frontowa' },
+                                                            { id: 'left' as const, label: 'Links', icon: '◀', desc: 'Seitenwand links' },
+                                                            { id: 'right' as const, label: 'Rechts', icon: '▶', desc: 'Seitenwand rechts' },
+                                                            { id: 'front' as const, label: 'Front', icon: '⬛', desc: 'Frontwand' },
                                                         ]).map(p => (
                                                             <button
                                                                 key={p.id}
@@ -3345,7 +3376,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="text-blue-600 font-bold">📐</span>
                                                                     <span className="text-blue-800">
-                                                                        {isFrontPlacement ? 'Front' : wallPlacement === 'left' ? 'Lewa strona' : 'Prawa strona'}:
+                                                                        {isFrontPlacement ? 'Front' : wallPlacement === 'left' ? 'Links' : 'Rechts'}:
                                                                         {' '}<strong>{wallWidth} × {wallHeight} mm</strong>
                                                                         {!isFrontPlacement && ' (1 element)'}
                                                                     </span>
@@ -3368,7 +3399,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                                     <div className="flex border-b border-slate-100">
                                                         {[
-                                                            { id: 'fixed', label: 'Ściany Stałe', icon: '🧱' },
+                                                            { id: 'fixed', label: 'Festverglasung', icon: '🧱' },
                                                             { id: 'sliding', label: 'Drzwi Przesuwne', icon: '🚪' },
                                                             { id: 'panorama', label: 'Panorama', icon: '🌅' },
                                                         ].map(cat => (
@@ -3413,11 +3444,34 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                     ))}
                                                                 </div>
 
+                                                                {/* GLASS TYPE FOR SIDE/FRONT WALLS */}
+                                                                {(wallProduct.includes('Side Wall') || wallProduct.includes('Front Wall')) && (
+                                                                    <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                                                        <h4 className="text-sm font-bold text-blue-800 mb-3">🪟 Glasart</h4>
+                                                                        <div className="grid grid-cols-3 gap-2">
+                                                                            {WALL_GLASS_TYPES.map(v => (
+                                                                                <button
+                                                                                    key={v.id}
+                                                                                    onClick={() => setWallGlassType(v.id as any)}
+                                                                                    className={`p-3 rounded-lg border-2 text-center transition-all ${wallGlassType === v.id
+                                                                                        ? 'border-blue-500 bg-white shadow-sm ring-1 ring-blue-300'
+                                                                                        : 'border-blue-100 bg-white/50 hover:border-blue-300'
+                                                                                        }`}
+                                                                                >
+                                                                                    <div className="text-lg mb-1">{v.icon}</div>
+                                                                                    <div className="font-bold text-xs text-slate-800">{v.name}</div>
+                                                                                    <div className="text-[9px] text-slate-500 leading-tight">{v.price}</div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
                                                                 {/* WEDGE GLASS OPTIONS */}
                                                                 {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
                                                                     <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
                                                                         {/* Keilfenster Side Selector */}
-                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">📐 Strona Keilfenster</h4>
+                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">📐 Seite Keilfenster</h4>
                                                                         <div className="grid grid-cols-2 gap-2 mb-4">
                                                                             {([
                                                                                 { id: 'left' as const, label: 'Lewy', icon: '◀', desc: 'Keilfenster po lewej' },
@@ -3458,9 +3512,9 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                         <h4 className="text-sm font-bold text-orange-800 mb-3">Rodzaj Szkła (Keilfenster)</h4>
                                                                         <div className="grid grid-cols-3 gap-2">
                                                                             {[
-                                                                                { id: 'clear', name: 'Przeźroczyste', icon: '🪟', price: 'Standard' },
-                                                                                { id: 'matt', name: 'Mleczne (Matt)', icon: '🌫️', price: '+ Dopłata' },
-                                                                                { id: 'iso', name: 'Izolacyjne (Iso)', icon: '🔥', price: '+ Dopłata' }
+                                                                                { id: 'clear', name: 'Klar (VSG 44.2)', icon: '🪟', price: 'Standard' },
+                                                                                { id: 'matt', name: 'Matt (VSG 44.2)', icon: '🌫️', price: '+ Aufpreis' },
+                                                                                { id: 'iso', name: 'Isolierglas', icon: '🔥', price: '+ Aufpreis' }
                                                                             ].map(v => (
                                                                                 <button
                                                                                     key={v.id}
@@ -3659,7 +3713,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
 
                                                                     {/* Opening Direction */}
                                                                     <div>
-                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Strona otwierania</label>
+                                                                        <label className="text-xs font-medium text-slate-500 mb-2 block">Öffnungsrichtung</label>
                                                                         <div className="grid grid-cols-2 gap-2">
                                                                             <button
                                                                                 onClick={() => setPanoramaOpeningType('side')}
@@ -3963,7 +4017,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                 }
 
                                                                 // For front: add all segments at once with placement info
-                                                                const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Lewa' : 'Prawa';
+                                                                const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Links' : 'Rechts';
                                                                 const finalPrice = totalWithAccessories * segmentMultiplier;
                                                                 const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× odcinek)` : '';
                                                                 configStr = `${placementLabel}: ${configStr}${qtyNote}`;
@@ -3985,7 +4039,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                 : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-70'
                                                                 }`}
                                                         >
-                                                            <span>Dodaj do oferty</span>
+                                                            <span>Hinzufügen</span>
                                                             <span>➡️</span>
                                                         </button>
                                                     </div>
@@ -4123,7 +4177,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                                 ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:shadow-md transform hover:-translate-y-0.5'
                                                                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                                                         >
-                                                            {awningPrice !== null ? '➕ Dodaj do koszyka' : 'Obliczanie...'}
+                                                            {awningPrice !== null ? '➕ Hinzufügen' : 'Berechnung...'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -4175,7 +4229,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         onClick={handleAddAccessoryBatch}
                                                         className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all transform hover:-translate-y-0.5"
                                                     >
-                                                        Dodaj wybrane akcesoria ➕
+                                                        Zubehör hinzufügen ➕
                                                     </button>
                                                 </div>
                                             </div>
@@ -4262,7 +4316,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     }}
                                                     className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all transform hover:-translate-y-0.5"
                                                 >
-                                                    ➕ Dodaj wybrane materiały do koszyka
+                                                    ➕ Material hinzufügen
                                                 </button>
                                             </div>
                                         </div>
@@ -4358,7 +4412,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                                         }`}
                                                 >
-                                                    ➕ Dodaj WPC do koszyka
+                                                    ➕ WPC hinzufügen
                                                 </button>
                                             </div>
 
@@ -4372,14 +4426,14 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     {wallTab === 'aluminum' && (
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                                <span className="text-slate-900 font-medium">🔲 Ściany Aluminiowe</span>
+                                                <span className="text-slate-900 font-medium">🔲 Aluminium-Wände</span>
                                                 <span className="font-bold text-slate-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-slate-300 shadow-sm">Pełne / Lamelowe</span>
                                             </div>
 
                                             {/* Wall Type Selector */}
                                             <div className="grid grid-cols-2 gap-4">
                                                 {[
-                                                    { id: 'full', name: 'Pełna', icon: '⬛', desc: 'Ściana aluminiowa pełna' },
+                                                    { id: 'full', name: 'Vollwand', icon: '⬛', desc: 'Aluminium-Vollwand' },
                                                     { id: 'lamellar', name: 'Lamelowa', icon: '≡', desc: 'Lamele aluminiowe (mb × wys)' },
                                                 ].map(type => (
                                                     <button
@@ -4462,7 +4516,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         <div className="text-center py-8 text-slate-400">
                                                             <div className="text-3xl mb-2">📊</div>
                                                             <p>Brak ceny dla wybranych wymiarów</p>
-                                                            <p className="text-xs mt-2">Uzupełnij cennik w Admin → Cenniki V2 → Ściany Alu</p>
+                                                            <p className="text-xs mt-2">Preisliste ergänzen: Admin → Preislisten V2 → Alu-Wände</p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -4473,7 +4527,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     onClick={() => {
                                                         if (aluWallPrice && aluWallPrice > 0) {
                                                             addToBasket(
-                                                                `Ściana Alu ${aluWallType === 'full' ? 'Pełna' : 'Lamelowa'}`,
+                                                                `Alu-Wand ${aluWallType === 'full' ? 'Voll' : 'Lamellen'}`,
                                                                 aluWallPrice,
                                                                 aluWallType === 'full' ? 'Aluminum Wall Full' : 'Aluminum Wall Lamellar',
                                                                 `${aluWallWidth}x${aluWallHeight}`,
@@ -4487,7 +4541,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                         : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                                         }`}
                                                 >
-                                                    ➕ Dodaj ścianę do koszyka
+                                                    ➕ Alu-Wand hinzufügen
                                                 </button>
                                             </div>
                                         </div>
@@ -4532,7 +4586,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                         (view === 'config') && (
                             <div className="col-span-12 lg:col-span-3 space-y-4 lg:sticky lg:top-4">
                                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h3>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Zusammenfassung</h3>
 
                                     {/* Main Config Summary */}
                                     <div className="mb-6 space-y-2">
@@ -4585,7 +4639,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                                 }`}
                                         >
-                                            Dodaj Zadaszenie +
+                                            Dach hinzufügen +
                                         </button>
                                     </div>
                                 </div>
@@ -4594,7 +4648,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                 <div className="bg-white rounded-2xl shadow border border-slate-200 p-4">
                                     <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowBasket(!showBasket)}>
                                         <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                            🛒 Koszyk <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
+                                            🛒 Positionen <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
                                         </h3>
                                         <span className="text-slate-400 text-sm">{showBasket ? '▼' : '▲'}</span>
                                     </div>
@@ -4622,7 +4676,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                                     )}
                                                 </div>
                                             ))}
-                                            {basket.length === 0 && <p className="text-center text-slate-400 text-xs py-2">Pusty koszyk</p>}
+                                            {basket.length === 0 && <p className="text-center text-slate-400 text-xs py-2">Keine Positionen</p>}
                                         </div>
                                     )}
 
@@ -4632,7 +4686,7 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     </div>
 
                                     <button
-                                        onClick={() => basket.length > 0 ? setView('summary') : toast.error('Dodaj coś do koszyka')}
+                                        onClick={() => basket.length > 0 ? setView('summary') : toast.error('Bitte Positionen hinzufügen')}
                                         className={`w-full mt-3 py-2 rounded-lg font-bold text-sm ${basket.length > 0
                                             ? 'bg-slate-900 text-white hover:bg-slate-800'
                                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'

@@ -56,8 +56,7 @@ serve(async (req) => {
                 },
                 // Robustness settings
                 tls: {
-                    rejectUnauthorized: false, // Often needed for shared hosts
-                    ciphers: 'SSLv3' // Sometimes helps with old servers
+                    rejectUnauthorized: false,
                 }
             });
 
