@@ -252,7 +252,18 @@ export default function CampaignsTab() {
     const [creating, setCreating] = useState(false);
     const [customerRegions, setCustomerRegions] = useState<{ plz_prefix: string; region: string; count: number }[]>([]);
 
-    useEffect(() => { loadCampaigns(); loadCustomerRegions(); }, []);
+    useEffect(() => { loadCampaigns(); loadCustomerRegions(); loadUploadedImages(); }, []);
+
+    const loadUploadedImages = async () => {
+        try {
+            const { data: files, error } = await supabase.storage.from('media').list('fb-ads', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
+            if (error || !files) return;
+            const urls = files
+                .filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f.name))
+                .map(f => supabase.storage.from('media').getPublicUrl(`fb-ads/${f.name}`).data.publicUrl);
+            if (urls.length > 0) setUploadedImages(urls);
+        } catch { /* silent */ }
+    };
 
     const PLZ_REGION_MAP: Record<string, string> = {
         '01': 'Dresden', '02': 'Ostsachsen', '03': 'Cottbus', '04': 'Leipzig', '06': 'Halle/SA',
@@ -680,6 +691,66 @@ export default function CampaignsTab() {
                         <p className="text-xs text-red-700 mt-1">{error}</p>
                     </div>
                     <button onClick={loadCampaigns} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 ml-3">🔄 Ponów</button>
+                </div>
+            )}
+
+            {/* ═══════════ CUSTOMER REGIONS INTELLIGENCE ═══════════ */}
+            {customerRegions.length > 0 && !showCreator && !showTemplates && (
+                <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50 rounded-2xl border border-indigo-200 p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md">
+                                📊
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-indigo-900">Heatmapa klientów — dane z CRM</h3>
+                                <p className="text-[10px] text-indigo-500">Twoje regiony wg liczby leadów. Używaj do targetowania Facebook Ads.</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-lg font-bold text-indigo-700">{customerRegions.reduce((s, r) => s + r.count, 0)}</p>
+                            <p className="text-[9px] text-indigo-400 uppercase tracking-wider">Leadów z PLZ</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                        {customerRegions.slice(0, 15).map((r, i) => {
+                            const maxCount = customerRegions[0]?.count || 1;
+                            const pct = Math.round((r.count / maxCount) * 100);
+                            return (
+                                <div key={r.plz_prefix} className="relative bg-white rounded-xl px-3 py-2.5 border border-indigo-100 overflow-hidden hover:shadow-md transition-shadow">
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-indigo-500/15 to-purple-500/15 rounded-b-xl" style={{ height: `${pct}%` }} />
+                                    <div className="relative">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                i < 3 ? 'bg-indigo-600 text-white' : i < 6 ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                                {i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`}
+                                            </span>
+                                            <span className="text-xs font-bold text-indigo-700">{r.count}</span>
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-slate-700 leading-tight">{r.region}</p>
+                                        <p className="text-[9px] text-slate-400 mt-0.5">PLZ {r.plz_prefix}xxx</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex items-center gap-4 bg-white/70 rounded-xl p-3 border border-indigo-100">
+                        <div className="flex-1">
+                            <p className="text-[10px] text-indigo-600">
+                                💡 <strong>Główny rynek:</strong> Ostdeutschland (Sachsen, Brandenburg, Berlin, Sachsen-Anhalt).
+                                <strong> Ekspansja:</strong> NRW, Bayern, Hamburg — nowe tereny z potencjałem.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => { setShowCreator(true); setShowTemplates(false); }}
+                            className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap shadow-sm"
+                        >
+                            🎯 Utwórz kampanię z tych regionów
+                        </button>
+                    </div>
                 </div>
             )}
 
