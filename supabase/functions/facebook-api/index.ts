@@ -176,6 +176,7 @@ async function handleCreateCampaign(params: any) {
     objective: objective || "OUTCOME_TRAFFIC",
     status: status || "PAUSED",
     special_ad_categories: special_ad_categories || [],
+    is_adset_budget_sharing_enabled: false,
   };
   if (daily_budget) body.daily_budget = Math.round(daily_budget * 100); // FB uses cents
   if (lifetime_budget) body.lifetime_budget = Math.round(lifetime_budget * 100);
@@ -217,10 +218,8 @@ async function handleCreateAdSet(params: any) {
   if (start_time) body.start_time = start_time;
   if (end_time) body.end_time = end_time;
 
-  // LEAD_GENERATION requires promoted_object with page_id
-  if (optimization_goal === 'LEAD_GENERATION' || optimization_goal === 'LEADGEN_BIZ') {
-    body.promoted_object = { page_id: FB_PAGE_ID };
-  }
+  // Facebook v25+ requires promoted_object with page_id for all ad sets
+  body.promoted_object = { page_id: FB_PAGE_ID };
   
   // Ad schedule (dayparting)
   if (pacing_type) body.pacing_type = pacing_type;

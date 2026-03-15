@@ -1488,6 +1488,28 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                 )}
                             </div>
 
+                            {/* ═══ CONFIG PREVIEW ═══ */}
+                            <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">📋 Podgląd konfiguracji</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                                    <div><span className="text-slate-400">Nazwa:</span> <span className="font-medium text-slate-700">{newCampaign.name || '—'}</span></div>
+                                    <div><span className="text-slate-400">Cel:</span> <span className="font-medium text-slate-700">{newCampaign.objective}</span></div>
+                                    <div><span className="text-slate-400">Budżet/dzień:</span> <span className="font-medium text-slate-700">{newCampaign.daily_budget || '20'}€</span></div>
+                                    <div><span className="text-slate-400">Status:</span> <span className="font-medium text-slate-700">{newCampaign.status || 'PAUSED'}</span></div>
+                                    <div><span className="text-slate-400">Kraje:</span> <span className="font-medium text-slate-700">{targeting.countries.join(', ')}</span></div>
+                                    <div><span className="text-slate-400">Wiek:</span> <span className="font-medium text-slate-700">{targeting.age_min}–{targeting.age_max}</span></div>
+                                    <div><span className="text-slate-400">Płeć:</span> <span className="font-medium text-slate-700">{targeting.gender === 0 ? 'Wszystkie' : targeting.gender === 1 ? 'Mężczyźni' : 'Kobiety'}</span></div>
+                                    <div><span className="text-slate-400">Umiejscowienia:</span> <span className="font-medium text-slate-700">{placementMode === 'advantage' ? 'Advantage+' : 'Ręczne'}</span></div>
+                                    <div><span className="text-slate-400">Interests:</span> <span className="font-medium text-slate-700">{interests.length > 0 ? `${interests.length} wybranych` : 'Broad (auto)'}</span></div>
+                                    <div><span className="text-slate-400">Format:</span> <span className="font-medium text-slate-700">{adFormat}</span></div>
+                                    <div className="col-span-2"><span className="text-slate-400">Copy:</span> <span className="font-medium text-slate-700 truncate block">{newCampaign.primary_text?.substring(0, 80) || '—'}{(newCampaign.primary_text?.length || 0) > 80 ? '...' : ''}</span></div>
+                                    <div><span className="text-slate-400">Headline:</span> <span className="font-medium text-slate-700">{newCampaign.headline || '—'}</span></div>
+                                    <div><span className="text-slate-400">CTA:</span> <span className="font-medium text-slate-700">{newCampaign.cta || 'LEARN_MORE'}</span></div>
+                                    <div><span className="text-slate-400">Link:</span> <span className="font-medium text-slate-700 truncate block">{newCampaign.link_url || 'https://polendach24.de'}</span></div>
+                                    <div><span className="text-slate-400">Obraz:</span> <span className="font-medium text-slate-700">{selectedImages[0]?.split('/').pop() || '—'}</span></div>
+                                </div>
+                            </div>
+
                             <div className="flex gap-3 pt-2">
                                 <button onClick={handleCreate} disabled={creating} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-blue-200 text-sm">
                                     {creating ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> {createStep === 1 ? 'Kampania...' : createStep === 2 ? 'Ad Set...' : 'Reklama...'} ({createStep}/3)</> : <>🚀 Utwórz kampanię + reklamę</>}
