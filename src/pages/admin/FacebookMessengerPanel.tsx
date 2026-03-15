@@ -208,12 +208,84 @@ export default function FacebookMessengerPanel() {
                 <p className="text-xs text-slate-400 mt-3">Ładuję...</p>
               </div>
             ) : filteredConversations.length === 0 ? (
-              <div className="p-8 text-center">
-                <span className="text-4xl">💬</span>
-                <p className="text-sm text-slate-500 mt-3 font-medium">Brak konwersacji</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Konwersacje pojawią się gdy klienci napiszą na Messenger
-                </p>
+              <div className="p-6 space-y-4">
+                <div className="text-center mb-4">
+                  <span className="text-4xl">💬</span>
+                  <p className="text-sm text-slate-500 mt-3 font-medium">Brak konwersacji</p>
+                </div>
+
+                {/* Setup Guide */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-200 space-y-3">
+                  <p className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded bg-indigo-600 text-white flex items-center justify-center text-[10px]">⚙️</span>
+                    Setup Messenger Bot
+                  </p>
+
+                  <div className="space-y-2">
+                    {[
+                      { step: '1', label: 'Otwórz', link: 'https://developers.facebook.com/apps/', text: 'Facebook Developer Console' },
+                      { step: '2', label: 'Przejdź do Messenger → Webhook', text: '' },
+                      { step: '3', label: 'Wklej Webhook URL ⬇️', text: '' },
+                      { step: '4', label: 'Verify Token:', text: 'polendach24_messenger_verify' },
+                      { step: '5', label: 'Subskrybuj:', text: 'messages, messaging_postbacks' },
+                    ].map(s => (
+                      <div key={s.step} className="flex items-start gap-2">
+                        <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">{s.step}</span>
+                        <p className="text-[11px] text-slate-700">
+                          {s.label}{' '}
+                          {s.link ? (
+                            <a href={s.link} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold underline">{s.text}</a>
+                          ) : (
+                            <span className="font-semibold text-indigo-700">{s.text}</span>
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Webhook URL */}
+                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+                    <p className="text-[9px] text-indigo-500 font-bold uppercase tracking-wider mb-1">Webhook URL:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="text-[10px] text-slate-700 bg-slate-100 px-2 py-1 rounded font-mono flex-1 break-all select-all">
+                        https://whgjsppyuvglhbdgdark.supabase.co/functions/v1/messenger-webhook
+                      </code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText('https://whgjsppyuvglhbdgdark.supabase.co/functions/v1/messenger-webhook');
+                          toast.success('📋 Skopiowano!');
+                        }}
+                        className="px-2 py-1 bg-indigo-600 text-white text-[10px] rounded font-bold hover:bg-indigo-700"
+                      >
+                        📋
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Test button */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('https://whgjsppyuvglhbdgdark.supabase.co/functions/v1/messenger-webhook?hub.mode=subscribe&hub.verify_token=polendach24_messenger_verify&hub.challenge=test_ok');
+                        const text = await res.text();
+                        if (text === 'test_ok') {
+                          toast.success('✅ Webhook działa poprawnie!');
+                        } else {
+                          toast.error('⚠️ Webhook odpowiedział: ' + text);
+                        }
+                      } catch (err: any) {
+                        toast.error('❌ Webhook error: ' + err.message);
+                      }
+                    }}
+                    className="w-full py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    🔗 Test połączenia z Webhook
+                  </button>
+
+                  <p className="text-[9px] text-indigo-400 text-center">
+                    Po konfiguracji, nowe wiadomości z Messengera pojawią się tutaj automatycznie
+                  </p>
+                </div>
               </div>
             ) : (
               filteredConversations.map(conv => {
