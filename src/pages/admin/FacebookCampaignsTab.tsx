@@ -251,6 +251,9 @@ export default function CampaignsTab() {
     });
     const [creating, setCreating] = useState(false);
     const [customerRegions, setCustomerRegions] = useState<{ plz_prefix: string; region: string; count: number }[]>([]);
+    const [advisorContent, setAdvisorContent] = useState('');
+    const [showAdvisor, setShowAdvisor] = useState(false);
+    const [loadingAdvisor, setLoadingAdvisor] = useState(false);
 
     useEffect(() => { loadCampaigns(); loadCustomerRegions(); loadUploadedImages(); }, []);
 
@@ -679,7 +682,7 @@ Antworte NUR als JSON (ohne Markdown-Codeblocks). Exakt dieses Format:
 Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CRM-Regionen und bewährten Facebook-Ads-Strategien für die Baubranche.`;
 
             const { data, error } = await supabase.functions.invoke('morning-coffee-ai', {
-                body: { analysisType: 'market_analysis', businessData: prompt, customPrompt: 'Antworte NUR als reines JSON-Objekt. Kein Markdown, keine Codeblöcke, kein Text davor oder danach.' },
+                body: { analysisType: 'fb_campaign_json', businessData: prompt },
             });
 
             const raw = data?.content || data?.result || '';
@@ -869,7 +872,76 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
                         >
                             🎯 Utwórz kampanię z tych regionów
                         </button>
+                        <button
+                            onClick={async () => {
+                                setLoadingAdvisor(true);
+                                setShowAdvisor(true);
+                                try {
+                                    const topRegions = customerRegions.slice(0, 10).map(r => `${r.region} (PLZ ${r.plz_prefix}xxx): ${r.count} Leads`).join('\n');
+                                    const totalLeads = customerRegions.reduce((s, r) => s + r.count, 0);
+                                    const now = new Date();
+                                    const businessData = `AKTUELLER MONAT: ${now.toLocaleString('de-DE', { month: 'long' })} ${now.getFullYear()}
+BESTEHENDE KAMPAGNEN: ${campaigns.length} (${campaigns.filter(c => c.status === 'ACTIVE').length} aktiv)
+CRM LEADS TOTAL MIT PLZ: ${totalLeads}
+TOP REGIONEN:
+${topRegions}
+
+PRODUKTE: Terrassenüberdachungen, Carports, Pergolen, Wintergärten
+BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
+                                    const { data } = await supabase.functions.invoke('morning-coffee-ai', {
+                                        body: { analysisType: 'fb_campaign_advisor', businessData },
+                                    });
+                                    setAdvisorContent(data?.content || data?.result || 'Brak odpowiedzi');
+                                } catch (err: any) {
+                                    setAdvisorContent('❌ Błąd: ' + err.message);
+                                } finally { setLoadingAdvisor(false); }
+                            }}
+                            disabled={loadingAdvisor}
+                            className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold rounded-lg hover:from-amber-600 hover:to-orange-600 transition-colors whitespace-nowrap shadow-sm disabled:opacity-50"
+                        >
+                            {loadingAdvisor ? '⏳ AI planuje...' : '📋 AI Plan kampanii'}
+                        </button>
                     </div>
+                </div>
+            )}
+
+            {/* ═══════════ AI CAMPAIGN ADVISOR ═══════════ */}
+            {showAdvisor && (
+                <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-2xl border border-amber-200 p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md">
+                                📋
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-amber-900">AI Doradca Kampanii</h3>
+                                <p className="text-[10px] text-amber-600">Strategia, budżet, ilość kampanii — plan od AI</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setShowAdvisor(false)} className="px-2 py-1 text-amber-500 hover:text-amber-700 text-sm">✕</button>
+                    </div>
+                    {loadingAdvisor ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="ml-3 text-sm text-amber-700">AI analizuje dane i tworzy strategię...</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-xl p-5 border border-amber-100 prose prose-sm max-w-none">
+                            <div 
+                                className="text-sm text-slate-700 leading-relaxed [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-amber-800 [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-3 [&_h3]:mb-1 [&_strong]:text-slate-900 [&_ul]:list-disc [&_ul]:ml-4 [&_hr]:my-3 [&_hr]:border-amber-200"
+                                dangerouslySetInnerHTML={{ 
+                                    __html: advisorContent
+                                        .replace(/^## (.*)/gm, '<h2>$1</h2>')
+                                        .replace(/^### (.*)/gm, '<h3>$1</h3>')
+                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                        .replace(/^- (.*)/gm, '<li>$1</li>')
+                                        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+                                        .replace(/^---$/gm, '<hr/>')
+                                        .replace(/\n/g, '<br/>')
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 
