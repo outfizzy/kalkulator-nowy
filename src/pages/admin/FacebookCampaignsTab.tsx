@@ -607,8 +607,8 @@ export default function CampaignsTab() {
         try {
             const { data } = await supabase.functions.invoke('morning-coffee-ai', {
                 body: {
-                    analysis_type: 'fb_post_generator',
-                    topic: `Generiere einen kreativen, deutschen Kampagnennamen für Facebook Ads. 
+                    analysisType: 'fb_post_generator',
+                    businessData: `Generiere einen kreativen, deutschen Kampagnennamen für Facebook Ads. 
                     Branche: Aluminium-Terrassenüberdachungen, Carports, Pergolen in Deutschland.
                     Ziel: ${objectiveLabels[newCampaign.objective] || 'Traffic'}.
                     Format: Nur den Kampagnennamen, maximal 60 Zeichen, mit einem passenden Emoji am Anfang.
@@ -679,13 +679,18 @@ Antworte NUR als JSON (ohne Markdown-Codeblocks). Exakt dieses Format:
 Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CRM-Regionen und bewährten Facebook-Ads-Strategien für die Baubranche.`;
 
             const { data, error } = await supabase.functions.invoke('morning-coffee-ai', {
-                body: { analysis_type: 'fb_post_generator', topic: prompt },
+                body: { analysisType: 'market_analysis', businessData: prompt, customPrompt: 'Antworte NUR als reines JSON-Objekt. Kein Markdown, keine Codeblöcke, kein Text davor oder danach.' },
             });
 
             const raw = data?.content || data?.result || '';
+            console.log('AI raw response:', raw.substring(0, 500));
             // Parse JSON from response (handle possible markdown code blocks)
-            const jsonMatch = raw.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error('AI nie zwróciło poprawnego wyniku');
+            let jsonStr = raw;
+            // Strip markdown code blocks if present
+            const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (codeBlockMatch) jsonStr = codeBlockMatch[1];
+            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error(`AI nie zwróciło JSON. Odpowiedź: "${raw.substring(0, 200)}..."`);
 
             const ai = JSON.parse(jsonMatch[0]);
 
