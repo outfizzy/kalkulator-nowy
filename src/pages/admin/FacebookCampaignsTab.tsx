@@ -51,7 +51,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         headline: 'Terrassenüberdachung nach Maß',
         link_description: 'Aluminium-Überdachung ab €X — Kostenlose Beratung & Montage in ganz DE',
         cta: 'LEARN_MORE',
-        link_url: 'https://polendach24.app',
+        link_url: 'https://polendach24.de',
         image_key: 'terrasse',
     },
     {
@@ -70,7 +70,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         headline: 'Kostenloses Angebot in 24h',
         link_description: 'Formular ausfüllen — Terrassendach nach Maß planen lassen',
         cta: 'GET_QUOTE',
-        link_url: 'https://polendach24.app',
+        link_url: 'https://polendach24.de',
         image_key: 'terrasse',
     },
     {
@@ -89,7 +89,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         headline: 'Carport aus Aluminium — jetzt planen',
         link_description: 'Kostenlos Carport konfigurieren — inklusive Montage deutschlandweit',
         cta: 'GET_QUOTE',
-        link_url: 'https://polendach24.app',
+        link_url: 'https://polendach24.de',
         image_key: 'carport',
     },
     {
@@ -107,7 +107,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '🌿 Bioklimatische Pergola — Intelligenter Sonnenschutz!\n\nVerstellbare Lamellen für perfekte Licht- und Luftkontrolle. Premium-Aluminium, moderne Architektur.\n\n✅ Automatische Lamellensteuerung\n✅ Wind- und Regensensor\n✅ LED-Beleuchtung optional',
         headline: 'Bioklimatische Pergola — Premium',
         link_description: 'Intelligenter Sonnenschutz mit verstellbaren Lamellen',
-        cta: 'LEARN_MORE', link_url: 'https://polendach24.app', image_key: 'pergola',
+        cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'pergola',
     },
     {
         id: 'brand-awareness',
@@ -124,7 +124,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '📢 Polendach24 — Ihr Partner für Aluminium-Überdachungen!\n\n500+ erfolgreiche Montagen in Deutschland. Terrassenüberdachungen, Carports & Pergolen nach Maß.\n\n⭐ Top-Bewertungen\n🇩🇪 Deutsche Qualität',
         headline: 'Polendach24 — 500+ Montagen in DE',
         link_description: 'Aluminium-Überdachungen nach Maß — Ihr Partner in Deutschland',
-        cta: 'LEARN_MORE', link_url: 'https://polendach24.app', image_key: 'terrasse',
+        cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'terrasse',
     },
     {
         id: 'social-proof',
@@ -141,7 +141,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '⭐⭐⭐⭐⭐ "Perfekte Arbeit, schnelle Montage, top Qualität!"\n\nSehen Sie, was unsere Kunden über ihre neue Terrassenüberdachung sagen.\n\n🏠 Familie M. aus München\n🚗 Herr K. aus Hamburg\n🌿 Familie S. aus Stuttgart',
         headline: 'Was unsere Kunden sagen',
         link_description: 'Echte Kundenbewertungen — Terrassenüberdachungen & Carports',
-        cta: 'LEARN_MORE', link_url: 'https://polendach24.app', image_key: 'terrasse',
+        cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'terrasse',
     },
     {
         id: 'sommer-aktion',
@@ -158,7 +158,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '🔥 NUR JETZT: 15% Rabatt auf Terrassenüberdachungen!\n\nSichern Sie sich Ihre Aluminium-Überdachung zum Sonderpreis. Inklusive professioneller Montage.\n\n⏰ Angebot gültig bis [Datum]\n📞 Jetzt beraten lassen!',
         headline: 'Sommer-Aktion: 15% Rabatt',
         link_description: 'Terrassenüberdachung zum Sonderpreis — nur für kurze Zeit',
-        cta: 'SHOP_NOW', link_url: 'https://polendach24.app', image_key: 'terrasse',
+        cta: 'SHOP_NOW', link_url: 'https://polendach24.de', image_key: 'terrasse',
     },
     {
         id: 'retargeting',
@@ -175,7 +175,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '👋 Sie haben sich unsere Überdachungen angesehen!\n\nSie waren bereits auf unserer Seite — haben Sie noch Fragen? Wir beraten Sie gerne kostenlos und unverbindlich.\n\n👉 Jetzt Angebot anfordern',
         headline: 'Noch Fragen? Wir beraten Sie!',
         link_description: 'Kostenloses Angebot für Ihre Terrassenüberdachung',
-        cta: 'CONTACT_US', link_url: 'https://polendach24.app', image_key: 'terrasse',
+        cta: 'CONTACT_US', link_url: 'https://polendach24.de', image_key: 'terrasse',
     },
     {
         id: 'wintergarten-regional',
@@ -192,7 +192,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '🏡 Wintergarten aus Aluminium — Genießen Sie Ihren Garten das ganze Jahr!\n\nRegionale Montage in Bayern, NRW, Baden-Württemberg & Hessen.\n\n✅ Wärmeisoliert\n✅ Individuelle Größen\n✅ Montage vom Fachbetrieb',
         headline: 'Wintergarten — regional montiert',
         link_description: 'Aluminium-Wintergarten nach Maß — regionale Montage',
-        cta: 'GET_QUOTE', link_url: 'https://polendach24.app', image_key: 'terrasse',
+        cta: 'GET_QUOTE', link_url: 'https://polendach24.de', image_key: 'terrasse',
     },
     {
         id: 'video-showcase',
@@ -209,7 +209,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         primary_text: '🎬 Von der Planung bis zur fertigen Überdachung in 60 Sekunden!\n\nSehen Sie unsere Arbeit im Zeitraffer. Professionelle Montage, Premium-Qualität.\n\n▶️ Jetzt Video ansehen!',
         headline: 'Montage-Zeitraffer — 60 Sekunden',
         link_description: 'Sehen Sie unsere Arbeit — Aluminium-Überdachungen',
-        cta: 'LEARN_MORE', link_url: 'https://polendach24.app', image_key: 'terrasse',
+        cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'terrasse',
     },
 ];
 
@@ -247,11 +247,63 @@ export default function CampaignsTab() {
     const [newCampaign, setNewCampaign] = useState({
         name: '', objective: 'OUTCOME_TRAFFIC', daily_budget: '', status: 'PAUSED',
         primary_text: '', headline: '', link_description: '', cta: 'LEARN_MORE',
-        link_url: 'https://polendach24.app', image_key: 'terrasse',
+        link_url: 'https://polendach24.de', image_key: 'terrasse',
     });
     const [creating, setCreating] = useState(false);
+    const [customerRegions, setCustomerRegions] = useState<{ plz_prefix: string; region: string; count: number }[]>([]);
 
-    useEffect(() => { loadCampaigns(); }, []);
+    useEffect(() => { loadCampaigns(); loadCustomerRegions(); }, []);
+
+    const PLZ_REGION_MAP: Record<string, string> = {
+        '01': 'Dresden', '02': 'Ostsachsen', '03': 'Cottbus', '04': 'Leipzig', '06': 'Halle/SA',
+        '07': 'Jena', '08': 'Zwickau', '09': 'Chemnitz', '10': 'Berlin-Mitte', '12': 'Berlin-Süd',
+        '13': 'Berlin-Nord', '14': 'Potsdam', '15': 'Frankfurt(O)', '16': 'Oranienburg',
+        '17': 'Neubrandenburg', '18': 'Rostock', '19': 'Schwerin', '20': 'Hamburg',
+        '21': 'Lüneburg', '22': 'Hamburg-Ost', '23': 'Lübeck', '24': 'Kiel', '25': 'Pinneberg',
+        '26': 'Oldenburg', '27': 'Bremen-Nord', '28': 'Bremen', '29': 'Celle',
+        '30': 'Hannover', '31': 'Hildesheim', '32': 'Bielefeld', '33': 'Paderborn',
+        '34': 'Kassel', '35': 'Gießen', '36': 'Fulda', '37': 'Göttingen',
+        '38': 'Braunschweig', '39': 'Magdeburg', '40': 'Düsseldorf', '41': 'Mönchengladbach',
+        '42': 'Wuppertal', '44': 'Dortmund', '45': 'Essen', '46': 'Oberhausen',
+        '47': 'Duisburg', '48': 'Münster', '49': 'Osnabrück', '50': 'Köln',
+        '51': 'Leverkusen', '52': 'Aachen', '53': 'Bonn', '54': 'Trier',
+        '55': 'Mainz', '56': 'Koblenz', '57': 'Siegen', '58': 'Hagen',
+        '59': 'Hamm', '60': 'Frankfurt/M', '61': 'Bad Homburg', '63': 'Offenbach',
+        '64': 'Darmstadt', '65': 'Wiesbaden', '66': 'Saarbrücken', '67': 'Ludwigshafen',
+        '68': 'Mannheim', '69': 'Heidelberg', '70': 'Stuttgart', '71': 'Böblingen',
+        '72': 'Tübingen', '73': 'Esslingen', '74': 'Heilbronn', '75': 'Pforzheim',
+        '76': 'Karlsruhe', '77': 'Offenburg', '78': 'Konstanz', '79': 'Freiburg',
+        '80': 'München', '81': 'München-Süd', '82': 'Garmisch', '83': 'Rosenheim',
+        '84': 'Landshut', '85': 'Freising', '86': 'Augsburg', '87': 'Kempten',
+        '88': 'Ravensburg', '89': 'Ulm', '90': 'Nürnberg', '91': 'Erlangen',
+        '92': 'Amberg', '93': 'Regensburg', '94': 'Passau', '95': 'Bayreuth',
+        '96': 'Bamberg', '97': 'Würzburg', '98': 'Suhl', '99': 'Erfurt',
+    };
+
+    const loadCustomerRegions = async () => {
+        try {
+            const { data, error } = await supabase.rpc('get_lead_plz_regions').catch(() => ({ data: null, error: 'no rpc' }));
+            // Fallback: direct query
+            const { data: leads } = await supabase
+                .from('leads')
+                .select('customer_data')
+                .not('customer_data', 'is', null);
+            if (!leads) return;
+            const regionMap = new Map<string, number>();
+            for (const l of leads) {
+                const plz = l.customer_data?.postalCode || l.customer_data?.plz || l.customer_data?.PLZ || '';
+                if (plz && plz.length >= 2) {
+                    const prefix = plz.substring(0, 2);
+                    regionMap.set(prefix, (regionMap.get(prefix) || 0) + 1);
+                }
+            }
+            const regions = Array.from(regionMap.entries())
+                .map(([prefix, count]) => ({ plz_prefix: prefix, region: PLZ_REGION_MAP[prefix] || `PLZ ${prefix}xxx`, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 15);
+            setCustomerRegions(regions);
+        } catch { /* silent */ }
+    };
 
     const loadCampaigns = async () => {
         setLoading(true);
@@ -383,7 +435,7 @@ export default function CampaignsTab() {
                 adset_id: adSetId,
                 name: `${newCampaign.name} — Ad`,
                 creative: {
-                    link: buildUtmUrl(newCampaign.link_url || 'https://polendach24.app', newCampaign.name),
+                    link: buildUtmUrl(newCampaign.link_url || 'https://polendach24.de', newCampaign.name),
                     message: newCampaign.primary_text,
                     headline: newCampaign.headline,
                     description: newCampaign.link_description,
@@ -396,7 +448,7 @@ export default function CampaignsTab() {
             toast.success('✅ Kampania + Grupa Reklam + Reklama — wszystko utworzone na Facebooku!');
             setShowCreator(false);
             setCreateStep(0);
-            setNewCampaign({ name: '', objective: 'OUTCOME_TRAFFIC', daily_budget: '', status: 'PAUSED', primary_text: '', headline: '', link_description: '', cta: 'LEARN_MORE', link_url: 'https://polendach24.app', image_key: 'terrasse' });
+            setNewCampaign({ name: '', objective: 'OUTCOME_TRAFFIC', daily_budget: '', status: 'PAUSED', primary_text: '', headline: '', link_description: '', cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'terrasse' });
             loadCampaigns();
         } catch (err: any) {
             toast.error('Błąd: ' + err.message);
@@ -436,7 +488,7 @@ export default function CampaignsTab() {
             headline: '',
             link_description: '',
             cta: 'LEARN_MORE',
-            link_url: 'https://polendach24.app',
+            link_url: 'https://polendach24.de',
             image_key: 'terrasse',
         });
         setSelectedImages(['/fb-terrasse.png']);
@@ -499,7 +551,7 @@ export default function CampaignsTab() {
             headline: tpl.headline || '',
             link_description: tpl.link_description || '',
             cta: tpl.cta || 'LEARN_MORE',
-            link_url: tpl.link_url || 'https://polendach24.app',
+            link_url: tpl.link_url || 'https://polendach24.de',
             image_key: tpl.image_key || 'terrasse',
         });
         setSelectedImages([AD_IMAGES[tpl.image_key || 'terrasse']]);
@@ -918,6 +970,56 @@ export default function CampaignsTab() {
                                 </div>
                             </div>
 
+                            {/* ═══ CUSTOMER REGIONS HEATMAP ═══ */}
+                            {customerRegions.length > 0 && (
+                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-200 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+                                                <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[10px]">📊</span>
+                                                Heatmapa klientów (dane z CRM)
+                                            </p>
+                                            <p className="text-[9px] text-indigo-500 mt-0.5">Regiony z największą liczbą leadów — kieruj reklamy tam, gdzie masz klientów + nowe tereny</p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                // Auto-select top 5 regions as targeting
+                                                const topRegions = customerRegions.slice(0, 5).map(r => r.region);
+                                                toast.success(`🎯 Załadowano Top 5 regionów z CRM: ${topRegions.join(', ')}`);
+                                            }}
+                                            className="px-2.5 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                                        >
+                                            🎯 Zastosuj Top 5
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                                        {customerRegions.slice(0, 12).map((r, i) => {
+                                            const maxCount = customerRegions[0]?.count || 1;
+                                            const pct = Math.round((r.count / maxCount) * 100);
+                                            return (
+                                                <div key={r.plz_prefix} className="relative bg-white rounded-lg px-2.5 py-2 border border-indigo-100 overflow-hidden group">
+                                                    <div className="absolute inset-0 bg-indigo-500/10 rounded-lg" style={{ width: `${pct}%` }} />
+                                                    <div className="relative flex items-center justify-between">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                                i < 3 ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
+                                                            }`}>
+                                                                {r.plz_prefix}xxx
+                                                            </span>
+                                                            <span className="text-[10px] font-medium text-slate-700">{r.region}</span>
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold ${i < 3 ? 'text-indigo-700' : 'text-slate-500'}`}>{r.count}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="text-[9px] text-indigo-400 text-center">
+                                        💡 Tip: Twoim głównym rynkiem jest Ostdeutschland (Sachsen, Brandenburg, Berlin). Rozważ ekspansję na NRW / Bayern.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* ═══ AD SCHEDULE ═══ */}
                             <hr className="border-slate-100" />
                             <div className="flex items-center justify-between">
@@ -964,7 +1066,7 @@ export default function CampaignsTab() {
                                 <div className="bg-emerald-50 rounded-lg p-2.5 border border-emerald-200">
                                     <p className="text-[10px] font-bold text-emerald-700 mb-1">🔗 UTM Tracking (automatyczny)</p>
                                     <p className="text-[9px] text-emerald-600 font-mono break-all leading-relaxed">
-                                        {buildUtmUrl(newCampaign.link_url || 'https://polendach24.app', newCampaign.name)}
+                                        {buildUtmUrl(newCampaign.link_url || 'https://polendach24.de', newCampaign.name)}
                                     </p>
                                 </div>
                             )}
@@ -1043,7 +1145,7 @@ export default function CampaignsTab() {
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold text-slate-600 mb-1 block">Link docelowy</label>
-                                    <input value={newCampaign.link_url} onChange={e => setNewCampaign(p => ({ ...p, link_url: e.target.value }))} placeholder="https://polendach24.app" className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+                                    <input value={newCampaign.link_url} onChange={e => setNewCampaign(p => ({ ...p, link_url: e.target.value }))} placeholder="https://polendach24.de" className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                             </div>
 
@@ -1193,7 +1295,7 @@ export default function CampaignsTab() {
                                 {/* Link preview bar */}
                                 {adFormat === 'single' && (
                                     <div className="px-4 py-2.5 bg-slate-50 border-t border-b border-slate-200">
-                                        <p className="text-[10px] text-slate-400 uppercase tracking-wider">{(newCampaign.link_url || 'polendach24.app').replace(/https?:\/\//, '')}</p>
+                                        <p className="text-[10px] text-slate-400 uppercase tracking-wider">{(newCampaign.link_url || 'polendach24.de').replace(/https?:\/\//, '')}</p>
                                         <p className="text-[13px] font-bold text-slate-800 leading-tight mt-0.5">{newCampaign.headline || 'Nagłówek reklamy'}</p>
                                         <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{newCampaign.link_description || 'Opis pod linkiem'}</p>
                                     </div>
