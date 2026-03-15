@@ -221,6 +221,10 @@ async function handleCreateAdSet(params: any) {
   // Facebook v25+ requires promoted_object with page_id for all ad sets
   body.promoted_object = { page_id: FB_PAGE_ID };
   
+  // EU Digital Services Act (DSA) compliance — mandatory for EU-targeted ads
+  body.dsa_beneficiary = "Polendach24 GmbH";
+  body.dsa_payor = "Polendach24 GmbH";
+  
   // Ad schedule (dayparting)
   if (pacing_type) body.pacing_type = pacing_type;
   if (adset_schedule) body.adset_schedule = adset_schedule;
@@ -305,17 +309,26 @@ async function handleCreateAd(params: any) {
       page_id: FB_PAGE_ID,
       link_data: linkData,
     },
+    // EU Digital Services Act (DSA) compliance — mandatory for EU-targeted ads
+    degrees_of_freedom_spec: {
+      creative_features_spec: {
+        standard_enhancements: { enroll_status: "OPT_OUT" },
+      },
+    },
   };
   
   console.log('Creating ad creative with body:', JSON.stringify(creativeBody));
   const creativeResult = await fbApi(`/${FB_AD_ACCOUNT_ID}/adcreatives`, "POST", creativeBody);
   
-  // Step 3: Create the ad
-  const adBody = {
+  // Step 3: Create the ad with DSA compliance (EU Digital Services Act)
+  const adBody: any = {
     name,
     adset_id,
     creative: { creative_id: creativeResult.id },
     status: status || "PAUSED",
+    // DSA compliance — mandatory for EU-targeted ads since 2024
+    dsa_beneficiary: creative.dsa_beneficiary || "Polendach24 GmbH",
+    dsa_payor: creative.dsa_payor || "Polendach24 GmbH",
   };
   
   return await fbApi(`/${FB_AD_ACCOUNT_ID}/ads`, "POST", adBody);
