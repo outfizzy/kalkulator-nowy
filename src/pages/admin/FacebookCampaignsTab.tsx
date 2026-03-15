@@ -626,6 +626,113 @@ export default function CampaignsTab() {
         } finally { setGeneratingAI(false); }
     };
 
+    // ═══ AI FULL CAMPAIGN GENERATOR (A-Z) ═══
+    const generateAICampaignFull = async () => {
+        setGeneratingAI(true);
+        toast.loading('🤖 AI generiert eine komplette Kampagne...', { id: 'ai-full', duration: 15000 });
+        try {
+            const now = new Date();
+            const month = now.toLocaleString('de-DE', { month: 'long' });
+            const year = now.getFullYear();
+            const season = (() => {
+                const m = now.getMonth();
+                if (m >= 2 && m <= 4) return 'Frühling — Hochsaison für Terrassenüberdachungen! Kunden planen jetzt für den Sommer.';
+                if (m >= 5 && m <= 7) return 'Sommer — Montage-Saison läuft! Kunden wollen schnell bestellen.';
+                if (m >= 8 && m <= 9) return 'Herbst — Carport-Saison! Kunden schützen ihr Auto vor Regen und Schnee.';
+                return 'Winter — Planungsphase. Wintergärten und Frühbucher-Aktionen.';
+            })();
+
+            const topRegions = customerRegions.slice(0, 8).map(r => `${r.region} (${r.count} Leads)`).join(', ');
+            const totalLeads = customerRegions.reduce((s, r) => s + r.count, 0);
+            
+            const imageOptions = STOCK_IMAGES.map(i => `${i.key}: ${i.label}`).join(', ');
+
+            const prompt = `Du bist ein Top-Facebook-Ads-Experte bei einer Premium-Agentur. Erstelle eine KOMPLETTE Facebook-Kampagne für folgendes Unternehmen:
+
+UNTERNEHMEN: Polendach24 — Premium Aluminium-Überdachungen, Carports, Pergolen & Wintergärten in Deutschland.
+ZIELGRUPPE: Hauseigentümer in Deutschland (30-65 Jahre), mittleres bis hohes Einkommen.
+USP: Polnische Premium-Qualität, deutsche Montage, individuelle Maße, alles aus einer Hand, 500+ Montagen.
+WEBSITE: https://polendach24.de
+
+DATUM: ${month} ${year}
+SAISON: ${season}
+
+CRM-DATEN (${totalLeads} Leads mit PLZ):
+Top-Regionen: ${topRegions || 'Ostdeutschland (Sachsen, Brandenburg, Berlin)'}
+
+VERFÜGBARE BILDER: ${imageOptions}
+
+Antworte NUR als JSON (ohne Markdown-Codeblocks). Exakt dieses Format:
+{
+  "name": "Kampagnenname mit Emoji (max 60 Zeichen, deutsch)",
+  "objective": "OUTCOME_LEADS oder OUTCOME_TRAFFIC",
+  "daily_budget": "Tagesbudget in EUR als Zahl (15-50)",
+  "primary_text": "Haupttext der Anzeige (deutsch, 3-5 Absätze, mit Emojis, Bulletpoints ✅, Zeilenumbrüche als \\n)",
+  "headline": "Anzeigen-Headline (max 40 Zeichen, deutsch, packend)",
+  "link_description": "Link-Beschreibung (max 100 Zeichen)",
+  "cta": "LEARN_MORE oder GET_QUOTE oder CONTACT_US",
+  "image_key": "einer von: terrasse, terrasse-night, carport, pergola, wintergarten, montage",
+  "targeting_hint": "Kurze Targeting-Empfehlung deutsch",
+  "strategy_note": "2-3 Sätze warum diese Kampagne jetzt funktioniert"
+}
+
+Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CRM-Regionen und bewährten Facebook-Ads-Strategien für die Baubranche.`;
+
+            const { data, error } = await supabase.functions.invoke('morning-coffee-ai', {
+                body: { analysis_type: 'fb_post_generator', topic: prompt },
+            });
+
+            const raw = data?.content || data?.result || '';
+            // Parse JSON from response (handle possible markdown code blocks)
+            const jsonMatch = raw.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('AI nie zwróciło poprawnego wyniku');
+
+            const ai = JSON.parse(jsonMatch[0]);
+
+            // Auto-fill everything
+            setNewCampaign({
+                name: ai.name || '🏠 AI Kampagne',
+                objective: ai.objective || 'OUTCOME_LEADS',
+                daily_budget: String(ai.daily_budget || '20'),
+                status: 'PAUSED',
+                primary_text: (ai.primary_text || '').replace(/\\n/g, '\n'),
+                headline: ai.headline || '',
+                link_description: ai.link_description || '',
+                cta: ai.cta || 'GET_QUOTE',
+                link_url: 'https://polendach24.de',
+                image_key: ai.image_key || 'terrasse',
+            });
+
+            // Set image
+            const imgSrc = AD_IMAGES[ai.image_key || 'terrasse'] || '/fb-terrasse.png';
+            setSelectedImages([imgSrc]);
+            setAdFormat('single');
+
+            // Auto-select interests for home/garden
+            setInterests(['6003349442621', '6003384248805', '6003020834693', '6003337506837', '6003277229371']);
+            setTargeting({ countries: ['DE'], age_min: 30, age_max: 65, gender: 0 });
+
+            setShowCreator(true);
+            setShowTemplates(false);
+
+            toast.dismiss('ai-full');
+            toast.success('✨ AI stworzyło kampanię od A-Z! Sprawdź i kliknij Utwórz.', { duration: 5000 });
+
+            // Show strategy note
+            if (ai.strategy_note) {
+                setTimeout(() => toast(ai.strategy_note, { icon: '💡', duration: 8000 }), 1500);
+            }
+            if (ai.targeting_hint) {
+                setTimeout(() => toast(`🎯 Targeting: ${ai.targeting_hint}`, { duration: 8000 }), 3000);
+            }
+
+        } catch (err: any) {
+            toast.dismiss('ai-full');
+            toast.error('AI Fehler: ' + err.message);
+        } finally { setGeneratingAI(false); }
+    };
+
+
     const filtered = filter === 'all'
         ? campaigns.filter(c => c.status !== 'DELETED')
         : campaigns.filter(c => c.status === filter);
@@ -647,6 +754,13 @@ export default function CampaignsTab() {
                         </div>
                         <div className="flex items-center gap-2">
                             <button onClick={loadCampaigns} className="px-3 py-2 bg-white/10 backdrop-blur text-white rounded-lg text-xs font-medium hover:bg-white/20 border border-white/20">🔄</button>
+                            <button
+                                onClick={generateAICampaignFull}
+                                disabled={generatingAI}
+                                className="px-3 py-2 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-lg text-xs font-bold hover:from-emerald-500 hover:to-teal-600 shadow-lg disabled:opacity-50 animate-pulse hover:animate-none border border-emerald-300/50"
+                            >
+                                {generatingAI ? '⏳ AI generuje...' : '✨ AI Stwórz kampanię A-Z'}
+                            </button>
                             <button onClick={() => { setShowTemplates(!showTemplates); setShowCreator(false); }} className="px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 shadow-lg">
                                 🤖 AI Szablony
                             </button>
