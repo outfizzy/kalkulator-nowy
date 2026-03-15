@@ -37,7 +37,18 @@ async function fbApi(endpoint: string, method = "GET", body?: any): Promise<any>
   const data = await res.json();
   
   if (data.error) {
-    throw new Error(`FB API Error: ${data.error.message} (code: ${data.error.code})`);
+    const e = data.error;
+    const details = [
+      `FB API Error: ${e.message}`,
+      `(code: ${e.code})`,
+      e.error_subcode ? `subcode: ${e.error_subcode}` : '',
+      e.error_user_title ? `title: ${e.error_user_title}` : '',
+      e.error_user_msg ? `detail: ${e.error_user_msg}` : '',
+      e.fbtrace_id ? `trace: ${e.fbtrace_id}` : '',
+      `endpoint: ${endpoint}`,
+    ].filter(Boolean).join(' | ');
+    console.error('FB API ERROR:', JSON.stringify(data.error));
+    throw new Error(details);
   }
   
   return data;

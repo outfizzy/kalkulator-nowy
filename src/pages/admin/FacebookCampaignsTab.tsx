@@ -353,111 +353,125 @@ export default function CampaignsTab() {
         if (selectedImages.length === 0) return toast.error('Wybierz przynajmniej jedno zdjęcie');
         setCreating(true);
         setCreateStep(1);
+        let campaignId = '';
+        let adSetId = '';
         try {
             // STEP 1: Create Campaign
             toast('📦 Krok 1/3 — Tworzenie kampanii...', { icon: '🔄' });
-            const campaignResult = await FacebookService.createCampaign({
-                name: newCampaign.name,
-                objective: newCampaign.objective,
-                status: 'PAUSED', // Always start paused, activate via Ad Set
-            });
-            const campaignId = campaignResult.id;
-            if (!campaignId) throw new Error('Nie udało się utworzyć kampanii');
+            try {
+                const campaignResult = await FacebookService.createCampaign({
+                    name: newCampaign.name,
+                    objective: newCampaign.objective,
+                    status: 'PAUSED',
+                });
+                campaignId = campaignResult.id;
+                if (!campaignId) throw new Error('Brak ID kampanii w odpowiedzi FB: ' + JSON.stringify(campaignResult));
+            } catch (e1: any) {
+                throw new Error(`❌ Krok 1 (Kampania) — ${e1.message}`);
+            }
 
             // STEP 2: Create Ad Set with placements & targeting
             setCreateStep(2);
-            toast('🎯 Krok 2/3 — Ustawienia grupy reklam (umiejscowienia, targetowanie)...', { icon: '🔄' });
-            
-            const adSetParams: any = {
-                campaign_id: campaignId,
-                name: `${newCampaign.name} — Ad Set`,
-                daily_budget: newCampaign.daily_budget ? Number(newCampaign.daily_budget) : 20,
-                optimization_goal: newCampaign.objective === 'OUTCOME_LEADS' ? 'LEAD_GENERATION'
-                    : newCampaign.objective === 'OUTCOME_AWARENESS' ? 'REACH'
-                    : newCampaign.objective === 'OUTCOME_ENGAGEMENT' ? 'POST_ENGAGEMENT' : 'LINK_CLICKS',
-                billing_event: 'IMPRESSIONS',
-                status: newCampaign.status || 'PAUSED',
-                targeting: {
-                    geo_locations: {
-                        countries: targeting.countries,
-                        ...(targetCities.length > 0 ? { cities: targetCities.map(c => ({ key: c })) } : {}),
+            toast('🎯 Krok 2/3 — Ustawienia grupy reklam...', { icon: '🔄' });
+            try {
+                const adSetParams: any = {
+                    campaign_id: campaignId,
+                    name: `${newCampaign.name} — Ad Set`,
+                    daily_budget: newCampaign.daily_budget ? Number(newCampaign.daily_budget) : 20,
+                    optimization_goal: newCampaign.objective === 'OUTCOME_LEADS' ? 'LEAD_GENERATION'
+                        : newCampaign.objective === 'OUTCOME_AWARENESS' ? 'REACH'
+                        : newCampaign.objective === 'OUTCOME_ENGAGEMENT' ? 'POST_ENGAGEMENT' : 'LINK_CLICKS',
+                    billing_event: 'IMPRESSIONS',
+                    status: newCampaign.status || 'PAUSED',
+                    targeting: {
+                        geo_locations: {
+                            countries: targeting.countries,
+                            ...(targetCities.length > 0 ? { cities: targetCities.map(c => ({ key: c })) } : {}),
+                        },
+                        age_min: targeting.age_min,
+                        age_max: targeting.age_max,
+                        ...(targeting.gender !== 0 ? { genders: [targeting.gender] } : {}),
+                        ...(interests.length > 0 ? { flexible_spec: [{ interests: interests.map(id => ({ id, name: id })) }] } : {}),
                     },
-                    age_min: targeting.age_min,
-                    age_max: targeting.age_max,
-                    ...(targeting.gender !== 0 ? { genders: [targeting.gender] } : {}),
-                    ...(interests.length > 0 ? { flexible_spec: [{ interests: interests.map(id => ({ id, name: id })) }] } : {}),
-                },
-            };
+                };
 
-            // Ad schedule (dayparting)
-            if (adSchedule.enabled) {
-                adSetParams.pacing_type = ['day_parting'];
-                adSetParams.adset_schedule = adSchedule.days.map((day: number) => ({
-                    start_minute: adSchedule.startHour * 60,
-                    end_minute: adSchedule.endHour * 60,
-                    days: [day],
-                    timezone_type: 'USER',
-                }));
+                // Ad schedule (dayparting)
+                if (adSchedule.enabled) {
+                    adSetParams.pacing_type = ['day_parting'];
+                    adSetParams.adset_schedule = adSchedule.days.map((day: number) => ({
+                        start_minute: adSchedule.startHour * 60,
+                        end_minute: adSchedule.endHour * 60,
+                        days: [day],
+                        timezone_type: 'USER',
+                    }));
+                }
+
+                // Manual placements
+                if (placementMode === 'manual') {
+                    const pp: string[] = [];
+                    const fbPos: string[] = [];
+                    const igPos: string[] = [];
+                    const msgPos: string[] = [];
+                    if (placements.facebook_feed || placements.facebook_stories || placements.facebook_reels || placements.facebook_marketplace) {
+                        pp.push('facebook');
+                        if (placements.facebook_feed) fbPos.push('feed');
+                        if (placements.facebook_stories) fbPos.push('story');
+                        if (placements.facebook_reels) fbPos.push('reels');
+                        if (placements.facebook_marketplace) fbPos.push('marketplace');
+                    }
+                    if (placements.instagram_feed || placements.instagram_stories || placements.instagram_reels || placements.instagram_explore) {
+                        pp.push('instagram');
+                        if (placements.instagram_feed) igPos.push('stream');
+                        if (placements.instagram_stories) igPos.push('story');
+                        if (placements.instagram_reels) igPos.push('reels');
+                        if (placements.instagram_explore) igPos.push('explore');
+                    }
+                    if (placements.messenger_home || placements.messenger_stories) {
+                        pp.push('messenger');
+                        if (placements.messenger_home) msgPos.push('messenger_home');
+                        if (placements.messenger_stories) msgPos.push('story');
+                    }
+                    if (pp.length > 0) {
+                        adSetParams.publisher_platforms = pp;
+                        if (fbPos.length) adSetParams.facebook_positions = fbPos;
+                        if (igPos.length) adSetParams.instagram_positions = igPos;
+                        if (msgPos.length) adSetParams.messenger_positions = msgPos;
+                    }
+                }
+
+                console.log('AdSet params:', JSON.stringify(adSetParams));
+                const adSetResult = await FacebookService.createAdSet(adSetParams);
+                adSetId = adSetResult.id;
+                if (!adSetId) throw new Error('Brak ID ad set w odpowiedzi FB: ' + JSON.stringify(adSetResult));
+            } catch (e2: any) {
+                throw new Error(`❌ Krok 2 (Ad Set, kampania ${campaignId}) — ${e2.message}`);
             }
-
-            // Manual placements
-            if (placementMode === 'manual') {
-                const pp: string[] = [];
-                const fbPos: string[] = [];
-                const igPos: string[] = [];
-                const msgPos: string[] = [];
-                if (placements.facebook_feed || placements.facebook_stories || placements.facebook_reels || placements.facebook_marketplace) {
-                    pp.push('facebook');
-                    if (placements.facebook_feed) fbPos.push('feed');
-                    if (placements.facebook_stories) fbPos.push('story');
-                    if (placements.facebook_reels) fbPos.push('reels');
-                    if (placements.facebook_marketplace) fbPos.push('marketplace');
-                }
-                if (placements.instagram_feed || placements.instagram_stories || placements.instagram_reels || placements.instagram_explore) {
-                    pp.push('instagram');
-                    if (placements.instagram_feed) igPos.push('stream');
-                    if (placements.instagram_stories) igPos.push('story');
-                    if (placements.instagram_reels) igPos.push('reels');
-                    if (placements.instagram_explore) igPos.push('explore');
-                }
-                if (placements.messenger_home || placements.messenger_stories) {
-                    pp.push('messenger');
-                    if (placements.messenger_home) msgPos.push('messenger_home');
-                    if (placements.messenger_stories) msgPos.push('story');
-                }
-                if (pp.length > 0) {
-                    adSetParams.publisher_platforms = pp;
-                    if (fbPos.length) adSetParams.facebook_positions = fbPos;
-                    if (igPos.length) adSetParams.instagram_positions = igPos;
-                    if (msgPos.length) adSetParams.messenger_positions = msgPos;
-                }
-            }
-
-            const adSetResult = await FacebookService.createAdSet(adSetParams);
-            const adSetId = adSetResult.id;
-            if (!adSetId) throw new Error('Nie udało się utworzyć grupy reklam');
 
             // STEP 3: Create Ad with creative
             setCreateStep(3);
             toast('🎨 Krok 3/3 — Tworzenie reklamy z kreacją...', { icon: '🔄' });
+            try {
+                const imageUrl = selectedImages[0]?.startsWith('http')
+                    ? selectedImages[0]
+                    : `${window.location.origin}${selectedImages[0]}`;
 
-            const imageUrl = selectedImages[0]?.startsWith('http')
-                ? selectedImages[0]
-                : `${window.location.origin}${selectedImages[0]}`;
-
-            await FacebookService.createAd({
-                adset_id: adSetId,
-                name: `${newCampaign.name} — Ad`,
-                creative: {
-                    link: buildUtmUrl(newCampaign.link_url || 'https://polendach24.de', newCampaign.name),
-                    message: newCampaign.primary_text,
-                    headline: newCampaign.headline,
-                    description: newCampaign.link_description,
-                    image_url: imageUrl,
-                    cta: newCampaign.cta || 'LEARN_MORE',
-                },
-                status: newCampaign.status || 'PAUSED',
-            });
+                console.log('Ad creative image URL:', imageUrl);
+                await FacebookService.createAd({
+                    adset_id: adSetId,
+                    name: `${newCampaign.name} — Ad`,
+                    creative: {
+                        link: buildUtmUrl(newCampaign.link_url || 'https://polendach24.de', newCampaign.name),
+                        message: newCampaign.primary_text,
+                        headline: newCampaign.headline,
+                        description: newCampaign.link_description,
+                        image_url: imageUrl,
+                        cta: newCampaign.cta || 'LEARN_MORE',
+                    },
+                    status: newCampaign.status || 'PAUSED',
+                });
+            } catch (e3: any) {
+                throw new Error(`❌ Krok 3 (Ad/Creative, adset ${adSetId}) — ${e3.message}`);
+            }
 
             toast.success('✅ Kampania + Grupa Reklam + Reklama — wszystko utworzone na Facebooku!');
             setShowCreator(false);
@@ -465,7 +479,8 @@ export default function CampaignsTab() {
             setNewCampaign({ name: '', objective: 'OUTCOME_TRAFFIC', daily_budget: '', status: 'PAUSED', primary_text: '', headline: '', link_description: '', cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'terrasse' });
             loadCampaigns();
         } catch (err: any) {
-            toast.error('Błąd: ' + err.message);
+            console.error('Campaign creation failed:', err);
+            toast.error(err.message, { duration: 15000 });
             setCreateStep(0);
         } finally {
             setCreating(false);
