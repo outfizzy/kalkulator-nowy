@@ -214,6 +214,8 @@ async function handleCreateAdSet(params: any) {
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     targeting: targeting || { geo_locations: { countries: ["DE"] }, age_min: 25, age_max: 65 },
   };
+  // Add Advantage audience flag (required by FB API v25+)
+  body.targeting.targeting_automation = { advantage_audience: 0 };
   if (daily_budget) body.daily_budget = Math.round(daily_budget * 100);
   if (start_time) body.start_time = start_time;
   if (end_time) body.end_time = end_time;
@@ -222,8 +224,8 @@ async function handleCreateAdSet(params: any) {
   body.promoted_object = { page_id: FB_PAGE_ID };
   
   // EU Digital Services Act (DSA) compliance — mandatory for EU-targeted ads
-  body.dsa_beneficiary = "Polendach24 GmbH";
-  body.dsa_payor = "Polendach24 GmbH";
+  body.dsa_beneficiary = "Polendach24 s.c.";
+  body.dsa_payor = "Polendach24 s.c.";
   
   // Ad schedule (dayparting)
   if (pacing_type) body.pacing_type = pacing_type;
@@ -272,20 +274,7 @@ async function handleGetAds(params: any) {
 async function handleCreateAd(params: any) {
   const { adset_id, name, creative, status } = params;
   
-  // Step 1: Upload image to FB Ad Account (if image_url provided)
-  let imageHash: string | undefined;
-  if (creative.image_url) {
-    try {
-      console.log('Uploading ad image:', creative.image_url);
-      const uploadResult = await handleUploadAdImage({ image_url: creative.image_url });
-      imageHash = uploadResult.image_hash;
-      console.log('Image uploaded, hash:', imageHash);
-    } catch (imgErr: any) {
-      console.error('Image upload failed, continuing without image:', imgErr.message);
-    }
-  }
-  
-  // Step 2: Create the ad creative
+  // Create the ad creative using `picture` field (no /adimages permission needed)
   const linkData: any = {
     link: creative.link || "https://polendach24.de",
     message: creative.message || "",
@@ -296,11 +285,9 @@ async function handleCreateAd(params: any) {
     },
   };
   
-  // Use image_hash if uploaded successfully, otherwise fall back to image_url
-  if (imageHash) {
-    linkData.image_hash = imageHash;
-  } else if (creative.image_url) {
-    linkData.image_url = creative.image_url;
+  // Use `picture` field for image URL (universally supported, no upload needed)
+  if (creative.image_url) {
+    linkData.picture = creative.image_url;
   }
   
   const creativeBody: any = {
@@ -327,8 +314,8 @@ async function handleCreateAd(params: any) {
     creative: { creative_id: creativeResult.id },
     status: status || "PAUSED",
     // DSA compliance — mandatory for EU-targeted ads since 2024
-    dsa_beneficiary: creative.dsa_beneficiary || "Polendach24 GmbH",
-    dsa_payor: creative.dsa_payor || "Polendach24 GmbH",
+    dsa_beneficiary: creative.dsa_beneficiary || "Polendach24 s.c.",
+    dsa_payor: creative.dsa_payor || "Polendach24 s.c.",
   };
   
   return await fbApi(`/${FB_AD_ACCOUNT_ID}/ads`, "POST", adBody);
