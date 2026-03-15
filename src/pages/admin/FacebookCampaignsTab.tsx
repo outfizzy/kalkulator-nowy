@@ -731,8 +731,8 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
             setSelectedImages([imgSrc]);
             setAdFormat('single');
 
-            // Auto-select interests for home/garden
-            setInterests(['6003349442621', '6003384248805', '6003020834693', '6003337506837', '6003277229371']);
+            // Use Advantage+ broad targeting (no hardcoded interest IDs — they can be invalid)
+            setInterests([]);
             setTargeting({ countries: ['DE'], age_min: 30, age_max: 65, gender: 0 });
 
             setShowCreator(true);
