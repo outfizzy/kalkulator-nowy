@@ -486,9 +486,10 @@ const ItemRow = ({ item }: { item: { name: string; config?: string; price?: numb
 // ═══════ MAIN COMPONENT ═══════
 interface OfferSpecificationProps {
     product: ProductConfig;
+    pricing?: any;
 }
 
-export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product }) => {
+export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product, pricing }) => {
     // === MANUAL OFFER ===
     if (product.isManual) {
         const hasCustomItems = product.customItems && product.customItems.length > 0;
@@ -564,7 +565,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
     const modelImage = getModelImage(product.modelId);
 
     // Build all positions as a flat numbered list
-    const allPositions: Array<{ label: string; description: string; config?: string; price?: number; qty?: number }> = [];
+    const allPositions: Array<{ label: string; description: string; config?: string; qty?: number }> = [];
 
     // 1. Base construction — includes roof covering info
     const coverInfo = product.roofType === 'glass'
@@ -588,7 +589,6 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
             label,
             description: info.description,
             config: parsed.dimensions || (!parsed.dimensions ? item.config : undefined),
-            price: item.price,
         });
     }
 
@@ -604,15 +604,24 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
     if (product.selectedAccessories?.length) {
         for (const acc of product.selectedAccessories) {
             const info = getGermanInfo(acc.name);
-            allPositions.push({ label: info.label, description: info.description, qty: acc.quantity, price: acc.price });
+            allPositions.push({ label: info.label, description: info.description, qty: acc.quantity });
         }
     }
 
     // 6. Custom items
     if (product.customItems?.length) {
         for (const item of product.customItems) {
-            allPositions.push({ label: item.name, description: item.description || '', price: item.price, qty: item.quantity });
+            allPositions.push({ label: item.name, description: item.description || '', qty: item.quantity });
         }
+    }
+
+    // 7. Installation & Delivery as a position
+    if (pricing?.installationCosts?.totalInstallation > 0) {
+        const instDays = pricing.installationCosts.installationDays;
+        allPositions.push({
+            label: 'Fachgerechte Montage & Lieferung',
+            description: `Durch zertifiziertes Montageteam inkl. Kleinmaterial${instDays ? ` · Montagezeit: ${instDays} Tag${instDays > 1 ? 'e' : ''}` : ''}`,
+        });
     }
 
     return (
@@ -648,7 +657,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                     <div className="grid grid-cols-[2rem_1fr_auto] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Nr.</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Position</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase text-right">Preis</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase text-right">Status</span>
                     </div>
 
                     {/* Rows */}
@@ -671,14 +680,10 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
                                 )}
                             </div>
                             <div className="text-right pt-0.5 shrink-0">
-                                {pos.price && pos.price > 0 ? (
-                                    <span className="text-sm font-semibold text-slate-700">{pos.price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
-                                ) : (
-                                    <span className="flex items-center gap-1 text-emerald-600">
-                                        <IconCheck className="w-3 h-3" />
-                                        <span className="text-[10px] font-bold uppercase">Inkl.</span>
-                                    </span>
-                                )}
+                                <span className="flex items-center gap-1 text-emerald-600">
+                                    <IconCheck className="w-3 h-3" />
+                                    <span className="text-[10px] font-bold uppercase">Inkl.</span>
+                                </span>
                             </div>
                         </div>
                     ))}

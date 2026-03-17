@@ -314,7 +314,7 @@ export const PublicOfferPage: React.FC = () => {
                                 ...offer.product,
                                 numberOfPosts: offer.pricing?.numberOfPosts,
                                 numberOfFields: offer.pricing?.numberOfFields
-                            }} />
+                            }} pricing={offer.pricing} />
                         </div>
 
                         {/* Model-specific Advantages (Vorteile) — sells the value */}
