@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { DatabaseService } from '../../services/database';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
-import { InstallerTeamsPage } from './InstallerTeamsPage';
 import { InstallerWorkersPage } from './InstallerWorkersPage';
 import { supabase } from '../../lib/supabase';
 import type { User, Installation } from '../../types';
@@ -399,10 +398,9 @@ export const InstallerManagementPanel: React.FC = () => {
             {/* Tabs */}
             <div className="bg-white rounded-lg p-1 inline-flex border border-slate-200 shadow-sm">
                 {([
-                    { key: 'workers' as const, label: '👷 Pula Pracowników' },
+                    { key: 'workers' as const, label: '👷 Ekipy & Pracownicy' },
                     { key: 'accounts' as const, label: 'Konta' },
                     { key: 'stats' as const, label: 'Statystyki' },
-                    { key: 'teams' as const, label: 'Brygady' },
                 ]).map(tab => (
                     <button
                         key={tab.key}
@@ -648,8 +646,6 @@ export const InstallerManagementPanel: React.FC = () => {
                 </>
             )}
 
-            {/* ---- TEAMS TAB ---- */}
-            {activeTab === 'teams' && <InstallerTeamsPage />}
 
             {/* ---- WORKERS TAB ---- */}
             {activeTab === 'workers' && <InstallerWorkersPage />}
