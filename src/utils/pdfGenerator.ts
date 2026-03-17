@@ -100,6 +100,10 @@ function getPlacementLabel(config: string): string {
 function professionalItemDescription(name: string, config?: string): string {
     const n = (name || '').toLowerCase();
     const conf = config || '';
+    
+    // Helper: extract dimensions from config string
+    const dimMatch = conf.match(/(\d+)\s*[×x]\s*(\d+)\s*mm/i);
+    const dimStr = dimMatch ? `${dimMatch[1]} × ${dimMatch[2]} mm` : '';
 
     // --- WALLS ---
     if (n.includes('seitenwand') || n.includes('side wall')) {
@@ -107,6 +111,7 @@ function professionalItemDescription(name: string, config?: string): string {
         const placement = getPlacementLabel(conf);
         let desc = 'Festverglaste Aluminium-Seitenwand';
         if (glass) desc += `\ninkl. ${glass}`;
+        if (dimStr) desc += ` · ${dimStr}`;
         if (placement) desc += ` · ${placement}`;
         return desc;
     }
@@ -116,6 +121,7 @@ function professionalItemDescription(name: string, config?: string): string {
         const placement = getPlacementLabel(conf);
         let desc = 'Festverglaste Aluminium-Frontwand';
         if (glass) desc += `\ninkl. ${glass}`;
+        if (dimStr) desc += ` · ${dimStr}`;
         if (placement) desc += ` · ${placement}`;
         return desc;
     }
@@ -126,6 +132,7 @@ function professionalItemDescription(name: string, config?: string): string {
         let desc = 'Dreieckiges Keilfenster (Giebeldreieck)';
         const glass = getGlassTypeLabel(conf) || getGlassTypeLabel(n);
         if (glass) desc += `\ninkl. ${glass}`;
+        if (dimStr) desc += ` · ${dimStr}`;
         if (placement) desc += ` · ${placement}`;
         // Add accessories from config
         if (conf.toLowerCase().includes('kipp-fenster') || conf.toLowerCase().includes('kippfenster')) {
@@ -168,11 +175,13 @@ function professionalItemDescription(name: string, config?: string): string {
     if (n.includes('zip') || n.includes('markise') || n.includes('awning')) {
         const placement = getPlacementLabel(conf);
         if (n.includes('zip')) {
-            let desc = 'ZIP-Senkrechtmarkise (Textilscreen)';
+            let desc = 'ZIP-Senkrechtmarkise mit Somfy-Motor (Textilscreen)';
+            if (dimStr) desc += `\n${dimStr}`;
             if (placement) desc += ` · ${placement}`;
             return desc;
         }
-        let desc = 'Aufglasmarkise mit Elektroantrieb';
+        let desc = 'Aufdachmarkise mit Somfy-Motor';
+        if (dimStr) desc += `\n${dimStr}`;
         if (placement) desc += ` · ${placement}`;
         return desc;
     }

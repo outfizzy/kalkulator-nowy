@@ -300,7 +300,7 @@ const GERMAN_LABELS: Record<string, { label: string; description?: string; iconK
     'glass': { label: 'Verbundsicherheitsglas (VSG)', description: '8 mm VSG mit Splitterschutz', iconKey: 'glass', category: 'roof' },
     'vsg': { label: 'Verbundsicherheitsglas (VSG)', description: '8 mm VSG mit Splitterschutz', iconKey: 'glass', category: 'roof' },
     'matt': { label: 'Mattglas-Eindeckung', description: 'Satiniert für Lichtstreuung und Sichtschutz', iconKey: 'glass', category: 'roof' },
-    'stopsol': { label: 'Sonnenschutzglas Stopsol', description: 'Reduziert Sonneneinstrahlung um bis zu 65 %', iconKey: 'glass', category: 'roof' },
+    'stopsol': { label: 'UV Reflex Sonnenschutzglas', description: 'Reduziert Sonneneinstrahlung um bis zu 65 %', iconKey: 'glass', category: 'roof' },
     'sunscreen': { label: 'Sonnenschutzglas', description: 'UV-reflektierend für weniger Hitze', iconKey: 'glass', category: 'roof' },
     'ir-gold': { label: 'IR Gold Hitzeschutzglas', description: 'Maximaler Hitzeschutz bei voller Transparenz', iconKey: 'glass', category: 'roof' },
     'heat-protection': { label: 'Hitzeschutzglas', description: 'Reduziert Wärmeeinstrahlung', iconKey: 'glass', category: 'roof' },
@@ -333,14 +333,14 @@ const GERMAN_LABELS: Record<string, { label: string; description?: string; iconK
     'wedge window': { label: 'Keilfenster', description: 'Dreieckige Festverglasung', iconKey: 'wedge', category: 'walls' },
 
     // === Comfort ===
-    'markise': { label: 'Unterdachmarkise', description: 'Elektrisch gesteuerter Sonnenschutz', iconKey: 'awning', category: 'comfort' },
-    'awning': { label: 'Unterdachmarkise', description: 'Elektrisch gesteuerter Sonnenschutz', iconKey: 'awning', category: 'comfort' },
-    'unterdachmarkise': { label: 'Unterdachmarkise', description: 'Unter der Überdachung montiert', iconKey: 'awning', category: 'comfort' },
-    'aufdachmarkise': { label: 'Aufdachmarkise', description: 'Auf dem Dach montierter Sonnenschutz', iconKey: 'awning', category: 'comfort' },
-    'zip screen': { label: 'ZIP Screen', description: 'Windstabile Vertikalmarkise', iconKey: 'zip', category: 'comfort' },
-    'zip-screen': { label: 'ZIP Screen', description: 'Windstabile Vertikalmarkise', iconKey: 'zip', category: 'comfort' },
-    'zip': { label: 'ZIP Screen', description: 'Seitliche Beschattung mit Reißverschlussführung', iconKey: 'zip', category: 'comfort' },
-    'senkrechtmarkise': { label: 'Senkrechtmarkise', description: 'Vertikaler Sonnenschutz', iconKey: 'zip', category: 'comfort' },
+    'markise': { label: 'Aufdachmarkise mit Somfy-Motor', description: 'Sonnenschutz mit elektrischem Antrieb', iconKey: 'awning', category: 'comfort' },
+    'awning': { label: 'Aufdachmarkise mit Somfy-Motor', description: 'Sonnenschutz mit elektrischem Antrieb', iconKey: 'awning', category: 'comfort' },
+    'unterdachmarkise': { label: 'Unterdachmarkise mit Somfy-Motor', description: 'Unter der Überdachung montiert', iconKey: 'awning', category: 'comfort' },
+    'aufdachmarkise': { label: 'Aufdachmarkise mit Somfy-Motor', description: 'Auf dem Dach montierter Sonnenschutz', iconKey: 'awning', category: 'comfort' },
+    'zip screen': { label: 'ZIP-Senkrechtmarkise mit Somfy-Motor', description: 'Windstabile Vertikalmarkise (Textilscreen)', iconKey: 'zip', category: 'comfort' },
+    'zip-screen': { label: 'ZIP-Senkrechtmarkise mit Somfy-Motor', description: 'Windstabile Vertikalmarkise (Textilscreen)', iconKey: 'zip', category: 'comfort' },
+    'zip': { label: 'ZIP-Senkrechtmarkise mit Somfy-Motor', description: 'Seitliche Beschattung mit Reißverschlussführung', iconKey: 'zip', category: 'comfort' },
+    'senkrechtmarkise': { label: 'ZIP-Senkrechtmarkise mit Somfy-Motor', description: 'Vertikaler Sonnenschutz (Textilscreen)', iconKey: 'zip', category: 'comfort' },
     'led': { label: 'LED-Beleuchtung', description: 'Dimmbar für stimmungsvolle Abende', iconKey: 'led', category: 'comfort' },
     'led spot': { label: 'LED Spotbeleuchtung', description: 'Warmweiß 3 000 K', iconKey: 'led', category: 'comfort' },
     'led-spot': { label: 'LED Spotbeleuchtung', description: 'Warmweiß 3 000 K', iconKey: 'led', category: 'comfort' },
@@ -566,17 +566,14 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product 
     // Build all positions as a flat numbered list
     const allPositions: Array<{ label: string; description: string; config?: string; price?: number; qty?: number }> = [];
 
-    // 1. Base construction
+    // 1. Base construction — includes roof covering info
+    const coverInfo = product.roofType === 'glass'
+        ? `inkl. ${product.glassType ? getGermanInfo(product.glassType).label : 'VSG Sicherheitsglas 8 mm'}`
+        : `inkl. ${(product as any).variant ? getGermanInfo((product as any).variant).label : 'Polycarbonat Stegplatten 16 mm'}`;
     allPositions.push({
         label: `${displayName} Terrassenüberdachung`,
-        description: `${product.width} × ${product.projection} mm — ${(product as any).construction === 'freestanding' ? 'Freistehend' : 'Wandmontage'} — ${product.customColor ? `RAL ${product.customColorRAL || 'Sonderfarbe'}` : (product.color || 'RAL 7016')}`,
+        description: `${product.width} × ${product.projection} mm — ${(product as any).construction === 'freestanding' ? 'Freistehend' : 'Wandmontage'} — ${product.customColor ? `RAL ${product.customColorRAL || 'Sonderfarbe'}` : (product.color || 'RAL 7016')}\n${coverInfo} · Pulverbeschichtung · Integrierte Entwässerung`,
     });
-
-    // 2. Roof covering
-    const roofLabel = product.roofType === 'glass'
-        ? `Dacheindeckung: ${product.glassType ? getGermanInfo(product.glassType).label : 'Verbundsicherheitsglas (VSG)'}`
-        : `Dacheindeckung: ${(product as any).variant ? getGermanInfo((product as any).variant).label : 'Polycarbonat (16 mm)'}`;
-    allPositions.push({ label: roofLabel, description: product.roofType === 'glass' ? 'Sicherheitsglas mit Splitterschutzfolie' : 'UV-beständige Stegplatten' });
 
     // 3. V2 Items from calculator
     for (const item of filteredItems) {
