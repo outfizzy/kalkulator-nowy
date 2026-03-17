@@ -21,14 +21,16 @@ interface SalesRepRow {
     monthlySalary: number;
     dailyCost: number; // monthlySalary / workdays
     currency: string;
+    commissionRate?: number; // prowizja 0-1
 }
 
 // Gauge component – simplified circular progress
-const CostGauge: React.FC<{ value: number; max: number; label: string; color: string }> = ({ value, max, label, color }) => {
+const CostGauge: React.FC<{ value: number; max: number; label: string; color: string; currency?: string }> = ({ value, max, label, color, currency = 'EUR' }) => {
     const pct = Math.min((value / Math.max(max, 1)) * 100, 100);
     const radius = 38;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (pct / 100) * circumference;
+    const sym = currency === 'EUR' ? '€' : 'zł';
 
     return (
         <div className="flex flex-col items-center">
@@ -48,7 +50,7 @@ const CostGauge: React.FC<{ value: number; max: number; label: string; color: st
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-lg font-bold text-slate-800">{value.toFixed(0)}</span>
-                    <span className="text-[9px] text-slate-400 font-medium">EUR</span>
+                    <span className="text-[9px] text-slate-400 font-medium">{sym}</span>
                 </div>
             </div>
             <p className="text-[10px] text-slate-500 font-semibold mt-1 uppercase tracking-wider">{label}</p>
@@ -173,7 +175,7 @@ export const LiveCostWidget: React.FC = () => {
             // profiles uses full_name (NOT first_name/last_name!)
             const { data: repsProfiles, error: repsErr } = await supabase
                 .from('profiles')
-                .select('id, full_name, role, base_salary, base_salary_currency, hourly_rate, hourly_rate_currency')
+                .select('id, full_name, role, base_salary, base_salary_currency, hourly_rate, hourly_rate_currency, commission_rate')
                 .in('role', ['sales_rep', 'manager']);
             
             console.log('[LiveCost] Reps profiles query:', { count: repsProfiles?.length, repsErr, data: repsProfiles });
@@ -239,6 +241,7 @@ export const LiveCostWidget: React.FC = () => {
                     monthlySalary,
                     dailyCost,
                     currency,
+                    commissionRate: typeof r.commission_rate === 'number' ? r.commission_rate : undefined,
                 };
             });
             console.log('[LiveCost] Final reps:', reps.length, reps);
@@ -257,14 +260,20 @@ export const LiveCostWidget: React.FC = () => {
     useEffect(() => { loadData(); }, [loadData]);
 
     const activeCount = teamRows.filter(r => r.status === 'active').length;
-    const todayInstallerTotal = teamRows.reduce((s, r) => s + r.estimatedCost, 0);
+    const todayInstallerTotal = teamRows.reduce((s, r) => s + r.estimatedCost, 0); // EUR
 
     // Sales reps today cost based on elapsed work hours (8-16) prorated from daily
     const nowHour = now.getHours() + now.getMinutes() / 60;
     const elapsedWorkHours = Math.max(0, Math.min(nowHour - 8, 8));
-    const todaySalesRepTotal = nowHour >= 8 ? salesReps.reduce((s, r) => s + (r.dailyCost * elapsedWorkHours / 8), 0) : 0;
 
-    const todayGrandTotal = todayInstallerTotal + todaySalesRepTotal;
+    // Split sales rep costs by currency
+    const plnReps = salesReps.filter(r => r.currency !== 'EUR');
+    const eurReps = salesReps.filter(r => r.currency === 'EUR');
+    const todaySalesRepPLN = nowHour >= 8 ? plnReps.reduce((s, r) => s + (r.dailyCost * elapsedWorkHours / 8), 0) : 0;
+    const todaySalesRepEUR = nowHour >= 8 ? eurReps.reduce((s, r) => s + (r.dailyCost * elapsedWorkHours / 8), 0) : 0;
+    const monthlySalesRepPLN = plnReps.reduce((s, r) => s + (r.dailyCost * (monthlySalesRepCost > 0 ? monthlySalesRepCost / salesReps.reduce((a, b) => a + b.dailyCost, 1) : 0)), 0);
+
+    const todayGrandTotalEUR = todayInstallerTotal + todaySalesRepEUR;
     const monthlyGrandTotal = monthlyInstallerCost + monthlySalesRepCost;
     const currentMonthName = new Date().toLocaleString('pl-PL', { month: 'long' });
 
@@ -327,7 +336,7 @@ export const LiveCostWidget: React.FC = () => {
                             <span className="text-sm font-bold">{activeCount} aktywn{activeCount === 1 ? 'a' : 'e'}</span>
                         </div>
                     )}
-                    <span className="text-lg font-bold">{todayGrandTotal.toFixed(0)} €</span>
+                    <span className="text-lg font-bold">{todayInstallerTotal.toFixed(0)} € {todaySalesRepPLN > 0 ? `+ ${todaySalesRepPLN.toFixed(0)} zł` : ''}</span>
                     <svg className={`w-5 h-5 transition-transform ${collapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
@@ -343,18 +352,21 @@ export const LiveCostWidget: React.FC = () => {
                             max={2000}
                             label="Montażyści dziś"
                             color="#8b5cf6"
+                            currency="EUR"
                         />
                         <CostGauge
-                            value={todaySalesRepTotal}
-                            max={1000}
+                            value={todaySalesRepPLN}
+                            max={3000}
                             label="Handlowcy dziś"
                             color="#3b82f6"
+                            currency="PLN"
                         />
                         <CostGauge
-                            value={monthlyGrandTotal}
+                            value={monthlyInstallerCost}
                             max={estimatedMonthlyBudget}
-                            label={currentMonthName}
+                            label={`${currentMonthName} (€)`}
                             color="#10b981"
+                            currency="EUR"
                         />
                     </div>
 
@@ -363,14 +375,19 @@ export const LiveCostWidget: React.FC = () => {
                         <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl p-3 border border-violet-200">
                             <p className="text-[10px] text-violet-600 font-bold uppercase tracking-wider">🔧 Montażyści / miesiąc</p>
                             <p className="text-xl font-bold text-violet-800 mt-1">
-                                {monthlyInstallerCost.toFixed(0)} <span className="text-xs font-medium">EUR</span>
+                                {monthlyInstallerCost.toFixed(0)} <span className="text-xs font-medium">€</span>
                             </p>
                         </div>
                         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200">
                             <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">💼 Handlowcy / miesiąc</p>
                             <p className="text-xl font-bold text-blue-800 mt-1">
-                                {monthlySalesRepCost.toFixed(0)} <span className="text-xs font-medium">EUR</span>
+                                {monthlySalesRepCost.toFixed(0)} <span className="text-xs font-medium">zł</span>
                             </p>
+                            {eurReps.length > 0 && (
+                                <p className="text-sm font-semibold text-blue-600 mt-0.5">
+                                    + {eurReps.reduce((s, r) => s + r.monthlySalary, 0).toFixed(0)} <span className="text-xs">€</span>
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -441,6 +458,9 @@ export const LiveCostWidget: React.FC = () => {
                                                 <p className="text-[10px] text-slate-400">{rep.monthlySalary.toFixed(0)} {rep.currency === 'EUR' ? '€' : 'zł'}/mies. → {rep.dailyCost.toFixed(0)} {rep.currency === 'EUR' ? '€' : 'zł'}/d</p>
                                             ) : (
                                                 <p className="text-[10px] text-amber-500">brak podstawy</p>
+                                            )}
+                                            {rep.commissionRate != null && rep.commissionRate > 0 && (
+                                                <p className="text-[10px] text-emerald-600 font-semibold">prowizja: {(rep.commissionRate * 100).toFixed(0)}%</p>
                                             )}
                                         </div>
                                     </div>
