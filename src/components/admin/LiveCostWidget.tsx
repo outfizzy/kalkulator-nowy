@@ -22,6 +22,7 @@ interface SalesRepRow {
     dailyCost: number; // monthlySalary / workdays
     currency: string;
     commissionRate?: number; // prowizja 0-1
+    monthlyCommission: number; // earned commission this month in EUR
 }
 
 // Gauge component – simplified circular progress
@@ -242,8 +243,31 @@ export const LiveCostWidget: React.FC = () => {
                     dailyCost,
                     currency,
                     commissionRate: typeof r.commission_rate === 'number' ? r.commission_rate : undefined,
+                    monthlyCommission: 0,
                 };
             });
+
+            // ─── Fetch earned commissions from contracts this month ────────
+            const { data: contractsData } = await supabase
+                .from('contracts')
+                .select('user_id, contract_data')
+                .gte('created_at', monthStart + 'T00:00:00')
+                .not('contract_data', 'is', null);
+
+            if (contractsData) {
+                const commMap = new Map<string, number>();
+                for (const c of contractsData) {
+                    const cd = c.contract_data as any;
+                    const comm = Number(cd?.commission) || 0;
+                    if (comm > 0 && c.user_id) {
+                        commMap.set(c.user_id, (commMap.get(c.user_id) || 0) + comm);
+                    }
+                }
+                for (const rep of reps) {
+                    rep.monthlyCommission = commMap.get(rep.userId) || 0;
+                }
+            }
+
             console.log('[LiveCost] Final reps:', reps.length, reps);
             setSalesReps(reps);
 
@@ -383,9 +407,9 @@ export const LiveCostWidget: React.FC = () => {
                             <p className="text-xl font-bold text-blue-800 mt-1">
                                 {monthlySalesRepCost.toFixed(0)} <span className="text-xs font-medium">zł</span>
                             </p>
-                            {eurReps.length > 0 && (
-                                <p className="text-sm font-semibold text-blue-600 mt-0.5">
-                                    + {eurReps.reduce((s, r) => s + r.monthlySalary, 0).toFixed(0)} <span className="text-xs">€</span>
+                            {salesReps.some(r => r.monthlyCommission > 0) && (
+                                <p className="text-sm font-semibold text-emerald-600 mt-0.5">
+                                    + {salesReps.reduce((s, r) => s + r.monthlyCommission, 0).toFixed(0)} <span className="text-xs">€ prowizji</span>
                                 </p>
                             )}
                         </div>
@@ -459,8 +483,11 @@ export const LiveCostWidget: React.FC = () => {
                                             ) : (
                                                 <p className="text-[10px] text-amber-500">brak podstawy</p>
                                             )}
-                                            {rep.commissionRate != null && rep.commissionRate > 0 && (
-                                                <p className="text-[10px] text-emerald-600 font-semibold">prowizja: {(rep.commissionRate * 100).toFixed(0)}%</p>
+                                            {(rep.monthlyCommission > 0 || (rep.commissionRate != null && rep.commissionRate > 0)) && (
+                                                <p className="text-[10px] text-emerald-600 font-semibold">
+                                                    prowizja: {rep.monthlyCommission > 0 ? `${rep.monthlyCommission.toFixed(0)} €` : '0 €'}
+                                                    {rep.commissionRate != null && rep.commissionRate > 0 && ` (${(rep.commissionRate * 100).toFixed(0)}%)`}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
