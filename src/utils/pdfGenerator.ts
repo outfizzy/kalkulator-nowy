@@ -61,30 +61,153 @@ function translateForPDF(key: string, category: string): string {
     return translate(key, category as any);
 }
 
-// Translate internal addon/accessory names to German display names
-function translateAddonName(name: string): string {
-    const map: Record<string, string> = {
-        'Wedge (Glass)': 'Keilfenster (Glas)',
-        'Side Wall (Glass)': 'Seitenwand (Glas)',
-        'Front Wall (Glass)': 'Frontwand (Glas)',
-        'Side Wall (Poly)': 'Seitenwand (Polycarbonat)',
-        'Front Wall (Poly)': 'Frontwand (Polycarbonat)',
-        'Schiebetuer (Glass)': 'Schiebetuer (Glas)',
-        'Schiebetuer (Poly)': 'Schiebetuer (Polycarbonat)',
-        'Surcharge Matt': 'Zuschlag Mattglas',
-        'Surcharge Iso': 'Zuschlag Isolierglas',
-        'Surcharge Stopsol': 'Zuschlag Stopsol (Sonnenschutz)',
-        'LED Lighting': 'LED-Beleuchtung',
-        'LED Spot': 'LED-Spotbeleuchtung',
-        'Heating': 'Infrarot-Heizstrahler',
-        'ZIP Screen': 'ZIP-Markise',
-        'Awning': 'Markise',
-        'Panorama': 'Panorama Schiebewand',
-    };
-    if (map[name]) return map[name];
-    for (const [eng, de] of Object.entries(map)) {
-        if (name.includes(eng)) return name.replace(eng, de);
+// === PROFESSIONAL PRODUCT DESCRIPTIONS FOR PDF ===
+// Parses item name + config to produce rich German descriptions with material specs
+
+function getGlassTypeLabel(config: string): string {
+    const c = (config || '').toLowerCase();
+    if (c.includes('isolierglas') || c.includes('iso')) return 'Wärmedämm-Isolierglas';
+    if (c.includes('matt') || c.includes('satiniert')) return 'VSG Sicherheitsglas satiniert (Sichtschutz)';
+    if (c.includes('stopsol')) return 'Stopsol Sonnenschutzglas';
+    if (c.includes('klar')) return 'VSG Sicherheitsglas klar';
+    if (c.includes('vsg')) return 'VSG Sicherheitsglas';
+    return '';
+}
+
+function getRoofCoverLabel(config: string): string {
+    const c = (config || '').toLowerCase();
+    if (c.includes('glass') || c.includes('glas')) {
+        if (c.includes('matt') || c.includes('satiniert')) return 'VSG Sicherheitsglas 8 mm satiniert';
+        if (c.includes('stopsol')) return 'Stopsol Sonnenschutzglas 8 mm';
+        return 'VSG Sicherheitsglas 8 mm klar';
     }
+    if (c.includes('poly')) {
+        if (c.includes('ir') || c.includes('gold')) return 'Polycarbonat Stegplatten 16 mm (IR-Wärmeschutz)';
+        if (c.includes('opal')) return 'Polycarbonat Stegplatten 16 mm opal';
+        return 'Polycarbonat Stegplatten 16 mm klar';
+    }
+    return '';
+}
+
+function getPlacementLabel(config: string): string {
+    const c = (config || '').toLowerCase();
+    if (c.includes('front:') || c.includes('front')) return 'Frontseite';
+    if (c.includes('links:') || c.includes('links') || c.includes('left')) return 'Linke Seite';
+    if (c.includes('rechts:') || c.includes('rechts') || c.includes('right')) return 'Rechte Seite';
+    return '';
+}
+
+function professionalItemDescription(name: string, config?: string): string {
+    const n = (name || '').toLowerCase();
+    const conf = config || '';
+
+    // --- WALLS ---
+    if (n.includes('seitenwand') || n.includes('side wall')) {
+        const glass = getGlassTypeLabel(conf) || getGlassTypeLabel(n);
+        const placement = getPlacementLabel(conf);
+        let desc = 'Festverglaste Aluminium-Seitenwand';
+        if (glass) desc += `\ninkl. ${glass}`;
+        if (placement) desc += ` · ${placement}`;
+        return desc;
+    }
+
+    if (n.includes('frontwand') || n.includes('front wall')) {
+        const glass = getGlassTypeLabel(conf) || getGlassTypeLabel(n);
+        const placement = getPlacementLabel(conf);
+        let desc = 'Festverglaste Aluminium-Frontwand';
+        if (glass) desc += `\ninkl. ${glass}`;
+        if (placement) desc += ` · ${placement}`;
+        return desc;
+    }
+
+    // --- KEILFENSTER (Wedge) ---
+    if (n.includes('keilfenster') || n.includes('wedge')) {
+        const placement = getPlacementLabel(conf);
+        let desc = 'Dreieckiges Keilfenster (Giebeldreieck)';
+        const glass = getGlassTypeLabel(conf) || getGlassTypeLabel(n);
+        if (glass) desc += `\ninkl. ${glass}`;
+        if (placement) desc += ` · ${placement}`;
+        // Add accessories from config
+        if (conf.toLowerCase().includes('kipp-fenster') || conf.toLowerCase().includes('kippfenster')) {
+            desc += '\nMit integriertem Dreh-Kipp-Fenster';
+        }
+        return desc;
+    }
+
+    // --- SCHIEBETÜR (Framed sliding door) ---
+    if (n.includes('schiebetür') || n.includes('schiebetuer') || n.includes('drzwi przesuwne')) {
+        const glass = getGlassTypeLabel(conf) || getGlassTypeLabel(n);
+        let desc = 'Aluminium-Schiebetür';
+        if (glass) desc += `, ${glass}`;
+        // Extract panels
+        const panelMatch = conf.match(/(\d+-\d*\s*Flügel|\d+\s*Flügel)/i);
+        if (panelMatch) desc += `, ${panelMatch[1]}`;
+        // Extract opening direction
+        if (conf.toLowerCase().includes('links')) desc += '\nÖffnung nach links';
+        else if (conf.toLowerCase().includes('rechts')) desc += '\nÖffnung nach rechts';
+        else if (conf.toLowerCase().includes('mittig')) desc += '\nMittig öffnend';
+        // Extract handle
+        const handleMatch = conf.match(/Handgriff[^(]*/i);
+        if (handleMatch) desc += ` · ${handleMatch[0].trim()}`;
+        return desc;
+    }
+
+    // --- PANORAMA (Frameless sliding glass) ---
+    if (n.includes('panorama')) {
+        const modelMatch = n.match(/AL\d+/i);
+        const trackMatch = n.match(/(\d+)-Tor/i);
+        let desc = 'Rahmenlose Panorama-Glasschiebewand';
+        if (modelMatch) desc += ` (${modelMatch[0].toUpperCase()})`;
+        if (trackMatch) desc += `\n${trackMatch[1]}-spuriges System, ESG Sicherheitsglas 10 mm`;
+        const placement = getPlacementLabel(conf);
+        if (placement) desc += ` · ${placement}`;
+        return desc;
+    }
+
+    // --- MARKISE / ZIP ---
+    if (n.includes('zip') || n.includes('markise') || n.includes('awning')) {
+        const placement = getPlacementLabel(conf);
+        if (n.includes('zip')) {
+            let desc = 'ZIP-Senkrechtmarkise (Textilscreen)';
+            if (placement) desc += ` · ${placement}`;
+            return desc;
+        }
+        let desc = 'Aufglasmarkise mit Elektroantrieb';
+        if (placement) desc += ` · ${placement}`;
+        return desc;
+    }
+
+    // --- LED ---
+    if (n.includes('led')) {
+        if (n.includes('spot')) return 'LED-Spotbeleuchtung\nEinbau in Sparren, warmweiß 3000K';
+        if (n.includes('strip')) return 'LED-Lichtleiste\nIndirekte Beleuchtung, warmweiß 3000K';
+        return 'LED-Beleuchtung\nIntegriert in Konstruktion, warmweiß 3000K';
+    }
+
+    // --- HEIZSTRAHLER ---
+    if (n.includes('heiz') || n.includes('heating') || n.includes('infrarot')) {
+        return 'Infrarot-Heizstrahler\nFernbedienung, spritzwassergeschützt (IP65)';
+    }
+
+    // --- WPC BODEN ---
+    if (n.includes('wpc')) {
+        return `WPC Terrassendielen\n${conf || 'Premium Holz-Kunststoff-Verbundwerkstoff, rutschfest'}`;
+    }
+
+    // --- U-Profil, Schrauben-Set, Abdeckung (Keil accessories) ---
+    if (n.includes('u-profil')) return 'U-Profil 55×29 mm (Ausgleichsprofil)';
+    if (n.includes('schrauben')) return 'Montage-Schrauben-Set';
+    if (n.includes('abdeckung')) return `Abdeckprofil ${n.match(/EL\d+/i)?.[0] || ''}`;
+    if (n.includes('kipp-fenster') || n.includes('kippfenster')) return 'Dreh-Kipp-Fenster (für Keilfenster)';
+
+    // --- FALLBACK: simple translate map ---
+    const simpleMap: Record<string, string> = {
+        'Surcharge Matt': 'Aufpreis Mattglas-Verglasung',
+        'Surcharge Iso': 'Aufpreis Wärmedämm-Isolierverglasung',
+        'Surcharge Stopsol': 'Aufpreis Stopsol Sonnenschutzglas',
+    };
+    if (simpleMap[name]) return simpleMap[name];
+
     return name;
 }
 
@@ -433,11 +556,16 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     const bodyRows: any[] = [];
     let pos = 1;
 
-    // Main Product
+    // Main Product — include roof cover type from config
+    const roofConfig = (offer.product as any).items?.find((i: any) => i.category === 'roof')?.config || '';
+    const coverLabel = getRoofCoverLabel(roofConfig || (offer.product as any).cover || '');
+    const mainDesc = coverLabel
+        ? `${model} Aluminiumkonstruktion\ninkl. ${coverLabel} · Pulverbeschichtung · Integrierte Entwässerung`
+        : `${model} Aluminiumkonstruktion\nPremium Pulverbeschichtung, Verstärkte Profile, Integrierte Entwässerung.`;
     bodyRows.push([
         { content: String(pos++), styles: { halign: 'center' } },
         {
-            content: (`${model} Aluminiumkonstruktion\nPremium Pulverbeschichtung, Verstärkte Profile, Integrierte Entwässerung.`),
+            content: mainDesc,
             styles: { fontStyle: 'bold' }
         },
         formatCurrency(offer.pricing?.basePrice || 0)
@@ -450,7 +578,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             if (item.name?.toLowerCase().includes(offer.product?.modelId)) return;
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
-                (translateAddonName(item.name) + (item.config ? `\n${item.config}` : '')),
+                (professionalItemDescription(item.name, item.config)),
                 formatCurrency(item.price)
             ]);
         });
@@ -458,7 +586,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         offer.product.addons.forEach((a: any) => {
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
-                (translateAddonName(a.name) + (a.variant ? ` (${a.variant})` : '')),
+                (professionalItemDescription(a.name, a.variant)),
                 formatCurrency(a.price)
             ]);
         });
