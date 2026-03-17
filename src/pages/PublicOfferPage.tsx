@@ -12,7 +12,22 @@ import { OfferSpecification } from '../components/public-offer/OfferSpecificatio
 import { CreatorProfileSection } from '../components/public-offer/CreatorProfileSection';
 import { MeasurementRequestModal } from '../components/public-offer/MeasurementRequestModal';
 import { FAQSection } from '../components/public-offer/FAQSection';
+import { ModelAdvantagesSection } from '../components/public-offer/ModelAdvantagesSection';
+import { UpsellSection } from '../components/public-offer/UpsellSection';
 import { getModelDisplayName } from '../config/modelImages';
+
+// Translate internal color keys to German display names
+function translateColorForDisplay(color: string): string {
+    const map: Record<string, string> = {
+        'anthracite': 'Anthrazit (RAL 7016)', 'white': 'Weiß (RAL 9016)',
+        'ral7016': 'Anthrazit (RAL 7016)', 'ral9016': 'Weiß (RAL 9016)',
+        'ral 7016': 'Anthrazit (RAL 7016)', 'ral 9016': 'Weiß (RAL 9016)',
+        'silberr': 'Silber (RAL 9006)', 'sepia': 'Sepiabraun (RAL 8014)',
+        'RAL 7016': 'Anthrazit (RAL 7016)', 'RAL 9016': 'Weiß (RAL 9016)',
+        'RAL 9006': 'Silber (RAL 9006)', 'RAL 8014': 'Sepiabraun (RAL 8014)',
+    };
+    return map[color] || map[color?.toLowerCase()] || color;
+}
 
 // Types for sibling offers
 interface SiblingOffer {
@@ -302,6 +317,9 @@ export const PublicOfferPage: React.FC = () => {
                             }} />
                         </div>
 
+                        {/* Model-specific Advantages (Vorteile) — sells the value */}
+                        <ModelAdvantagesSection modelId={offer.product.modelId} />
+
                         {/* Inline CTA — immediately after specification while interest is high */}
                         <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 md:p-8 text-white text-center shadow-xl shadow-blue-200">
                             <h3 className="text-xl md:text-2xl font-bold mb-2">Gefällt Ihnen diese Konfiguration?</h3>
@@ -328,6 +346,9 @@ export const PublicOfferPage: React.FC = () => {
                         {/* Trust Badges — reinforcement after CTA */}
                         <TrustSection />
 
+                        {/* Upsell Section — upgrades the customer hasn't chosen yet */}
+                        <UpsellSection offer={offer} />
+
                         {/* FAQ Section — addresses remaining concerns */}
                         <FAQSection />
 
@@ -350,7 +371,7 @@ export const PublicOfferPage: React.FC = () => {
                                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 3H3v18" /><path strokeLinecap="round" d="M21 3l-8 8" /></svg>{offer.product.width} × {offer.product.projection} mm</p>
                                         )}
                                         {offer.product.color && (
-                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9" strokeWidth={2} /><circle cx="12" cy="8" r="1.5" fill="currentColor" opacity={0.4} /></svg>{offer.product.color}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9" strokeWidth={2} /><circle cx="12" cy="8" r="1.5" fill="currentColor" opacity={0.4} /></svg>{translateColorForDisplay(offer.product.color)}</p>
                                         )}
                                     </div>
 

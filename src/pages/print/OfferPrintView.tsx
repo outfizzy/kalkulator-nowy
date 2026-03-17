@@ -152,8 +152,19 @@ export const OfferPrintView: React.FC = () => {
     const net = offer.pricing?.sellingPriceNet || 0;
     const discount = offer.pricing?.discountValue || 0;
     const vat = net * 0.19;
-    const gross = net + vat;
+    // Use gross from DB if available, otherwise calculate
+    const gross = offer.pricing?.sellingPriceGross || (net + vat);
     const preDiscount = net + discount;
+
+    // Date handling: use offer creation date, not today
+    const offerDate = offer.createdAt
+        ? new Date(offer.createdAt).toLocaleDateString('de-DE')
+        : new Date().toLocaleDateString('de-DE');
+    // Validity: 30 days from creation
+    const createdDate = offer.createdAt ? new Date(offer.createdAt) : new Date();
+    const validUntil = new Date(createdDate);
+    validUntil.setDate(validUntil.getDate() + 30);
+    const validUntilStr = validUntil.toLocaleDateString('de-DE');
 
     return (
         <div className="bg-slate-100 min-h-screen print:bg-white print:min-h-0 font-sans">
@@ -282,11 +293,11 @@ export const OfferPrintView: React.FC = () => {
                                             </div>
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="text-slate-500">Datum</span>
-                                                <span className="font-medium text-slate-900">{new Date().toLocaleDateString('de-DE')}</span>
+                                                <span className="font-medium text-slate-900">{offerDate}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-xs mt-1">
                                                 <span className="text-slate-500">Gültig bis</span>
-                                                <span className="font-medium text-slate-900">{new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')}</span>
+                                                <span className="font-medium text-slate-900">{validUntilStr}</span>
                                             </div>
                                         </div>
                                     </div>

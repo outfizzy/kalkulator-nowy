@@ -74,7 +74,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                 name: newItemName,
                 price: price,
                 quantity: qty,
-                description: 'Pozycja dodatkowa'
+                description: 'Manuelle Angebotsposition'
             };
 
             const updatedProduct = {
