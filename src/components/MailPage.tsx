@@ -926,7 +926,6 @@ export const MailPage: React.FC = () => {
             const companyMatch = body.match(/(?:Firma|Unternehmen|Company)\s*:\s*(.+)/i);
             if (companyMatch) regexCompany = companyMatch[1].trim();
 
-            console.log('[AI Lead] Regex fallback parsed:', { regexFirstName, regexLastName, regexEmail, regexPhone, regexPostalCode, regexCity });
 
             // --- AI extraction (may enhance or override regex) ---
             let extracted: any = null;
@@ -948,7 +947,6 @@ export const MailPage: React.FC = () => {
                     // Don't throw — we still have regex results
                 } else {
                     extracted = data?.leadData;
-                    console.log('AI Extracted Data:', extracted);
                 }
             } catch (aiErr) {
                 console.error('[AI Lead] AI extraction failed, using regex fallback:', aiErr);
@@ -964,12 +962,9 @@ export const MailPage: React.FC = () => {
             const finalAddress = extracted?.address || regexAddress;
             const finalCompany = extracted?.companyName || regexCompany;
 
-            console.log('[AI Lead] Final merged data:', { finalFirstName, finalLastName, finalEmail, finalPhone, finalPostalCode, finalCity });
 
             // Upload attachments from the email
             const uploadedAttachments = await uploadAttachments(selectedEmail);
-            console.log('[AI Lead] Email attachments count:', selectedEmail.attachments?.length || 0);
-            console.log('[AI Lead] Uploaded attachments count:', uploadedAttachments.length);
 
             // --- AI Price Estimation ---
             let priceEstimateNote = '';
@@ -985,7 +980,6 @@ export const MailPage: React.FC = () => {
                     const coverType = extracted.suggestedRoofType === 'glass' ? 'glass_clear' : 'poly_clear';
                     const constructionType: 'wall' | 'free' = extracted.suggestedInstallationType === 'freestanding' || extracted.suggestedInstallationType === 'free' ? 'free' : 'wall';
 
-                    console.log('[AI Price] Looking up:', { modelCode, width, depth, coverType, constructionType });
 
                     const priceResult = await PricingService.findBasePrice({
                         modelFamily: modelCode,

@@ -310,7 +310,6 @@ export const B2BService = {
     // =========================================
 
     async getPartners(): Promise<B2BPartner[]> {
-        console.log('[B2B] Fetching all partners...');
         const { data, error } = await supabase
             .from('b2b_partners')
             .select(`
@@ -323,7 +322,6 @@ export const B2BService = {
             console.error('[B2B] Error fetching partners:', error);
             throw error;
         }
-        console.log('[B2B] Fetched partners:', data?.length || 0, 'records');
         return data || [];
     },
 
@@ -449,7 +447,6 @@ export const B2BService = {
                             user_id: user.id,
                             role: 'admin' // Primary contact gets admin role
                         });
-                    console.log('[B2B] Auto-linked user to partner:', partner.company_name);
                 } catch (linkError) {
                     // Ignore if link already exists or RLS blocks it
                     console.warn('[B2B] Could not auto-link user to partner:', linkError);
@@ -475,7 +472,6 @@ export const B2BService = {
         if (partner) return partner;
 
         // No partner found - create one automatically
-        console.log('[B2B] Creating new partner for user:', user.email);
 
         // Get user profile for name
         const { data: profile } = await supabase
@@ -523,7 +519,6 @@ export const B2BService = {
                     role: 'admin'
                 });
 
-            console.log('[B2B] Partner created and linked:', newPartner.company_name);
             return newPartner as B2BPartner;
         } catch (error) {
             console.error('[B2B] Failed to create partner:', error);
@@ -536,7 +531,6 @@ export const B2BService = {
      * and auto-create it. This fixes the "Partner not found" error.
      */
     async syncMissingPartners(): Promise<{ found: number, synced: number, errors: any[] }> {
-        console.log('[B2B] Syncing missing partners (admin fix)...');
         const errors: any[] = [];
 
         // Fetch ALL profiles to debug role issues and avoid filter quirks
@@ -553,7 +547,6 @@ export const B2BService = {
 
         // Filter valid targets (legacy partners OR new b2b partners)
         const profiles = allProfiles.filter(p => p.role === 'b2b_partner' || p.role === 'partner');
-        console.log(`[B2B] Found ${profiles.length} potential partners out of ${allProfiles.length} profiles`);
 
         let fixedCount = 0;
 
@@ -567,7 +560,6 @@ export const B2BService = {
             if (!links || links.length === 0) {
                 // Use email if available, otherwise placeholder
                 const email = profile.email || `partner_${profile.id}@placeholder.com`;
-                console.log('[B2B] Fixing missing partner for:', email);
 
                 const companyName = profile.company_name || profile.full_name || (email.includes('@') ? email.split('@')[0] : 'Partner B2B');
 

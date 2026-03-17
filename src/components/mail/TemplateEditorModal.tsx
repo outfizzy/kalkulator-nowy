@@ -10,7 +10,6 @@ interface TemplateEditorModalProps {
 }
 
 export const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({ isOpen, onClose, template, onSuccess }) => {
-    console.log('TemplateEditorModal rendering. isOpen:', isOpen);
     const [loading, setLoading] = useState(false);
 
     const [name, setName] = useState('');

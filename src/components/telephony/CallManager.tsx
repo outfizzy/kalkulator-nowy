@@ -17,7 +17,6 @@ export const CallManager: React.FC = () => {
             });
 
             newDevice.on('ready', () => {
-                console.log('Twilio Device Ready');
             });
 
             newDevice.on('error', (error) => {
@@ -25,7 +24,6 @@ export const CallManager: React.FC = () => {
             });
 
             newDevice.on('incoming', (conn) => {
-                console.log('Incoming call from:', conn.parameters.From);
                 setIncomingCall(conn);
                 toast('Połączenie przychodzące!', { icon: '📞', duration: 5000 });
 

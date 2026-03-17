@@ -205,7 +205,6 @@ export const CustomerService = {
                     }
                 });
 
-                console.log(`Auto-created contract ${customer.contract_number} for customer ${data.id}`);
             } catch (contractError) {
                 console.error('Failed to auto-create contract:', contractError);
                 // Don't fail customer creation if contract creation fails

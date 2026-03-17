@@ -257,7 +257,6 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                     toast(`Wykryto ${priceCols} kolumn cenowych. Zastosowano domyślne nagłówki. Sprawdź wartości!`, { icon: '⚠️' });
                 }
 
-                console.log('Inferred Matrix Header:', headerProjections);
 
             } else {
                 // Double fallback for ZIP Screen if inference failed
@@ -271,7 +270,6 @@ export const ClipboardImportModal: React.FC<ClipboardImportModalProps> = ({ onCl
                 }
             }
         } else {
-            console.log('Detected Matrix Header:', headerProjections);
         }
 
         // 2. Flatten Data

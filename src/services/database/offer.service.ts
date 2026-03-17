@@ -144,7 +144,6 @@ export const OfferService = {
                 // Commission = Net Price * Rate (e.g. 0.05)
                 const netPrice = offer.pricing.sellingPriceNet || (offer.pricing.totalCost / 1.23);
                 calculatedCommission = Math.round(netPrice * rate * 100) / 100;
-                console.log(`[Commission] Auto-calculated: ${calculatedCommission} (${rate * 100}% of ${netPrice})`);
             }
         }
 
@@ -451,7 +450,6 @@ export const OfferService = {
                             // CustomerService.addCustomerCost doesn't take created_by in param (Omit<..., 'created_at'>), 
                             // but RLS/Database defaults usually handle auth.uid().
                         });
-                        console.log(`Commission cost created for offer ${id}`);
                     }
                 }
             } catch (err) {

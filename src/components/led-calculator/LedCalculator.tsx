@@ -222,7 +222,6 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
                         ),
                     }));
                     setFieldCountSource('auto');
-                    console.log(`[LED] Auto field count: ${fieldCount} (from pricing_base for ${inputs.roofType} @ ${inputs.width}mm)`);
                 }
             } catch (e) {
                 console.warn('[LED] Auto-fetch field count failed:', e);
@@ -267,9 +266,7 @@ export const LedCalculator: React.FC<LedCalculatorProps> = ({ onSave, initialDat
 
     const handleCalculate = useCallback(() => {
         try {
-            console.log('[LED] handleCalculate called with inputs:', JSON.stringify(inputs, null, 2));
             const calculatedResults = calculateLedConfig(inputs);
-            console.log('[LED] Calculation results:', calculatedResults);
             setResults(calculatedResults);
             setStep(3);
         } catch (e) {

@@ -62,7 +62,6 @@ export const GoogleCalendarService = {
             }
 
             const data = await res.json();
-            console.log(`[GCal] Event ${data.action}: ${data.eventId}`);
             return data.eventId || null;
         } catch (err) {
             console.warn('[GCal] Sync error (non-blocking):', err);
@@ -83,7 +82,6 @@ export const GoogleCalendarService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ googleEventId }),
             });
-            console.log(`[GCal] Event deleted: ${googleEventId}`);
         } catch (err) {
             console.warn('[GCal] Delete error (non-blocking):', err);
         }

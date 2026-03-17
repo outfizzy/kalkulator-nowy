@@ -175,7 +175,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     const bestFit = sorted[0]; // The smallest width/depth combo
 
                     if (bestFit) {
-                        console.log(`📏 Setting Default Dimensions for ${config.modelId}: ${bestFit.width_mm}x${bestFit.depth_mm}`);
                         setConfig(prev => ({
                             ...prev,
                             width: bestFit.width_mm,
@@ -342,7 +341,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 // config.modelId matches 'code'. product.name matches 'imported_from'.
                 const activeModelName = products.find(p => p.code === config.modelId?.toLowerCase())?.name;
 
-                console.log('📦 Fetching Addons for Context:', activeModelName || 'Global');
 
                 // Fetch all groups in parallel
                 const [walls, sliding, keil, light, heat, awnings, zips, panorama, wpc, accessories] = await Promise.all([
@@ -412,7 +410,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         const loadProducts = async () => {
             try {
                 const data = await PricingService.getMainProducts();
-                console.log("Loaded products:", data);
                 if (data && data.length > 0) {
                     // Filter out Orangestyle+ (missing data)
                     const filtered = data.filter(p => !p.code.includes('orangestyle_plus'));
@@ -567,7 +564,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             const hasMatrixItems = config.selectedAccessories.some(a => a.pricing_basis === 'MATRIX');
             if (!hasMatrixItems) return;
 
-            console.log('🔄 Recalculating Matrix Addon Prices...');
 
             const updated = await Promise.all(config.selectedAccessories.map(async (acc) => {
                 if (acc.pricing_basis === 'MATRIX') {

@@ -99,7 +99,6 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
         );
 
         if (measurementsWithGPS.length === 0) {
-            console.log('No measurements with GPS coordinates');
             return;
         }
 
@@ -199,7 +198,6 @@ export const DailyRouteMap: React.FC<DailyRouteMapProps> = ({ date, measurements
                             },
                         });
                         renderersRef.current.push(renderer);
-                        console.log(`Route for ${repMeasurements[0]?.salesRepName}: ${repMeasurements.length} stops`);
                     } else {
                         console.error('Failed to calculate route:', status);
                     }

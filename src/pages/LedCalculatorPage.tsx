@@ -20,7 +20,6 @@ export const LedCalculatorPage: React.FC = () => {
             {/* Calculator */}
             <LedCalculator
                 onSave={(data) => {
-                    console.log('LED config saved:', data);
                     // TODO: integrate with offer system
                 }}
             />

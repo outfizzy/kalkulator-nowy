@@ -71,14 +71,12 @@ export const SoftphoneWidget: React.FC = () => {
             });
 
             device.on('registered', () => {
-                console.log('☎️ Twilio Device registered');
                 setConnectionStatus('connected');
                 setConnectionError(null);
                 toast.success('Telefon aktywny — gotowy do odbierania', { duration: 3000, icon: '☎️' });
             });
 
             device.on('unregistered', () => {
-                console.log('☎️ Twilio Device unregistered');
                 setConnectionStatus('disconnected');
             });
 
@@ -92,7 +90,6 @@ export const SoftphoneWidget: React.FC = () => {
 
             device.on('incoming', (call: Call) => {
                 const from = call.parameters.From || 'Nieznany';
-                console.log('☎️ Incoming call:', from);
 
                 // Look up contact info
                 TelephonyService.lookupContact(from).then(info => {
@@ -171,7 +168,6 @@ export const SoftphoneWidget: React.FC = () => {
                 try {
                     const { token: newToken } = await TelephonyService.getTwilioToken();
                     device.updateToken(newToken);
-                    console.log('☎️ Token refreshed');
                 } catch (e) {
                     console.warn('Token refresh failed:', e);
                 }

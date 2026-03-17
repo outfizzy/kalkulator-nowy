@@ -220,7 +220,6 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
     }
 
     for (const name of formats) {
-        console.log(`[findPriceTable] Trying: "${name}"`);
         const { data } = await supabase
             .from('price_tables')
             .select('id, name')
@@ -229,7 +228,6 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .limit(1);
 
         if (data && data.length > 0) {
-            console.log(`[findPriceTable] ✅ Found: "${data[0].name}"`);
             return data[0];
         }
     }
@@ -245,7 +243,6 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .limit(1);
 
         if (fuzzy && fuzzy.length > 0) {
-            console.log(`[findPriceTable] ✅ Fuzzy found: "${fuzzy[0].name}"`);
             return fuzzy[0];
         }
     } else {
@@ -260,12 +257,10 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .limit(1);
 
         if (fuzzy && fuzzy.length > 0) {
-            console.log(`[findPriceTable] ✅ Fuzzy found: "${fuzzy[0].name}"`);
             return fuzzy[0];
         }
     }
 
-    console.log(`[findPriceTable] ❌ No table found for model=${model}, zone=${zone}`);
     return null;
 }
 
@@ -636,13 +631,11 @@ export const B2BCalculator: React.FC = () => {
                             0
                         );
 
-                        console.log(`Panorama pricing: product=${wallProduct}, trackCount=${trackCount}, panelPrice=${panelPrice}, height=${wallHeight}`);
 
                         if (panelPrice !== null) {
                             // Calculate total price: price_per_panel × number_of_tracks × height_in_meters
                             const heightInMeters = wallHeight / 1000;
                             finalPrice = panelPrice * trackCount * heightInMeters;
-                            console.log(`Panorama final price: ${panelPrice} × ${trackCount} × ${heightInMeters}m = ${finalPrice.toFixed(2)}`);
                         }
                     } else {
                         // Determine correct lookup dimensions based on product type
@@ -805,7 +798,6 @@ export const B2BCalculator: React.FC = () => {
                     if (unitPrice !== null) {
                         setSchiebeeinheitUnitPrice(unitPrice);
                         setSchiebeeinheitTotalPrice(unitPrice * schiebeeinheitCount);
-                        console.log(`[SCHIEBEEINHEIT] Unit price: ${unitPrice}€, Count: ${schiebeeinheitCount}, Total: ${unitPrice * schiebeeinheitCount}€`);
                     }
                 } else {
                     // Fallback: calculate based on formula from Excel (89.10 EUR per meter depth per field)
@@ -813,7 +805,6 @@ export const B2BCalculator: React.FC = () => {
                     const markupMultiplier = 1 + (partnerMarkup / 100);
                     setSchiebeeinheitUnitPrice(fallbackUnitPrice * markupMultiplier);
                     setSchiebeeinheitTotalPrice(fallbackUnitPrice * schiebeeinheitCount * markupMultiplier);
-                    console.log(`[SCHIEBEEINHEIT] Using fallback formula: ${fallbackUnitPrice}€ per field (Markup: ${partnerMarkup}%)`);
                 }
             } catch (e) {
                 console.error('Schiebeeinheit price fetch error:', e);
@@ -826,7 +817,6 @@ export const B2BCalculator: React.FC = () => {
     // === CALCULATE ROOF PRICE ===
     useEffect(() => {
         const fetchPrice = async () => {
-            console.log('[PRICE FETCH START]', { model, cover, zone, construction, width, projection, glassVariant, polyVariant });
             setLoading(true);
             setPrice(null);
             setError(null);
@@ -884,22 +874,18 @@ export const B2BCalculator: React.FC = () => {
 
                     // Check WIDTH limits (allow up to 2x for combined constructions)
                     if (width < limits.minWidth) {
-                        console.log(`[Price] Width ${width} < min ${limits.minWidth}, auto-adjusting`);
                         setWidth(limits.minWidth);
                         needsRerun = true;
                     } else if (width > limits.maxWidth * 2) {
-                        console.log(`[Price] Width ${width} > max combined ${limits.maxWidth * 2}, auto-adjusting`);
                         setWidth(limits.maxWidth * 2);
                         needsRerun = true;
                     }
 
                     // Check PROJECTION/DEPTH limits
                     if (projection < limits.minDepth) {
-                        console.log(`[Price] Projection ${projection} < min ${limits.minDepth}, auto-adjusting`);
                         setProjection(limits.minDepth);
                         needsRerun = true;
                     } else if (projection > limits.maxDepth) {
-                        console.log(`[Price] Projection ${projection} > max ${limits.maxDepth}, auto-adjusting`);
                         setProjection(limits.maxDepth);
                         needsRerun = true;
                     }
@@ -962,7 +948,6 @@ export const B2BCalculator: React.FC = () => {
                                         totalSurcharge += segmentSurcharge;
                                     }
                                 }
-                                console.log(`🔧 Freestanding Surcharge: ${combinedResult.structures.length} segments, total: ${totalSurcharge} EUR`);
                             } else {
                                 // Single structure: use total width
                                 const surcharge = await PricingService.calculateMatrixPrice(surchargeTables[0].id, width, 0);
@@ -1001,7 +986,6 @@ export const B2BCalculator: React.FC = () => {
                 const needsSurcharge = (cover === 'Glass' && glassVariant !== 'klar') ||
                     (cover === 'Poly' && polyVariant === 'ir-gold');
 
-                console.log('[SURCHARGE DEBUG]', { cover, glassVariant, polyVariant, needsSurcharge, basePrice: combinedResult?.totalPrice });
 
                 if (needsSurcharge && combinedResult?.totalPrice) {
                     // Map model name to DB format (e.g., "Trendline" stays as "Trendline")
@@ -1025,7 +1009,6 @@ export const B2BCalculator: React.FC = () => {
                     if (surchargeType) {
                         // Table name format: "Aluxe V2 - Trendline Glass Matt Surcharge (Zone 1)"
                         const surchargeTableName = `Aluxe V2 - ${dbModel} ${surchargeType} Surcharge (Zone ${zone})`;
-                        console.log('[SURCHARGE DEBUG] Looking for table:', surchargeTableName);
 
                         // Try exact match first
                         let { data: surchargeTable } = await supabase
@@ -1037,7 +1020,6 @@ export const B2BCalculator: React.FC = () => {
                         // If not found, try ILIKE for flexible matching
                         if (!surchargeTable || surchargeTable.length === 0) {
                             const searchPattern = `%${dbModel}%${surchargeType}%Zone ${zone}%`;
-                            console.log('[SURCHARGE DEBUG] Trying ILIKE:', searchPattern);
 
                             const { data: fuzzyResult } = await supabase
                                 .from('price_tables')
@@ -1048,14 +1030,12 @@ export const B2BCalculator: React.FC = () => {
                         }
 
                         if (surchargeTable && surchargeTable.length > 0) {
-                            console.log('[SURCHARGE DEBUG] Found table:', surchargeTable[0].name);
 
                             // Get price from matrix
                             const surchargePrice = await PricingService.calculateMatrixPrice(
                                 surchargeTable[0].id, width, projection
                             );
 
-                            console.log('[SURCHARGE DEBUG] Surcharge price:', surchargePrice);
 
                             if (surchargePrice !== null && surchargePrice > 0) {
                                 const markupMultiplier = 1 + (partnerMarkup / 100);
@@ -1071,7 +1051,6 @@ export const B2BCalculator: React.FC = () => {
                 if (sonderfarben && combinedResult?.totalPrice) {
                     const constructionPrice = combinedResult.totalPrice;
                     const sonderfarbenAmount = Math.round(constructionPrice * 0.20 * 100) / 100;
-                    console.log(`[SONDERFARBEN] Applied +20% = ${sonderfarbenAmount}€`);
                     const markupMultiplier = 1 + (partnerMarkup / 100);
                     setSonderfarbenSurcharge(sonderfarbenAmount * markupMultiplier);
                 } else {

@@ -37,7 +37,6 @@ export const DeliveryCalendar: React.FC = () => {
     // Extract all deliveries from all contracts
     const allDeliveries = useMemo((): DeliveryItem[] => {
         const deliveries: DeliveryItem[] = [];
-        console.log('Processing contracts for deliveries:', contracts.length);
 
         contracts.forEach(contract => {
             if (!contract.orderedItems || contract.orderedItems.length === 0) {
@@ -46,7 +45,6 @@ export const DeliveryCalendar: React.FC = () => {
 
             contract.orderedItems.forEach(item => {
                 if (item.plannedDeliveryDate) {
-                    console.log('Found delivery:', item.name, item.plannedDeliveryDate);
                     deliveries.push({
                         ...item,
                         contractId: contract.id,
@@ -57,7 +55,6 @@ export const DeliveryCalendar: React.FC = () => {
             });
         });
 
-        console.log('Total deliveries found:', deliveries.length);
         return deliveries.sort((a, b) =>
             new Date(a.plannedDeliveryDate!).getTime() - new Date(b.plannedDeliveryDate!).getTime()
         );

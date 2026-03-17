@@ -439,7 +439,6 @@ export default function CampaignsTab() {
                     }
                 }
 
-                console.log('AdSet params:', JSON.stringify(adSetParams));
                 const adSetResult = await FacebookService.createAdSet(adSetParams);
                 adSetId = adSetResult.id;
                 if (!adSetId) throw new Error('Brak ID ad set w odpowiedzi FB: ' + JSON.stringify(adSetResult));
@@ -455,7 +454,6 @@ export default function CampaignsTab() {
                     ? selectedImages[0]
                     : `${window.location.origin}${selectedImages[0]}`;
 
-                console.log('Ad creative image URL:', imageUrl);
                 await FacebookService.createAd({
                     adset_id: adSetId,
                     name: `${newCampaign.name} — Ad`,
@@ -701,7 +699,6 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
             });
 
             const raw = data?.content || data?.result || '';
-            console.log('AI raw response:', raw.substring(0, 500));
             // Parse JSON from response (handle possible markdown code blocks)
             let jsonStr = raw;
             // Strip markdown code blocks if present

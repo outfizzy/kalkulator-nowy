@@ -263,7 +263,6 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
     }
 
     for (const name of formats) {
-        console.log(`[findPriceTable] Trying: "${name}"`);
         const { data } = await supabase
             .from('price_tables')
             .select('id, name')
@@ -272,7 +271,6 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .limit(1);
 
         if (data && data.length > 0) {
-            console.log(`[findPriceTable] ✅ Found: "${data[0].name}"`);
             return data[0];
         }
     }
@@ -288,7 +286,6 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .limit(1);
 
         if (fuzzy && fuzzy.length > 0) {
-            console.log(`[findPriceTable] ✅ Fuzzy found: "${fuzzy[0].name}"`);
             return fuzzy[0];
         }
     } else {
@@ -303,12 +300,10 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .limit(1);
 
         if (fuzzy && fuzzy.length > 0) {
-            console.log(`[findPriceTable] ✅ Fuzzy found: "${fuzzy[0].name}"`);
             return fuzzy[0];
         }
     }
 
-    console.log(`[findPriceTable] ❌ No table found for model=${model}, zone=${zone}`);
     return null;
 }
 
@@ -569,11 +564,9 @@ export const ProductConfiguratorV2: React.FC = () => {
             } as Customer);
             // Auto-skip customer form when coming from a lead
             setView('config');
-            console.log('📋 Pre-filled customer from lead — skipping to configurator');
         }
         if (navState?.leadId) {
             linkedLeadIdRef.current = navState.leadId;
-            console.log('🔗 Linked to lead:', navState.leadId);
             // Load configurator form data
             ConfiguratorService.getByLeadId(navState.leadId).then(configs => {
                 const completed = configs.find(c => c.status === 'completed') || configs[0];
@@ -846,13 +839,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                             0
                         );
 
-                        console.log(`Panorama pricing: product=${wallProduct}, trackCount=${trackCount}, panelPrice=${panelPrice}, height=${wallHeight}`);
 
                         if (panelPrice !== null) {
                             // Calculate total price: price_per_panel × number_of_tracks
                             // The DB price is "Per Panel" (up to max height), NOT per meter height.
                             finalPrice = panelPrice * trackCount;
-                            console.log(`Panorama final price: ${panelPrice} × ${trackCount} = ${finalPrice.toFixed(2)}`);
 
                             // Add accessory prices
                             let accessoriesTotal = 0;
@@ -876,7 +867,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 const panelArea = panelWidthM * panelHeightM;
                                 const glassSurcharge = 47.95 * panelArea * trackCount;
                                 accessoriesTotal += glassSurcharge;
-                                console.log(`Glass surcharge: 47.95 × ${panelArea.toFixed(2)}m² × ${trackCount} panels = ${glassSurcharge.toFixed(2)}€`);
                             }
 
                             // Steel-Look profiles (2 side profiles per system)
@@ -886,7 +876,6 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                             setPanoramaAccessoriesPrice(accessoriesTotal);
                             finalPrice += accessoriesTotal;
-                            console.log(`Panorama with accessories: base ${(finalPrice - accessoriesTotal).toFixed(2)} + accessories ${accessoriesTotal.toFixed(2)} = ${finalPrice.toFixed(2)}€`);
                         }
                     } else {
                         // Determine correct lookup dimensions based on product type
@@ -970,7 +959,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     lookupProjection
                                 );
                                 if (surchargePrice) {
-                                    console.log(`Wall glass surcharge (${surchargeName}): +${surchargePrice.toFixed(2)}`);
                                     finalPrice += surchargePrice;
                                 }
                             }
@@ -1111,14 +1099,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                     if (unitPrice !== null) {
                         setSchiebeeinheitUnitPrice(unitPrice);
                         setSchiebeeinheitTotalPrice(unitPrice * schiebeeinheitCount);
-                        console.log(`[SCHIEBEEINHEIT] Unit price: ${unitPrice}€, Count: ${schiebeeinheitCount}, Total: ${unitPrice * schiebeeinheitCount}€`);
                     }
                 } else {
                     // Fallback: calculate based on formula from Excel (89.10 EUR per meter depth per field)
                     const fallbackUnitPrice = Math.round((projection / 1000) * 89.10 * 100) / 100;
                     setSchiebeeinheitUnitPrice(fallbackUnitPrice);
                     setSchiebeeinheitTotalPrice(fallbackUnitPrice * schiebeeinheitCount);
-                    console.log(`[SCHIEBEEINHEIT] Using fallback formula: ${fallbackUnitPrice}€ per field`);
                 }
             } catch (e) {
                 console.error('Schiebeeinheit price fetch error:', e);
@@ -1131,7 +1117,6 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === CALCULATE ROOF PRICE ===
     useEffect(() => {
         const fetchPrice = async () => {
-            console.log('[PRICE FETCH START]', { model, cover, zone, construction, width, projection, glassVariant, polyVariant });
             setLoading(true);
             setPrice(null);
             setError(null);
@@ -1189,22 +1174,18 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                     // Check WIDTH limits (allow up to 2x for combined constructions)
                     if (width < limits.minWidth) {
-                        console.log(`[Price] Width ${width} < min ${limits.minWidth}, auto-adjusting`);
                         setWidth(limits.minWidth);
                         needsRerun = true;
                     } else if (width > limits.maxWidth * 2) {
-                        console.log(`[Price] Width ${width} > max combined ${limits.maxWidth * 2}, auto-adjusting`);
                         setWidth(limits.maxWidth * 2);
                         needsRerun = true;
                     }
 
                     // Check PROJECTION/DEPTH limits
                     if (projection < limits.minDepth) {
-                        console.log(`[Price] Projection ${projection} < min ${limits.minDepth}, auto-adjusting`);
                         setProjection(limits.minDepth);
                         needsRerun = true;
                     } else if (projection > limits.maxDepth) {
-                        console.log(`[Price] Projection ${projection} > max ${limits.maxDepth}, auto-adjusting`);
                         setProjection(limits.maxDepth);
                         needsRerun = true;
                     }
@@ -1266,7 +1247,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         totalSurcharge += segmentSurcharge;
                                     }
                                 }
-                                console.log(`🔧 Freestanding Surcharge: ${combinedResult.structures.length} segments, total: ${totalSurcharge} EUR`);
                             } else {
                                 // Single structure: use total width
                                 const surcharge = await PricingService.calculateMatrixPrice(surchargeTables[0].id, width, 0);
@@ -1303,7 +1283,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                 const needsSurcharge = (cover === 'Glass' && glassVariant !== 'klar') ||
                     (cover === 'Poly' && polyVariant === 'ir-gold');
 
-                console.log('[SURCHARGE DEBUG]', { cover, glassVariant, polyVariant, needsSurcharge, basePrice: combinedResult?.totalPrice });
 
                 if (needsSurcharge && combinedResult?.totalPrice) {
                     // Map model name to DB format (e.g., "Trendline" stays as "Trendline")
@@ -1327,7 +1306,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                     if (surchargeType) {
                         // Table name format: "Aluxe V2 - Trendline Glass Matt Surcharge (Zone 1)"
                         const surchargeTableName = `Aluxe V2 - ${dbModel} ${surchargeType} Surcharge (Zone ${zone})`;
-                        console.log('[SURCHARGE DEBUG] Looking for table:', surchargeTableName);
 
                         // Try exact match first
                         let { data: surchargeTable } = await supabase
@@ -1339,7 +1317,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                         // If not found, try ILIKE for flexible matching
                         if (!surchargeTable || surchargeTable.length === 0) {
                             const searchPattern = `%${dbModel}%${surchargeType}%Zone ${zone}%`;
-                            console.log('[SURCHARGE DEBUG] Trying ILIKE:', searchPattern);
 
                             const { data: fuzzyResult } = await supabase
                                 .from('price_tables')
@@ -1350,14 +1327,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                         }
 
                         if (surchargeTable && surchargeTable.length > 0) {
-                            console.log('[SURCHARGE DEBUG] Found table:', surchargeTable[0].name);
 
                             // Get price from matrix
                             const surchargePrice = await PricingService.calculateMatrixPrice(
                                 surchargeTable[0].id, width, projection
                             );
 
-                            console.log('[SURCHARGE DEBUG] Surcharge price:', surchargePrice);
 
                             if (surchargePrice !== null && surchargePrice > 0) {
                                 setVariantSurchargePrice(surchargePrice);
@@ -1372,7 +1347,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                 if (sonderfarben && combinedResult?.totalPrice) {
                     const constructionPrice = combinedResult.totalPrice;
                     const sonderfarbenAmount = Math.round(constructionPrice * 0.20 * 100) / 100;
-                    console.log(`[SONDERFARBEN] Applied +20% = ${sonderfarbenAmount}€`);
                     setSonderfarbenSurcharge(sonderfarbenAmount);
                 } else {
                     setSonderfarbenSurcharge(0);
@@ -1643,7 +1617,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                     .single();
                 if (linkedLead) {
                     lead = linkedLead;
-                    console.log('🔗 Using linked lead from navigation:', lead.id);
                     if (lead.status !== 'won' && lead.status !== 'lost') {
                         await LeadService.updateLead(lead.id, { status: 'offer_sent' as any });
                     }
@@ -1656,11 +1629,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                 if (existingLeads && existingLeads.length > 0) {
                     // Reuse the most recent lead — just update its status
                     lead = existingLeads[0];
-                    console.log('♻️ Reusing existing lead:', lead.id);
                     // Update lead status to offer_sent if it's not already won/lost
                     if (lead.status !== 'won' && lead.status !== 'lost') {
                         await LeadService.updateLead(lead.id, { status: 'offer_sent' as any });
-                        console.log('📝 Updated lead status to offer_sent');
                     }
                 }
             }
@@ -1674,7 +1645,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                     .limit(1);
                 if (emailLeads && emailLeads.length > 0) {
                     lead = emailLeads[0];
-                    console.log('♻️ Found existing lead by email:', lead.id);
                     if (lead.status !== 'won' && lead.status !== 'lost') {
                         await LeadService.updateLead(lead.id, { status: 'offer_sent' as any });
                     }
@@ -1689,7 +1659,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                     customerId: customerState.id,
                     notes: `Konfiguracja V2: ${basket.map(b => b.name).join(', ')}`
                 });
-                console.log('🆕 Created new lead:', lead.id);
             }
 
             const selectedModel = isManualMode ? manualModel : model;
@@ -2224,7 +2193,6 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                                 <div className="flex flex-wrap gap-3">
                                     <button
-                                        onClick={() => { console.log('[EMAIL] Button clicked, opening modal'); setShowSendEmailModal(true); }}
                                         className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                                     >
                                         ✉️ E-Mail senden
@@ -2257,7 +2225,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
                                 </button>
                                 <button
-                                    onClick={() => { console.log('[EMAIL] Button clicked, opening modal'); setShowSendEmailModal(true); }}
                                     disabled={(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
                                     className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
                                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'

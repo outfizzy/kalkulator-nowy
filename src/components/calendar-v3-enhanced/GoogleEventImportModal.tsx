@@ -84,7 +84,6 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
                 }
 
                 customerId = newCustomer.id;
-                console.log('[GCal Import] Created customer:', customerId);
             }
 
             // Step 2: Create contract if requested
@@ -116,7 +115,6 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
                 }
 
                 contractId = newContract.id;
-                console.log('[GCal Import] Created contract:', contractId);
             }
 
             // Step 3: Create installation
@@ -147,7 +145,6 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
             };
 
             await InstallationService.createManualInstallation(installationData);
-            console.log('[GCal Import] Installation created');
 
             // Step 4: Update Google Calendar event with CRM link
             // This is fire-and-forget — we mark it so it won't show up in next import

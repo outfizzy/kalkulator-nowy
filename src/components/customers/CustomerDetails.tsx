@@ -157,7 +157,6 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
 
             if (error) throw error;
 
-            console.log('Vapi Call started:', data);
             toast.success('Asystent AI dzwoni do klienta!', { id: toastId });
 
         } catch (error) {

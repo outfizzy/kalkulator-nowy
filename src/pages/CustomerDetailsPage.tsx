@@ -115,7 +115,6 @@ export const CustomerDetailsPage: React.FC = () => {
                     filter: `customer_id=eq.${id}`
                 },
                 (payload) => {
-                    console.log('Realtime communication update:', payload);
                     // Refresh communications only for speed
                     DatabaseService.getCommunications(id!).then(setCommunications);
                 }
@@ -128,7 +127,6 @@ export const CustomerDetailsPage: React.FC = () => {
                     table: 'installations'
                 },
                 (payload) => {
-                    console.log('Realtime installation update:', payload);
                     // Refresh entire data to ensure status update propagates
                     fetchData();
                 }

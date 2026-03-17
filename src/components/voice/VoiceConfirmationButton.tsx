@@ -38,7 +38,6 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
                     filter: `id=eq.${installationId}`
                 },
                 (payload) => {
-                    console.log('Installation updated (VoiceButton):', payload);
                     if (payload.new.status === 'scheduled') {
                         setConfirmed(true);
                         setLoading(false);
@@ -82,7 +81,6 @@ export const VoiceConfirmationButton: React.FC<VoiceConfirmationButtonProps> = (
             if (error) throw error;
             if (data && data.error) throw new Error(`Server: ${data.error} ${data.details ? JSON.stringify(data.details) : ''}`);
 
-            console.log('Vapi Call started:', data);
             toast.success('AI dzwoni do klienta! 🤖📞', { id: toastId });
 
         } catch (error: any) {

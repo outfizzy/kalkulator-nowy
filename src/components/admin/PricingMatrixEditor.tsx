@@ -122,7 +122,6 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
             .order('depth_mm', { ascending: true });
 
         if (manualData && manualData.length > 0) {
-            console.log("Loading Manual Data (Priority)", manualData.length);
             const mappedEntries: MatrixEntry[] = manualData.map(d => ({
                 id: d.id,
                 width_mm: d.width_mm,
@@ -457,8 +456,6 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         // Try getting text from clipboard
         const text = e.clipboardData.getData('text');
 
-        console.log('Paste event triggered on:', width, 'x', projection);
-        console.log('Clipboard content length:', text.length);
 
         // Heuristic: If it contains newlines OR tabs, treat as potential smart paste
         // Also if it looks like a list of numbers separated by newlines (single column)
@@ -471,7 +468,6 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({ tableId, onClose, ta
         }
 
         e.preventDefault();
-        console.log('Smart Paste Activated');
 
         setPasteOrigin({ width, projection, targetField: targetField as keyof MatrixEntry });
         setSmartPasteText(text);

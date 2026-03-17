@@ -310,7 +310,6 @@ export const InstallationService = {
 
                     if (email) {
                         // Auto-email disabled per user request — feedback is sent manually via FeedbackRequestWidget
-                        console.log(`[Installation] Completion email SKIPPED for ${email} (auto-send disabled)`);
                     }
                 }
             } catch (notifyError) {
@@ -995,7 +994,6 @@ export const InstallationService = {
             clients?.forEach(c => clientMap.set(c.id, c));
         }
 
-        console.log('Fetched contracts for calendar:', contracts?.length || 0);
 
         const backlogContracts = (contracts || []).filter((c: any) =>
             !activeOfferIds.has(c.offer_id) && !activeSourceIds.has(c.id)
@@ -1031,21 +1029,8 @@ export const InstallationService = {
                 name: liveClient.name || snapshotClient.name || ''
             };
 
-            // DEBUG: Log what we have for this contract
-            const debugContractNumber = c.contract_number || c.contract_data?.contractNumber || offer?.offer_number;
-            console.log('[BACKLOG DEBUG]', {
-                contractId: c.id,
-                hasOffer: !!offer,
-                offerNumber: offer?.offer_number,
-                contractNumber: c.contract_number,
-                contractDataNumber: c.contract_data?.contractNumber,
-                resolvedNumber: debugContractNumber || 'Brak numeru',
-                clientId,
-                hasLiveClient: !!clientMap.get(clientId),
-                liveCity: liveClient.city,
-                snapshotCity: snapshotClient.city,
-                resolvedCity: liveClient.city || snapshotClient.city || 'Brak miasta'
-            });
+
+
 
             return {
                 ...c,
@@ -1065,7 +1050,6 @@ export const InstallationService = {
             };
         });
 
-        console.log('Backlog contracts after filtering:', backlogContracts.length);
 
         // 4. Service Tickets (Active, not in active installations)
         // Tickets that need scheduling: 'new', 'open'

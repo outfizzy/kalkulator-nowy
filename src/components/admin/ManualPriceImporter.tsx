@@ -142,7 +142,6 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 .single();
 
             if (data?.configuration?.freestanding_surcharge_rules) {
-                console.log('⚡ Auto-loading Freestanding Rules for', modelFamily);
                 const loadedRules = data.configuration.freestanding_surcharge_rules.map((r: any) => ({
                     maxWidth: r.max_width,
                     price: r.price
@@ -157,7 +156,6 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
                 // This allows the user to set rules once and apply them to multiple models by switching and saving.
                 // UNLESS the current rules are all zero (fresh start), in which case we might want to stay zero.
                 // But generally, persistence is preferred here as per user request ("dla szkła też niech zasysa...").
-                console.log('ℹ️ No specific rules for', modelFamily, '- keeping current values.');
             }
         };
 
@@ -570,7 +568,6 @@ export const ImportManual: React.FC<ManualPriceImporterProps> = ({
 
             if (!productId && !targetTableId) {
                 // Auto-create product if missing (same logic as before)
-                console.log('✨ Creating new Product Definition for:', modelFamily);
                 const codeCandidate = modelFamily.trim().toLowerCase().replace(/\s+/g, '');
                 const { data: newProd, error: createError } = await supabase
                     .from('product_definitions')

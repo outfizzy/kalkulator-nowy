@@ -27,7 +27,6 @@ export const VisualizerAIChat: React.FC<VisualizerAIChatProps> = ({ config, onCh
 
         try {
             const updates = await AiService.interpretVisualizerCommand(command, config, user);
-            console.log("AI Updates:", updates);
 
             // Handle Special Actions
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

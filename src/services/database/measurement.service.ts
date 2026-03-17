@@ -289,7 +289,6 @@ export const MeasurementService = {
                         .from('leads')
                         .update({ status: 'measurement_scheduled', updated_at: new Date().toISOString() })
                         .eq('id', data.lead_id);
-                    console.log(`[MeasurementService] Auto-transitioned lead ${data.lead_id} → measurement_scheduled`);
                 }
             } catch (err) {
                 console.warn('[MeasurementService] Failed to auto-transition lead on create:', err);
@@ -367,7 +366,6 @@ export const MeasurementService = {
                         .from('leads')
                         .update({ status: 'measurement_completed', updated_at: new Date().toISOString() })
                         .eq('id', data.lead_id);
-                    console.log(`[MeasurementService] Auto-transitioned lead ${data.lead_id} → measurement_completed`);
                 }
             } catch (err) {
                 console.warn('[MeasurementService] Failed to auto-transition lead:', err);

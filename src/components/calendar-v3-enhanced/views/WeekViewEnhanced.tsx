@@ -63,9 +63,16 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
         const start = new Date(i.scheduledDate);
         const duration = i.expectedDuration || 1;
         if (duration <= 1) return isSameDay(start, date);
-        // Multi-day: check if date falls within [start, start + duration - 1]
-        for (let d = 0; d < duration; d++) {
-            if (isSameDay(addDays(start, d), date)) return true;
+        // Multi-day: span across business days (skip weekends)
+        let businessDaysCounted = 0;
+        let calendarDay = 0;
+        while (businessDaysCounted < duration && calendarDay < duration + 10) {
+            const checkDate = addDays(start, calendarDay);
+            if (!isWeekend(checkDate)) {
+                businessDaysCounted++;
+                if (isSameDay(checkDate, date)) return true;
+            }
+            calendarDay++;
         }
         return false;
     });
@@ -266,8 +273,15 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                 const start = new Date(i.scheduledDate);
                 const duration = i.expectedDuration || 1;
                 if (duration <= 1) return isSameDay(start, day);
-                for (let d = 0; d < duration; d++) {
-                    if (isSameDay(addDays(start, d), day)) return true;
+                let businessDaysCounted = 0;
+                let calendarDay = 0;
+                while (businessDaysCounted < duration && calendarDay < duration + 10) {
+                    const checkDate = addDays(start, calendarDay);
+                    if (!isWeekend(checkDate)) {
+                        businessDaysCounted++;
+                        if (isSameDay(checkDate, day)) return true;
+                    }
+                    calendarDay++;
                 }
                 return false;
             }).length;

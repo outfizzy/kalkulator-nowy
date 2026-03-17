@@ -322,7 +322,6 @@ export class ConfiguratorService {
                         .from('customers')
                         .update(custUpdates)
                         .eq('id', leadForCustomer.customer_id);
-                    console.log(`[Configurator] Customer ${leadForCustomer.customer_id} synced from form`);
                 }
             }
 
@@ -489,7 +488,6 @@ export class ConfiguratorService {
                                 config: sharedConfig,
                             }
                         });
-                        console.log(`[Configurator] Email notification sent to ${emails.length} recipients`);
                     }
                 }
             } catch (emailErr) {

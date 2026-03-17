@@ -126,7 +126,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (error) throw error;
 
             if (data) {
-                console.log('Fetched profile data:', data);
                 const rawRole = data.role as string | null;
 
                 const normalizedRole = ((): UserRole => {

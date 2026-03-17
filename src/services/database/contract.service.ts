@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import type { Contract } from '../../types';
 import { getEurPlnRate } from '../exchange-rate.service';
 import { FuelPriceService } from '../fuel-price.service';
+import { calculateDistanceFromGubin } from '../../utils/distanceCalculator';
 
 export const ContractService = {
     async getContracts(): Promise<Contract[]> {
@@ -128,7 +129,6 @@ export const ContractService = {
                         const rate = Number(profile.commission_rate);
                         if (rate > 0) {
                             calculatedCommission = Math.round(netPrice * rate * 100) / 100;
-                            console.log(`[Commission] Auto-calculated for contract: ${calculatedCommission}€ (${rate * 100}% of ${netPrice}€)`);
                         }
                     }
                 }
@@ -195,7 +195,6 @@ export const ContractService = {
                     (typeof contract.product === 'string' ? contract.product : `${contract.product.modelId.toUpperCase()} ${contract.product.width}x${contract.product.projection}`)
                     : 'Produkt z Umowy';
 
-                console.log('Auto-creating pending installation for contract', newContractNumber);
 
                 await supabase.from('installations').insert({
                     offer_id: contract.offerId,
@@ -313,7 +312,6 @@ export const ContractService = {
                             const rate = Number(repProfile.commission_rate);
                             if (rate > 0) {
                                 finalCommission = Math.round(netPrice * rate * 100) / 100;
-                                console.log(`[Commission] Recalculated on update: ${finalCommission}€ (${rate * 100}% of ${netPrice}€)`);
                             }
                         }
                     }
@@ -909,33 +907,80 @@ export const ContractService = {
                     }
                 }
 
-                // Work logs — hours
-                const { data: workLogs } = await supabase
-                    .from('installation_work_logs')
-                    .select('*')
-                    .eq('installation_id', inst.id);
+                // ── LABOR COST: prefer real data from work sessions ──
+                const { data: wsSess } = await supabase
+                    .from('work_sessions')
+                    .select('labor_cost, total_work_minutes, crew_members')
+                    .eq('installation_id', inst.id)
+                    .eq('status', 'completed');
 
-                if (workLogs) {
-                    const HOURLY_RATE = 25; // EUR per worker-hour
-                    workLogs.forEach((log: any) => {
-                        if (log.start_time && log.end_time) {
-                            const start = new Date(log.start_time);
-                            const end = new Date(log.end_time);
-                            const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                            const workers = (log.user_ids || []).length || 1;
-                            laborHours += hours * workers;
+                if (wsSess && wsSess.length > 0) {
+                    // Use real labor cost from completed work sessions
+                    laborCost = wsSess.reduce((s: number, ws: any) => s + (Number(ws.labor_cost) || 0), 0);
+                    laborHours = wsSess.reduce((s: number, ws: any) => s + ((Number(ws.total_work_minutes) || 0) / 60), 0);
+                    laborCost = Math.round(laborCost * 100) / 100;
+                    laborHours = Math.round(laborHours * 100) / 100;
+                } else {
+                    // Fallback: work logs with real hourly rates from team members
+                    const { data: workLogs } = await supabase
+                        .from('installation_work_logs')
+                        .select('*')
+                        .eq('installation_id', inst.id);
+
+                    // Get real hourly rates from team members
+                    let avgHourlyRate = 25; // Final fallback
+                    if (inst.team_id) {
+                        const { data: teamMembers } = await supabase
+                            .from('installer_workers')
+                            .select('hourly_rate')
+                            .eq('team_id', inst.team_id)
+                            .eq('status', 'active');
+                        if (teamMembers && teamMembers.length > 0) {
+                            const rates = teamMembers.map((m: any) => Number(m.hourly_rate) || 0).filter((r: number) => r > 0);
+                            if (rates.length > 0) {
+                                avgHourlyRate = rates.reduce((s: number, r: number) => s + r, 0) / rates.length;
+                            }
                         }
-                    });
-                    laborCost = Math.round(laborHours * HOURLY_RATE * 100) / 100;
+                    }
+
+                    if (workLogs) {
+                        workLogs.forEach((log: any) => {
+                            if (log.start_time && log.end_time) {
+                                const start = new Date(log.start_time);
+                                const end = new Date(log.end_time);
+                                const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                                const workers = (log.user_ids || []).length || 1;
+                                laborHours += hours * workers;
+                            }
+                        });
+                        laborCost = Math.round(laborHours * avgHourlyRate * 100) / 100;
+                    }
                 }
 
-                // Fuel cost — flat 0.5 €/km × roundtrip (Gubin ↔ client)
+                // ── FUEL COST: auto-calculate distance from postal code if missing ──
                 const instCosts = contractData?.pricing?.installationCosts;
-                const travelDistance = instCosts?.travelDistance || 0;
+                let travelDistance = instCosts?.travelDistance || 0;
+
+                // Auto-calculate from installation client postal code
+                if (travelDistance === 0) {
+                    const clientData = inst.installation_data?.client || inst.client_snapshot;
+                    const postalCode = clientData?.postalCode || clientData?.postal_code || contractData?.client?.postalCode || '';
+                    if (postalCode) {
+                        const autoDistance = calculateDistanceFromGubin(postalCode);
+                        if (autoDistance && autoDistance > 0) {
+                            travelDistance = autoDistance;
+                        }
+                    }
+                }
+
                 const COST_PER_KM = 0.50; // EUR per km
+                const expectedDuration = Number(inst.expected_duration) || 1;
 
                 if (travelDistance > 0) {
-                    fuelCost = Math.round(travelDistance * 2 * COST_PER_KM * 100) / 100;
+                    // Multi-day with hotel: only 1 roundtrip fuel
+                    // Single day or no hotel: 1 roundtrip per day
+                    const trips = (expectedDuration > 1 && hotelCost > 0) ? 1 : expectedDuration;
+                    fuelCost = Math.round(travelDistance * 2 * trips * COST_PER_KM * 100) / 100;
                 }
             }
         }
@@ -1169,7 +1214,6 @@ export const ContractService = {
                 const rate = creatorProfile?.commission_rate ? Number(creatorProfile.commission_rate) : 0;
                 if (rate > 0) {
                     calculatedCommission = Math.round(totalPrice * rate * 100) / 100;
-                    console.log(`[Commission] Manual contract auto-calculated: ${calculatedCommission}€ (${rate * 100}% of ${totalPrice}€)`);
                 }
             } catch (err) {
                 console.error('[Commission] Failed to calculate for manual contract:', err);

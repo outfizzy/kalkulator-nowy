@@ -255,7 +255,6 @@ export const PricingService = {
         // We look for a table that explicitly matches the tags.
         const normalizedConstruct = criteria.constructionType === 'free' ? 'freestanding' : 'wall';
 
-        console.log(`🔎 [Pricing] Explicit Table Lookup: ${criteria.modelFamily} / Zone ${criteria.zone} / ${normalizedConstruct} / ${criteria.coverType}`);
 
         try {
             const { data: explicitTables } = await supabase
@@ -271,7 +270,6 @@ export const PricingService = {
                 // A. Exact Match (e.g. 'glass_opal')
                 const exactCover = explicitTables.find(t => t.cover_type?.toLowerCase() === criteria.coverType.toLowerCase());
                 if (exactCover) {
-                    console.log(`✅ Explicit Match Found: ${exactCover.name}`);
                     return exactCover as any as PriceTable;
                 }
 
@@ -279,14 +277,12 @@ export const PricingService = {
                 if (criteria.coverType.includes('glass')) {
                     const genericGlass = explicitTables.find(t => t.cover_type?.toLowerCase() === 'glass');
                     if (genericGlass) {
-                        console.log(`✅ Explicit Generic Match Found (Glass): ${genericGlass.name}`);
                         return genericGlass as any as PriceTable;
                     }
                 }
                 if (criteria.coverType.includes('poly')) {
                     const genericPoly = explicitTables.find(t => t.cover_type?.toLowerCase() === 'polycarbonate');
                     if (genericPoly) {
-                        console.log(`✅ Explicit Generic Match Found (Poly): ${genericPoly.name}`);
                         return genericPoly as any as PriceTable;
                     }
                 }
@@ -370,7 +366,6 @@ export const PricingService = {
         });
 
         if (bestMatch) {
-            console.log(`✅ Heuristic Match: ${bestMatch.name} (Score: ${bestScore})`);
         }
 
         return bestMatch as PriceTable | null;
@@ -388,7 +383,6 @@ export const PricingService = {
         depth: number;
         splitPoint?: number; // Custom split position in mm (e.g., 5000 = segment1: 5000mm, segment2: width-5000mm)
     }): Promise<{ price: number, variant_note?: string, properties?: { matchedWidth: number; matchedProjection: number; posts_count?: number; fields_count?: number, constructionType?: string; splitSegments?: { width: number; price: number }[] } } | null> {
-        console.log('🔍 Pricing Lookup:', criteria);
 
         // 0. NEW STRATEGY: Explicit Price Table Lookup (Matrix)
         // Try to find a specific Price Table matching these criteria first
@@ -404,7 +398,6 @@ export const PricingService = {
         });
 
         if (matchedTable && matchedTable.type === 'matrix') {
-            console.log(`💎 Found Explicit Matrix Table: "${matchedTable.name}" (ID: ${matchedTable.id})`);
 
             // Query Matrix Entries
             const { data: matrixEntry } = await supabase
@@ -419,7 +412,6 @@ export const PricingService = {
                 .maybeSingle();
 
             if (matrixEntry) {
-                console.log('✅ Matrix Price Found:', matrixEntry.price);
                 return {
                     price: matrixEntry.price,
                     variant_note: `Matrix: ${matchedTable.name}`,
@@ -460,7 +452,6 @@ export const PricingService = {
         const { data: exactData } = await exactQuery.maybeSingle();
 
         if (exactData) {
-            console.log('✅ Exact Price Found (Legacy):', exactData.price_upe_net_eur);
             return {
                 price: exactData.price_upe_net_eur,
                 variant_note: exactData.variant_note,
@@ -496,7 +487,6 @@ export const PricingService = {
             .maybeSingle();
 
         if (smartData) {
-            console.log(`✅ Smart Match Found: Requested ${criteria.width}x${criteria.depth} -> Used ${smartData.width_mm}x${smartData.depth_mm}`);
             return {
                 price: smartData.price_upe_net_eur,
                 variant_note: smartData.variant_note,
@@ -514,7 +504,6 @@ export const PricingService = {
         if (criteria.splitPoint && criteria.splitPoint > 0 && criteria.splitPoint < criteria.width) {
             const seg1Width = criteria.splitPoint;
             const seg2Width = criteria.width - criteria.splitPoint;
-            console.log(`✂️ Custom Split Point: ${seg1Width}mm + ${seg2Width}mm (total: ${criteria.width}mm)`);
 
             const [seg1Price, seg2Price] = await Promise.all([
                 this.findBasePrice({ ...criteria, width: seg1Width, splitPoint: undefined }),
@@ -597,7 +586,6 @@ export const PricingService = {
             const remainingW = criteria.width - maxW;
 
             if (remainingW > 0) {
-                console.log(`⚠️ Oversized Width ${criteria.width}mm. Splitting into ${maxW}mm + ${remainingW}mm.`);
 
                 // Recurse for the remainder
                 // Note: We use the SAME depth requirements for the remainder
@@ -725,7 +713,6 @@ export const PricingService = {
                 // Merge strategies:
                 // 1. If table has rules, they OVERWRITE product definition rules.
                 // 2. Other config keys are also overwritten.
-                console.log('✅ Found Configuration in Price Table (Applying Overlay)');
 
                 // Special handling for freestanding_surcharge_rules to ensure we don't just merge objects but replace arrays if present
                 const tableRules = tableData.configuration.freestanding_surcharge_rules;
@@ -737,7 +724,6 @@ export const PricingService = {
                 // Usually table config is the source of truth if it exists.
                 if (tableRules) {
                     productConfig.freestanding_surcharge_rules = tableRules;
-                    console.log(`⚡ Updated Freestanding Rules from Import (${tableRules.length} rules)`);
                 }
             } else if (defData?.id) {
                 // Fallback (Id-based lookup if Code match failed or ambiguous)
@@ -750,7 +736,6 @@ export const PricingService = {
                     .maybeSingle();
 
                 if (simpleTable?.configuration) {
-                    console.log('✅ Found Configuration in Price Table via ID (Fallback)');
                     productConfig = { ...productConfig, ...simpleTable.configuration };
                 }
             }
@@ -765,7 +750,6 @@ export const PricingService = {
         let priceResult = null;
 
         if (useAdditiveLogic) {
-            console.log('⚡ Force Additive Logic for Freestanding (Configured)');
             priceResult = await this.findBasePrice({
                 modelFamily: product.modelId,
                 constructionType: 'wall', // Force Wall Lookup
@@ -820,8 +804,6 @@ export const PricingService = {
             }
         }
         if (shouldApplySurcharge) {
-            if (!useAdditiveLogic && !isUniversalTable) console.log('⚠️ Freestanding base price not found. Attempting Wall Base + Surcharge fallback.');
-            if (isUniversalTable) console.log('⚡ Universal Table used for Freestanding. Applying Surcharge.');
 
             // If we don't have a price yet (Fallback case), try fetching Wall price
 
@@ -843,13 +825,11 @@ export const PricingService = {
 
                 if (rules && Array.isArray(rules) && rules.length > 0) {
                     // 1. Use Inline Configuration Rules (STRICT PRIORITY)
-                    console.log('⚡ Using Configured Surcharge Rules');
                     const sorted = [...rules].sort((a: any, b: any) => a.max_width - b.max_width);
                     const match = sorted.find((r: any) => Number(r.max_width) >= product.width);
 
                     if (match) {
                         freestandingSurcharge = Number(match.price);
-                        console.log(`⚡ Surcharge Applied: ${freestandingSurcharge} EUR (Limit: ${match.max_width}mm)`);
                     } else {
                         // Extrapolation Logic (User request: "powinna być wyższa")
                         const maxRule = sorted[sorted.length - 1];
@@ -871,10 +851,8 @@ export const PricingService = {
                         const addedValue = excessWidth * slope;
 
                         freestandingSurcharge = Math.round((Number(maxRule.price) + addedValue) * 100) / 100;
-                        console.log(`⚡ Extrapolated Surcharge: ${freestandingSurcharge} EUR (Base: ${maxRule.price}, Added: ${addedValue.toFixed(2)})`);
                     }
                 } else {
-                    console.log('ℹ️ No freestanding rules found. Surcharge = 0.');
                     freestandingSurcharge = 0;
                 }
             }
@@ -1028,7 +1006,6 @@ export const PricingService = {
      * Used by ProductConfigurator to find "Next Size Up" locally or get exact match details.
      */
     async getPriceMatrix(modelId: string, attributes: Record<string, string>) {
-        console.log('Fetching Price Matrix for:', modelId, attributes);
         const zone = parseInt(attributes.snow_zone || '1');
         let constructionType = attributes.mounting === 'wall-mounted' ? 'wall' : (attributes.mounting || 'wall');
         if (constructionType === 'free') constructionType = 'freestanding';
@@ -1315,17 +1292,14 @@ export const PricingService = {
     },
 
     async getSurchargePrice(modelFamily: string, surchargeType: string, width: number, configOverride?: any): Promise<number> {
-        console.log(`💰 Surcharge Lookup: ${modelFamily} - ${surchargeType} (Width: ${width})`);
 
         // 0. Check Override (Propagated from Table Configuration)
         if (configOverride) {
             const rules = configOverride.free_standing_surcharge || configOverride.freestanding_surcharge_rules;
             if (surchargeType === 'freestanding' && rules && Array.isArray(rules) && rules.length > 0) {
-                console.log('⚡ Found Freestanding Rules in Table Config Override');
                 const sorted = [...rules].sort((a: any, b: any) => (a.width || a.max_width) - (b.width || b.max_width));
                 const match = sorted.find((r: any) => Number(r.width || r.max_width) >= width);
                 if (match) {
-                    console.log(`✅ Rule Matched (Override): ${match.price} EUR`);
                     return Number(match.price);
                 } else {
                     const maxRule = sorted[sorted.length - 1];
@@ -1346,7 +1320,6 @@ export const PricingService = {
             // Compatibility: Check both keys
             const rules = defData?.configuration?.free_standing_surcharge || defData?.configuration?.freestanding_surcharge_rules;
             if (rules && Array.isArray(rules) && rules.length > 0) {
-                console.log('⚡ Found Freestanding Rules in Global Configuration');
                 // SurchargeRulesModal saves as { width: number, price: number }
                 // Sort by width ascending
                 const sorted = [...rules].sort((a: any, b: any) => (a.width || a.max_width) - (b.width || b.max_width));
@@ -1355,7 +1328,6 @@ export const PricingService = {
                 const match = sorted.find((r: any) => Number(r.width || r.max_width) >= width);
 
                 if (match) {
-                    console.log(`✅ Rule Matched: ${match.price} EUR (Limit: ${match.width || match.max_width}mm)`);
                     return Number(match.price);
                 } else {
                     // Exceeds max rule - use largest
@@ -1378,7 +1350,6 @@ export const PricingService = {
             .maybeSingle();
 
         if (data) {
-            console.log(`✅ Surcharge Found (Legacy Table): ${data.price_eur} EUR (Matched Width: ${data.width_mm})`);
             return data.price_eur;
         }
 
@@ -1469,7 +1440,6 @@ export const PricingService = {
                         .maybeSingle();
 
                     if (latestTable) {
-                        console.log(`🔄 Dynamic Addon Pricing: "switched" table for ${addon.addon_name} -> ${latestTable.name} (${latestTable.id})`);
                         tableId = latestTable.id;
                     }
                 } catch (err) {
@@ -1497,7 +1467,6 @@ export const PricingService = {
                 .maybeSingle();
 
             if (matrixEntry) {
-                console.log(`✅ Addon Matrix Match (New Schema): ${addon.addon_name} -> ${matrixEntry.price} (Size: ${matrixEntry.width_mm}x${matrixEntry.projection_mm})`);
                 return matrixEntry.price;
             }
 
@@ -1523,7 +1492,6 @@ export const PricingService = {
                     // Sort by size (area or width then depth)
                     applicable.sort((a: any, b: any) => (a.width_mm * a.depth_mm) - (b.width_mm * b.depth_mm));
                     const match = applicable[0];
-                    console.log(`✅ Addon Matrix Match (Legacy): ${addon.addon_name} -> ${match.price_upe_net_eur} (Size: ${match.width_mm}x${match.depth_mm})`);
                     return Number(match.price_upe_net_eur);
                 } else {
                     console.warn(`⚠️ No Matrix match for ${addon.addon_name} (Req: ${width}x${depth}) - Largest available?`);

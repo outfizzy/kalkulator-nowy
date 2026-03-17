@@ -765,9 +765,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         if (currentUser && status !== 'new' && !lead?.assignedTo) {
             updates.assignedTo = currentUser.id;
             toast.success('Przejąłeś opiekę nad tym leadem');
-            console.log(`[Kanban] Lead ${leadId}: Auto-assigned to ${currentUser.id} (${currentUser.firstName} ${currentUser.lastName})`);
         } else if (lead?.assignedTo) {
-            console.log(`[Kanban] Lead ${leadId}: Keeping existing assignee ${lead.assignedTo} (status → ${status})`);
         }
 
         try {

@@ -146,7 +146,6 @@ export const PergolaModel: React.FC<PergolaModelProps> = ({ config }) => {
 
     const zipAddons = addons.filter(a => a.type === 'zipScreen');
 
-    console.log('PergolaModel render:', { width, depth, height, config });
 
     return (
         <group>

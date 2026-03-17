@@ -98,11 +98,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                 contractNumber: undefined
             };
 
-            console.log('Attempting to create transaction:', transactionData);
 
             const result = await DatabaseService.createWalletTransaction(transactionData);
 
-            console.log('Transaction created successfully:', result);
 
             toast.success('Transakcja dodana pomyślnie');
             onSuccess();

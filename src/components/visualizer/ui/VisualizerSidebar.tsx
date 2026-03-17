@@ -169,7 +169,6 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                                 );
 
                                                 if (product?.configuration?.visualizer) {
-                                                    // console.log('Applying Specs:', product.configuration.visualizer);
                                                     updateConfig('productSpecs', product.configuration.visualizer);
                                                 } else {
                                                     // Reset if no specific specs found (or handle defaults)

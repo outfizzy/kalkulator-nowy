@@ -7,12 +7,8 @@ import { normalizePhone } from '../../utils/phone';
 
 export const LeadService = {
     async createLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
-        // Debug: Log supabase instance status
-        console.log('LeadService.createLead: Checking auth', {
-            supabaseDefined: !!supabase,
-            authDefined: !!supabase?.auth,
-            url: import.meta.env.VITE_SUPABASE_URL ? 'DEFINED' : 'MISSING'
-        });
+
+
 
         if (!supabase) throw new Error('Supabase Client is undefined in LeadService');
         if (!supabase.auth) throw new Error('Supabase Auth is undefined in LeadService');
@@ -155,7 +151,6 @@ export const LeadService = {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     dbUpdates.assigned_to = user.id;
-                    console.log(`[LeadService] Lead ${id}: Auto-assigned to ${user.id} (status ${currentLead.status} → ${updates.status})`);
                 }
             }
         }
@@ -166,7 +161,6 @@ export const LeadService = {
                 // Only allow clearing assignment when moving to 'new' status
                 if (updates.status === 'new') {
                     dbUpdates.assigned_to = null;
-                    console.log(`[LeadService] Lead ${id}: Clearing assigned_to (status → 'new')`);
                 } else {
                     // Check current lead state before clearing
                     const { data: currentLead } = await supabase
@@ -184,12 +178,10 @@ export const LeadService = {
                         // Do NOT set assigned_to = null — keep existing assignment
                     } else {
                         dbUpdates.assigned_to = null;
-                        console.log(`[LeadService] Lead ${id}: assigned_to already null, no change needed`);
                     }
                 }
             } else {
                 dbUpdates.assigned_to = updates.assignedTo;
-                console.log(`[LeadService] Lead ${id}: Setting assigned_to = ${updates.assignedTo}`);
             }
         }
 
@@ -221,7 +213,6 @@ export const LeadService = {
                     if (custError) {
                         console.error('Failed to sync Customer Representative ownership:', custError);
                     } else {
-                        console.log(`Ownership Synced: Customer ${leadData.customer_id} is now assigned to ${updates.assignedTo}`);
 
                         // --- Phase 3: Automation (Welcome Email) ---
                         // Trigger only if we have customer data and a new specific assignee
@@ -275,7 +266,6 @@ export const LeadService = {
                         if (custUpdateError) {
                             console.error('[LeadService] Failed to sync customer data:', custUpdateError);
                         } else {
-                            console.log(`[LeadService] Customer ${leadData.customer_id} synced with lead ${id} data`);
                         }
                     }
                 }
@@ -650,7 +640,6 @@ export const LeadService = {
                 .single();
 
             if (!userProfile || !customer || !customer.email) {
-                console.log('Skipping Welcome Email: Missing user or customer email.');
                 return;
             }
 
@@ -681,7 +670,6 @@ export const LeadService = {
             });
 
             if (error) throw error;
-            console.log(`Welcome Email sent to ${customer.email}`);
 
         } catch (err) {
             console.error('Failed to send Welcome Email:', err);

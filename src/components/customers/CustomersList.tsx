@@ -28,7 +28,6 @@ export const CustomersList: React.FC = () => {
     const loadCustomers = async () => {
         setLoading(true);
         try {
-            console.log('Fetching customers, contracts, and offers...');
             const [rawCustomers, rawContracts, rawOffers] = await Promise.all([
                 DatabaseService.getCustomers(),
                 DatabaseService.getContracts(),

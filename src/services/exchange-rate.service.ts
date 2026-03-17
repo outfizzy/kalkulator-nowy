@@ -38,7 +38,6 @@ export async function getEurPlnRate(): Promise<number> {
         if (typeof rate === 'number' && rate > 0) {
             cachedRate = rate;
             cachedAt = now;
-            console.log(`[ExchangeRate] NBP EUR/PLN: ${rate}`);
             return rate;
         }
 

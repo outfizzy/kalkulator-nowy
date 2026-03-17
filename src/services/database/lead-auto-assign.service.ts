@@ -93,7 +93,6 @@ export const LeadAutoAssignService = {
 
             const best = scored[0];
             const repName = reps.find(r => r.id === best.id)?.full_name || 'Unknown';
-            console.log(`[AutoAssign] Best rep for PLZ ${plzPrefix || '?'}: ${repName} (PLZ score: ${best.plzScore}, workload: ${best.workload})`);
 
             return best.id;
         } catch (err) {
@@ -151,7 +150,6 @@ export const LeadAutoAssignService = {
                 });
             } catch { /* notification failure is non-critical */ }
 
-            console.log(`[AutoAssign] Lead ${leadId} assigned to ${bestRep}`);
             return bestRep;
         } catch (err) {
             console.error('[AutoAssign] Error:', err);
