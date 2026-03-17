@@ -170,10 +170,13 @@ export const LiveCostWidget: React.FC = () => {
             setMonthlyInstallerCost(monthTotal);
 
             // Sales reps with base salaries
-            const { data: repsData } = await supabase
+            const { data: repsData, error: repsError } = await supabase
                 .from('profiles')
-                .select('id, first_name, last_name, role, base_salary, base_salary_currency')
-                .in('role', ['sales_rep', 'manager']);
+                .select('id, first_name, last_name, role, base_salary, base_salary_currency, status')
+                .in('role', ['sales_rep', 'manager', 'admin'])
+                .eq('status', 'active');
+            
+            console.log('[LiveCostWidget] Sales reps query:', { repsData, repsError, count: repsData?.length });
 
             // Count total workdays in current month
             const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
