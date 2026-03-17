@@ -723,17 +723,30 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     const gross = offer.pricing?.sellingPriceGross || (net + vat);
 
     if (discount > 0) {
-        doc.setTextColor(...THEME.textLight);
+        // Strikethrough effect — Listenpreis with dimmed color
+        doc.setTextColor(180, 180, 180);
         doc.text('Listenpreis (Netto):', totalBoxX, ty + 5);
         doc.text(formatCurrency(preDiscount), pageWidth - MARGIN, ty + 5, { align: 'right' });
+        // Draw strikethrough line
+        const priceTextWidth = doc.getTextWidth(formatCurrency(preDiscount));
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.line(pageWidth - MARGIN - priceTextWidth, ty + 4, pageWidth - MARGIN, ty + 4);
         ty += 6;
 
-        doc.setTextColor(...THEME.secondary);
-        doc.text(`Ihr Vorteil (-${offer.pricing?.discountPercentage}%):`, totalBoxX, ty + 5);
-        doc.text(`- ${formatCurrency(discount)}`, pageWidth - MARGIN, ty + 5, { align: 'right' });
+        // Sonderrabatt label — green color for positive association
+        const discountLabel = offer.pricing?.discountPercentage
+            ? `Sonderrabatt (−${offer.pricing.discountPercentage}%):`
+            : 'Sonderrabatt:';
+        doc.setTextColor(22, 163, 74); // green-600
+        doc.setFont(FONTS.bold, 'bold');
+        doc.text(discountLabel, totalBoxX, ty + 5);
+        doc.text(`− ${formatCurrency(discount)}`, pageWidth - MARGIN, ty + 5, { align: 'right' });
+        doc.setFont(FONTS.normal, 'normal');
         ty += 8;
 
         doc.setDrawColor(...THEME.line);
+        doc.setLineWidth(0.1);
         doc.line(totalBoxX, ty, pageWidth - MARGIN, ty);
         ty += 2;
     }

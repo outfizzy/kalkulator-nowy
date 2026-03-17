@@ -529,20 +529,32 @@ export const OfferPrintView: React.FC = () => {
                                         {/* Calculation */}
                                         <div>
                                             <div className="space-y-2 text-sm mb-6">
-                                                <div className="flex justify-between text-slate-500">
-                                                    <span>Zwischensumme:</span>
-                                                    <span>{formatCurrency(preDiscount)}</span>
-                                                </div>
-                                                {discount > 0 && (
-                                                    <div className="flex justify-between text-[#d63031]">
-                                                        <span>Aktionsrabatt:</span>
-                                                        <span>- {formatCurrency(discount)}</span>
+                                                {discount > 0 ? (
+                                                    <>
+                                                        <div className="flex justify-between text-slate-400">
+                                                            <span>Listenpreis (netto):</span>
+                                                            <span className="line-through">{formatCurrency(preDiscount)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-green-600 font-bold bg-green-50 rounded px-2 py-1 print:bg-green-50">
+                                                            <span className="flex items-center gap-1">
+                                                                🏷️ {offer.pricing?.discountPercentage
+                                                                    ? `Sonderrabatt (−${offer.pricing.discountPercentage}%):`
+                                                                    : 'Sonderrabatt:'
+                                                                }
+                                                            </span>
+                                                            <span>− {formatCurrency(discount)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between font-bold text-slate-900 pt-3 border-t border-slate-200 mt-2">
+                                                            <span>Ihr Preis (netto):</span>
+                                                            <span>{formatCurrency(net)}</span>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex justify-between font-bold text-slate-900 pt-3 border-t border-slate-200 mt-2">
+                                                        <span>Netto:</span>
+                                                        <span>{formatCurrency(net)}</span>
                                                     </div>
                                                 )}
-                                                <div className="flex justify-between font-bold text-slate-900 pt-3 border-t border-slate-200 mt-2">
-                                                    <span>Netto:</span>
-                                                    <span>{formatCurrency(net)}</span>
-                                                </div>
                                                 <div className="flex justify-between text-slate-500 text-xs">
                                                     <span>+ 19% MwSt.:</span>
                                                     <span>{formatCurrency(vat)}</span>
