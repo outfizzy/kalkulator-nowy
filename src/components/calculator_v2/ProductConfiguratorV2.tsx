@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/translations';
 import { PricingService } from '../../services/pricing.service';
+import { ConfiguratorService, type LeadConfiguration } from '../../services/database/configurator.service';
 import { toast } from 'react-hot-toast';
 import { WallVisualizer } from './WallVisualizer';
 import { DatabaseService } from '../../services/database';
 import { LeadService } from '../../services/database/lead.service';
+import { SendEmailModal } from '../leads/SendEmailModal';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Customer, Lead, Offer } from '../../types';
 import { generateOfferPDF, generateOfferPDFBase64 } from '../../utils/offerPDF';
@@ -60,6 +62,8 @@ const ROOF_MODELS: RoofModel[] = [
     { id: 'Ultraline', name: 'Ultrastyle', description: 'Premium 100mm • nur Glas', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
     { id: 'Skyline', name: 'Skystyle', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
     { id: 'Carport', name: 'Carport', description: 'Carport mit Stahlblech', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
+    { id: 'Pergola', name: 'Pergola', description: 'Bioklimatische Pergola mit Lamellen', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola.jpg' },
+    { id: 'Pergola Deluxe', name: 'Pergola Deluxe', description: 'Premium Pergola mit Lamellen', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-deluxe.jpg' },
 ];
 
 // Glass variant options
@@ -322,6 +326,12 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === VIEW STATE ===
     const [view, setView] = useState<ViewState>('customer');
     const [customerState, setCustomerState] = useState<Customer | null>(null);
+    const linkedLeadIdRef = useRef<string | null>(null);
+    const location = useLocation();
+    const [leadNotes, setLeadNotes] = useState<string>('');
+    const [leadCustomerData, setLeadCustomerData] = useState<any>(null);
+    const [leadConfig, setLeadConfig] = useState<LeadConfiguration | null>(null);
+    const [contextOpen, setContextOpen] = useState(true);
 
     // === ROOF CONFIG ===
     const [model, setModel] = useState<string>('Trendline');
@@ -479,17 +489,10 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [savingOffer, setSavingOffer] = useState(false);
     const [savedOfferId, setSavedOfferId] = useState<string | null>(null);
     const [savedOffer, setSavedOffer] = useState<Offer | null>(null); // Store full offer for PDF
+    const savedOfferRef = useRef<Offer | null>(null); // Ref for immediate access (bypasses React batching)
     const [publicLink, setPublicLink] = useState<string | null>(null);
-    // Email Workflow State
-    const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
-    const [emailBody, setEmailBody] = useState('');
-    const [showEmailModal, setShowEmailModal] = useState(false);
-    const [emailSubject, setEmailSubject] = useState('');
-    const [emailSender, setEmailSender] = useState<string>('buero'); // 'buero' or mailbox id
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
-    const [attachPDF, setAttachPDF] = useState(true);
-    const [emailPreviewMode, setEmailPreviewMode] = useState(false);
-    const [userMailboxes, setUserMailboxes] = useState<Array<{ id: string; name: string; smtp_host: string; smtp_port: number; smtp_user: string; smtp_password: string }>>([]);
+    // Email Workflow State — uses proven SendEmailModal from leads
+    const [showSendEmailModal, setShowSendEmailModal] = useState(false);
 
     // === CUSTOM ITEMS (Manual Positions) ===
     const [customItems, setCustomItems] = useState<{ id: string; name: string; price: number }[]>([]);
@@ -499,6 +502,9 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === MANUAL OFFER MODE ===
     const [isManualMode, setIsManualMode] = useState(false);
     const [manualModel, setManualModel] = useState<string>('Trendline');
+    const [manualWidth, setManualWidth] = useState<string>('');
+    const [manualDepth, setManualDepth] = useState<string>('');
+    const [manualInstallationCost, setManualInstallationCost] = useState<string>('');
 
     // === MONTAGE (INSTALLATION) ===
     const [montagePrice, setMontagePrice] = useState<number>(0);
@@ -544,6 +550,40 @@ export const ProductConfiguratorV2: React.FC = () => {
         }
     }, [model, construction, projection, width, dachH3, dachH1, dachOverhang, modelDrConfig, structuralMetadata, extraPosts]);
 
+    // === PRE-FILL FROM LEAD (Navigation State) ===
+    useEffect(() => {
+        const navState = location.state as { customer?: any; leadId?: string; leadNotes?: string; leadCustomerData?: any } | null;
+        if (navState?.customer) {
+            const c = navState.customer;
+            setCustomerState({
+                firstName: c.firstName || '',
+                lastName: c.lastName || '',
+                email: c.email || '',
+                phone: c.phone || '',
+                companyName: c.companyName || '',
+                postalCode: c.postalCode || '',
+                city: c.city || '',
+                street: c.street || '',
+                houseNumber: c.houseNumber || '',
+                salutation: c.salutation || 'Herr',
+            } as Customer);
+            // Auto-skip customer form when coming from a lead
+            setView('config');
+            console.log('📋 Pre-filled customer from lead — skipping to configurator');
+        }
+        if (navState?.leadId) {
+            linkedLeadIdRef.current = navState.leadId;
+            console.log('🔗 Linked to lead:', navState.leadId);
+            // Load configurator form data
+            ConfiguratorService.getByLeadId(navState.leadId).then(configs => {
+                const completed = configs.find(c => c.status === 'completed') || configs[0];
+                if (completed) setLeadConfig(completed);
+            }).catch(console.error);
+        }
+        if (navState?.leadNotes) setLeadNotes(navState.leadNotes);
+        if (navState?.leadCustomerData) setLeadCustomerData(navState.leadCustomerData);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Auto-fill wall dimensions from Dachrechner when product changes
     useEffect(() => {
         if (!wallDimsAuto || !dachrechnerResults) return;
@@ -579,27 +619,7 @@ export const ProductConfiguratorV2: React.FC = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
 
-    // === FETCH USER MAILBOXES ===
-    useEffect(() => {
-        const fetchMailboxes = async () => {
-            if (!currentUser) return;
-            try {
-                const { data } = await supabase
-                    .from('mailbox_users')
-                    .select('mailbox_id, mailboxes(id, name, smtp_host, smtp_port, smtp_user, smtp_password)')
-                    .eq('user_id', currentUser.id);
-                if (data) {
-                    const boxes = data
-                        .map((mu: any) => mu.mailboxes)
-                        .filter(Boolean);
-                    setUserMailboxes(boxes);
-                }
-            } catch (e) {
-                console.error('Failed to fetch mailboxes:', e);
-            }
-        };
-        fetchMailboxes();
-    }, [currentUser]);
+    // Mailbox fetching is handled by SendEmailModal via currentUser.mailboxes
 
     // === AUTO-SWITCH COVER TYPE FOR GLASS-ONLY OR SPECIAL MODELS ===
     useEffect(() => {
@@ -1571,24 +1591,24 @@ export const ProductConfiguratorV2: React.FC = () => {
     const finalPrice = priceAfterDiscount + montagePrice;
 
     // === SAVE OFFER HANDLER ===
-    const handleSaveOffer = async () => {
+    const handleSaveOffer = async (): Promise<Offer | null> => {
         if (!currentUser) {
             toast.error('Bitte einloggen');
-            return;
+            return null;
         }
         // In manual mode, check customItems instead of basket
         if (!isManualMode && basket.length === 0) {
             toast.error('Keine Positionen vorhanden');
-            return;
+            return null;
         }
         if (isManualMode && customItems.length === 0) {
             toast.error('Bitte mindestens eine Position hinzufügen');
-            return;
+            return null;
         }
         // Validation using customerState
         if (!customerState || (!customerState.name && !customerState.lastName)) {
             toast.error('Kundendaten fehlen');
-            return;
+            return null;
         }
 
         setSavingOffer(true);
@@ -1611,15 +1631,53 @@ export const ProductConfiguratorV2: React.FC = () => {
                 salutation: customerState.salutation || 'Herr'
             };
 
-            // 2. Reuse existing lead or create new one
+            // 2. Reuse existing lead or create new one (NEVER duplicate)
             let lead: any;
-            if (customerState.id) {
+
+            // If we came from a lead page, use that lead directly
+            if (linkedLeadIdRef.current) {
+                const { data: linkedLead } = await supabase
+                    .from('leads')
+                    .select('*')
+                    .eq('id', linkedLeadIdRef.current)
+                    .single();
+                if (linkedLead) {
+                    lead = linkedLead;
+                    console.log('🔗 Using linked lead from navigation:', lead.id);
+                    if (lead.status !== 'won' && lead.status !== 'lost') {
+                        await LeadService.updateLead(lead.id, { status: 'offer_sent' as any });
+                    }
+                }
+            }
+
+            if (!lead && customerState.id) {
                 // Customer already exists — check for existing lead
                 const existingLeads = await LeadService.getCustomerLeads(customerState.id);
                 if (existingLeads && existingLeads.length > 0) {
-                    // Reuse the most recent lead
+                    // Reuse the most recent lead — just update its status
                     lead = existingLeads[0];
                     console.log('♻️ Reusing existing lead:', lead.id);
+                    // Update lead status to offer_sent if it's not already won/lost
+                    if (lead.status !== 'won' && lead.status !== 'lost') {
+                        await LeadService.updateLead(lead.id, { status: 'offer_sent' as any });
+                        console.log('📝 Updated lead status to offer_sent');
+                    }
+                }
+            }
+            // Also search by email/phone if no lead found yet (de-duplication)
+            if (!lead && customerData.email) {
+                const { data: emailLeads } = await supabase
+                    .from('leads')
+                    .select('*')
+                    .contains('customer_data', { email: customerData.email })
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                if (emailLeads && emailLeads.length > 0) {
+                    lead = emailLeads[0];
+                    console.log('♻️ Found existing lead by email:', lead.id);
+                    if (lead.status !== 'won' && lead.status !== 'lost') {
+                        await LeadService.updateLead(lead.id, { status: 'offer_sent' as any });
+                    }
                 }
             }
             if (!lead) {
@@ -1640,8 +1698,8 @@ export const ProductConfiguratorV2: React.FC = () => {
             const productConfig = {
                 modelId: selectedModel,
                 isManual: isManualMode,
-                width: isManualMode ? 0 : width,
-                projection: isManualMode ? 0 : projection,
+                width: isManualMode ? (parseInt(manualWidth) || 0) : width,
+                projection: isManualMode ? (parseInt(manualDepth) || 0) : projection,
                 roofType: isManualMode ? 'manual' as any : cover.toLowerCase() as any,
                 construction: isManualMode ? 'wall' as any : construction,
                 color: isManualMode ? '' : color,
@@ -1683,6 +1741,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             };
 
             // 4. Build pricing object
+            const manualInstallation = isManualMode ? (parseFloat(manualInstallationCost) || 0) : 0;
             const pricing = {
                 basePrice: basketTotal, // Base sum of basket components
                 addonsPrice: 0,
@@ -1693,7 +1752,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                 discountValue: discountValue,
                 sellingPriceNet: finalPrice,
                 sellingPriceGross: finalPrice * 1.19, // 19% VAT
-                totalCost: finalPrice * 1.19
+                totalCost: finalPrice * 1.19,
+                installationCosts: manualInstallation > 0 ? {
+                    totalInstallation: manualInstallation,
+                    installationBase: manualInstallation,
+                    transportCost: 0
+                } : (isManualMode ? undefined : undefined)
             };
 
             // 5. Create Offer
@@ -1715,15 +1779,14 @@ export const ProductConfiguratorV2: React.FC = () => {
             setPublicLink(link);
             setSavedOfferId(offer.id);
             setSavedOffer(offer); // Store full offer for PDF generation
+            savedOfferRef.current = offer; // Immediately available (no React batching delay)
 
             toast.success('Oferta zapisana!');
-
-            // Stay on summary to show link, or navigate
-            // For now, show success state on summary
-
+            return offer;
         } catch (e: any) {
             console.error('Save offer error:', e);
             toast.error(e.message || 'Fehler beim Speichern');
+            return null;
         } finally {
             setSavingOffer(false);
         }
@@ -1747,68 +1810,9 @@ export const ProductConfiguratorV2: React.FC = () => {
             setCustomItems(customItems.filter(item => item.id !== id));
         };
 
-        const handleGenerateEmail = async () => {
-            console.log('[EMAIL] handleGenerateEmail called', { currentUser: !!currentUser, savedOffer: !!savedOffer });
-            if (!currentUser) {
-                toast.error('Nicht angemeldet — bitte erneut einloggen');
-                return;
-            }
-            // Auto-save the offer if not yet saved
-            if (!savedOffer) {
-                console.log('[EMAIL] No saved offer — auto-saving first...');
-                try {
-                    await handleSaveOffer();
-                } catch (saveErr) {
-                    console.error('[EMAIL] Auto-save failed:', saveErr);
-                    toast.error('Angebot konnte nicht gespeichert werden');
-                    return;
-                }
-                // After save, savedOffer should be set. Wait a tick for state update.
-                await new Promise(r => setTimeout(r, 100));
-            }
-            setIsGeneratingEmail(true);
-            try {
-                const lastName = customerState?.lastName || customerState?.name || '';
-                const firstName = customerState?.firstName || '';
-                const salutation = lastName
-                    ? `Sehr geehrte/r ${customerState?.salutation === 'Frau' ? 'Frau' : 'Herr'} ${lastName}`
-                    : `Sehr geehrte Damen und Herren`;
-                const modelLabel = ROOF_MODELS.find(m => m.id === model)?.name || model;
-                const dims = `${width} mm × ${projection} mm`;
-                const offerNr = savedOffer?.offerNumber || savedOfferId || '';
-                const repName = currentUser?.firstName
-                    ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
-                    : 'PolenDach24 Team';
 
-                const body = `${salutation},
 
-vielen Dank für Ihr Interesse an unseren hochwertigen Terrassenüberdachungen.
-
-Anbei erhalten Sie Ihr individuelles Angebot${offerNr ? ` Nr. ${offerNr}` : ''} für das Modell ${modelLabel} in den Maßen ${dims}.
-
-${publicLink ? `Ihr persönliches Angebot finden Sie hier:\n${publicLink}\n` : ''}Wir sind überzeugt, dass diese Lösung Ihren Außenbereich optimal aufwertet und Ihnen viele Jahre Freude bereiten wird.
-
-Sollten Sie Fragen haben oder eine persönliche Beratung wünschen, stehe ich Ihnen jederzeit gerne zur Verfügung.
-
-Mit freundlichen Grüßen
-
-${repName}
-Polendach24
-Tel: +49 176 47453883
-E-Mail: buero@polendach24.de`;
-
-                setEmailBody(body);
-                setEmailSubject(`Angebot ${offerNr} — Terrassenüberdachung ${modelLabel}`);
-                setShowEmailModal(true);
-                console.log('[EMAIL] Modal opened successfully');
-            } catch (error) {
-                console.error('[EMAIL] Generation FAILED:', error);
-                toast.error('Fehler beim Generieren der E-Mail');
-            } finally {
-                setIsGeneratingEmail(false);
-            }
-        };
-
+        // buildPDFData is only used for PDF download now
         const buildPDFData = () => {
             const positions = [
                 ...basket.map(b => ({
@@ -1871,100 +1875,7 @@ E-Mail: buero@polendach24.de`;
             };
         };
 
-        const handleSendOfferEmail = async () => {
-            console.log('[EMAIL] handleSendOfferEmail called');
-            const toEmail = customerState?.email;
-            if (!toEmail) { toast.error('Keine E-Mail-Adresse des Kunden'); return; }
-            setIsSendingEmail(true);
-            try {
-                // Build PDF
-                let pdfAttachment: { filename: string; content: string; contentType: string } | undefined;
-                if (attachPDF) {
-                    console.log('[EMAIL] Generating PDF attachment...');
-                    const pdfData = buildPDFData();
-                    const { base64, filename } = generateOfferPDFBase64(pdfData);
-                    pdfAttachment = { filename, content: base64, contentType: 'application/pdf' };
-                    console.log('[EMAIL] PDF ready:', filename, 'base64 length:', base64.length);
-                }
 
-                // Determine SMTP config — always fetch from DB mailboxes
-                let smtpConfig: any = undefined;
-                let fromName = 'Polendach24';
-                if (emailSender === 'buero') {
-                    // Fetch buero mailbox SMTP from DB
-                    const { data: bueroBox } = await supabase
-                        .from('mailboxes')
-                        .select('smtp_host, smtp_port, smtp_user, smtp_password')
-                        .eq('smtp_user', 'buero@polendach24.de')
-                        .limit(1)
-                        .single();
-                    if (bueroBox) {
-                        smtpConfig = {
-                            smtpHost: bueroBox.smtp_host,
-                            smtpPort: bueroBox.smtp_port,
-                            smtpUser: bueroBox.smtp_user,
-                            smtpPassword: bueroBox.smtp_password
-                        };
-                    }
-                } else {
-                    const box = userMailboxes.find(m => m.id === emailSender);
-                    if (box) {
-                        smtpConfig = {
-                            smtpHost: box.smtp_host,
-                            smtpPort: box.smtp_port,
-                            smtpUser: box.smtp_user,
-                            smtpPassword: box.smtp_password
-                        };
-                        fromName = currentUser?.firstName
-                            ? `${currentUser.firstName} ${currentUser.lastName || ''} — Polendach24`.trim()
-                            : box.name;
-                    }
-                }
-                console.log('[EMAIL] SMTP config resolved:', { emailSender, hasConfig: !!smtpConfig, host: smtpConfig?.smtpHost, user: smtpConfig?.smtpUser });
-
-                // Call edge function
-                // Convert plain text body to styled HTML email
-                const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px">
-${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="margin:0 0 8px 0">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('\n')}
-<hr style="border:none;border-top:1px solid #ddd;margin:24px 0 12px"/>
-<p style="font-size:11px;color:#999">Polendach24 — Terrassenüberdachungen &amp; Carports<br/>buero@polendach24.de | +49 176 47453883</p>
-</body></html>`;
-
-                console.log('[EMAIL] Calling edge function send-email...', { to: toEmail, hasConfig: !!smtpConfig, hasAttachments: !!pdfAttachment });
-                const { data: emailResult, error } = await supabase.functions.invoke('send-email', {
-                    body: {
-                        to: toEmail,
-                        subject: emailSubject,
-                        html: htmlBody,
-                        config: smtpConfig,
-                        fromName,
-                        attachments: pdfAttachment ? [pdfAttachment] : undefined
-                    }
-                });
-                console.log('Edge function response:', { emailResult, error });
-                if (error) {
-                    console.error('Edge function error details:', error);
-                    throw new Error(error.message || 'Edge Function Fehler');
-                }
-                // Edge function returns 200 even for errors — check response body
-                if (emailResult && emailResult.success === false) {
-                    throw new Error(emailResult.error || 'E-Mail konnte nicht gesendet werden');
-                }
-
-                // Update lead status to offer_sent
-                if (savedOffer?.leadId) {
-                    await LeadService.updateLead(savedOffer.leadId, { status: 'offer_sent' as any });
-                }
-
-                toast.success('E-Mail wurde erfolgreich gesendet!');
-                setShowEmailModal(false);
-            } catch (e: any) {
-                console.error('Send email error:', e);
-                toast.error(e.message || 'Fehler beim Senden der E-Mail');
-            } finally {
-                setIsSendingEmail(false);
-            }
-        };
 
         const handleGeneratePDF = () => {
             generateOfferPDF(buildPDFData());
@@ -1972,400 +1883,407 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
         };
 
         return (
-            <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
-                <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                        <button
-                            onClick={() => setView(isManualMode ? 'manual' : 'config')}
-                            className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-                        >
-                            ← {isManualMode ? 'Zurück zur manuellen Eingabe' : 'Zurück zur Konfiguration'}
-                        </button>
-                        <h1 className="text-2xl font-black text-slate-900">Angebotszusammenfassung</h1>
-                    </div>
-
-                    {/* Technical Specs — hidden in manual mode */}
-                    {!isManualMode ? (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                📐 Technische Daten
-                            </h2>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                    <p className="text-slate-500 text-xs uppercase">Breite</p>
-                                    <p className="font-bold text-lg">{(width / 1000).toFixed(2)} m</p>
-                                </div>
-                                <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                    <p className="text-slate-500 text-xs uppercase">Tiefe</p>
-                                    <p className="font-bold text-lg">{(projection / 1000).toFixed(2)} m</p>
-                                </div>
-                                <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-200">
-                                    <p className="text-indigo-600 text-xs uppercase font-bold">Fläche</p>
-                                    <p className="font-black text-xl text-indigo-700">{areaM2.toFixed(2)} m²</p>
-                                </div>
-                                <div className="bg-amber-50 p-3 rounded-lg text-center border border-amber-200">
-                                    <p className="text-amber-600 text-xs uppercase font-bold">Pfosten</p>
-                                    <p className="font-black text-xl text-amber-700">{structuralMetadata?.posts_count || '-'}</p>
-                                </div>
-                            </div>
-                            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                                <div><span className="text-slate-500">Modell:</span> <strong>{model}</strong></div>
-                                <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
-                                <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                ✍️ Manuelles Angebot
-                            </h2>
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden border border-indigo-100">
-                                    <img
-                                        src={ROOF_MODELS.find(m => m.id === manualModel)?.image_url || '/images/models/trendline.jpg'}
-                                        alt={manualModel}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                    />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs uppercase">Ausgewähltes Modell</p>
-                                    <p className="font-bold text-xl text-slate-800">{manualModel}</p>
-                                    <p className="text-xs text-slate-400">{ROOF_MODELS.find(m => m.id === manualModel)?.description || ''}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Customer Info (REFRESHED) */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
-                        <div className="flex justify-between items-start">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                👤 Kundendaten
-                            </h2>
+            <>
+                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
                             <button
-                                onClick={() => setView('customer')}
-                                className="text-xs text-indigo-600 font-bold hover:underline"
+                                onClick={() => setView(isManualMode ? 'manual' : 'config')}
+                                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
                             >
-                                Bearbeiten
+                                ← {isManualMode ? 'Zurück zur manuellen Eingabe' : 'Zurück zur Konfiguration'}
                             </button>
+                            <h1 className="text-2xl font-black text-slate-900">Angebotszusammenfassung</h1>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span className="text-slate-500 block">Name:</span>
-                                <strong className="text-slate-800">
-                                    {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : '-'}
-                                </strong>
-                            </div>
-                            <div>
-                                <span className="text-slate-500 block">E-Mail:</span>
-                                <strong className="text-slate-800">{customerState?.email || '-'}</strong>
-                            </div>
-                            <div>
-                                <span className="text-slate-500 block">Telefon:</span>
-                                <strong className="text-slate-800">{customerState?.phone || '-'}</strong>
-                            </div>
-                            <div>
-                                <span className="text-slate-500 block">Adresse:</span>
-                                <strong className="text-slate-800">
-                                    {[customerState?.street, customerState?.postalCode, customerState?.city].filter(Boolean).join(', ') || '-'}
-                                </strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Items Table */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">🛒 Positionen</h2>
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-slate-100">
-                                    <th className="text-left py-2 text-slate-500">Produkt</th>
-                                    <th className="text-left py-2 text-slate-500">Konfiguration</th>
-                                    <th className="text-right py-2 text-slate-500">Preis</th>
-                                    <th className="w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {basket.map((item) => (
-                                    <tr key={item.id} className="border-b border-slate-50 last:border-0">
-                                        <td className="py-3 font-medium">{item.name}</td>
-                                        <td className="py-3 text-slate-600 text-xs max-w-[200px]">
-                                            <div className="truncate">{item.config}</div>
-                                            {item.dimensions && (
-                                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">📐 {item.dimensions}</div>
-                                            )}
-                                        </td>
-                                        <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
-                                        <td className="py-3 text-center">
-                                            <button
-                                                onClick={() => removeFromBasket(item.id)}
-                                                className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
-                                                title="Entfernen"
-                                            >
-                                                ✕
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {customItems.map((item) => (
-                                    <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
-                                        <td className="py-3 font-medium text-blue-700">📝 {item.name}</td>
-                                        <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
-                                        <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
-                                        <td className="py-3 text-center">
-                                            <button
-                                                onClick={() => handleRemoveCustomItem(item.id)}
-                                                className="text-red-500 hover:text-red-700 text-xs"
-                                            >
-                                                ✕
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                {montagePrice > 0 && (
-                                    <tr className="border-t border-slate-100 bg-blue-50">
-                                        <td className="py-3 font-medium text-blue-700">🔧 Montage</td>
-                                        <td className="py-3 text-slate-600 text-xs">Montagekosten (netto, ohne Aufschlag)</td>
-                                        <td className="py-3 text-right font-bold text-blue-700">{formatCurrency(montagePrice)}</td>
-                                        <td></td>
-                                    </tr>
-                                )}
-                                {extraPostTotalPrice > 0 && (
-                                    <tr className="border-t border-slate-100 bg-amber-50">
-                                        <td className="py-3 font-medium text-amber-700">🏗️ Zusatzpfosten</td>
-                                        <td className="py-3 text-slate-600 text-xs">
-                                            {extraPosts > 0 && `${extraPosts}× Zusatzpfosten`}
-                                            {extraPostHeight === 3000 && ` + Höhenaufschlag 3000mm (${totalPostCount} Pfosten)`}
-                                        </td>
-                                        <td className="py-3 text-right font-bold text-amber-700">{formatCurrency(extraPostTotalPrice)}</td>
-                                        <td></td>
-                                    </tr>
-                                )}
-                                <tr className="border-t-2 border-slate-200">
-                                    <td colSpan={2} className="py-3 font-bold">Zwischensumme</td>
-                                    <td className="py-3 text-right font-bold">{formatCurrency(subtotal)}</td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-
-                        {/* Add Custom Item */}
-                        <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Position hinzufügen</p>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newItemName}
-                                    onChange={e => setNewItemName(e.target.value)}
-                                    placeholder="Beschreibung..."
-                                    className="flex-1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
-                                />
-                                <input
-                                    type="number"
-                                    value={newItemPrice}
-                                    onChange={e => setNewItemPrice(e.target.value)}
-                                    placeholder="Preis €"
-                                    className="w-32 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
-                                />
-                                <button
-                                    onClick={handleAddCustomItem}
-                                    disabled={!newItemName.trim()}
-                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50"
-                                >
-                                    + Hinzufügen
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Margin & Discount */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
-
-                        {/* Purchase Discount Info (from Admin) */}
-                        {purchaseDiscount > 0 && (
-                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
-                                    <span className="font-bold text-green-800">{purchaseDiscount}%</span>
+                        {/* Technical Specs — hidden in manual mode */}
+                        {!isManualMode ? (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    📐 Technische Daten
+                                </h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div className="bg-slate-50 p-3 rounded-lg text-center">
+                                        <p className="text-slate-500 text-xs uppercase">Breite</p>
+                                        <p className="font-bold text-lg">{(width / 1000).toFixed(2)} m</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg text-center">
+                                        <p className="text-slate-500 text-xs uppercase">Tiefe</p>
+                                        <p className="font-bold text-lg">{(projection / 1000).toFixed(2)} m</p>
+                                    </div>
+                                    <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-200">
+                                        <p className="text-indigo-600 text-xs uppercase font-bold">Fläche</p>
+                                        <p className="font-black text-xl text-indigo-700">{areaM2.toFixed(2)} m²</p>
+                                    </div>
+                                    <div className="bg-amber-50 p-3 rounded-lg text-center border border-amber-200">
+                                        <p className="text-amber-600 text-xs uppercase font-bold">Pfosten</p>
+                                        <p className="font-black text-xl text-amber-700">{structuralMetadata?.posts_count || '-'}</p>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                    <span>Einkaufspreis:</span>
-                                    <span className="font-bold">{formatCurrency(purchasePrice)}</span>
+                                <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                                    <div><span className="text-slate-500">Modell:</span> <strong>{model}</strong></div>
+                                    <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
+                                    <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    ✍️ Manuelles Angebot
+                                </h2>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden border border-indigo-100">
+                                        <img
+                                            src={ROOF_MODELS.find(m => m.id === manualModel)?.image_url || '/images/models/trendline.jpg'}
+                                            alt={manualModel}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-500 text-xs uppercase">Ausgewähltes Modell</p>
+                                        <p className="font-bold text-xl text-slate-800">{manualModel}</p>
+                                        <p className="text-xs text-slate-400">{ROOF_MODELS.find(m => m.id === manualModel)?.description || ''}</p>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-6">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
-                                <input
-                                    type="number"
-                                    value={margin}
-                                    onChange={e => setMargin(parseFloat(e.target.value) || 0)}
-                                    min={0}
-                                    max={100}
-                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                />
-                                <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
+                        {/* Customer Info (REFRESHED) */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
+                            <div className="flex justify-between items-start">
+                                <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    👤 Kundendaten
+                                </h2>
+                                <button
+                                    onClick={() => setView('customer')}
+                                    className="text-xs text-indigo-600 font-bold hover:underline"
+                                >
+                                    Bearbeiten
+                                </button>
                             </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabat (%)</label>
-                                <input
-                                    type="number"
-                                    value={discount}
-                                    onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                                    min={0}
-                                    max={100}
-                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                />
-                                <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
-                            </div>
-                        </div>
 
-                        {/* MONTAGE PRICE */}
-                        <div className="mt-4 pt-4 border-t border-slate-100">
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="number"
-                                    value={montagePrice || ''}
-                                    onChange={e => setMontagePrice(parseFloat(e.target.value) || 0)}
-                                    min={0}
-                                    step={100}
-                                    placeholder="0.00"
-                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                />
-                                <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
-                            </div>
-                            <p className="text-xs text-slate-400 mt-1">Wird zum Endpreis addiert (keine Marge/Rabatt)</p>
-                        </div>
-                    </div>
-
-                    {/* Final Price */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
-                                <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                {montagePrice > 0 && <p className="text-indigo-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
-                                <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
-                            </div>
-                            {!isManualMode && (
-                                <div className="text-right">
-                                    <p className="text-indigo-200 text-xs">Powierzchnia</p>
-                                    <p className="text-2xl font-bold">{areaM2.toFixed(2)} m²</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Save Button or Success State */}
-                    {savedOfferId ? (
-                        <div className="bg-green-50 border border-green-200 rounded-2xl p-6 space-y-4">
-                            <div className="flex items-center gap-3 text-green-700">
-                                <span className="text-2xl">✅</span>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <p className="font-bold">Angebot erfolgreich gespeichert!</p>
-                                    <p className="text-xs text-green-600">ID: {savedOfferId}</p>
+                                    <span className="text-slate-500 block">Name:</span>
+                                    <strong className="text-slate-800">
+                                        {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : '-'}
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span className="text-slate-500 block">E-Mail:</span>
+                                    <strong className="text-slate-800">{customerState?.email || '-'}</strong>
+                                </div>
+                                <div>
+                                    <span className="text-slate-500 block">Telefon:</span>
+                                    <strong className="text-slate-800">{customerState?.phone || '-'}</strong>
+                                </div>
+                                <div>
+                                    <span className="text-slate-500 block">Adresse:</span>
+                                    <strong className="text-slate-800">
+                                        {[customerState?.street, customerState?.postalCode, customerState?.city].filter(Boolean).join(', ') || '-'}
+                                    </strong>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Public Link Section */}
-                            {publicLink && (
-                                <div className="bg-white p-4 rounded-xl border border-green-100 space-y-2">
-                                    <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                        🔗 Link zur interaktiven Angebotsseite
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            readOnly
-                                            value={publicLink}
-                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 outline-none"
-                                            onClick={(e) => e.currentTarget.select()}
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(publicLink);
-                                                toast.success('Link skopiowany!');
-                                            }}
-                                            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium text-sm"
-                                        >
-                                            Kopiuj
-                                        </button>
-                                        <a
-                                            href={publicLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium text-sm flex items-center"
-                                        >
-                                            ↗️
-                                        </a>
+                        {/* Items Table */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4">🛒 Positionen</h2>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-slate-100">
+                                        <th className="text-left py-2 text-slate-500">Produkt</th>
+                                        <th className="text-left py-2 text-slate-500">Konfiguration</th>
+                                        <th className="text-right py-2 text-slate-500">Preis</th>
+                                        <th className="w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {basket.map((item) => (
+                                        <tr key={item.id} className="border-b border-slate-50 last:border-0">
+                                            <td className="py-3 font-medium">{item.name}</td>
+                                            <td className="py-3 text-slate-600 text-xs max-w-[200px]">
+                                                <div className="truncate">{item.config}</div>
+                                                {item.dimensions && (
+                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">📐 {item.dimensions}</div>
+                                                )}
+                                            </td>
+                                            <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
+                                            <td className="py-3 text-center">
+                                                <button
+                                                    onClick={() => removeFromBasket(item.id)}
+                                                    className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
+                                                    title="Entfernen"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {customItems.map((item) => (
+                                        <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
+                                            <td className="py-3 font-medium text-blue-700">📝 {item.name}</td>
+                                            <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
+                                            <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
+                                            <td className="py-3 text-center">
+                                                <button
+                                                    onClick={() => handleRemoveCustomItem(item.id)}
+                                                    className="text-red-500 hover:text-red-700 text-xs"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    {montagePrice > 0 && (
+                                        <tr className="border-t border-slate-100 bg-blue-50">
+                                            <td className="py-3 font-medium text-blue-700">🔧 Montage</td>
+                                            <td className="py-3 text-slate-600 text-xs">Montagekosten (netto, ohne Aufschlag)</td>
+                                            <td className="py-3 text-right font-bold text-blue-700">{formatCurrency(montagePrice)}</td>
+                                            <td></td>
+                                        </tr>
+                                    )}
+                                    {extraPostTotalPrice > 0 && (
+                                        <tr className="border-t border-slate-100 bg-amber-50">
+                                            <td className="py-3 font-medium text-amber-700">🏗️ Zusatzpfosten</td>
+                                            <td className="py-3 text-slate-600 text-xs">
+                                                {extraPosts > 0 && `${extraPosts}× Zusatzpfosten`}
+                                                {extraPostHeight === 3000 && ` + Höhenaufschlag 3000mm (${totalPostCount} Pfosten)`}
+                                            </td>
+                                            <td className="py-3 text-right font-bold text-amber-700">{formatCurrency(extraPostTotalPrice)}</td>
+                                            <td></td>
+                                        </tr>
+                                    )}
+                                    <tr className="border-t-2 border-slate-200">
+                                        <td colSpan={2} className="py-3 font-bold">Zwischensumme</td>
+                                        <td className="py-3 text-right font-bold">{formatCurrency(subtotal)}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            {/* Add Custom Item */}
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Position hinzufügen</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newItemName}
+                                        onChange={e => setNewItemName(e.target.value)}
+                                        placeholder="Beschreibung..."
+                                        className="flex-1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
+                                    />
+                                    <input
+                                        type="number"
+                                        value={newItemPrice}
+                                        onChange={e => setNewItemPrice(e.target.value)}
+                                        placeholder="Preis €"
+                                        className="w-32 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
+                                    />
+                                    <button
+                                        onClick={handleAddCustomItem}
+                                        disabled={!newItemName.trim()}
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50"
+                                    >
+                                        + Hinzufügen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Margin & Discount */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
+
+                            {/* Purchase Discount Info (from Admin) */}
+                            {purchaseDiscount > 0 && (
+                                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
+                                        <span className="font-bold text-green-800">{purchaseDiscount}%</span>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-1 text-xs text-green-600">
+                                        <span>Einkaufspreis:</span>
+                                        <span className="font-bold">{formatCurrency(purchasePrice)}</span>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="flex flex-wrap gap-3">
-                                <button
-                                    onClick={handleGenerateEmail}
-                                    disabled={isGeneratingEmail}
-                                    className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
-                                >
-                                    {isGeneratingEmail ? (
-                                        <>
-                                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                                            Wird generiert...
-                                        </>
-                                    ) : (
-                                        <>✉️ E-Mail senden</>
-                                    )}
-                                </button>
-                                <button
-                                    onClick={handleGeneratePDF}
-                                    className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
-                                >
-                                    📄 PDF herunterladen
-                                </button>
-                                <button
-                                    onClick={() => navigate('/dashboard')}
-                                    className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
-                                >
-                                    Beenden
-                                </button>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
+                                    <input
+                                        type="number"
+                                        value={margin}
+                                        onChange={e => setMargin(parseFloat(e.target.value) || 0)}
+                                        min={0}
+                                        max={100}
+                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">+ {formatCurrency(marginValue)}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabat (%)</label>
+                                    <input
+                                        type="number"
+                                        value={discount}
+                                        onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+                                        min={0}
+                                        max={100}
+                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">- {formatCurrency(discountValue)}</p>
+                                </div>
+                            </div>
+
+                            {/* MONTAGE PRICE */}
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="number"
+                                        value={montagePrice || ''}
+                                        onChange={e => setMontagePrice(parseFloat(e.target.value) || 0)}
+                                        min={0}
+                                        step={100}
+                                        placeholder="0.00"
+                                        className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
+                                    />
+                                    <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">Wird zum Endpreis addiert (keine Marge/Rabatt)</p>
                             </div>
                         </div>
 
-                    ) : (
-                        <div className="flex flex-wrap gap-3">
-                            <button
-                                onClick={handleSaveOffer}
-                                disabled={savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
-                                className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
-                                    }`}
-                            >
-                                {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
-                            </button>
-                            <button
-                                onClick={handleGenerateEmail}
-                                disabled={isGeneratingEmail || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
-                                className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${isGeneratingEmail || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
-                                    }`}
-                            >
-                                {isGeneratingEmail ? 'Wird generiert...' : '✉️ E-Mail senden'}
-                            </button>
+                        {/* Final Price */}
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
+                                    <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
+                                    {montagePrice > 0 && <p className="text-indigo-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
+                                    <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
+                                </div>
+                                {!isManualMode && (
+                                    <div className="text-right">
+                                        <p className="text-indigo-200 text-xs">Powierzchnia</p>
+                                        <p className="text-2xl font-bold">{areaM2.toFixed(2)} m²</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )}
+
+                        {/* Save Button or Success State */}
+                        {savedOfferId ? (
+                            <div className="bg-green-50 border border-green-200 rounded-2xl p-6 space-y-4">
+                                <div className="flex items-center gap-3 text-green-700">
+                                    <span className="text-2xl">✅</span>
+                                    <div>
+                                        <p className="font-bold">Angebot erfolgreich gespeichert!</p>
+                                        <p className="text-xs text-green-600">ID: {savedOfferId}</p>
+                                    </div>
+                                </div>
+
+                                {/* Public Link Section */}
+                                {publicLink && (
+                                    <div className="bg-white p-4 rounded-xl border border-green-100 space-y-2">
+                                        <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                            🔗 Link zur interaktiven Angebotsseite
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                readOnly
+                                                value={publicLink}
+                                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 outline-none"
+                                                onClick={(e) => e.currentTarget.select()}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(publicLink);
+                                                    toast.success('Link skopiowany!');
+                                                }}
+                                                className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium text-sm"
+                                            >
+                                                Kopiuj
+                                            </button>
+                                            <a
+                                                href={publicLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium text-sm flex items-center"
+                                            >
+                                                ↗️
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-3">
+                                    <button
+                                        onClick={() => { console.log('[EMAIL] Button clicked, opening modal'); setShowSendEmailModal(true); }}
+                                        className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        ✉️ E-Mail senden
+                                    </button>
+                                    <button
+                                        onClick={handleGeneratePDF}
+                                        className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
+                                    >
+                                        📄 PDF herunterladen
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/dashboard')}
+                                        className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
+                                    >
+                                        Beenden
+                                    </button>
+                                </div>
+                            </div>
+
+                        ) : (
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    onClick={handleSaveOffer}
+                                    disabled={savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
+                                    className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
+                                        }`}
+                                >
+                                    {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
+                                </button>
+                                <button
+                                    onClick={() => { console.log('[EMAIL] Button clicked, opening modal'); setShowSendEmailModal(true); }}
+                                    disabled={(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
+                                    className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
+                                        }`}
+                                >
+                                    ✉️ E-Mail senden
+                                </button>
+                            </div>
+                        )}
+                    </div >
                 </div >
-            </div >
+                {/* SendEmailModal must be inside summary return — because summary does early return! */}
+                <SendEmailModal
+                    isOpen={showSendEmailModal}
+                    onClose={() => setShowSendEmailModal(false)}
+                    to={customerState?.email || ''}
+                    leadData={{
+                        firstName: customerState?.firstName,
+                        lastName: customerState?.lastName || customerState?.name,
+                        companyName: customerState?.companyName,
+                    }}
+                    leadId={savedOfferRef.current?.leadId}
+                    offer={savedOfferRef.current || undefined}
+                />
+            </>
         );
     }
 
@@ -2492,6 +2410,35 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                         </div>
                     </div>
 
+                    {/* Dimensions (optional) */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            📐 Abmessungen <span className="text-xs text-slate-400 font-normal">(optional — wird in der Kundenansicht angezeigt)</span>
+                        </h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Breite (mm)</label>
+                                <input
+                                    type="number"
+                                    value={manualWidth}
+                                    onChange={e => setManualWidth(e.target.value)}
+                                    placeholder="z.B. 5000"
+                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tiefe / Ausladung (mm)</label>
+                                <input
+                                    type="number"
+                                    value={manualDepth}
+                                    onChange={e => setManualDepth(e.target.value)}
+                                    placeholder="z.B. 3000"
+                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Line Items */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -2590,6 +2537,27 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                                     + Hinzufügen
                                 </button>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Installation Cost (optional) */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            🔧 Montagekosten <span className="text-xs text-slate-400 font-normal">(optional — wird dem Kunden separat angezeigt)</span>
+                        </h2>
+                        <div className="max-w-xs">
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Montage netto (€)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    value={manualInstallationCost}
+                                    onChange={e => setManualInstallationCost(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full p-3 pr-12 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
+                                />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">€</div>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Wird in der Kundenansicht als separate Position "Fachmontage & Logistik" angezeigt.</p>
                         </div>
                     </div>
 
@@ -2745,6 +2713,123 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                         </div>
 
                         {/* CONTENT */}
+
+                        {/* LEAD CONTEXT PANEL — only when creating offer from lead */}
+                        {linkedLeadIdRef.current && (leadConfig || leadNotes || leadCustomerData?.configuredModel) && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden mb-6">
+                                <button
+                                    onClick={() => setContextOpen(!contextOpen)}
+                                    className="w-full flex items-center justify-between px-5 py-3 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                                >
+                                    <span className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                                        📋 Ściąga z leada
+                                        {leadConfig?.status === 'completed' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px]">Formularz ✅</span>}
+                                    </span>
+                                    <svg className={`w-4 h-4 text-indigo-500 transition-transform ${contextOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                {contextOpen && (
+                                    <div className="px-5 py-4 space-y-4 text-sm">
+                                        {/* Configuration from form */}
+                                        {(leadConfig || leadCustomerData?.configuredModel) && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">⚙️ Konfiguracja klienta</h4>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                    {(leadConfig?.modelDisplayName || leadCustomerData?.configuredModel) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Model</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.modelDisplayName || leadCustomerData?.configuredModel}</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.width || leadCustomerData?.configuredWidth) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Szerokość</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.width || leadCustomerData?.configuredWidth} mm</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.projection || leadCustomerData?.configuredProjection) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Wysięg</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.projection || leadCustomerData?.configuredProjection} mm</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.mountingType || leadCustomerData?.configuredMounting) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Montaż</div>
+                                                            <div className="font-bold text-slate-800 capitalize">{leadConfig?.mountingType || leadCustomerData?.configuredMounting}</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.color || leadCustomerData?.configuredColor) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Kolor</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.color || leadCustomerData?.configuredColor}</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.roofCovering || leadCustomerData?.configuredRoofCovering) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Pokrycie</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.roofCovering || leadCustomerData?.configuredRoofCovering}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Extras */}
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    {(leadConfig?.heater || leadCustomerData?.configuredHeater) && (
+                                                        <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-200">🔥 Grzejnik</span>
+                                                    )}
+                                                    {(leadConfig?.led || leadCustomerData?.configuredLed) && (
+                                                        <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200">💡 LED</span>
+                                                    )}
+                                                    {leadConfig?.glazingSides && Object.entries(leadConfig.glazingSides).filter(([, v]) => v).map(([side, type]) => (
+                                                        <span key={side} className="bg-sky-50 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold border border-sky-200">🪟 {side}: {type}</span>
+                                                    ))}
+                                                    {leadConfig?.zipScreen?.enabled && (
+                                                        <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200">🔲 ZipScreen</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Notes from form */}
+                                        {(leadConfig?.notes || leadCustomerData?.configuredNotes) && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">💬 Uwagi klienta (z formularza)</h4>
+                                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-slate-700 text-sm whitespace-pre-wrap">
+                                                    {leadConfig?.notes || leadCustomerData?.configuredNotes}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Lead Notizen */}
+                                        {leadNotes && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">📝 Notizen</h4>
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-slate-700 text-sm whitespace-pre-wrap">
+                                                    {leadNotes}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Photos from form */}
+                                        {leadConfig?.photos && leadConfig.photos.length > 0 && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">📸 Zdjęcia klienta</h4>
+                                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                                    {leadConfig.photos.map((url, i) => (
+                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                            <img src={url} alt={`Foto ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-slate-200 hover:ring-2 ring-indigo-400 transition-all" />
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* STEP 0: MODEL */}
                         {activeStep === 0 && (
@@ -4750,159 +4835,19 @@ ${emailBody.split('\n').map(line => line.trim() === '' ? '<br/>' : `<p style="ma
                 </>
             )}
 
-            {/* Email Send Dialog — rendered at component root level so it's visible in any view */}
-            {showEmailModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-0 animate-in fade-in zoom-in duration-200 max-h-[92vh] overflow-hidden flex flex-col">
-                        {/* Header */}
-                        <div className="flex justify-between items-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 rounded-t-2xl">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">✉️ Angebot per E-Mail senden</h3>
-                            <button onClick={() => setShowEmailModal(false)} className="text-white/70 hover:text-white text-xl transition-colors">✕</button>
-                        </div>
-
-                        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-                            {/* Sender + Recipient row */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Absender</label>
-                                    <select
-                                        value={emailSender}
-                                        onChange={(e) => setEmailSender(e.target.value)}
-                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                    >
-                                        <option value="buero">📧 buero@polendach24.de</option>
-                                        {userMailboxes.map(mb => (
-                                            <option key={mb.id} value={mb.id}>📬 {mb.smtp_user}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empfänger</label>
-                                    <input
-                                        readOnly
-                                        value={customerState?.email || '(Keine E-Mail)'}
-                                        className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Subject */}
-                            <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Betreff</label>
-                                <input
-                                    value={emailSubject}
-                                    onChange={(e) => setEmailSubject(e.target.value)}
-                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                    placeholder="Angebot ..."
-                                />
-                            </div>
-
-                            {/* Body — Edit / Preview toggle */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nachricht</label>
-                                    <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs">
-                                        <button
-                                            onClick={() => setEmailPreviewMode(false)}
-                                            className={`px-3 py-1 rounded-md transition-all font-medium ${!emailPreviewMode ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >✏️ Bearbeiten</button>
-                                        <button
-                                            onClick={() => setEmailPreviewMode(true)}
-                                            className={`px-3 py-1 rounded-md transition-all font-medium ${emailPreviewMode ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >👁️ Vorschau</button>
-                                    </div>
-                                </div>
-                                {emailPreviewMode ? (
-                                    <div className="border border-slate-200 rounded-xl bg-white p-5 min-h-[200px] max-h-[320px] overflow-y-auto">
-                                        {/* Preview header */}
-                                        <div className="mb-4 pb-3 border-b border-slate-100 text-xs text-slate-500 space-y-1">
-                                            <div><strong>Von:</strong> {emailSender === 'buero' ? 'buero@polendach24.de' : (userMailboxes.find(m => m.id === emailSender)?.smtp_user || emailSender)}</div>
-                                            <div><strong>An:</strong> {customerState?.email || '—'}</div>
-                                            <div><strong>Betreff:</strong> <span className="font-semibold text-slate-700">{emailSubject}</span></div>
-                                        </div>
-                                        {/* Rendered HTML body */}
-                                        <div
-                                            className="text-sm leading-relaxed text-slate-800 prose prose-sm max-w-none"
-                                            dangerouslySetInnerHTML={{
-                                                __html: emailBody
-                                                    .replace(/&/g, '&amp;')
-                                                    .replace(/</g, '&lt;')
-                                                    .replace(/>/g, '&gt;')
-                                                    .replace(/\n\n/g, '</p><p style="margin:0 0 12px 0">')
-                                                    .replace(/\n/g, '<br/>')
-                                                    .replace(/^/, '<p style="margin:0 0 12px 0">')
-                                                    .replace(/$/, '</p>')
-                                            }}
-                                        />
-                                        {attachPDF && (
-                                            <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400 flex items-center gap-1.5">
-                                                📎 <span className="font-medium">PDF-Angebot angehängt</span>
-                                                <span>({savedOffer?.offerNumber ? `Angebot_${savedOffer.offerNumber}.pdf` : 'Angebot.pdf'})</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <textarea
-                                        value={emailBody}
-                                        onChange={(e) => setEmailBody(e.target.value)}
-                                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm leading-relaxed font-mono"
-                                        rows={10}
-                                    />
-                                )}
-                            </div>
-
-                            {/* PDF Attachment Toggle */}
-                            <div className="flex items-center gap-3 p-3 bg-amber-50/70 border border-amber-100 rounded-xl">
-                                <input
-                                    type="checkbox"
-                                    checked={attachPDF}
-                                    onChange={(e) => setAttachPDF(e.target.checked)}
-                                    className="w-5 h-5 rounded border-amber-300 text-amber-500 focus:ring-amber-400"
-                                />
-                                <div>
-                                    <p className="text-sm font-bold text-amber-800">📎 PDF-Angebot anhängen</p>
-                                    <p className="text-xs text-amber-600">Das Angebots-PDF wird als Anhang mitgesendet</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Actions footer */}
-                        <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(emailBody);
-                                    toast.success('In die Zwischenablage kopiert');
-                                }}
-                                className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 font-medium transition-colors"
-                            >
-                                📋 Kopieren
-                            </button>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowEmailModal(false)}
-                                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm"
-                                >
-                                    Abbrechen
-                                </button>
-                                <button
-                                    onClick={handleSendOfferEmail}
-                                    disabled={isSendingEmail || !customerState?.email}
-                                    className={`px-6 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${isSendingEmail || !customerState?.email
-                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200 hover:shadow-blue-300'
-                                        }`}
-                                >
-                                    {isSendingEmail ? (
-                                        <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span> Wird gesendet...</>
-                                    ) : (
-                                        <>📤 E-Mail senden</>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Email Send Modal — proven SendEmailModal from leads */}
+            <SendEmailModal
+                isOpen={showSendEmailModal}
+                onClose={() => setShowSendEmailModal(false)}
+                to={customerState?.email || ''}
+                leadData={{
+                    firstName: customerState?.firstName,
+                    lastName: customerState?.lastName || customerState?.name,
+                    companyName: customerState?.companyName,
+                }}
+                leadId={savedOfferRef.current?.leadId}
+                offer={savedOfferRef.current || undefined}
+            />
         </div >
     );
 };

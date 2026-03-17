@@ -19,66 +19,132 @@ const createRoundedRect = (width: number, height: number, radius: number) => {
     return shape;
 };
 
+// ═══════════ POST PROFILE ═══════════
+// 110mm × 110mm square aluminum post with 3mm corner radius
 export const getPostProfile = () => {
-    // 110mm x 110mm with 3mm radius
     return createRoundedRect(0.11, 0.11, 0.003);
 };
 
+// ═══════════ RAFTER PROFILE (main body) ═══════════
+// 60mm wide × 80mm tall structural body
 export const getRafterProfile = () => {
-    // 60mm x 100mm (or higher?) usually rafters are tall. 
-    // Let's say 60mm width x 100mm height
-    // But in "Extrusion" usually Z is length. So Shape is the XY cross section.
-    // In our model, we might extrude along Z or Y. 
-    // Let's define shape as Width x Height cross-section.
-    return createRoundedRect(0.06, 0.10, 0.002);
+    return createRoundedRect(0.06, 0.08, 0.002);
 };
 
+// ═══════════ RAFTER CAP (cover strip) ═══════════
+// Wider cap that sits on top of rafter body — creates T-shape silhouette
+// 80mm wide × 15mm tall (wider than 60mm rafter body)
+export const getRafterCapProfile = () => {
+    return createRoundedRect(0.08, 0.015, 0.001);
+};
+
+// ═══════════ RUBBER SEAL STRIP ═══════════
+// Black EPDM rubber gasket between glass panels and rafter caps
+// 8mm wide × 5mm tall
+export const getRubberSealProfile = () => {
+    return createRoundedRect(0.008, 0.005, 0.0005);
+};
+
+// ═══════════ WALL PROFILE (Wandanschluss) ═══════════
+// Wall attachment bar — 50mm deep × 150mm tall
 export const getWallProfileShape = () => {
-    // Simple L-shape or Box for wall connection
-    // 150mm height, 50mm depth?
-    // Let's just use a nice rounded box for now, maybe with a "lip"
     return createRoundedRect(0.05, 0.15, 0.002);
 };
 
+// ═══════════ GUTTER PROFILE (Rinne / Frontbalken) ═══════════
+// Multi-part profile: front fascia + drainage channel + top shelf
 export const getGutterProfile = (style: 'trendstyle' | 'orangestyle' | 'topstyle' | string, width: number = 0.15, height: number = 0.15) => {
     const shape = new THREE.Shape();
-    // width is GUTTER_DEPTH (approx 150mm - 200mm)
-    // height is BEAM_HEIGHT (approx 150mm - 200mm)
+    // width = GUTTER_DEPTH (front-to-back thickness)
+    // height = BEAM_HEIGHT (top-to-bottom visual height)
+
+    const lip = 0.02;       // bottom drainage lip extension
+    const channel = 0.012;  // water channel depth on top
+    const fascia = 0.008;   // front fascia overhang
 
     if (style === 'orangestyle') {
-        // Softline: Rounded front face
-        // We draw the CROSS SECTION.
-        // Assuming we look from side? 
-        // No, typically we extrude the LENGTH (Width of patio).
-        // So shape is the side profile (Depth x Height).
-
-        // Start bottom left
-        shape.moveTo(0, 0);
-        // Bottom line
-        shape.lineTo(width, 0);
-        // Front face (curved)
-        shape.bezierCurveTo(width + 0.05, height * 0.3, width + 0.02, height * 0.8, width, height);
-        // Top line
-        shape.lineTo(0, height);
-        // Back line
-        shape.lineTo(0, 0);
+        // Softline: Rounded front face with drainage lip
+        shape.moveTo(0, -lip);                          // Bottom lip start
+        shape.lineTo(width + fascia, -lip);             // Bottom edge to front
+        shape.bezierCurveTo(
+            width + fascia + 0.03, height * 0.3,
+            width + fascia + 0.015, height * 0.7,
+            width + fascia, height
+        );                                               // Curved front face
+        shape.lineTo(width, height);                     // Top shelf outer edge
+        shape.lineTo(width, height - channel);           // Channel dip
+        shape.lineTo(channel, height - channel);         // Channel bottom
+        shape.lineTo(0, height);                         // Top shelf inner edge
+        shape.lineTo(0, -lip);                           // Close
 
         return shape;
     } else {
-        // Trendstyle: Modern Boxy - Cubist Flat Front
-        // Removed decorative steps to match "Cubist" reference photo
-        shape.moveTo(0, 0);
-        shape.lineTo(width, 0);
-        shape.lineTo(width, height);
-        shape.lineTo(0, height);
-        shape.lineTo(0, 0);
+        // Trendstyle / Topstyle: Modern cubist with drainage lip + channel
+        shape.moveTo(0, -lip);                           // Bottom lip start
+        shape.lineTo(width + fascia, -lip);              // Bottom edge to front
+        shape.lineTo(width + fascia, height);            // Front face (flat)
+        shape.lineTo(width, height);                     // Top outer edge
+        shape.lineTo(width, height - channel);           // Channel outer drop
+        shape.lineTo(channel, height - channel);         // Channel bottom
+        shape.lineTo(0, height);                         // Top inner edge
+        shape.lineTo(0, -lip);                           // Close
 
         return shape;
     }
 };
 
-// Wedge Frame Profile (for triangles)
+// ═══════════ TRACK RAIL (for sliding glass) ═══════════
+// Top track: multi-channel profile ~30mm tall × 40mm deep
+export const getTopTrackProfile = () => {
+    const shape = new THREE.Shape();
+    const w = 0.04; // depth (front-to-back)
+    const h = 0.03; // height
+
+    shape.moveTo(0, 0);
+    shape.lineTo(w, 0);
+    shape.lineTo(w, h);
+    // Two grooves in the bottom for glass panes
+    shape.lineTo(w * 0.7, h);
+    shape.lineTo(w * 0.7, h - 0.008);
+    shape.lineTo(w * 0.55, h - 0.008);
+    shape.lineTo(w * 0.55, h);
+    shape.lineTo(w * 0.45, h);
+    shape.lineTo(w * 0.45, h - 0.008);
+    shape.lineTo(w * 0.3, h - 0.008);
+    shape.lineTo(w * 0.3, h);
+    shape.lineTo(0, h);
+    shape.lineTo(0, 0);
+
+    return shape;
+};
+
+// Bottom track: low-profile rail ~15mm tall × 40mm wide
+export const getBottomTrackProfile = () => {
+    return createRoundedRect(0.04, 0.015, 0.001);
+};
+
+// ═══════════ GLASS EDGE U-PROFILE ═══════════
+// Slim aluminum U-channel on glass panel edges — 20mm × 10mm
+export const getGlassEdgeProfile = () => {
+    const shape = new THREE.Shape();
+    const w = 0.01;
+    const h = 0.02;
+    const wall = 0.003;
+
+    shape.moveTo(0, 0);
+    shape.lineTo(w, 0);
+    shape.lineTo(w, h);
+    shape.lineTo(w - wall, h);
+    shape.lineTo(w - wall, wall);
+    shape.lineTo(wall, wall);
+    shape.lineTo(wall, h);
+    shape.lineTo(0, h);
+    shape.lineTo(0, 0);
+
+    return shape;
+};
+
+// ═══════════ WEDGE FRAME PROFILE ═══════════
 export const getWedgeFrameProfile = () => {
-    // Small 40x40mm profile
     return createRoundedRect(0.04, 0.04, 0.001);
 };

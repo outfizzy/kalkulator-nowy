@@ -43,7 +43,10 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
 
     // Financial State
     const [totalContractPrice, setTotalContractPrice] = useState('');
+    const [totalContractPriceBrutto, setTotalContractPriceBrutto] = useState('');
+    const [priceInputMode, setPriceInputMode] = useState<'netto' | 'brutto'>('netto');
     const [advance, setAdvance] = useState('0');
+    const [advanceType, setAdvanceType] = useState<'netto' | 'brutto'>('brutto');
     const [installationPrice, setInstallationPrice] = useState('');
     const [installationDays, setInstallationDays] = useState('1');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('transfer');
@@ -55,20 +58,57 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     const [productColor, setProductColor] = useState('');
     const [productWidth, setProductWidth] = useState('');
     const [productDepth, setProductDepth] = useState('');
-    const [productAddons, setProductAddons] = useState<string[]>([]);
+    const [productAddons, setProductAddons] = useState<Array<{
+        name: string;
+        placement: string;
+        quantity: number;
+        width?: string;
+        height?: string;
+        segments?: string;
+    }>>([]);;
     const [newAddon, setNewAddon] = useState('');
+    const [newAddonPlacement, setNewAddonPlacement] = useState('alle');
+
+    // Addons that need placement specification
+    const placementAddons = [
+        'Schiebewand Glas AL23', 'Schiebewand Glas AL24',
+        'Senkrechtmarkise (ZIP Screen)',
+        'Seitenwand Glas', 'Seitenwand Alu', 'Frontwand Alu',
+        'Seitenwand Polycarbonat',
+        'Markise Aufdach (Dachowa)', 'Markise Unterdach (Poddachowa)',
+        'Keilfenster (Okno klinowe)',
+        'Windschutz'
+    ];
+    const placementOptions = [
+        { id: 'links', label: 'Links (Lewa)' },
+        { id: 'rechts', label: 'Rechts (Prawa)' },
+        { id: 'vorne', label: 'Vorne (Przód)' },
+        { id: 'alle', label: 'Alle Seiten (Wszystkie)' }
+    ];
+    const needsPlacement = (addonName: string) => placementAddons.some(p => addonName.includes(p.split(' ')[0]));
+    const needsDimensions = (addonName: string) => ['Senkrechtmarkise', 'Seitenwand', 'Frontwand', 'Keilfenster', 'Windschutz', 'Schiebewand'].some(k => addonName.includes(k));
+    const needsQuantity = (addonName: string) => ['LED', 'Heizstrahler', 'Lautsprecher', 'Spots'].some(k => addonName.includes(k));
 
     // Measurement / Ordering Data State
     const [unterkRinne, setUnterkRinne] = useState('');     // H3 - Unterkante Rinne
     const [unterkWand, setUnterkWand] = useState('');       // H1 - Unterkante Wandprofil  
-    const [slopeLeft, setSlopeLeft] = useState('');          // Gefälle links (mm)
-    const [slopeRight, setSlopeRight] = useState('');        // Gefälle rechts (mm)
-    const [slopeFront, setSlopeFront] = useState('');        // Gefälle vorne (mm)
+    const [needsLevelingProfiles, setNeedsLevelingProfiles] = useState(false);  // Profile wyrównujące teren
+    const [levelingLeft, setLevelingLeft] = useState('');      // Wyrównanie Links (mm)
+    const [levelingRight, setLevelingRight] = useState('');    // Wyrównanie Rechts (mm)
+    const [levelingFront, setLevelingFront] = useState('');    // Wyrównanie Vorne (mm)
     const [wallType, setWallType] = useState('massiv');      // Wandbeschaffenheit
     const [mountType, setMountType] = useState('wall');      // Montageart
     const [hasElectrical, setHasElectrical] = useState(false);
     const [hasDrainage, setHasDrainage] = useState(false);
+    const [drainageDirection, setDrainageDirection] = useState('links'); // Kierunek odpływu
     const [technicalNotes, setTechnicalNotes] = useState('');
+
+    // Extended fields
+    const [postsCount, setPostsCount] = useState('2');           // Ilość słupów
+    const [deliveryAddress, setDeliveryAddress] = useState('');  // Adres dostawy
+    const [deliveryCity, setDeliveryCity] = useState('');         // Miasto dostawy
+    const [deliverySameAsClient, setDeliverySameAsClient] = useState(true);
+    const [plannedInstallDate, setPlannedInstallDate] = useState(''); // Planowana data montażu
 
     // Addons from catalog.json and pricing engine — grouped by category
     const commonAddons = [
@@ -114,8 +154,30 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     if (!isOpen) return null;
 
     const totalPrice = parseFloat(totalContractPrice.replace(',', '.')) || 0;
+    const totalPriceBrutto = parseFloat(totalContractPriceBrutto.replace(',', '.')) || 0;
     const installPriceNum = parseFloat(installationPrice.replace(',', '.')) || 0;
     const installDaysNum = parseInt(installationDays) || 1;
+
+    // Bidirectional netto/brutto sync
+    const handleNettoChange = (val: string) => {
+        setTotalContractPrice(val);
+        const n = parseFloat(val.replace(',', '.')) || 0;
+        setTotalContractPriceBrutto(n > 0 ? (n * 1.19).toFixed(2) : '');
+        setPriceInputMode('netto');
+    };
+    const handleBruttoChange = (val: string) => {
+        setTotalContractPriceBrutto(val);
+        const b = parseFloat(val.replace(',', '.')) || 0;
+        setTotalContractPrice(b > 0 ? (b / 1.19).toFixed(2) : '');
+        setPriceInputMode('brutto');
+    };
+
+    // Advance helpers
+    const advanceNum = parseFloat(advance.replace(',', '.')) || 0;
+    const setAdvancePercent = (pct: number) => {
+        const base = advanceType === 'brutto' ? totalPrice * 1.19 : totalPrice;
+        setAdvance((base * pct / 100).toFixed(2));
+    };
 
     const handleAddItem = () => {
         if (!newItemDesc && newItemModel === 'other') {
@@ -155,6 +217,17 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
             return;
         }
 
+        // Build addon descriptions with placement, dimensions, and segments info
+        const addonDescriptions = productAddons.map(a => {
+            const parts = [a.name];
+            const placementLabel = placementOptions.find(p => p.id === a.placement)?.label || a.placement;
+            if (a.placement && a.placement !== 'alle') parts.push(`— ${placementLabel}`);
+            if (a.width && a.height) parts.push(`${a.width}×${a.height}mm`);
+            else if (a.width) parts.push(`B: ${a.width}mm`);
+            if (a.segments) parts.push(`${a.segments} Segm.`);
+            return parts.join(' ');
+        });
+
         if (totalPrice <= 0) {
             toast.error('Podaj kwotę za zlecenie');
             return;
@@ -166,15 +239,16 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
             ...productAddons.map((addon, idx) => ({
                 id: `addon-${idx}-${Date.now()}`,
                 modelId: 'addon',
-                description: addon,
-                quantity: 1,
+                description: addonDescriptions[idx],
+                quantity: addon.quantity || 1,
                 price: 0
             }))
         ];
 
         setIsSubmitting(true);
         try {
-            const advanceNum = parseFloat(advance.replace(',', '.'));
+            const advanceRaw = parseFloat(advance.replace(',', '.'));
+            const advanceNetto = advanceType === 'brutto' ? advanceRaw / 1.19 : advanceRaw;
 
             await DatabaseService.createManualContract({
                 customer: selectedCustomer,
@@ -182,25 +256,33 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                 totalPrice: totalPrice,
                 contractDetails: {
                     contractNumber: contractNumber,
-                    advance: isNaN(advanceNum) ? 0 : advanceNum,
+                    advance: isNaN(advanceNetto) ? 0 : advanceNetto,
                     signedAt: new Date(),
                     installationPriceNet: installPriceNum,
                     installationDays: installDaysNum,
                     paymentMethod: paymentMethod,
-                    installationNotes: installationNotes.trim() || undefined
+                    installationNotes: installationNotes.trim() || undefined,
+                    plannedInstallDate: plannedInstallDate || undefined,
+                    deliveryAddress: !deliverySameAsClient ? {
+                        street: deliveryAddress.trim() || undefined,
+                        city: deliveryCity.trim() || undefined
+                    } : undefined
                 },
                 productConfig: {
                     modelId: productModel,
                     color: productColor.trim() || undefined,
                     width: parseInt(productWidth) || 0,
                     projection: parseInt(productDepth) || 0,
-                    addons: productAddons,
+                    addons: addonDescriptions,
+                    postsCount: parseInt(postsCount) || 2,
+                    drainageDirection: hasDrainage ? drainageDirection : undefined,
                     measurements: {
                         unterkRinne: parseInt(unterkRinne) || undefined,
                         unterkWand: parseInt(unterkWand) || undefined,
-                        slopeLeft: parseInt(slopeLeft) || undefined,
-                        slopeRight: parseInt(slopeRight) || undefined,
-                        slopeFront: parseInt(slopeFront) || undefined,
+                        slopeLeft: needsLevelingProfiles ? (parseInt(levelingLeft) || undefined) : undefined,
+                        slopeRight: needsLevelingProfiles ? (parseInt(levelingRight) || undefined) : undefined,
+                        slopeFront: needsLevelingProfiles ? (parseInt(levelingFront) || undefined) : undefined,
+                        needsLevelingProfiles: needsLevelingProfiles || undefined,
                         wallType: wallType || undefined,
                         mountType: mountType || undefined,
                         hasElectrical,
@@ -332,8 +414,8 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                         </div>
                                     </div>
 
-                                    {/* Width x Depth */}
-                                    <div className="grid grid-cols-2 gap-2">
+                                    {/* Width x Depth x Posts */}
+                                    <div className="grid grid-cols-3 gap-2">
                                         <div>
                                             <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Szerokość (mm)</label>
                                             <input
@@ -354,6 +436,18 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                                 className="w-full p-2.5 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"
                                             />
                                         </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Ilość słupów</label>
+                                            <input
+                                                type="number"
+                                                min="2"
+                                                max="10"
+                                                value={postsCount}
+                                                onChange={e => setPostsCount(e.target.value)}
+                                                className="w-full p-2.5 border border-blue-200 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-blue-400 outline-none"
+                                            />
+                                            <p className="text-[9px] text-blue-400 text-center mt-0.5">Pfosten / Stützen</p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -363,23 +457,82 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
 
                                     {/* Selected Addons */}
                                     {productAddons.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 mb-2">
+                                        <div className="space-y-2 mb-3">
                                             {productAddons.map((addon, i) => (
-                                                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                                                    {addon}
-                                                    <button type="button" onClick={() => setProductAddons(prev => prev.filter((_, idx) => idx !== i))} className="text-blue-500 hover:text-red-500">✕</button>
-                                                </span>
+                                                <div key={i} className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="flex-1 text-sm font-medium text-blue-800">{addon.name}</span>
+                                                        {/* Quantity for LED/Heizstrahler */}
+                                                        {needsQuantity(addon.name) && (
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-[9px] text-slate-500">szt:</span>
+                                                                <input
+                                                                    type="number" min="1" max="20"
+                                                                    value={addon.quantity}
+                                                                    onChange={e => setProductAddons(prev => prev.map((a, idx) => idx === i ? { ...a, quantity: parseInt(e.target.value) || 1 } : a))}
+                                                                    className="w-12 p-1 text-xs text-center border border-blue-200 rounded bg-white font-bold"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <select
+                                                            value={addon.placement}
+                                                            onChange={e => setProductAddons(prev => prev.map((a, idx) => idx === i ? { ...a, placement: e.target.value } : a))}
+                                                            className="text-[10px] p-1 border border-blue-200 rounded bg-white text-blue-700 font-medium"
+                                                        >
+                                                            {placementOptions.map(p => (
+                                                                <option key={p.id} value={p.id}>{p.label}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button type="button" onClick={() => setProductAddons(prev => prev.filter((_, idx) => idx !== i))} className="text-blue-400 hover:text-red-500 transition-colors">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                    </div>
+                                                    {/* Dimensions for ZIP/Seitenwand/Schiebewand */}
+                                                    {needsDimensions(addon.name) && (
+                                                        <div className="flex gap-2 mt-1.5">
+                                                            <div className="flex-1">
+                                                                <input
+                                                                    type="number"
+                                                                    value={addon.width || ''}
+                                                                    onChange={e => setProductAddons(prev => prev.map((a, idx) => idx === i ? { ...a, width: e.target.value } : a))}
+                                                                    placeholder="Szer. (mm)"
+                                                                    className="w-full p-1.5 text-xs border border-blue-200 rounded bg-white text-center"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <input
+                                                                    type="number"
+                                                                    value={addon.height || ''}
+                                                                    onChange={e => setProductAddons(prev => prev.map((a, idx) => idx === i ? { ...a, height: e.target.value } : a))}
+                                                                    placeholder="Wys. (mm)"
+                                                                    className="w-full p-1.5 text-xs border border-blue-200 rounded bg-white text-center"
+                                                                />
+                                                            </div>
+                                                            {addon.name.includes('Schiebewand') && (
+                                                                <div className="flex-1">
+                                                                    <input
+                                                                        type="number" min="1" max="10"
+                                                                        value={addon.segments || ''}
+                                                                        onChange={e => setProductAddons(prev => prev.map((a, idx) => idx === i ? { ...a, segments: e.target.value } : a))}
+                                                                        placeholder="Segm."
+                                                                        className="w-full p-1.5 text-xs border border-blue-200 rounded bg-white text-center"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
                                         </div>
                                     )}
 
                                     {/* Quick-add common addons */}
                                     <div className="flex flex-wrap gap-1 mb-2">
-                                        {commonAddons.filter(a => !productAddons.includes(a)).slice(0, 8).map(addon => (
+                                        {commonAddons.filter(a => !productAddons.some(pa => pa.name === a)).slice(0, 10).map(addon => (
                                             <button
                                                 key={addon}
                                                 type="button"
-                                                onClick={() => setProductAddons(prev => [...prev, addon])}
+                                                onClick={() => setProductAddons(prev => [...prev, { name: addon, placement: needsPlacement(addon) ? 'links' : 'alle', quantity: needsQuantity(addon) ? 1 : 1 }])}
                                                 className="px-2 py-0.5 text-[10px] bg-white border border-blue-200 rounded-full text-blue-600 hover:bg-blue-100 hover:border-blue-300 transition-colors"
                                             >
                                                 + {addon}
@@ -398,14 +551,23 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                             onKeyDown={e => {
                                                 if (e.key === 'Enter' && newAddon.trim()) {
                                                     e.preventDefault();
-                                                    setProductAddons(prev => [...prev, newAddon.trim()]);
+                                                    setProductAddons(prev => [...prev, { name: newAddon.trim(), placement: newAddonPlacement, quantity: 1 }]);
                                                     setNewAddon('');
                                                 }
                                             }}
                                         />
+                                        <select
+                                            value={newAddonPlacement}
+                                            onChange={e => setNewAddonPlacement(e.target.value)}
+                                            className="p-2 border border-blue-200 rounded-lg text-xs bg-white text-blue-700 font-medium"
+                                        >
+                                            {placementOptions.map(p => (
+                                                <option key={p.id} value={p.id}>{p.label}</option>
+                                            ))}
+                                        </select>
                                         <button type="button" onClick={() => {
                                             if (newAddon.trim()) {
-                                                setProductAddons(prev => [...prev, newAddon.trim()]);
+                                                setProductAddons(prev => [...prev, { name: newAddon.trim(), placement: newAddonPlacement, quantity: 1 }]);
                                                 setNewAddon('');
                                             }
                                         }} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-bold hover:bg-blue-600 transition-colors">+</button>
@@ -448,42 +610,57 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     </div>
                                 </div>
 
-                                {/* Ground Slopes (Gefälle) */}
-                                <div className="mb-3">
-                                    <label className="block text-xs font-bold text-emerald-700 mb-1.5">Spadki terenu / Gefälle (mm)</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div>
-                                            <input
-                                                type="number"
-                                                value={slopeLeft}
-                                                onChange={e => setSlopeLeft(e.target.value)}
-                                                placeholder="Lewo / Links"
-                                                className="w-full p-2 border border-emerald-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-emerald-400 outline-none"
-                                            />
-                                            <p className="text-[9px] text-emerald-400 text-center mt-0.5">← Links</p>
+                                {/* Leveling Profiles — only when Schiebewand is selected */}
+                                {productAddons.some(a => a.name.includes('Schiebewand') || a.name.includes('Szyby Przesuwne')) && (
+                                    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={needsLevelingProfiles}
+                                                    onChange={e => setNeedsLevelingProfiles(e.target.checked)}
+                                                    className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+                                                />
+                                                <span className="text-xs font-bold text-amber-800">Profile wyrównujące teren / Ausgleichsprofile</span>
+                                            </label>
                                         </div>
-                                        <div>
-                                            <input
-                                                type="number"
-                                                value={slopeFront}
-                                                onChange={e => setSlopeFront(e.target.value)}
-                                                placeholder="Przód / Vorne"
-                                                className="w-full p-2 border border-emerald-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-emerald-400 outline-none"
-                                            />
-                                            <p className="text-[9px] text-emerald-400 text-center mt-0.5">↓ Vorne</p>
-                                        </div>
-                                        <div>
-                                            <input
-                                                type="number"
-                                                value={slopeRight}
-                                                onChange={e => setSlopeRight(e.target.value)}
-                                                placeholder="Prawo / Rechts"
-                                                className="w-full p-2 border border-emerald-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-emerald-400 outline-none"
-                                            />
-                                            <p className="text-[9px] text-emerald-400 text-center mt-0.5">→ Rechts</p>
-                                        </div>
+                                        <p className="text-[10px] text-amber-600 mb-2">Wymagane gdy teren pod szyby przesuwne jest nierówny — podaj różnicę wysokości (mm) na każdej stronie</p>
+                                        {needsLevelingProfiles && (
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div>
+                                                    <input
+                                                        type="number"
+                                                        value={levelingLeft}
+                                                        onChange={e => setLevelingLeft(e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full p-2 border border-amber-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                                                    />
+                                                    <p className="text-[9px] text-amber-500 text-center mt-0.5">← Links (mm)</p>
+                                                </div>
+                                                <div>
+                                                    <input
+                                                        type="number"
+                                                        value={levelingFront}
+                                                        onChange={e => setLevelingFront(e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full p-2 border border-amber-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                                                    />
+                                                    <p className="text-[9px] text-amber-500 text-center mt-0.5">↓ Vorne (mm)</p>
+                                                </div>
+                                                <div>
+                                                    <input
+                                                        type="number"
+                                                        value={levelingRight}
+                                                        onChange={e => setLevelingRight(e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full p-2 border border-amber-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                                                    />
+                                                    <p className="text-[9px] text-amber-500 text-center mt-0.5">→ Rechts (mm)</p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Wall & Mounting Type */}
                                 <div className="grid grid-cols-2 gap-3 mb-3">
@@ -536,6 +713,29 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                         />
                                         <span className="text-xs text-emerald-800 font-medium">🌧️ Odpływ wody (Entwässerung vorhanden)</span>
                                     </label>
+                                    {hasDrainage && (
+                                        <div className="flex items-center gap-2 ml-6">
+                                            <span className="text-[10px] text-emerald-600 font-bold">Kierunek:</span>
+                                            {[
+                                                { id: 'links', label: '← Links' },
+                                                { id: 'rechts', label: 'Rechts →' },
+                                                { id: 'beidseitig', label: '← Obie / Beidseitig →' }
+                                            ].map(d => (
+                                                <button
+                                                    key={d.id}
+                                                    type="button"
+                                                    onClick={() => setDrainageDirection(d.id)}
+                                                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition-colors ${
+                                                        drainageDirection === d.id
+                                                            ? 'bg-emerald-600 text-white border-emerald-600'
+                                                            : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                                                    }`}
+                                                >
+                                                    {d.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Technical Notes */}
@@ -551,11 +751,65 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 </div>
                             </div>
 
+                            {/* Delivery Address & Installation Date */}
+                            <div className="bg-violet-50 p-4 rounded-xl border border-violet-200">
+                                <h3 className="font-bold text-violet-800 text-sm flex items-center gap-2 mb-3">
+                                    <span>📦</span> Dostawa i Montaż
+                                </h3>
+
+                                {/* Planned Installation Date */}
+                                <div className="mb-3">
+                                    <label className="block text-xs font-bold text-violet-600 uppercase mb-1">Planowana data montażu</label>
+                                    <input
+                                        type="date"
+                                        value={plannedInstallDate}
+                                        onChange={e => setPlannedInstallDate(e.target.value)}
+                                        className="w-full p-2.5 border border-violet-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                    />
+                                    <p className="text-[9px] text-violet-400 mt-0.5">Voraussichtlicher Montagetermin — materiały muszą być gotowe wcześniej</p>
+                                </div>
+
+                                {/* Delivery Address */}
+                                <div>
+                                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={deliverySameAsClient}
+                                            onChange={e => setDeliverySameAsClient(e.target.checked)}
+                                            className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-400"
+                                        />
+                                        <span className="text-xs text-violet-800 font-medium">Adres dostawy = adres klienta</span>
+                                    </label>
+                                    {!deliverySameAsClient && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    value={deliveryAddress}
+                                                    onChange={e => setDeliveryAddress(e.target.value)}
+                                                    placeholder="Ulica i numer"
+                                                    className="w-full p-2.5 border border-violet-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    value={deliveryCity}
+                                                    onChange={e => setDeliveryCity(e.target.value)}
+                                                    placeholder="Miasto / PLZ"
+                                                    className="w-full p-2.5 border border-violet-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Items Section */}
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                                 <h3 className="font-bold text-slate-800 mb-3 flex items-center justify-between">
                                     <span>Elementy Umowy</span>
-                                    <span className="text-xs text-slate-500">{items.length + productAddons.length} elementów</span>
+                                    <span className="text-xs text-slate-500">{items.length + productAddons.length} elementów/pozycji</span>
                                 </h3>
 
                                 {/* List of Items + Addons */}
@@ -591,7 +845,12 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                                 {productAddons.map((addon, i) => (
                                                     <tr key={`addon-${i}`} className="bg-blue-50/30">
                                                         <td className="p-2 pl-4">
-                                                            <div className="font-medium text-slate-700">{addon}</div>
+                                                            <div className="font-medium text-slate-700">{addon.name}</div>
+                                                            {addon.placement && addon.placement !== 'alle' && (
+                                                                <div className="text-[10px] text-blue-600 font-medium">
+                                                                    📍 {placementOptions.find(p => p.id === addon.placement)?.label || addon.placement}
+                                                                </div>
+                                                            )}
                                                         </td>
                                                         <td className="p-2 text-center">1</td>
                                                         <td className="p-2 text-center">
@@ -670,24 +929,28 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     <span>💰</span> Podsumowanie Finansowe
                                 </h3>
 
-                                {/* Total Contract Price */}
+                                {/* Total Contract Price — Netto / Brutto bidirectional */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Netto (EUR)</label>
                                         <input
                                             type="text"
                                             value={totalContractPrice}
-                                            onChange={e => setTotalContractPrice(e.target.value)}
+                                            onChange={e => handleNettoChange(e.target.value)}
                                             placeholder="np. 5000"
-                                            className="w-full p-2.5 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-right font-bold text-lg"
+                                            className={`w-full p-2.5 border-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-right font-bold text-lg ${priceInputMode === 'netto' ? 'border-indigo-400 bg-white' : 'border-slate-200 bg-slate-50'}`}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Brutto</label>
-                                        <div className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-600 text-right text-lg">
-                                            {(totalPrice * 1.19).toFixed(2)} €
-                                            <span className="text-[10px] text-slate-400 ml-1">(19% MwSt)</span>
-                                        </div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Brutto (EUR)</label>
+                                        <input
+                                            type="text"
+                                            value={totalContractPriceBrutto}
+                                            onChange={e => handleBruttoChange(e.target.value)}
+                                            placeholder="np. 5950"
+                                            className={`w-full p-2.5 border-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-right font-bold text-lg ${priceInputMode === 'brutto' ? 'border-indigo-400 bg-white' : 'border-slate-200 bg-slate-50'}`}
+                                        />
+                                        <p className="text-[10px] text-slate-400 text-right mt-0.5">19% MwSt</p>
                                     </div>
                                 </div>
 
@@ -738,17 +1001,45 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     </div>
                                 </div>
 
+                                {/* Advance + Payment */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zaliczka (EUR)</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Zaliczka (EUR)</label>
+                                            <div className="flex items-center gap-1">
+                                                <button type="button" onClick={() => setAdvanceType('netto')} className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${advanceType === 'netto' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Netto</button>
+                                                <button type="button" onClick={() => setAdvanceType('brutto')} className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${advanceType === 'brutto' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Brutto</button>
+                                            </div>
+                                        </div>
                                         <input
                                             type="number"
                                             value={advance}
                                             onChange={e => setAdvance(e.target.value)}
-                                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-right font-medium"
                                             min="0"
                                             step="0.01"
                                         />
+                                        {/* Quick percentage buttons */}
+                                        <div className="flex gap-1.5 mt-2">
+                                            {[50, 40, 30, 10].map(pct => (
+                                                <button
+                                                    key={pct}
+                                                    type="button"
+                                                    onClick={() => setAdvancePercent(pct)}
+                                                    className="flex-1 py-1.5 text-[10px] font-bold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                                                >
+                                                    {pct}%
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {totalPrice > 0 && advanceNum > 0 && (
+                                            <p className="text-[10px] text-slate-400 mt-1 text-right">
+                                                = {advanceType === 'brutto'
+                                                    ? `${((advanceNum / (totalPrice * 1.19)) * 100).toFixed(0)}% brutto`
+                                                    : `${((advanceNum / totalPrice) * 100).toFixed(0)}% netto`
+                                                }
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Metoda odbioru płatności</label>

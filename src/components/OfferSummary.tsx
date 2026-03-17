@@ -439,7 +439,7 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
                                 </tr>
                             )}
                             {/* Selected Add-ons */}
-                            {offer.product.addons.map((addon, idx) => (
+                            {offer.product.addons?.map((addon, idx) => (
                                 <tr key={idx} className="bg-green-50/50">
                                     <td className="py-4 text-slate-900 pl-2 border-l-2 border-green-500">
                                         <span className="font-medium">{addon.name}</span>

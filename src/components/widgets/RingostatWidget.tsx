@@ -1,15 +1,16 @@
 /**
  * RingostatWidget - Widget do wyświetlania statystyk połączeń z Ringostat
  * Shows: call list, team stats, missed call queue with callback tracking
+ * + AI Transcription Analysis & Lead Creation
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DatabaseService } from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import type { Customer, User } from '../../types';
+import type { Customer, User, Lead, LeadSource } from '../../types';
 
 interface CustomerMatch {
     customer: Customer;
@@ -54,8 +55,54 @@ interface RingostatWidgetProps {
     compact?: boolean;
 }
 
+interface DialogueLine {
+    speaker: 'Konsultant' | 'Klient';
+    text: string;
+}
+
+interface TranscriptionAnalysis {
+    clientIntroduced: boolean;
+    firstName: string;
+    lastName: string;
+    postalCode: string;
+    city: string;
+    address: string;
+    phone: string;
+    email: string;
+    summary: string;
+    productInterest: string;
+    leadQuality: 'hot' | 'warm' | 'cold';
+    detectedData: {
+        hasName: boolean;
+        hasPLZ: boolean;
+        hasAddress: boolean;
+        hasPhone: boolean;
+        hasEmail: boolean;
+    };
+}
+
+interface TranscriptionResult {
+    transcription: string;
+    analysis: TranscriptionAnalysis | null;
+    dialogue: DialogueLine[];
+    translatedDialogue: DialogueLine[];
+    error?: string;
+}
+
+interface LeadFormData {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    postalCode: string;
+    city: string;
+    address: string;
+    notes: string;
+}
+
 export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = false }) => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [stats, setStats] = useState<CallStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -67,6 +114,14 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
     const [activeTab, setActiveTab] = useState<'calls' | 'team' | 'missed'>('calls');
     const [syncing, setSyncing] = useState(false);
     const [playingRecording, setPlayingRecording] = useState<string | null>(null);
+    // Transcription & AI Analysis state
+    const [transcriptions, setTranscriptions] = useState<Record<string, TranscriptionResult>>({});
+    const [transcribing, setTranscribing] = useState<string | null>(null);
+    const [transcriptionModal, setTranscriptionModal] = useState<string | null>(null); // call.id for modal
+    const [showTranslation, setShowTranslation] = useState(false);
+    const [transcribedCallIds, setTranscribedCallIds] = useState<Set<string>>(new Set()); // calls that have AI in DB
+    const [leadForm, setLeadForm] = useState<{ callId: string; data: LeadFormData } | null>(null);
+    const [creatingLead, setCreatingLead] = useState(false);
 
     const getDateRange = useCallback(() => {
         const now = new Date();
@@ -158,11 +213,23 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         finally { setSyncing(false); }
     }, [getDateRange, fetchCallbacks]);
 
+    const fetchExistingTranscriptions = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('call_log')
+                .select('ringostat_id')
+                .not('transcription', 'is', null);
+            if (data) {
+                setTranscribedCallIds(new Set(data.map(d => d.ringostat_id)));
+            }
+        } catch (err) { console.error('Error fetching transcription IDs:', err); }
+    }, []);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
-        try { await Promise.all([fetchStats(), fetchCustomers(), fetchCallbacks(), fetchUsers()]); }
+        try { await Promise.all([fetchStats(), fetchCustomers(), fetchCallbacks(), fetchUsers(), fetchExistingTranscriptions()]); }
         finally { setLoading(false); }
-    }, [fetchStats, fetchCustomers, fetchCallbacks, fetchUsers]);
+    }, [fetchStats, fetchCustomers, fetchCallbacks, fetchUsers, fetchExistingTranscriptions]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -196,6 +263,124 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
         } catch (err) {
             console.error('Callback save error:', err);
             toast.error('Błąd zapisu oddzwonienia');
+        }
+    };
+
+    // --- Transcription handler ---
+    const handleTranscribe = async (call: CallRecord) => {
+        if (!call.recording) { toast.error('Brak nagrania'); return; }
+        // If already transcribed, just open modal
+        if (transcriptions[call.id]) {
+            setTranscriptionModal(call.id);
+            return;
+        }
+        setTranscribing(call.id);
+        setTranscriptionModal(call.id);
+        try {
+            // Check if transcription already exists in call_log
+            const { data: existing } = await supabase
+                .from('call_log')
+                .select('transcription, ai_analysis')
+                .eq('ringostat_id', call.id)
+                .not('transcription', 'is', null)
+                .maybeSingle();
+
+            if (existing?.transcription) {
+                const cached: TranscriptionResult = {
+                    transcription: existing.transcription,
+                    analysis: existing.ai_analysis,
+                    dialogue: existing.ai_analysis?.dialogue || [],
+                    translatedDialogue: existing.ai_analysis?.translatedDialogue || [],
+                };
+                setTranscriptions(prev => ({ ...prev, [call.id]: cached }));
+                setTranscribing(null);
+                return;
+            }
+
+            // Call edge function
+            const { data: fnData, error: fnError } = await supabase.functions.invoke('analyze-call-recording', {
+                body: { recording_url: call.recording, call_id: call.id }
+            });
+
+            if (fnError) throw fnError;
+            setTranscriptions(prev => ({ ...prev, [call.id]: fnData as TranscriptionResult }));
+            toast.success('Transkrypcja gotowa');
+            setTranscribedCallIds(prev => new Set([...prev, call.id]));
+        } catch (err: any) {
+            console.error('Transcription error:', err);
+            toast.error(`Błąd transkrypcji: ${err.message || 'Nieznany błąd'}`);
+            setTranscriptions(prev => ({ ...prev, [call.id]: { transcription: '', analysis: null, dialogue: [], translatedDialogue: [], error: err.message } }));
+        } finally {
+            setTranscribing(null);
+        }
+    };
+
+    // --- Lead creation from transcription ---
+    const openLeadForm = (callId: string) => {
+        const t = transcriptions[callId];
+        if (!t?.analysis) return;
+        const a = t.analysis;
+        const call = allCalls.find(c => c.id === callId);
+        const clientNum = call ? (call.client_number || (call.direction === 'incoming' ? call.caller : call.callee)) : '';
+        setLeadForm({
+            callId,
+            data: {
+                firstName: a.firstName || '',
+                lastName: a.lastName || '',
+                phone: a.phone || clientNum || '',
+                email: a.email || '',
+                postalCode: a.postalCode || '',
+                city: a.city || '',
+                address: a.address || '',
+                notes: `${a.summary || ''}${a.productInterest ? `\nProdukt: ${a.productInterest}` : ''}`
+            }
+        });
+    };
+
+    const handleCreateCustomerOrLead = async (mode: 'customer' | 'customer_lead') => {
+        if (!leadForm || !currentUser) return;
+        const d = leadForm.data;
+        if (!d.lastName.trim()) { toast.error('Nazwisko jest wymagane'); return; }
+        setCreatingLead(true);
+        try {
+            if (mode === 'customer') {
+                // Create customer only
+                await DatabaseService.createCustomer({
+                    firstName: d.firstName.trim(),
+                    lastName: d.lastName.trim(),
+                    phone: d.phone.trim(),
+                    email: d.email.trim(),
+                    city: d.city.trim(),
+                    postalCode: d.postalCode.trim(),
+                    street: d.address.trim(),
+                });
+                toast.success(`Klient ${d.firstName} ${d.lastName} utworzony!`);
+            } else {
+                // Create lead (which also creates/links customer)
+                const lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> = {
+                    status: 'new',
+                    source: 'phone' as LeadSource,
+                    customerData: {
+                        firstName: d.firstName.trim(),
+                        lastName: d.lastName.trim(),
+                        phone: d.phone.trim(),
+                        email: d.email.trim(),
+                        city: d.city.trim(),
+                        postalCode: d.postalCode.trim(),
+                        address: d.address.trim(),
+                    },
+                    notes: d.notes.trim(),
+                    assignedTo: currentUser.id,
+                };
+                await DatabaseService.createLead(lead);
+                toast.success(`Lead + Klient ${d.firstName} ${d.lastName} utworzony!`);
+            }
+            setLeadForm(null);
+        } catch (err: any) {
+            console.error('Create error:', err);
+            toast.error(`Błąd: ${err.message}`);
+        } finally {
+            setCreatingLead(false);
         }
     };
 
@@ -416,81 +601,94 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                                     const dirArrow = call.direction === 'incoming' ? '↙' : '↗';
 
                                     return (
-                                        <tr key={call.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors ${isMissed && !cb ? 'bg-rose-50/40' : ''}`}>
-                                            {/* Time + direction */}
-                                            <td className="px-2 py-1.5 whitespace-nowrap">
-                                                <div className="flex items-center gap-1">
-                                                    <span className={`${dirColor} text-xs font-bold`}>{dirArrow}</span>
-                                                    <span className="text-slate-500">{formatDate(call.date)}</span>
-                                                </div>
-                                            </td>
-                                            {/* Client number — always the external/client number */}
-                                            <td className="px-2 py-1.5 whitespace-nowrap">
-                                                <span className="font-mono text-slate-700">{clientNum || '—'}</span>
-                                            </td>
-                                            {/* Our number — always the internal/company number */}
-                                            <td className="px-2 py-1.5 whitespace-nowrap">
-                                                <span className="font-mono text-slate-400">{internalNum || '—'}</span>
-                                            </td>
-                                            {/* Client match */}
-                                            <td className="px-2 py-1.5">
-                                                {match ? (
-                                                    <Link to={`/customers/${match.customer.id}`} className="font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1">
-                                                        <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-[7px] font-bold shrink-0">
-                                                            {match.customer.firstName[0]}{match.customer.lastName[0]}
+                                        <React.Fragment key={call.id}>
+                                            <tr className={`border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors ${isMissed && !cb ? 'bg-rose-50/40' : ''}`}>
+                                                {/* Time + direction */}
+                                                <td className="px-2 py-1.5 whitespace-nowrap">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className={`${dirColor} text-xs font-bold`}>{dirArrow}</span>
+                                                        <span className="text-slate-500">{formatDate(call.date)}</span>
+                                                    </div>
+                                                </td>
+                                                {/* Client number — always the external/client number */}
+                                                <td className="px-2 py-1.5 whitespace-nowrap">
+                                                    <span className="font-mono text-slate-700">{clientNum || '—'}</span>
+                                                </td>
+                                                {/* Our number — always the internal/company number */}
+                                                <td className="px-2 py-1.5 whitespace-nowrap">
+                                                    <span className="font-mono text-slate-400">{internalNum || '—'}</span>
+                                                </td>
+                                                {/* Client match */}
+                                                <td className="px-2 py-1.5">
+                                                    {match ? (
+                                                        <Link to={`/customers/${match.customer.id}`} className="font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1">
+                                                            <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-[7px] font-bold shrink-0">
+                                                                {match.customer.firstName[0]}{match.customer.lastName[0]}
+                                                            </span>
+                                                            <span className="truncate max-w-[100px]">{match.customer.firstName} {match.customer.lastName}</span>
+                                                        </Link>
+                                                    ) : consultant ? (
+                                                        <span className="text-slate-500">{consultant.firstName} {consultant.lastName}</span>
+                                                    ) : (
+                                                        <Link to={`/customers/new?phone=${clientNum}`}
+                                                            className="text-slate-400 hover:text-green-600 flex items-center gap-1 transition-colors" title="Dodaj do bazy">
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                                            <span className="text-[10px]">Dodaj</span>
+                                                        </Link>
+                                                    )}
+                                                </td>
+                                                {/* Status + Duration */}
+                                                <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                                                    {isMissed ? (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Nieodebr.
                                                         </span>
-                                                        <span className="truncate max-w-[100px]">{match.customer.firstName} {match.customer.lastName}</span>
-                                                    </Link>
-                                                ) : consultant ? (
-                                                    <span className="text-slate-500">{consultant.firstName} {consultant.lastName}</span>
-                                                ) : (
-                                                    <Link to={`/customers/new?phone=${clientNum}`}
-                                                        className="text-slate-400 hover:text-green-600 flex items-center gap-1 transition-colors" title="Dodaj do bazy">
-                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                                                        <span className="text-[10px]">Dodaj</span>
-                                                    </Link>
-                                                )}
-                                            </td>
-                                            {/* Status + Duration */}
-                                            <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                                                {isMissed ? (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Nieodebr.
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{call.duration > 0 ? formatDuration(call.duration) : 'Odebr.'}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            {/* Actions */}
-                                            <td className="px-2 py-1.5 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {call.recording && (
-                                                        <button onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
-                                                            className="text-[10px] bg-slate-700 text-white w-5 h-5 rounded flex items-center justify-center hover:bg-slate-800 transition-colors">
-                                                            {playingRecording === call.id ? <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" /></svg> : <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
-                                                        </button>
-                                                    )}
-                                                    {isMissed && !cb && call.direction === 'incoming' && (
-                                                        <button onClick={() => handleCallback(call.id)}
-                                                            className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded hover:bg-rose-700 font-semibold transition-colors flex items-center gap-0.5">
-                                                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                                            Oddzwoń
-                                                        </button>
-                                                    )}
-                                                    {cb && (
-                                                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
-                                                            title={`Oddzwonił: ${cb.user_name}\n${cb.callback_at ? new Date(cb.callback_at).toLocaleString('pl-PL') : ''}`}>
-                                                            <span className="inline-flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>{cb.user_name}</span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{call.duration > 0 ? formatDuration(call.duration) : 'Odebr.'}
                                                         </span>
                                                     )}
-                                                </div>
-                                                {playingRecording === call.id && call.recording && (
-                                                    <audio controls autoPlay className="w-full h-6 mt-1" style={{ maxWidth: 150 }}><source src={call.recording} /></audio>
-                                                )}
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                {/* Actions */}
+                                                <td className="px-2 py-1.5 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {call.recording && (
+                                                            <>
+                                                                <button onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
+                                                                    className="text-[10px] bg-slate-700 text-white w-5 h-5 rounded flex items-center justify-center hover:bg-slate-800 transition-colors" title="Odtwórz">
+                                                                    {playingRecording === call.id ? <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" /></svg> : <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
+                                                                </button>
+                                                                <button onClick={() => handleTranscribe(call)}
+                                                                    disabled={transcribing === call.id}
+                                                                    className={`text-[10px] px-1.5 py-0.5 rounded font-semibold transition-colors flex items-center gap-0.5 ${transcribing === call.id ? 'bg-amber-100 text-amber-700 animate-pulse' :
+                                                                            (transcriptions[call.id] || transcribedCallIds.has(call.id)) ? 'bg-violet-100 text-violet-700 hover:bg-violet-200 border border-violet-200' :
+                                                                                'bg-violet-600 text-white hover:bg-violet-700'
+                                                                        }`} title="Transkrypcja AI">
+                                                                    {transcribing === call.id ? '⏳' : (transcriptions[call.id] || transcribedCallIds.has(call.id)) ? '✨' : '📝'}
+                                                                    {transcribing === call.id ? 'Analizuję...' : (transcriptions[call.id] || transcribedCallIds.has(call.id)) ? 'Pokaż' : 'AI'}
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        {isMissed && !cb && call.direction === 'incoming' && (
+                                                            <button onClick={() => handleCallback(call.id)}
+                                                                className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded hover:bg-rose-700 font-semibold transition-colors flex items-center gap-0.5">
+                                                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                                                Oddzwoń
+                                                            </button>
+                                                        )}
+                                                        {cb && (
+                                                            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                                                                title={`Oddzwonił: ${cb.user_name}\n${cb.callback_at ? new Date(cb.callback_at).toLocaleString('pl-PL') : ''}`}>
+                                                                <span className="inline-flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>{cb.user_name}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {playingRecording === call.id && call.recording && (
+                                                        <audio controls autoPlay className="w-full h-6 mt-1" style={{ maxWidth: 150 }}><source src={call.recording} /></audio>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>
@@ -604,18 +802,247 @@ export const RingostatWidget: React.FC<RingostatWidgetProps> = ({ compact = fals
                 )}
             </div>
 
-            {/* Detail modal from compact view */}
-            {showDetails && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-                        <div className="p-3 border-b flex justify-between items-center bg-slate-50">
-                            <h2 className="font-bold text-base">Raport Połączeń</h2>
-                            <button onClick={() => setShowDetails(false)} className="w-7 h-7 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100 text-sm">✕</button>
+            {/* ===== TRANSCRIPTION MODAL ===== */}
+            {transcriptionModal && (() => {
+                const t = transcriptions[transcriptionModal];
+                const call = allCalls.find(c => c.id === transcriptionModal);
+                const clientNum = call ? (call.client_number || (call.direction === 'incoming' ? call.caller : call.callee)) : '';
+                const dialogueToShow = showTranslation ? (t?.translatedDialogue || []) : (t?.dialogue || []);
+                return (
+                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm" onClick={() => setTranscriptionModal(null)}>
+                        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                            {/* Header */}
+                            <div className="p-4 border-b bg-gradient-to-r from-violet-50 to-indigo-50 flex justify-between items-center">
+                                <div>
+                                    <h2 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                                        📞 Analiza rozmowy
+                                        {t?.analysis?.leadQuality && (
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${t.analysis.leadQuality === 'hot' ? 'bg-red-100 text-red-700' : t.analysis.leadQuality === 'warm' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {t.analysis.leadQuality === 'hot' ? '🔥 Hot' : t.analysis.leadQuality === 'warm' ? '🌤 Warm' : '❄️ Cold'}
+                                            </span>
+                                        )}
+                                    </h2>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {call ? `${formatDate(call.date)} • ${clientNum} • ${formatDuration(call.duration)}` : ''}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {/* Translation toggle */}
+                                    {t?.translatedDialogue && t.translatedDialogue.length > 0 && (
+                                        <button onClick={() => setShowTranslation(!showTranslation)}
+                                            className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${showTranslation ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                            🇵🇱 {showTranslation ? 'Polski' : 'Tłumacz'}
+                                        </button>
+                                    )}
+                                    <button onClick={() => setTranscriptionModal(null)} className="w-8 h-8 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100 text-sm shadow-sm">✕</button>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {/* Loading state */}
+                                {transcribing === transcriptionModal && (
+                                    <div className="flex flex-col items-center justify-center py-12">
+                                        <div className="w-12 h-12 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin mb-4"></div>
+                                        <p className="text-sm font-semibold text-slate-600">Transkrybuję i analizuję...</p>
+                                        <p className="text-xs text-slate-400 mt-1">To może potrwać 10-30 sekund</p>
+                                    </div>
+                                )}
+
+                                {/* Error */}
+                                {t?.error && (
+                                    <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm border border-red-200">
+                                        ❌ {t.error}
+                                    </div>
+                                )}
+
+                                {/* Summary */}
+                                {t?.analysis?.summary && (
+                                    <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-xl p-3 border border-indigo-100">
+                                        <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">💡 Podsumowanie</div>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{t.analysis.summary}</p>
+                                    </div>
+                                )}
+
+                                {/* Detection badges */}
+                                {t?.analysis && (() => {
+                                    const a = t.analysis!;
+                                    const d = a.detectedData;
+                                    return (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${d?.hasName ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                                {d?.hasName ? '✅' : '❌'} {a.firstName || a.lastName ? `${a.firstName} ${a.lastName}`.trim() : 'Imię'}
+                                            </span>
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${d?.hasPLZ ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                                {d?.hasPLZ ? '✅' : '❌'} PLZ: {a.postalCode || '—'}
+                                            </span>
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${d?.hasAddress ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                                {d?.hasAddress ? '✅' : '❌'} {a.address && a.city ? `${a.address}, ${a.city}` : 'Adres'}
+                                            </span>
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${d?.hasPhone ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                                {d?.hasPhone ? '✅' : '❌'} Tel: {a.phone || '—'}
+                                            </span>
+                                            {d?.hasEmail && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">✅ {a.email}</span>}
+                                            {a.productInterest && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">🏠 {a.productInterest}</span>}
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Dialogue */}
+                                {dialogueToShow.length > 0 && (
+                                    <div>
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                            💬 {showTranslation ? 'Dialog (tłumaczenie PL)' : 'Dialog (oryginał DE)'}
+                                        </div>
+                                        <div className="space-y-2">
+                                            {dialogueToShow.map((line, idx) => (
+                                                <div key={idx} className={`flex gap-2 ${line.speaker === 'Klient' ? 'flex-row-reverse' : ''}`}>
+                                                    <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${line.speaker === 'Konsultant' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                        {line.speaker === 'Konsultant' ? '👤' : '👥'}
+                                                    </div>
+                                                    <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed ${line.speaker === 'Konsultant' ? 'bg-blue-50 text-slate-700 rounded-tl-sm' : 'bg-orange-50 text-slate-700 rounded-tr-sm'}`}>
+                                                        <div className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${line.speaker === 'Konsultant' ? 'text-blue-500' : 'text-orange-500'}`}>
+                                                            {line.speaker}
+                                                        </div>
+                                                        {line.text}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Fallback: raw transcription if no dialogue */}
+                                {(!dialogueToShow || dialogueToShow.length === 0) && t?.transcription && !transcribing && (
+                                    <div>
+                                        <div className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-1">📝 Transkrypcja (raw)</div>
+                                        <div className="bg-slate-50 rounded-lg border p-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                                            {t.transcription}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer with actions */}
+                            {t?.analysis && !transcribing && (
+                                <div className="p-4 border-t bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="text-xs text-slate-400">Utwórz z danych AI:</div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => { openLeadForm(transcriptionModal!); setTranscriptionModal(null); }}
+                                            className="px-3 py-2 bg-slate-600 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
+                                            👤 Utwórz Klienta
+                                        </button>
+                                        <button onClick={() => { openLeadForm(transcriptionModal!); setTranscriptionModal(null); }}
+                                            className="px-3 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg text-xs font-semibold hover:from-indigo-700 hover:to-violet-700 shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
+                                            📊 Utwórz Klienta + Lead
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex-1 overflow-auto"><RingostatWidget compact={false} /></div>
+                    </div>
+                );
+            })()}
+
+            {/* Lead/Customer creation modal from AI analysis */}
+            {leadForm && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl">
+                        <div className="p-4 border-b bg-gradient-to-r from-indigo-50 to-violet-50 flex justify-between items-center">
+                            <div>
+                                <h2 className="font-bold text-base text-slate-800">Dane klienta z rozmowy</h2>
+                                <p className="text-xs text-slate-500 mt-0.5">Sprawdź i edytuj dane wykryte przez AI</p>
+                            </div>
+                            <button onClick={() => setLeadForm(null)} className="w-7 h-7 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100 text-sm shadow-sm">✕</button>
+                        </div>
+                        <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Imię</label>
+                                    <input type="text" value={leadForm.data.firstName}
+                                        onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, firstName: e.target.value } } : null)}
+                                        className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="Vorname" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nazwisko *</label>
+                                    <input type="text" value={leadForm.data.lastName}
+                                        onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, lastName: e.target.value } } : null)}
+                                        className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="Nachname" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Telefon</label>
+                                    <input type="text" value={leadForm.data.phone}
+                                        onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, phone: e.target.value } } : null)}
+                                        className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="+49..." />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email</label>
+                                    <input type="email" value={leadForm.data.email}
+                                        onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, email: e.target.value } } : null)}
+                                        className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="email@..." />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PLZ</label>
+                                    <input type="text" value={leadForm.data.postalCode}
+                                        onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, postalCode: e.target.value } } : null)}
+                                        className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="12345" />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Miasto</label>
+                                    <input type="text" value={leadForm.data.city}
+                                        onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, city: e.target.value } } : null)}
+                                        className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="Stadt" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Adres (ulica + nr)</label>
+                                <input type="text" value={leadForm.data.address}
+                                    onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, address: e.target.value } } : null)}
+                                    className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all" placeholder="Straße Nr." />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Notatki</label>
+                                <textarea value={leadForm.data.notes}
+                                    onChange={e => setLeadForm(prev => prev ? { ...prev, data: { ...prev.data, notes: e.target.value } } : null)}
+                                    rows={3}
+                                    className="mt-0.5 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-all resize-none" placeholder="Podsumowanie rozmowy..." />
+                            </div>
+                        </div>
+                        <div className="p-4 border-t bg-slate-50 flex items-center justify-between gap-2">
+                            <button onClick={() => setLeadForm(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium">Anuluj</button>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handleCreateCustomerOrLead('customer')} disabled={creatingLead}
+                                    className="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm font-semibold hover:bg-slate-700 shadow-sm disabled:opacity-50 transition-all flex items-center gap-1.5 active:scale-95">
+                                    {creatingLead ? <><span className="animate-spin">⟳</span> Tworzę...</> : <>👤 Tylko Klient</>}
+                                </button>
+                                <button onClick={() => handleCreateCustomerOrLead('customer_lead')} disabled={creatingLead}
+                                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-700 hover:to-violet-700 shadow-sm disabled:opacity-50 transition-all flex items-center gap-1.5 active:scale-95">
+                                    {creatingLead ? <><span className="animate-spin">⟳</span> Tworzę...</> : <>📊 Klient + Lead</>}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
-        </div>
+
+            {/* Detail modal from compact view */}
+            {
+                showDetails && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                            <div className="p-3 border-b flex justify-between items-center bg-slate-50">
+                                <h2 className="font-bold text-base">Raport Połączeń</h2>
+                                <button onClick={() => setShowDetails(false)} className="w-7 h-7 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100 text-sm">✕</button>
+                            </div>
+                            <div className="flex-1 overflow-auto"><RingostatWidget compact={false} /></div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };

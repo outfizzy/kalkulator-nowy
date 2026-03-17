@@ -14,6 +14,8 @@ export const Layout: React.FC = () => {
     const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ sprzedaz: true });
+    const toggleSection = (key: string) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
     // Poll unread email count every 3 minutes
     const checkUnread = useCallback(async () => {
@@ -82,77 +84,125 @@ export const Layout: React.FC = () => {
                     {/* SPRZEDAŻ - Always visible or granular? Let's use permissions */}
                     {(hasPermission('dashboard') || hasPermission('crm_mail') || hasPermission('crm_tasks') || hasPermission('crm_leads') || hasPermission('crm_clients') || hasPermission('offers_create') || hasPermission('ai_assistant')) && (
                         <div className="space-y-1">
-                            <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sprzedaż</div>
-                            {hasPermission('dashboard') && <NavLink to="/dashboard" label="Dashboard" icon="dashboard" />}
-                            {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" badge={unreadCount} />}
-                            {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" />}
-                            {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" />}
-                            <NavLink to="/admin/fairs" label="Targi / Hub" icon="calendar" />
-                            {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" />}
-                            {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />}
-                            {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" />}
-                            {hasPermission('ai_assistant') && (
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setAiSidebarOpen(true);
-                                    }}
-                                    className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-slate-400 hover:bg-slate-800 hover:text-white w-full text-left"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                    </svg>
-                                    Asystent AI
-                                </button>
-                            )}
-                            {/* Visualizer? */}
-                            {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
-                            <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" />
+                            <button onClick={() => toggleSection('sprzedaz')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sprzedaż</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.sprzedaz ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.sprzedaz && (<>
+                                {hasPermission('dashboard') && <NavLink to="/dashboard" label="Dashboard" icon="dashboard" />}
+                                {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" badge={unreadCount} />}
+                                {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" />}
+                                {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" />}
+                                <NavLink to="/admin/fairs" label="Targi / Hub" icon="calendar" />
+                                {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" />}
+                                {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />}
+                                {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" />}
+                                {hasPermission('ai_assistant') && (
+                                    <NavLink to="/ai-assistant" label="Chat GPT" icon="chat" />
+                                )}
+                                {/* Visualizer? */}
+                                {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
+                                <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" />
+                            </>)}
                         </div>
                     )}
+
+                    {/* TELEFONIA */}
+                    <div className="space-y-1">
+                        <button onClick={() => toggleSection('telefonia')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">📞 Telefonia</span>
+                            <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.telefonia ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+                        {expandedSections.telefonia && (<>
+                            <NavLink to="/telephony/calls" label="Połączenia" icon="phone" />
+                            <NavLink to="/telephony/sms" label="SMS" icon="chat" />
+                            <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" />
+                            <NavLink to="/telephony/whatsapp/campaigns" label="Kampanie WA" icon="mail" />
+                            <NavLink to="/telephony/voicemail" label="Poczta Głosowa" icon="bell" />
+                            {isAdmin() && <NavLink to="/telephony/numbers" label="Numery Tel." icon="settings" />}
+                        </>)}
+                    </div>
 
                     {/* REALIZACJA */}
                     {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module') || hasPermission('portfolio_map')) && (
                         <div className="space-y-1">
-                            <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Realizacja</div>
-                            {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" />}
-                            {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />}
-                            {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" />}
-                            {hasPermission('logistics') && <NavLink to="/procurement" label="Logistyka" icon="box" />}
-                            {hasPermission('deliveries') && <NavLink to="/deliveries" label="Dostawy" icon="calendar" />}
-                            {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />}
-                            {hasPermission('service_module') && <NavLink to="/service" label="Serwis" icon="tools" />}
+                            <button onClick={() => toggleSection('realizacja')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Realizacja</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.realizacja ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.realizacja && (<>
+                                {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" />}
+                                {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />}
+                                {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/advance-payments" label="💰 Zaliczki" icon="clipboard" />}
+                                {hasPermission('logistics') && <NavLink to="/procurement" label="Logistyka" icon="box" />}
+                                {hasPermission('deliveries') && <NavLink to="/deliveries" label="Dostawy" icon="calendar" />}
+                                {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />}
+                                {hasPermission('service_module') && <NavLink to="/service" label="Serwis" icon="tools" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/routing" label="🗺️ AI Routing" icon="map" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/profitability" label="💰 Rentowność" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager' || currentUser?.role === 'sales_rep') && <NavLink to="/admin/teams-dashboard" label="👷 Dashboard Ekip" icon="users" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/installers" label="🔧 Zarządzanie Ekipami" icon="users" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="⛽ Dziennik Paliwa" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/failures" label="⚠️ Zgłoszenia Awarii" icon="tools" />}
+                            </>)}
                         </div>
                     )}
 
                     {/* ADMINISTRACJA */}
                     {(hasPermission('stats_dashboard') || hasPermission('team_management') || hasPermission('partner_management') || hasPermission('pricing_management') || hasPermission('inventory_lite') || hasPermission('system_logs') || hasPermission('system_notifications') || hasPermission('settings_general')) && (
                         <div className="space-y-1">
-                            <div className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Administracja</div>
-                            {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />}
-                            {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" />}
-                            {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
-                            {hasPermission('pricing_management') && <NavLink to="/admin/product-images" label="Zdjęcia Produktów" icon="offers" />}
-                            {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
-                            {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/wallet" label="Portfel" icon="clipboard" />}
-                            {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
-                            <NavLink to="/admin/error-reports" label="Raporty Błędów" icon="bell" />
-                            <NavLink to="/admin/email-templates" label="Szablony Wiadomości" icon="mail" />
-                            {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" />}
+                            <button onClick={() => toggleSection('administracja')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Administracja</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.administracja ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.administracja && (<>
+                                {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />}
+                                {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" />}
+                                {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
+                                {hasPermission('pricing_management') && <NavLink to="/admin/product-images" label="Zdjęcia Produktów" icon="offers" />}
+                                {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/wallet" label="Portfel" icon="clipboard" />}
+                                {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
+                                <NavLink to="/admin/error-reports" label="Raporty Błędów" icon="bell" />
+                                <NavLink to="/admin/email-templates" label="Szablony Wiadomości" icon="mail" />
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/marketing" label="📊 Marketing Intelligence" icon="dashboard" />}
+                                {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" />}
+                            </>)}
+                        </div>
+                    )}
+
+                    {/* FACEBOOK ADS MANAGER */}
+                    {(isAdmin() || currentUser?.role === 'manager') && (
+                        <div className="space-y-1">
+                            <button onClick={() => toggleSection('facebook')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">📘 Facebook Ads</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.facebook ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.facebook && (<>
+                                <NavLink to="/admin/facebook-ads" label="Menedżer Reklam" icon="dashboard" />
+                                <NavLink to="/admin/facebook-ads?tab=contacts" label="Kontakty FB" icon="users" />
+                                <NavLink to="/admin/facebook-ads?tab=ai" label="AI Asystent" icon="chat" />
+                            </>)}
                         </div>
                     )}
 
                     {/* PORTAL B2B */}
                     {hasPermission('partner_management') && (
                         <div className="space-y-1">
-                            <div className="px-4 text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🏢 Portal B2B</div>
-                            <NavLink to="/admin/b2b/partners" label="Partnerzy B2B" icon="users" />
-                            <NavLink to="/admin/b2b/offers" label="Oferty B2B" icon="clipboard" />
-                            <NavLink to="/admin/b2b/orders" label="Zamówienia B2B" icon="box" />
-                            <NavLink to="/admin/b2b/promotions" label="Promocje" icon="offers" />
-                            <NavLink to="/admin/b2b/credit" label="Kredyt Kupiecki" icon="clipboard" />
-                            <NavLink to="/admin/b2b/analytics" label="Analityka" icon="dashboard" />
-                            <NavLink to="/admin/b2b/marketing" label="Materiały Marketingowe" icon="offers" />
+                            <button onClick={() => toggleSection('b2b')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">🏢 Portal B2B</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.b2b ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.b2b && (<>
+                                <NavLink to="/admin/b2b/partners" label="Partnerzy B2B" icon="users" />
+                                <NavLink to="/admin/b2b/offers" label="Oferty B2B" icon="clipboard" />
+                                <NavLink to="/admin/b2b/orders" label="Zamówienia B2B" icon="box" />
+                                <NavLink to="/admin/b2b/promotions" label="Promocje" icon="offers" />
+                                <NavLink to="/admin/b2b/credit" label="Kredyt Kupiecki" icon="clipboard" />
+                                <NavLink to="/admin/b2b/analytics" label="Analityka" icon="dashboard" />
+                                <NavLink to="/admin/b2b/marketing" label="Materiały Marketingowe" icon="offers" />
+                            </>)}
                         </div>
                     )}
                 </nav>
@@ -166,6 +216,16 @@ export const Layout: React.FC = () => {
                             <p className="text-xs text-slate-400">{roleName}</p>
                         </div>
                     </div>
+                    <Link
+                        to="/settings"
+                        className="w-full px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        ⚙️ Moje Ustawienia
+                    </Link>
                     <button
                         onClick={handleLogout}
                         className="w-full px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -225,6 +285,17 @@ export const Layout: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* TELEFONIA */}
+                            <div className="space-y-1">
+                                <div className="px-4 text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-2">📞 Telefonia</div>
+                                <NavLink to="/telephony/calls" label="Połączenia" icon="phone" onClick={() => setMobileMenuOpen(false)} />
+                                <NavLink to="/telephony/sms" label="SMS" icon="chat" onClick={() => setMobileMenuOpen(false)} />
+                                <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" onClick={() => setMobileMenuOpen(false)} />
+                                <NavLink to="/telephony/whatsapp/campaigns" label="Kampanie WA" icon="mail" onClick={() => setMobileMenuOpen(false)} />
+                                <NavLink to="/telephony/voicemail" label="Poczta Głosowa" icon="bell" onClick={() => setMobileMenuOpen(false)} />
+                                {isAdmin() && <NavLink to="/telephony/numbers" label="Numery Tel." icon="settings" onClick={() => setMobileMenuOpen(false)} />}
+                            </div>
+
                             {/* REALIZACJA */}
                             {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
                                 <div className="space-y-1">
@@ -232,10 +303,17 @@ export const Layout: React.FC = () => {
                                     {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/advance-payments" label="💰 Zaliczki" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('logistics') && <NavLink to="/procurement" label="Logistyka" icon="box" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('deliveries') && <NavLink to="/deliveries" label="Dostawy" icon="calendar" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('service_module') && <NavLink to="/service" label="Serwis" icon="tools" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/routing" label="🗺️ AI Routing" icon="map" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/profitability" label="💰 Rentowność" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager' || currentUser?.role === 'sales_rep') && <NavLink to="/admin/teams-dashboard" label="👷 Dashboard Ekip" icon="users" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/installers" label="🔧 Zarządzanie Ekipami" icon="users" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="⛽ Dziennik Paliwa" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/failures" label="⚠️ Zgłoszenia Awarii" icon="tools" onClick={() => setMobileMenuOpen(false)} />}
                                 </div>
                             )}
 
@@ -271,6 +349,13 @@ export const Layout: React.FC = () => {
                                     <p className="text-xs text-slate-400">{roleName}</p>
                                 </div>
                             </div>
+                            <Link
+                                to="/settings"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="w-full px-4 py-3 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                ⚙️ Moje Ustawienia
+                            </Link>
                             <button
                                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
                                 className="w-full px-4 py-3 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -327,7 +412,7 @@ export const Layout: React.FC = () => {
                         </div>
                     </div>
                 </header>
-                <div className="flex-1 p-4 md:p-8 overflow-auto">
+                <div id="main-content" className="flex-1 p-4 md:p-8 overflow-auto">
                     <div className="max-w-7xl mx-auto">
                         <Outlet />
                     </div>
@@ -349,7 +434,7 @@ export const Layout: React.FC = () => {
 interface NavLinkProps {
     to: string;
     label: string;
-    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail' | 'chat' | 'box' | 'list' | 'check-circle' | 'tools' | 'bell';
+    icon: 'dashboard' | 'offers' | 'plus' | 'settings' | 'reports' | 'map' | 'contracts' | 'clipboard' | 'calendar' | 'users' | 'mail' | 'chat' | 'box' | 'list' | 'check-circle' | 'tools' | 'bell' | 'phone';
     onClick?: () => void;
     badge?: number;
 }
@@ -444,6 +529,11 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label, icon, onClick, badge }) =>
         bell: (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+        ),
+        phone: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
             </svg>
         )
     };

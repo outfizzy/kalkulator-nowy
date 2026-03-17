@@ -4,11 +4,16 @@ import type { Installation } from '../types';
 export const EmailService = {
     async sendEmail(to: string, subject: string, html: string): Promise<{ success: boolean; error?: string }> {
         try {
-            const { error } = await supabase.functions.invoke('send-email', {
+            const { data, error } = await supabase.functions.invoke('send-email', {
                 body: { to, subject, html }
             });
 
             if (error) throw error;
+            // Edge function returns 200 OK with { success: false, error: "..." } on SMTP failure
+            if (data && data.success === false) {
+                console.error('EmailService: Edge function reported failure:', data.error);
+                return { success: false, error: data.error || 'E-Mail konnte nicht gesendet werden' };
+            }
             return { success: true };
         } catch (error: any) {
             console.error('EmailService Error:', error);

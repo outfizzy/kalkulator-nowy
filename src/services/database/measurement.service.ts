@@ -274,6 +274,28 @@ export const MeasurementService = {
 
         if (error) throw error;
 
+        // Auto-transition: When measurement is created with a lead, move lead to 'measurement_scheduled'
+        if (data.lead_id) {
+            try {
+                const { data: lead } = await supabase
+                    .from('leads')
+                    .select('status')
+                    .eq('id', data.lead_id)
+                    .single();
+
+                const advanceable = ['new', 'contacted', 'fair', 'formularz', 'configuration_received'];
+                if (lead && advanceable.includes(lead.status)) {
+                    await supabase
+                        .from('leads')
+                        .update({ status: 'measurement_scheduled', updated_at: new Date().toISOString() })
+                        .eq('id', data.lead_id);
+                    console.log(`[MeasurementService] Auto-transitioned lead ${data.lead_id} → measurement_scheduled`);
+                }
+            } catch (err) {
+                console.warn('[MeasurementService] Failed to auto-transition lead on create:', err);
+            }
+        }
+
         return {
             id: data.id,
             offerId: data.offer_id,
@@ -328,6 +350,29 @@ export const MeasurementService = {
             .single();
 
         if (error) throw error;
+
+        // Auto-transition: When measurement is completed, move linked lead to 'measurement_completed'
+        if (updates.status === 'completed' && data.lead_id) {
+            try {
+                // Only advance if lead is in an earlier stage (don't regress)
+                const { data: lead } = await supabase
+                    .from('leads')
+                    .select('status')
+                    .eq('id', data.lead_id)
+                    .single();
+
+                const advanceable = ['new', 'contacted', 'fair', 'formularz', 'configuration_received', 'measurement_scheduled'];
+                if (lead && advanceable.includes(lead.status)) {
+                    await supabase
+                        .from('leads')
+                        .update({ status: 'measurement_completed', updated_at: new Date().toISOString() })
+                        .eq('id', data.lead_id);
+                    console.log(`[MeasurementService] Auto-transitioned lead ${data.lead_id} → measurement_completed`);
+                }
+            } catch (err) {
+                console.warn('[MeasurementService] Failed to auto-transition lead:', err);
+            }
+        }
 
         return {
             id: data.id,

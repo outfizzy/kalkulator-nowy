@@ -19,6 +19,8 @@ export const MODEL_IMAGES: Record<string, string> = {
     'Orangeline': '/images/models/orangeline.jpg',
     'Orangeline+': '/images/models/orangeline-plus.jpg',
     'Carport': '/images/models/carport.jpg',
+    'Pergola': '/images/models/pergola.jpg',
+    'Pergola Deluxe': '/images/models/pergola-deluxe.jpg',
 
     // Roof Models - Lowercase (for modelId matching)
     'trendline': '/images/models/trendline.webp',
@@ -30,6 +32,10 @@ export const MODEL_IMAGES: Record<string, string> = {
     'orangeline': '/images/models/orangeline.jpg',
     'orangeline+': '/images/models/orangeline-plus.jpg',
     'carport': '/images/models/carport.jpg',
+    'pergola': '/images/models/pergola.jpg',
+    'pergola_bio': '/images/models/pergola.jpg',
+    'pergola deluxe': '/images/models/pergola-deluxe.jpg',
+    'pergola_deluxe': '/images/models/pergola-deluxe.jpg',
 };
 
 /**
@@ -79,6 +85,8 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
     'Ultraline': 'Ultrastyle',
     'Skyline': 'Skystyle',
     'Carport': 'Carport',
+    'Pergola': 'Pergola',
+    'Pergola Deluxe': 'Pergola Deluxe',
 };
 
 /**

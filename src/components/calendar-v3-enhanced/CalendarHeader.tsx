@@ -12,6 +12,9 @@ interface CalendarHeaderProps {
     onRefresh: () => void;
     onToggleSidebar: () => void;
     onToggleTeamPanel: () => void;
+    onGoogleImport?: () => void;
+    onGoogleAIImport?: () => void;
+    showGoogleEvents?: boolean;
     sidebarOpen: boolean;
     teamPanelOpen: boolean;
 }
@@ -24,6 +27,9 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     onRefresh,
     onToggleSidebar,
     onToggleTeamPanel,
+    onGoogleImport,
+    onGoogleAIImport,
+    showGoogleEvents,
     sidebarOpen,
     teamPanelOpen
 }) => {
@@ -120,6 +126,21 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                     </button>
+
+                    {/* Google Calendar Toggle */}
+                    {onGoogleImport && (
+                        <button
+                            onClick={onGoogleImport}
+                            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 ${showGoogleEvents
+                                ? 'bg-sky-500 text-white shadow-sm'
+                                : 'text-sky-500 hover:bg-sky-50 hover:text-sky-600'
+                            }`}
+                            title={showGoogleEvents ? 'Ukryj Google Calendar' : 'Pokaż Google Calendar'}
+                        >
+                            <span className="text-sm">📅</span>
+                            <span className="text-[10px] font-bold hidden sm:inline">Google</span>
+                        </button>
+                    )}
 
                     {/* Refresh */}
                     <button

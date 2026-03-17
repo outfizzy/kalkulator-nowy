@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { normalizePhone } from '../../utils/phone';
 
 // ===== TYPES =====
 
@@ -26,6 +27,9 @@ export interface CallLog {
     duration_seconds: number;
     recording_url: string | null;
     recording_duration: number;
+    transcription: string | null;
+    summary: string | null;
+    sentiment: string | null;
     user_id: string | null;
     lead_id: string | null;
     customer_id: string | null;
@@ -69,6 +73,7 @@ export interface SMSLog {
     customer_id: string | null;
     phone_number_id: string | null;
     media_urls: string[];
+    channel: 'sms' | 'whatsapp';
     error_code: string | null;
     error_message: string | null;
     created_at: string;
@@ -154,6 +159,43 @@ export const TelephonyService = {
         if (error) throw error;
     },
 
+    // ─── PHONE NUMBER USERS (Multi-user access) ───
+
+    async getPhoneNumberUsers(phoneNumberId?: string): Promise<{ id: string; phone_number_id: string; user_id: string; can_whatsapp: boolean; can_voice: boolean; can_sms: boolean; created_at: string }[]> {
+        let query = supabase.from('phone_number_users').select('*');
+        if (phoneNumberId) query = query.eq('phone_number_id', phoneNumberId);
+        const { data, error } = await query.order('created_at');
+        if (error) throw error;
+        return data || [];
+    },
+
+    async addPhoneNumberUser(phoneNumberId: string, userId: string, caps?: { can_whatsapp?: boolean; can_voice?: boolean; can_sms?: boolean }): Promise<void> {
+        const { error } = await supabase.from('phone_number_users').upsert({
+            phone_number_id: phoneNumberId,
+            user_id: userId,
+            can_whatsapp: caps?.can_whatsapp ?? true,
+            can_voice: caps?.can_voice ?? true,
+            can_sms: caps?.can_sms ?? true,
+        }, { onConflict: 'phone_number_id,user_id' });
+        if (error) throw error;
+    },
+
+    async removePhoneNumberUser(phoneNumberId: string, userId: string): Promise<void> {
+        const { error } = await supabase.from('phone_number_users')
+            .delete()
+            .eq('phone_number_id', phoneNumberId)
+            .eq('user_id', userId);
+        if (error) throw error;
+    },
+
+    async updatePhoneNumberUserCaps(phoneNumberId: string, userId: string, caps: { can_whatsapp?: boolean; can_voice?: boolean; can_sms?: boolean }): Promise<void> {
+        const { error } = await supabase.from('phone_number_users')
+            .update(caps)
+            .eq('phone_number_id', phoneNumberId)
+            .eq('user_id', userId);
+        if (error) throw error;
+    },
+
     // ─── CALL LOGS ───
 
     async getCallLogs(options?: {
@@ -192,6 +234,32 @@ export const TelephonyService = {
         if (error) return null;
         const [enriched] = await this._enrichCallLogs([data]);
         return enriched;
+    },
+
+    async getCallLogsByPhone(phoneNumber: string): Promise<CallLog[]> {
+        // Normalize phone to compare
+        const normalized = phoneNumber.replace(/\s/g, '');
+        const { data, error } = await supabase
+            .from('call_logs')
+            .select('*')
+            .or(`from_number.eq.${normalized},to_number.eq.${normalized}`)
+            .order('started_at', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+        return this._enrichCallLogs(data || []);
+    },
+
+    async getCallLogsByLeadId(leadId: string): Promise<CallLog[]> {
+        const { data, error } = await supabase
+            .from('call_logs')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('started_at', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+        return this._enrichCallLogs(data || []);
     },
 
     async updateCallLog(id: string, updates: Partial<CallLog>): Promise<void> {
@@ -285,10 +353,10 @@ export const TelephonyService = {
     },
 
     async getSMSConversations(): Promise<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number }[]> {
-        // Get all SMS grouped by the "other" phone number
         const { data, error } = await supabase
             .from('sms_logs')
             .select('*')
+            .eq('channel', 'sms')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -313,6 +381,7 @@ export const TelephonyService = {
         const { data, error } = await supabase
             .from('sms_logs')
             .select('*')
+            .eq('channel', 'sms')
             .or(`from_number.eq.${phoneNumber},to_number.eq.${phoneNumber}`)
             .order('created_at', { ascending: true });
 
@@ -325,12 +394,234 @@ export const TelephonyService = {
         if (!session) throw new Error('Not authenticated');
 
         const { data, error } = await supabase.functions.invoke('twilio-sms', {
-            body: { to, body, fromNumberId },
+            body: { to, body, fromNumberId, channel: 'sms' },
             headers: { Authorization: `Bearer ${session.access_token}` }
         });
 
         if (error) throw error;
         return data;
+    },
+
+    // ── WhatsApp Methods ──
+
+    async sendWhatsApp(to: string, body: string, fromNumberId: string): Promise<any> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const { data, error } = await supabase.functions.invoke('twilio-sms', {
+            body: { to, body, fromNumberId, channel: 'whatsapp' },
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getWhatsAppConversations(): Promise<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number }[]> {
+        const { data, error } = await supabase
+            .from('sms_logs')
+            .select('*')
+            .eq('channel', 'whatsapp')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const grouped: Record<string, SMSLog[]> = {};
+        for (const msg of data || []) {
+            const otherNumber = msg.direction === 'outbound' ? msg.to_number : msg.from_number;
+            if (!grouped[otherNumber]) grouped[otherNumber] = [];
+            grouped[otherNumber].push(msg);
+        }
+
+        return Object.entries(grouped)
+            .map(([phoneNumber, messages]) => ({
+                phoneNumber,
+                lastMessage: messages[0],
+                messageCount: messages.length
+            }))
+            .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
+    },
+
+    async getWhatsAppThread(phoneNumber: string): Promise<SMSLog[]> {
+        const { data, error } = await supabase
+            .from('sms_logs')
+            .select('*')
+            .eq('channel', 'whatsapp')
+            .or(`from_number.eq.${phoneNumber},to_number.eq.${phoneNumber}`)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    async getAllMessagesByPhone(phoneNumber: string): Promise<SMSLog[]> {
+        // Strip whatsapp: prefix and leading + for matching
+        const clean = phoneNumber.replace('whatsapp:', '').trim();
+        const variants = [clean];
+        if (clean.startsWith('+')) variants.push(clean.substring(1));
+        else variants.push('+' + clean);
+
+        const { data, error } = await supabase
+            .from('sms_logs')
+            .select('*')
+            .or(variants.map(v => `from_number.ilike.%${v},to_number.ilike.%${v}`).join(','))
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    // ── WhatsApp Campaign Methods ──
+
+    async getWhatsAppTemplates(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('whatsapp_templates')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+    },
+
+    async createWhatsAppTemplate(template: { name: string; category: string; body: string; media_urls?: string[] }): Promise<any> {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+            .from('whatsapp_templates')
+            .insert({ ...template, created_by: user?.id })
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async updateWhatsAppTemplate(id: string, updates: { name?: string; category?: string; body?: string; media_urls?: string[] }): Promise<any> {
+        const { data, error } = await supabase
+            .from('whatsapp_templates')
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async uploadWhatsAppMedia(file: File): Promise<string> {
+        const ext = file.name.split('.').pop();
+        const path = `templates/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const { error } = await supabase.storage.from('whatsapp-media').upload(path, file);
+        if (error) throw error;
+        const { data: { publicUrl } } = supabase.storage.from('whatsapp-media').getPublicUrl(path);
+        return publicUrl;
+    },
+
+    async deleteWhatsAppTemplate(id: string): Promise<void> {
+        const { error } = await supabase.from('whatsapp_templates').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async submitTemplateForApproval(templateId: string): Promise<any> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        const { data, error } = await supabase.functions.invoke('whatsapp-template-approval', {
+            body: { action: 'create', templateId },
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        if (error) throw error;
+        return data;
+    },
+
+    async checkTemplateApprovalStatus(templateId: string): Promise<any> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        const { data, error } = await supabase.functions.invoke('whatsapp-template-approval', {
+            body: { action: 'status', templateId },
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        if (error) throw error;
+        return data;
+    },
+
+    async getWhatsAppCampaigns(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('whatsapp_campaigns')
+            .select('*, whatsapp_templates(name, category)')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+    },
+
+    async getWhatsAppCampaignDetail(id: string): Promise<any> {
+        const { data, error } = await supabase
+            .from('whatsapp_campaigns')
+            .select('*, whatsapp_templates(*)')
+            .eq('id', id)
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async getCampaignRecipients(campaignId: string): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('whatsapp_campaign_recipients')
+            .select('*')
+            .eq('campaign_id', campaignId)
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data || [];
+    },
+
+    async createCampaign(campaign: { name: string; template_id: string; filters: any }): Promise<any> {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+            .from('whatsapp_campaigns')
+            .insert({ ...campaign, created_by: user?.id, status: 'draft' })
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async addCampaignRecipients(campaignId: string, recipients: { lead_id?: string; customer_id?: string; phone: string; name: string; message_body: string }[]): Promise<void> {
+        const rows = recipients.map(r => ({ ...r, campaign_id: campaignId, status: 'pending' }));
+        const { error } = await supabase.from('whatsapp_campaign_recipients').insert(rows);
+        if (error) throw error;
+        // Update total
+        await supabase.from('whatsapp_campaigns').update({ total_recipients: recipients.length }).eq('id', campaignId);
+    },
+
+    async launchCampaign(campaignId: string): Promise<any> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        const { data, error } = await supabase.functions.invoke('whatsapp-campaign', {
+            body: { campaignId },
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        if (error) throw error;
+        return data;
+    },
+
+    async getLeadContacts(filters?: { statuses?: string[]; sources?: string[] }): Promise<{ id: string; firstName: string; lastName: string; phone: string; email: string; city: string; status: string; source: string; companyName: string }[]> {
+        let query = supabase.from('leads').select('id, customer_data, status, source').not('customer_data', 'is', null);
+        if (filters?.statuses && filters.statuses.length > 0) {
+            query = query.in('status', filters.statuses);
+        }
+        if (filters?.sources && filters.sources.length > 0) {
+            query = query.in('source', filters.sources);
+        }
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || [])
+            .map((l: any) => ({
+                id: l.id,
+                firstName: l.customer_data?.firstName || '',
+                lastName: l.customer_data?.lastName || '',
+                phone: l.customer_data?.phone || '',
+                email: l.customer_data?.email || '',
+                city: l.customer_data?.city || '',
+                status: l.status || '',
+                source: l.source || '',
+                companyName: l.customer_data?.companyName || '',
+            }))
+            .filter((c: any) => c.phone && c.phone.trim() !== '');
     },
 
     // ─── CALLING ───
@@ -389,35 +680,102 @@ export const TelephonyService = {
 
     // ─── CONTACT LOOKUP ───
 
+    /**
+     * Generate multiple phone number format variants for fuzzy DB matching.
+     * E.g. "+491711234567" → ["+491711234567", "491711234567", "01711234567", "1711234567", ...]
+     */
+    _phoneVariants(phoneNumber: string): string[] {
+        const variants = new Set<string>();
+
+        // Original input
+        const raw = phoneNumber.trim();
+        variants.add(raw);
+
+        // Stripped (no spaces/dashes/parens)
+        const stripped = raw.replace(/[\s\-()/.]/g, '');
+        variants.add(stripped);
+
+        // E.164 normalized
+        const e164 = normalizePhone(phoneNumber);
+        if (e164) variants.add(e164);
+
+        // Without + prefix
+        if (e164.startsWith('+')) {
+            variants.add(e164.slice(1));
+        }
+
+        // German national format (0171...)
+        if (e164.startsWith('+49')) {
+            variants.add('0' + e164.slice(3));
+            variants.add(e164.slice(3)); // Just digits without country code
+        }
+
+        // Polish national format (502...)
+        if (e164.startsWith('+48')) {
+            variants.add(e164.slice(3));
+        }
+
+        // Also strip + from stripped
+        if (stripped.startsWith('+')) {
+            variants.add(stripped.slice(1));
+        }
+
+        return [...variants].filter(v => v.length >= 7);
+    },
+
     async lookupContact(phoneNumber: string): Promise<{
         type: 'lead' | 'customer' | null;
         id: string | null;
         name: string | null;
+        leadStatus?: string | null;
+        assignedTo?: string | null;
+        assignedToName?: string | null;
     }> {
-        // Normalize number (strip spaces, dashes)
-        const normalized = phoneNumber.replace(/[\s\-()]/g, '');
+        const variants = this._phoneVariants(phoneNumber);
 
-        // Check leads first (leads use customer_data JSONB)
+        // Build OR filter for all variants against leads
+        const leadFilter = variants
+            .map(v => `customer_data->>phone.eq.${v}`)
+            .join(',');
+
         const { data: leads } = await supabase
             .from('leads')
-            .select('id, customer_data')
-            .or(`customer_data->>phone.eq.${normalized},customer_data->>phone.eq.${phoneNumber}`)
+            .select('id, customer_data, status, assigned_to')
+            .or(leadFilter)
             .limit(1);
 
         if (leads && leads.length > 0) {
             const cd = leads[0].customer_data || {};
+            let assignedToName: string | null = null;
+
+            if (leads[0].assigned_to) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', leads[0].assigned_to)
+                    .single();
+                assignedToName = profile?.full_name || null;
+            }
+
             return {
                 type: 'lead',
                 id: leads[0].id,
-                name: `${cd.firstName || ''} ${cd.lastName || ''}`.trim() || 'Lead'
+                name: `${cd.firstName || ''} ${cd.lastName || ''}`.trim() || 'Lead',
+                leadStatus: leads[0].status || null,
+                assignedTo: leads[0].assigned_to || null,
+                assignedToName,
             };
         }
 
-        // Then customers
+        // Then customers — try all variants
+        const custFilter = variants
+            .map(v => `phone.eq.${v}`)
+            .join(',');
+
         const { data: customers } = await supabase
             .from('customers')
             .select('id, first_name, last_name')
-            .or(`phone.eq.${normalized},phone.eq.${phoneNumber}`)
+            .or(custFilter)
             .limit(1);
 
         if (customers && customers.length > 0) {
@@ -483,11 +841,128 @@ export const TelephonyService = {
         const customerMap = Object.fromEntries(customers.map((c: any) => [c.id, { firstName: c.first_name, lastName: c.last_name }]));
         const userMap = Object.fromEntries(users.map((u: any) => [u.id, { fullName: u.full_name }]));
 
-        return logs.map(l => ({
-            ...l,
-            lead: l.lead_id ? leadMap[l.lead_id] || null : null,
-            customer: l.customer_id ? customerMap[l.customer_id] || null : null,
-            user: l.user_id ? userMap[l.user_id] || null : null,
-        }));
+        // Phone-based fallback: for calls without lead/customer, try to match by phone number
+        const unlinkedLogs = logs.filter(l => !l.lead_id && !l.customer_id);
+        const phoneLookups: Record<string, { type: 'lead' | 'customer'; id: string; name: string; leadName?: string; custFirstName?: string; custLastName?: string } | null> = {};
+
+        if (unlinkedLogs.length > 0) {
+            // Collect unique phone numbers from unlinked calls
+            const phonesToLookup = [...new Set(unlinkedLogs.map(l =>
+                l.direction === 'inbound' ? l.from_number : l.to_number
+            ).filter(Boolean))];
+
+            // Batch lookup: gather all variants for all phones
+            const allLeadFilters: string[] = [];
+            const allCustFilters: string[] = [];
+            const phoneToVariants: Record<string, string[]> = {};
+
+            for (const phone of phonesToLookup) {
+                const variants = this._phoneVariants(phone);
+                phoneToVariants[phone] = variants;
+                for (const v of variants) {
+                    allLeadFilters.push(`customer_data->>phone.eq.${v}`);
+                    allCustFilters.push(`phone.eq.${v}`);
+                }
+            }
+
+            // Query leads by phone variants (batch)
+            if (allLeadFilters.length > 0) {
+                const { data: matchedLeads } = await supabase
+                    .from('leads')
+                    .select('id, customer_data')
+                    .or(allLeadFilters.join(','))
+                    .limit(50);
+
+                if (matchedLeads && matchedLeads.length > 0) {
+                    for (const phone of phonesToLookup) {
+                        if (phoneLookups[phone]) continue;
+                        const variants = phoneToVariants[phone];
+                        const match = matchedLeads.find((l: any) => {
+                            const lPhone = l.customer_data?.phone || '';
+                            return variants.some(v => v === lPhone);
+                        });
+                        if (match) {
+                            const cd = match.customer_data || {};
+                            const name = `${cd.firstName || ''} ${cd.lastName || ''}`.trim() || 'Lead';
+                            phoneLookups[phone] = { type: 'lead', id: match.id, name, leadName: name };
+                        }
+                    }
+                }
+            }
+
+            // Query customers by phone variants (batch)
+            if (allCustFilters.length > 0) {
+                const { data: matchedCustomers } = await supabase
+                    .from('customers')
+                    .select('id, first_name, last_name, phone')
+                    .or(allCustFilters.join(','))
+                    .limit(50);
+
+                if (matchedCustomers && matchedCustomers.length > 0) {
+                    for (const phone of phonesToLookup) {
+                        if (phoneLookups[phone]) continue;
+                        const variants = phoneToVariants[phone];
+                        const match = matchedCustomers.find((c: any) => {
+                            return variants.some(v => v === c.phone);
+                        });
+                        if (match) {
+                            phoneLookups[phone] = {
+                                type: 'customer',
+                                id: match.id,
+                                name: `${match.first_name} ${match.last_name}`,
+                                custFirstName: match.first_name,
+                                custLastName: match.last_name
+                            };
+                        }
+                    }
+                }
+            }
+
+            // Auto-link discovered matches in the background (fire-and-forget)
+            for (const log of unlinkedLogs) {
+                const phone = log.direction === 'inbound' ? log.from_number : log.to_number;
+                const match = phoneLookups[phone];
+                if (match) {
+                    if (match.type === 'lead') {
+                        supabase.from('call_logs').update({ lead_id: match.id }).eq('id', log.id).then(() => {});
+                    } else {
+                        supabase.from('call_logs').update({ customer_id: match.id }).eq('id', log.id).then(() => {});
+                    }
+                }
+            }
+        }
+
+        return logs.map(l => {
+            // If already linked, use the existing data
+            if (l.lead_id || l.customer_id) {
+                return {
+                    ...l,
+                    lead: l.lead_id ? leadMap[l.lead_id] || null : null,
+                    customer: l.customer_id ? customerMap[l.customer_id] || null : null,
+                    user: l.user_id ? userMap[l.user_id] || null : null,
+                };
+            }
+
+            // Phone-based fallback
+            const phone = l.direction === 'inbound' ? l.from_number : l.to_number;
+            const match = phoneLookups[phone];
+            if (match) {
+                return {
+                    ...l,
+                    lead_id: match.type === 'lead' ? match.id : null,
+                    customer_id: match.type === 'customer' ? match.id : null,
+                    lead: match.type === 'lead' ? { name: match.name } : null,
+                    customer: match.type === 'customer' ? { firstName: match.custFirstName || '', lastName: match.custLastName || '' } : null,
+                    user: l.user_id ? userMap[l.user_id] || null : null,
+                };
+            }
+
+            return {
+                ...l,
+                lead: null,
+                customer: null,
+                user: l.user_id ? userMap[l.user_id] || null : null,
+            };
+        });
     }
 };

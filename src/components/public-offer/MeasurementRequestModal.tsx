@@ -48,14 +48,12 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
             const success = await LeadService.sendClientMessage(offerToken, message);
             if (success) {
                 toast.success('Vielen Dank! Ihre Anfrage wurde gesendet.');
-                // Track measurement request
-                if (offerId) {
-                    OfferService.trackInteraction(offerId, 'measurement_request', {
-                        preferredDays: selectedDays,
-                        preferredTimes: selectedTimes,
-                        note: note
-                    });
-                }
+                // Notify sales rep about measurement request
+                OfferService.notifyOfferAction(offerToken, 'measurement_requested', {
+                    preferredDays: selectedDays.join(', '),
+                    preferredTimes: selectedTimes.join(', '),
+                    note: note
+                }).catch(() => { });
                 onClose();
             } else {
                 toast.error('Fehler beim Senden.');

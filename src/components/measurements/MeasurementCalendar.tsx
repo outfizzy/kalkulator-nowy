@@ -196,26 +196,28 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
     return (
         <div className="space-y-4">
             {/* Header with week navigation */}
-            <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <button
                     onClick={handlePrevWeek}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors font-medium w-full sm:w-auto justify-center sm:justify-start"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
-                    Poprzedni tydzień
+                    <span className="hidden sm:inline">Poprzedni tydzień</span>
+                    <span className="sm:hidden">Poprz.</span>
                 </button>
 
-                <div className="text-lg font-bold text-slate-800">
+                <div className="text-base sm:text-lg font-bold text-slate-800 text-center order-first sm:order-none">
                     {formatDate(weekDays[0])} - {formatDate(weekDays[6])}
                 </div>
 
                 <button
                     onClick={handleNextWeek}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors font-medium w-full sm:w-auto justify-center sm:justify-end"
                 >
-                    Następny tydzień
+                    <span className="hidden sm:inline">Następny tydzień</span>
+                    <span className="sm:hidden">Nast.</span>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -261,8 +263,8 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
                 );
             })()}
 
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-2">
+            {/* Calendar Grid — responsive: 1 col mobile, 2 cols tablet, 7 cols desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2">
                 {weekDays.map((date, index) => {
                     const dayMeasurements = getMeasurementsForDate(date);
                     const isTargetDate = dropTarget && dropTarget.date.toDateString() === date.toDateString();
@@ -449,17 +451,17 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-between text-sm bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-4">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
                     <div className="font-bold text-slate-700">Status:</div>
-                    <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('scheduled')}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-2 py-1 rounded border text-xs sm:text-sm ${getStatusBadgeColor('scheduled')}`}>
                             Zaplanowano
                         </span>
-                        <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('completed')}`}>
+                        <span className={`px-2 py-1 rounded border text-xs sm:text-sm ${getStatusBadgeColor('completed')}`}>
                             Zrealizowano
                         </span>
-                        <span className={`px-2 py-1 rounded border ${getStatusBadgeColor('cancelled')}`}>
+                        <span className={`px-2 py-1 rounded border text-xs sm:text-sm ${getStatusBadgeColor('cancelled')}`}>
                             Anulowano
                         </span>
                     </div>
@@ -467,7 +469,7 @@ export const MeasurementCalendar: React.FC<MeasurementCalendarProps> = ({ measur
 
                 <button
                     onClick={() => setShowReportModal(true)}
-                    className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium flex items-center gap-2"
+                    className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium flex items-center gap-2 w-full sm:w-auto justify-center"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

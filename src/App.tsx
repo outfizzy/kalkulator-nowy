@@ -15,11 +15,13 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ManagerDashboard } from './components/admin/ManagerDashboard';
 import { InstallerManagementPanel } from './components/admin/InstallerManagementPanel';
 import { TeamManagementPanel } from './components/admin/TeamManagementPanel';
+import { TeamsDashboard } from './components/admin/TeamsDashboard';
 import { FuelLogManager } from './components/admin/FuelLogManager';
 import { FuelPriceManager } from './components/admin/FuelPriceManager';
 import { FailureReportManager } from './components/admin/FailureReportManager';
 import { PricingPage } from './components/admin/PricingPage';
 import { InstallationProfitability } from './components/admin/InstallationProfitability';
+import { InstallationRoutingOptimizer } from './components/admin/InstallationRoutingOptimizer';
 import { SystemPermissionsPage } from './components/admin/SystemPermissionsPage';
 import { InventoryDashboard } from './components/inventory/InventoryDashboard';
 import { ServiceDashboard } from './components/service/ServiceDashboard';
@@ -30,6 +32,7 @@ import { InstallerLayout } from './components/installer/InstallerLayout';
 import { InstallerCalendarPage } from './components/installer/InstallerCalendarPage';
 import { FailureReportForm } from './components/installer/FailureReportForm';
 import { InstallerSettingsPage } from './components/installer/InstallerSettingsPage';
+import { InstallerFuelPage } from './components/installer/InstallerFuelPage';
 import { FuelPage } from './components/fuel/FuelPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -43,9 +46,11 @@ import { MeasurementDashboard } from './components/measurements/MeasurementDashb
 import { MeasurementReportsList } from './components/reports/MeasurementReportsList';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
+import { AdvancePaymentsList } from './components/contracts/AdvancePaymentsList';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
 import { ProcurementDashboard } from './components/logistics/ProcurementDashboard';
+import { LogisticsKPIDashboard } from './components/logistics/LogisticsKPIDashboard';
 import { CalendarV3 } from './components/calendar-v3/CalendarV3';
 import { CustomersList } from './components/customers/CustomersList';
 import { CustomerPage } from './components/customers/CustomerPage';
@@ -64,6 +69,7 @@ import { B2BPartnersPage } from './pages/admin/B2BPartnersPage';
 import { B2BOrdersAdminPage } from './pages/admin/B2BOrdersAdminPage';
 import { B2BOffersAdminPage } from './pages/admin/B2BOffersAdminPage';
 import { AIAssistantPage } from './components/admin/AIAssistantPage';
+import { MarketingDashboard } from './components/admin/MarketingDashboard';
 import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
 import { VisualizerPage } from './pages/VisualizerPage';
@@ -73,7 +79,15 @@ import CustomerFeedbackPage from './pages/public/CustomerFeedbackPage';
 import { CustomerFeedbackDashboard } from './components/admin/CustomerFeedbackDashboard';
 import { ServiceTicketDetailsPage } from './components/service/ServiceTicketDetailsPage';
 import { PublicOfferPage } from './pages/PublicOfferPage';
-import { CallManager } from './components/telephony/CallManager';
+import { ConfiguratorWizardPage } from './pages/public/ConfiguratorWizardPage';
+import { SoftphoneWidget } from './components/telephony/SoftphoneWidget';
+import { CallHistoryPage } from './components/telephony/CallHistoryPage';
+import { PhoneNumbersAdmin } from './components/telephony/PhoneNumbersAdmin';
+import { SMSInboxPage } from './components/telephony/SMSInboxPage';
+import { WhatsAppInboxPage } from './components/telephony/WhatsAppInboxPage';
+import { WhatsAppCampaignPage } from './components/telephony/WhatsAppCampaignPage';
+import { WhatsAppFloatingWidget } from './components/telephony/WhatsAppFloatingWidget';
+import { VoicemailPage } from './components/telephony/VoicemailPage';
 import { TaskBoard } from './components/tasks/TaskBoard';
 import { LandingPage } from './components/LandingPage';
 import { PartnerLoginPage } from './components/partner/PartnerLoginPage';
@@ -81,6 +95,7 @@ import { PartnerRegisterPage } from './components/partner/PartnerRegisterPage';
 import { PartnerLayout } from './components/partner/PartnerLayout';
 import { ScrollToTop } from './components/ScrollToTop';
 import { FuelRegistryPublic } from './pages/FuelRegistryPublic';
+import { SalesRepFuelPage } from './pages/SalesRepFuelPage';
 
 // B2B Partner Portal
 import { B2BLayout } from './pages/b2b/B2BLayout';
@@ -100,6 +115,7 @@ import { B2BCreditAdminPage } from './pages/admin/B2BCreditAdminPage';
 import { B2BPartnerAnalyticsPage } from './pages/admin/B2BPartnerAnalyticsPage';
 import { MarketingManagerPage } from './pages/admin/MarketingManagerPage';
 import { ProductImagesPage } from './pages/admin/ProductImagesPage';
+import FacebookAdsPage from './pages/admin/FacebookAdsPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
@@ -148,6 +164,11 @@ function WalletRouter() {
 }
 
 function App() {
+  // Initialize Meta Pixel for conversion tracking
+  React.useEffect(() => {
+    import('./services/tracking/meta-pixel.service').then(m => m.initMetaPixel());
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -168,12 +189,14 @@ function App() {
             <Route path="/b2b/register" element={<PartnerRegisterPage />} />
             <Route path="/print/offer/:token" element={<OfferPrintView />} />
             <Route path="/fuel-registry" element={<FuelRegistryPublic />} />
+            <Route path="/p/konfigurator/:token" element={<ConfiguratorWizardPage />} />
 
             {/* Sales Rep / Admin Routes */}
             <Route element={
               <ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}>
                 <>
-                  <CallManager />
+                  <SoftphoneWidget />
+                  <WhatsAppFloatingWidget />
                   <Layout />
                 </>
               </ProtectedRoute>
@@ -193,7 +216,8 @@ function App() {
               <Route path="/admin/stats" element={<SalesTeamDashboard />} />
               <Route path="/admin/partner-offers" element={<PartnerOffersPage />} />
               <Route path="/admin/installers" element={<InstallerManagementPanel />} />
-              <Route path="/admin/teams" element={<TeamManagementPanel />} />
+              <Route path="/admin/teams" element={<Navigate to="/admin/installers" replace />} />
+              <Route path="/admin/teams-dashboard" element={<TeamsDashboard />} />
               <Route path="/admin/wallet" element={<WalletRouter />} />
               <Route path="/reports/measurements" element={<MeasurementReportsList />} />
               <Route path="/measurements" element={<MeasurementDashboard />} />
@@ -201,6 +225,7 @@ function App() {
               <Route path="/portfolio" element={<PortfolioDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
+              <Route path="/advance-payments" element={<AdvancePaymentsList />} />
               <Route path="/dachrechner" element={<DachrechnerPage />} />
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
@@ -214,6 +239,7 @@ function App() {
               <Route path="admin/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><InventoryDashboard /></ProtectedRoute>} />
               <Route path="admin/logs" element={<ProtectedRoute allowedRoles={['admin']}><ActivityLogsPage /></ProtectedRoute>} />
               <Route path="/admin/profitability" element={<InstallationProfitability />} />
+              <Route path="/admin/routing" element={<InstallationRoutingOptimizer />} />
               <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><SystemPermissionsPage /></ProtectedRoute>} />
               <Route path="/admin/fairs" element={<ProtectedRoute allowedRoles={['admin']}><FairManagement /></ProtectedRoute>} />
               <Route path="/admin/email-templates" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}><EmailTemplatesPage /></ProtectedRoute>} />
@@ -227,13 +253,17 @@ function App() {
               <Route path="/admin/b2b/marketing" element={<ProtectedRoute allowedRoles={['admin', 'b2b_manager', 'manager']}><MarketingManagerPage /></ProtectedRoute>} />
               <Route path="/admin/error-reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorReportsPage /></ProtectedRoute>} />
               <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><CustomerFeedbackDashboard /></ProtectedRoute>} />
+              <Route path="/admin/marketing" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><MarketingDashboard /></ProtectedRoute>} />
+              <Route path="/admin/facebook-ads" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><FacebookAdsPage /></ProtectedRoute>} />
               <Route path="/fairs" element={<FairDashboard />} />
               <Route path="/fuel-logs" element={<FuelPage />} />
+              <Route path="/my-fuel" element={<SalesRepFuelPage />} />
               <Route path="/service" element={<ServiceDashboard />} />
               <Route path="/service/:id" element={<ServiceTicketDetailsPage />} />
               <Route path="/logistics" element={<LogisticsCalendar />} />
               <Route path="/calendar-v3" element={<CalendarV3 />} />
               <Route path="/procurement" element={<ProcurementDashboard />} />
+              <Route path="/logistics-kpi" element={<LogisticsKPIDashboard />} />
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/customers/new" element={<CustomerPage />} />
               <Route path="/customers/:id" element={<CustomerDetailsPage />} />
@@ -246,6 +276,14 @@ function App() {
               <Route path="/admin/tech-assistant" element={<TechnicalAssistant />} />
               <Route path="/admin/knowledge" element={<KnowledgeBaseManager />} />
               <Route path="/visualizer" element={<VisualizerPage />} />
+              {/* Telephony Routes */}
+              <Route path="/telephony" element={<CallHistoryPage />} />
+              <Route path="/telephony/calls" element={<CallHistoryPage />} />
+              <Route path="/telephony/sms" element={<SMSInboxPage />} />
+              <Route path="/telephony/whatsapp" element={<WhatsAppInboxPage />} />
+              <Route path="/telephony/whatsapp/campaigns" element={<WhatsAppCampaignPage />} />
+              <Route path="/telephony/voicemail" element={<VoicemailPage />} />
+              <Route path="/telephony/numbers" element={<ProtectedRoute allowedRoles={['admin']}><PhoneNumbersAdmin /></ProtectedRoute>} />
             </Route>
 
             {/* Partner Protected Routes - Redirect to B2B */}
@@ -280,7 +318,7 @@ function App() {
             }>
               <Route path="calendar" element={<InstallerCalendarPage />} />
               <Route path="requests" element={<InstallerRequestsPage />} />
-              <Route path="fuel" element={<FuelPage />} />
+              <Route path="fuel" element={<InstallerFuelPage />} />
               <Route path="failure-report" element={<FailureReportForm />} />
               <Route path="settings" element={<InstallerSettingsPage />} />
               <Route path="acceptance/:installationId" element={<InstallationAcceptance />} />

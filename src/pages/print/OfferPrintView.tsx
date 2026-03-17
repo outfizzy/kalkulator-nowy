@@ -20,6 +20,8 @@ function translateForView(key: string, category: string): string {
         'designline': 'Designstyle', 'designstyle': 'Designstyle',
         'orangeline': 'Orangestyle', 'orangestyle': 'Orangestyle',
         'orangeline+': 'Orangestyle+', 'orangestyle+': 'Orangestyle+',
+        'pergola': 'Pergola', 'pergola_bio': 'Pergola',
+        'pergola deluxe': 'Pergola Deluxe', 'pergola_deluxe': 'Pergola Deluxe',
         // Roof types
         'poly': 'Polycarbonat', 'polycarbonate': 'Polycarbonat', 'glass': 'Glas VSG 8mm',
         'clear': 'Klar', 'klar': 'Klar', 'opal': 'Opal', 'matt': 'Matt',
@@ -211,7 +213,7 @@ export const OfferPrintView: React.FC = () => {
             <div className="print-fixed-header print:block hidden">
                 <div className="px-[15mm] h-full flex items-center justify-between">
                     <div className="w-[45mm]">
-                        <img src="/logo.png" alt="PolenDach24" className="h-[12mm] w-auto object-contain brightness-0 invert" />
+                        <img src="/logo.png" alt="Polendach24" className="h-[12mm] w-auto object-contain brightness-0 invert" />
                     </div>
                     <div className="text-right">
                         <p className="text-slate-300 text-[10px]">Ihr Premium Partner für Terrassen.</p>
@@ -225,7 +227,7 @@ export const OfferPrintView: React.FC = () => {
             <div className="print-fixed-footer print:block hidden">
                 <div className="grid grid-cols-3 gap-4 text-[7px] text-slate-500 leading-tight">
                     <div>
-                        <span className="font-bold block text-slate-700 mb-0.5">PolenDach24 S.C.</span>
+                        <span className="font-bold block text-slate-700 mb-0.5">Polendach24 S.C.</span>
                         Kolonia Wałowice 221/33, 66-620 Gubin<br />NIP: PL9261695520
                     </div>
                     <div>
@@ -252,7 +254,7 @@ export const OfferPrintView: React.FC = () => {
                                 {/* WEB HEADER (Hidden Print) */}
                                 <header className="bg-[#121c2d] h-[28mm] flex flex-col justify-center relative mb-8 -mx-[15mm] print:hidden">
                                     <div className="px-[15mm] flex items-center justify-between">
-                                        <div className="w-[45mm]"><img src="/logo.png" alt="PolenDach24" className="h-[12mm] brightness-0 invert" /></div>
+                                        <div className="w-[45mm]"><img src="/logo.png" alt="Polendach24" className="h-[12mm] brightness-0 invert" /></div>
                                         <div className="text-right">
                                             <p className="text-slate-300 text-[10px]">Ihr Premium Partner für Terrassen.</p>
                                             <p className="text-[#c5a065] font-bold text-sm">www.polendach24.de</p>
@@ -266,7 +268,7 @@ export const OfferPrintView: React.FC = () => {
                                     {/* METADATA */}
                                     <div className="flex justify-between items-start mb-12">
                                         <div className="text-[11px] leading-relaxed">
-                                            <p className="text-slate-400 mb-4 text-[10px]">PolenDach24 S.C. - Kolonia Wałowice 221/33 - 66-620 Gubin</p>
+                                            <p className="text-slate-400 mb-4 text-[10px]">Polendach24 S.C. - Kolonia Wałowice 221/33 - 66-620 Gubin</p>
                                             {c.companyName && <p className="font-bold text-slate-900">{c.companyName}</p>}
                                             <p className="text-slate-900">{c.salutation} {c.firstName} {c.lastName}</p>
                                             <p className="text-slate-900">{c.street} {c.houseNumber}</p>
@@ -304,7 +306,7 @@ export const OfferPrintView: React.FC = () => {
                                                     Wir freuen uns, Ihnen basierend auf Ihren Wünschen diese maßgeschneiderte Lösung präsentieren zu dürfen.
                                                 </p>
                                                 <p>
-                                                    Bei <b>PolenDach24</b> stehen Qualität, Langlebigkeit und Ästhetik an erster Stelle.
+                                                    Bei <b>Polendach24</b> stehen Qualität, Langlebigkeit und Ästhetik an erster Stelle.
                                                     Ihre gewählte Konfiguration vereint modernes Design mit höchster Funktionalität, um Ihren Außenbereich in eine echte Wohlfühloase zu verwandeln.
                                                 </p>
                                             </div>
@@ -385,108 +387,7 @@ export const OfferPrintView: React.FC = () => {
                                                             </span>
                                                         </div>
                                                     )}
-                                                    {/* Dachrechner Technical Data */}
-                                                    {p.dachrechnerData && (() => {
-                                                        const d = p.dachrechnerData;
-                                                        return (
-                                                            <div className="col-span-3 pt-3 mt-2 border-t border-white/10">
-                                                                <span className="block text-[#6ba3d6] text-[10px] uppercase tracking-wide mb-3 font-bold">📐 Technische Daten (Dachrechner)</span>
-                                                                <div className="grid grid-cols-4 gap-y-3 gap-x-4 text-xs">
-                                                                    {d.angleAlpha != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">Neigung α</span>
-                                                                            <span className="font-bold text-white">{d.angleAlpha.toFixed(1)}°</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.inclinationMmM != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">Gefälle</span>
-                                                                            <span className="font-bold text-white">{d.inclinationMmM.toFixed(0)} mm/m</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.h3 != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">H3 Rinne</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.h3)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.h1 != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">H1 Wand</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.h1)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.heightH2 != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">H2 Oberkante</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.heightH2)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.fensterF2 != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">Fensterbreite</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.fensterF2)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.depthD2 != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">D2 m. Rinne</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.depthD2)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.depthD4post != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">D4 Pfosten</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.depthD4post)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.sparrenMitte != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">Sparren Mitte</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.sparrenMitte)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.sparrenAussen != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">Sparren Außen</span>
-                                                                            <span className="font-bold text-white">{Math.round(d.sparrenAussen)} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {p.postWidth && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">Pfostenbreite</span>
-                                                                            <span className="font-bold text-white">{p.postWidth} mm</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {d.angleBeta != null && (
-                                                                        <div>
-                                                                            <span className="block text-slate-400 text-[9px] uppercase">β Glaswinkel</span>
-                                                                            <span className="font-bold text-white">{d.angleBeta.toFixed(1)}°</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                {/* Keilfenster K1/K2 if present */}
-                                                                {(d.keilhoeheK1 != null || d.keilhoeheK2 != null) && (
-                                                                    <div className="mt-3 pt-2 border-t border-white/10 grid grid-cols-3 gap-4 text-xs">
-                                                                        <div>
-                                                                            <span className="block text-[#d4a06a] text-[9px] uppercase">K1 Keilhöhe Rinne</span>
-                                                                            <span className="font-bold text-white">{d.keilhoeheK1 != null ? Math.round(d.keilhoeheK1) + ' mm' : '–'}</span>
-                                                                        </div>
-                                                                        <div>
-                                                                            <span className="block text-[#d4a06a] text-[9px] uppercase">K2 Keilhöhe Wand</span>
-                                                                            <span className="font-bold text-white">{d.keilhoeheK2 != null ? Math.round(d.keilhoeheK2) + ' mm' : '–'}</span>
-                                                                        </div>
-                                                                        {d.fensterF1 != null && (
-                                                                            <div>
-                                                                                <span className="block text-[#d4a06a] text-[9px] uppercase">F1/F3 Fensterhöhe</span>
-                                                                                <span className="font-bold text-white">{Math.round(d.fensterF1)} / {d.fensterF3 != null ? Math.round(d.fensterF3) : '–'} mm</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })()}
+
                                                 </div>
                                             );
                                         })()}
@@ -519,7 +420,7 @@ export const OfferPrintView: React.FC = () => {
                                                 <tr className="print:bg-white break-inside-avoid">
                                                     <td className="py-3 px-3 text-center align-top text-slate-400">1</td>
                                                     <td className="py-3 px-3 align-top">
-                                                        <div className="font-bold text-slate-900 mb-0.5">{model} Basiskonstruktion</div>
+                                                        <div className="font-bold text-slate-900 mb-0.5">{model} Terrassenüberdachung</div>
                                                         <div className="text-xs text-slate-500 leading-snug">
                                                             Hochwertiges Aluminiumprofilsystem, pulverbeschichtet. <br />
                                                             Inklusive Pfosten, Rinnenprofil und Wandanschluss.

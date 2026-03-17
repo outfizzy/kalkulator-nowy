@@ -169,17 +169,18 @@ export const LoginPage: React.FC = () => {
 
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
-                                    Adres email
+                                    Email lub Login
                                 </label>
                                 <input
                                     id="email"
-                                    type="email"
+                                    type="text"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                                    placeholder="twoj.email@firma.pl"
+                                    placeholder="email@firma.pl lub login"
                                     disabled={loading}
+                                    autoComplete="username"
                                 />
                             </div>
 
@@ -246,7 +247,7 @@ export const LoginPage: React.FC = () => {
                         <p>Kontakt: <a href="mailto:buero@polendach24.de" className="hover:text-accent transition-colors">buero@polendach24.de</a></p>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };

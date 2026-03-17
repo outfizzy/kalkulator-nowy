@@ -171,9 +171,9 @@ export const InstallationSettlementModal: React.FC<InstallationSettlementModalPr
             const settlementNote = `Rozliczenie pracy:\nData: ${workDate}\nCzas: ${startTime}-${endTime} (${duration.toFixed(1)}h)\n` +
                 membersToSettle
                     .filter(m => selectedMemberIds.has(m.id))
-                    .map(m => `- ${m.firstName} ${m.lastName}: ${m.hourlyRate} PLN/h * ${duration.toFixed(1)}h = ${(m.hourlyRate * duration).toFixed(2)} PLN`)
+                    .map(m => `- ${m.firstName} ${m.lastName}: ${m.hourlyRate} EUR/h * ${duration.toFixed(1)}h = ${(m.hourlyRate * duration).toFixed(2)} EUR`)
                     .join('\n') +
-                `\nSuma Robocizny: ${laborCost.toFixed(2)} PLN`;
+                `\nSuma Robocizny: ${laborCost.toFixed(2)} EUR`;
 
             // We update additionalCosts to INCLUDE labor? 
             // Or we assume the system tracks it via WorkLogs?
@@ -312,14 +312,14 @@ export const InstallationSettlementModal: React.FC<InstallationSettlementModalPr
                                                 <div>
                                                     <div className="font-medium text-slate-900">{member.firstName} {member.lastName}</div>
                                                     <div className="text-xs text-slate-500">
-                                                        Stawka: {member.hourlyRate ? `${member.hourlyRate} PLN` : '0'} / h
+                                                        Stawka: {member.hourlyRate ? `${member.hourlyRate} EUR` : '0'} / h
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="font-bold text-slate-700">
                                             {selectedMemberIds.has(member.id)
-                                                ? `${((member.hourlyRate || 0) * calculateDuration()).toFixed(2)} PLN`
+                                                ? `${((member.hourlyRate || 0) * calculateDuration()).toFixed(2)} EUR`
                                                 : '-'}
                                         </div>
                                     </div>
@@ -329,7 +329,7 @@ export const InstallationSettlementModal: React.FC<InstallationSettlementModalPr
                         <div className="flex justify-end pt-2 border-t border-slate-100">
                             <div className="text-right">
                                 <div className="text-xs text-slate-500">Suma robocizny</div>
-                                <div className="text-lg font-bold text-green-600">{laborCost.toFixed(2)} PLN</div>
+                                <div className="text-lg font-bold text-green-600">{laborCost.toFixed(2)} EUR</div>
                             </div>
                         </div>
                     </div>
@@ -389,7 +389,7 @@ export const InstallationSettlementModal: React.FC<InstallationSettlementModalPr
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-end gap-1">
                         <div className="flex gap-4 items-baseline">
                             <div className="text-slate-500 text-sm">Robocizna:</div>
-                            <div className="font-bold text-slate-800">{laborCost.toFixed(2)} PLN</div>
+                            <div className="font-bold text-slate-800">{laborCost.toFixed(2)} EUR</div>
                         </div>
                         <div className="flex gap-4 items-baseline">
                             <div className="text-slate-500 text-sm">Koszty (Suma EUR):</div>

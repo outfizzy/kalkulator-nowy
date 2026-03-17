@@ -5,6 +5,8 @@ import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/off
 import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob } from '../../utils/installationProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { DatabaseService } from '../../services/database';
+import { InstallerSessionService, type WorkSession } from '../../services/database/installer-session.service';
+import { InstallationService } from '../../services/database/installation.service';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
@@ -44,6 +46,9 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
     const [hasConflict, setHasConflict] = useState(false);
     const [contractDetails, setContractDetails] = useState<any>(null);
+    const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
+    const [editCosts, setEditCosts] = useState({ hotelCost: 0, consumablesCost: 0, additionalCosts: 0 });
+    const [savingCosts, setSavingCosts] = useState(false);
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
     // ---- Data Loading ----
@@ -71,11 +76,34 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                     setAssignedInstallerIds(assignedIds);
                     setInstallers(allInstallers);
                     setAllInstallations(allInst);
+                    // Load work sessions for this installation's team
+                    if (installation.teamId) {
+                        try {
+                            const allSessions = await InstallerSessionService.getAllSessions();
+                            const installSessions = allSessions.filter(s =>
+                                s.teamId === installation.teamId && s.installationId === installation.id
+                            );
+                            // If no sessions linked by installationId, try sessions on same date & team
+                            if (installSessions.length === 0 && installation.scheduledDate) {
+                                const dateSessions = allSessions.filter(s =>
+                                    s.teamId === installation.teamId && s.sessionDate === installation.scheduledDate
+                                );
+                                setWorkSessions(dateSessions);
+                            } else {
+                                setWorkSessions(installSessions);
+                            }
+                        } catch (e) { console.error('Error loading sessions:', e); }
+                    }
                 } catch (error) {
                     console.error('Error loading data:', error);
                 }
             })();
             setFormData({ ...installation, client: { ...installation.client } });
+            setEditCosts({
+                hotelCost: installation.hotelCost || 0,
+                consumablesCost: installation.consumablesCost || 0,
+                additionalCosts: installation.additionalCosts || 0,
+            });
             setPhotos(installation.offerId ? getOfferPhotos(installation.offerId) : []);
             setActiveTab('overview');
         }
@@ -550,6 +578,198 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* ---- INLINE COST EDITING CARD ---- */}
+                                    <div className="bg-purple-50/50 rounded-xl border border-purple-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-purple-100/50 border-b border-purple-200 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base">💰</span>
+                                                <h3 className="font-bold text-purple-800 text-sm">Koszty Montażu</h3>
+                                            </div>
+                                            {savingCosts && <span className="text-[10px] text-purple-500 animate-pulse font-bold">Zapisuję...</span>}
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-purple-600 mb-1">🏨 Hotel</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={editCosts.hotelCost || ''}
+                                                            onChange={e => setEditCosts(prev => ({ ...prev, hotelCost: parseFloat(e.target.value) || 0 }))}
+                                                            onBlur={async () => {
+                                                                setSavingCosts(true);
+                                                                try {
+                                                                    await InstallationService.updateFinancials(installation.id, { hotelCost: editCosts.hotelCost });
+                                                                    toast.success('Koszt hotelu zapisany', { id: 'cost-save' });
+                                                                } catch { toast.error('Błąd zapisu'); }
+                                                                finally { setSavingCosts(false); }
+                                                            }}
+                                                            className="w-full pl-7 pr-2 py-2 border border-purple-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 outline-none bg-white"
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute left-2.5 top-2.5 text-purple-400 text-xs">€</span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-amber-600 mb-1">⛽ Materiały/Paliwo</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={editCosts.consumablesCost || ''}
+                                                            onChange={e => setEditCosts(prev => ({ ...prev, consumablesCost: parseFloat(e.target.value) || 0 }))}
+                                                            onBlur={async () => {
+                                                                setSavingCosts(true);
+                                                                try {
+                                                                    await InstallationService.updateFinancials(installation.id, { consumablesCost: editCosts.consumablesCost });
+                                                                    toast.success('Koszt materiałów zapisany', { id: 'cost-save' });
+                                                                } catch { toast.error('Błąd zapisu'); }
+                                                                finally { setSavingCosts(false); }
+                                                            }}
+                                                            className="w-full pl-7 pr-2 py-2 border border-amber-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute left-2.5 top-2.5 text-amber-400 text-xs">€</span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-600 mb-1">📦 Inne koszty</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={editCosts.additionalCosts || ''}
+                                                            onChange={e => setEditCosts(prev => ({ ...prev, additionalCosts: parseFloat(e.target.value) || 0 }))}
+                                                            onBlur={async () => {
+                                                                setSavingCosts(true);
+                                                                try {
+                                                                    await InstallationService.updateFinancials(installation.id, { additionalCosts: editCosts.additionalCosts });
+                                                                    toast.success('Koszty dodatkowe zapisane', { id: 'cost-save' });
+                                                                } catch { toast.error('Błąd zapisu'); }
+                                                                finally { setSavingCosts(false); }
+                                                            }}
+                                                            className="w-full pl-7 pr-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-400 outline-none bg-white"
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute left-2.5 top-2.5 text-slate-400 text-xs">€</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {(editCosts.hotelCost + editCosts.consumablesCost + editCosts.additionalCosts) > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-purple-100 flex justify-end">
+                                                    <div className="text-right">
+                                                        <div className="text-[10px] text-purple-500 font-bold uppercase">Suma kosztów</div>
+                                                        <div className="text-lg font-bold text-purple-700">{(editCosts.hotelCost + editCosts.consumablesCost + editCosts.additionalCosts).toFixed(2)} €</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Live Crew Card — Montażyści dnia */}
+                                    {workSessions.length > 0 && workSessions.some(ws => ws.crewMembers && ws.crewMembers.length > 0) && (
+                                        <div className="bg-indigo-50/50 rounded-xl border border-indigo-200 overflow-hidden">
+                                            <div className="px-4 py-2.5 bg-indigo-100/50 border-b border-indigo-200 flex items-center gap-2">
+                                                <span className="text-base">👷</span>
+                                                <h3 className="font-bold text-indigo-800 text-sm">Montażyści dnia</h3>
+                                                {workSessions.some(ws => ws.status === 'started') && (
+                                                    <span className="ml-auto bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">AKTYWNA SESJA</span>
+                                                )}
+                                            </div>
+                                            <div className="p-3 space-y-2">
+                                                {/* Show crew from the latest/active session */}
+                                                {(() => {
+                                                    const activeSession = workSessions.find(ws => ws.status === 'started') || workSessions[0];
+                                                    const crew = activeSession?.crewMembers || [];
+                                                    return crew.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {crew.map((cm: any) => (
+                                                                <div key={cm.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                                                                    <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                                                                        {cm.firstName?.[0]}{cm.lastName?.[0] || ''}
+                                                                    </div>
+                                                                    <span className="text-sm font-medium text-slate-700">{cm.firstName} {cm.lastName}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : null;
+                                                })()}
+                                                <p className="text-[10px] text-indigo-400 italic">Skład pobierany z aktywnej sesji montażowej</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Work Sessions & Costs Card */}
+                                    {(workSessions.length > 0 || (installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0) > 0) && (
+                                        <div className="bg-green-50/50 rounded-xl border border-green-200 overflow-hidden">
+                                            <div className="px-4 py-2.5 bg-green-100/50 border-b border-green-200 flex items-center gap-2">
+                                                <span className="text-base">⏱</span>
+                                                <h3 className="font-bold text-green-800 text-sm">Sesje robocze i koszty</h3>
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                {/* Cost Summary */}
+                                                {(() => {
+                                                    const laborCost = workSessions.reduce((s, ws) => s + ws.laborCost, 0);
+                                                    const fuelCost = workSessions.reduce((s, ws) => s + ws.fuelCost, 0) || (installation.consumablesCost || 0);
+                                                    const hotelCost = workSessions.reduce((s, ws) => s + ws.hotelCost, 0) || (installation.hotelCost || 0);
+                                                    const totalMinutes = workSessions.reduce((s, ws) => s + (ws.totalWorkMinutes || 0), 0);
+                                                    const totalCost = laborCost + fuelCost + hotelCost;
+                                                    return totalCost > 0 || totalMinutes > 0 ? (
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="bg-white p-2.5 rounded-lg border border-green-100">
+                                                                <div className="text-[10px] text-slate-400 font-bold uppercase">Czas pracy</div>
+                                                                <div className="text-base font-bold text-blue-700">{Math.floor(totalMinutes / 60)}h {Math.round(totalMinutes % 60)}m</div>
+                                                            </div>
+                                                            <div className="bg-white p-2.5 rounded-lg border border-green-100">
+                                                                <div className="text-[10px] text-slate-400 font-bold uppercase">Koszt łączny</div>
+                                                                <div className="text-base font-bold text-red-600">{totalCost.toFixed(2)} €</div>
+                                                            </div>
+                                                            {laborCost > 0 && <div className="bg-white p-2 rounded-lg border border-green-100 text-xs"><span className="text-slate-400">👷 Robocizna:</span> <strong className="text-blue-700">{laborCost.toFixed(2)} €</strong></div>}
+                                                            {fuelCost > 0 && <div className="bg-white p-2 rounded-lg border border-green-100 text-xs"><span className="text-slate-400">⛽ Paliwo:</span> <strong className="text-amber-700">{fuelCost.toFixed(2)} €</strong></div>}
+                                                            {hotelCost > 0 && <div className="bg-white p-2 rounded-lg border border-green-100 text-xs"><span className="text-slate-400">🏨 Hotel:</span> <strong className="text-purple-700">{hotelCost.toFixed(2)} €</strong></div>}
+                                                        </div>
+                                                    ) : null;
+                                                })()}
+
+                                                {/* Session List */}
+                                                {workSessions.length > 0 && (
+                                                    <div className="space-y-1.5">
+                                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sesje</h4>
+                                                        {workSessions.map(ws => (
+                                                            <div key={ws.id} className="bg-white p-2.5 rounded-lg border border-green-100 text-xs">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-bold text-slate-700">
+                                                                        📅 {ws.sessionDate ? new Date(ws.sessionDate).toLocaleDateString('pl-PL') : '—'}
+                                                                    </span>
+                                                                    <span className="text-blue-600 font-bold">
+                                                                        {Math.floor((ws.totalWorkMinutes || 0) / 60)}h {Math.round((ws.totalWorkMinutes || 0) % 60)}m
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                    {ws.crewMembers.map((cm: any) => (
+                                                                        <span key={cm.id} className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">
+                                                                            {cm.firstName} {cm.lastName}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                {ws.startedAt && ws.endedAt && (
+                                                                    <div className="text-[10px] text-slate-400 mt-1">
+                                                                        {new Date(ws.startedAt).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})} – {new Date(ws.endedAt).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}
+                                                                        {(ws.breakMinutes || 0) > 0 && ` (przerwa: ${ws.breakMinutes} min)`}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Measurement Tasks Card */}
                                     <div className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { normalizePhone, formatPhoneDisplay } from '../../utils/phone';
 import { useNavigate } from 'react-router-dom';
 import type { Lead, LeadStatus } from '../../types';
 import { MapPin, AlertCircle } from 'lucide-react';
@@ -205,7 +206,7 @@ export const LeadsMap: React.FC<LeadsMapProps> = ({ leads }) => {
                         <div style="font-size:12px;color:#475569;margin-top:4px;">
                             ${[cd?.address, cd?.postalCode, cd?.city].filter(Boolean).join(', ')}
                         </div>
-                        ${cd?.phone ? `<div style="font-size:12px;margin-top:4px;">📞 <a href="tel:${cd.phone}" style="color:#3B82F6;text-decoration:none;">${cd.phone}</a></div>` : ''}
+                        ${cd?.phone ? `<div style="font-size:12px;margin-top:4px;">📞 <a href="tel:${normalizePhone(cd.phone)}" style="color:#3B82F6;text-decoration:none;">${formatPhoneDisplay(cd.phone)}</a></div>` : ''}
                         ${cd?.email ? `<div style="font-size:12px;">✉️ ${cd.email}</div>` : ''}
                         <div style="margin-top:8px;text-align:center;">
                             <a href="/leads/${lead.id}" 

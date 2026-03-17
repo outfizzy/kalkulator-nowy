@@ -106,6 +106,12 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
     const hasLeftSlidingGlass = slidingWallAddons.some(a => a.location === 'left');
     const hasRightSlidingGlass = slidingWallAddons.some(a => a.location === 'right');
 
+    // Fixed walls (Festglas, Alu-Wand)
+    const fixedWallAddons = config.addons.filter(a => a.type === 'fixedWall');
+    const hasFrontFixed = fixedWallAddons.some(a => a.location === 'front');
+    const hasLeftFixed = fixedWallAddons.some(a => a.location === 'left');
+    const hasRightFixed = fixedWallAddons.some(a => a.location === 'right');
+
     // ... Materials (PBR) ...
     const glassWallMaterial = useMemo(() => createGlassWallMaterial(), []);
 
@@ -400,18 +406,44 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                         depth={depthM}
                         pitchAngle={pitchAngle}
                         position={[-widthM / 2, heightM - 0.15, 0]}
-                        glassMaterial={activeRoofMat}
+                        glassMaterial={fixedWallAddons.some(a => a.location === 'left' && a.name?.includes('Aluminium')) ? structureMaterial : activeRoofMat}
                         frameMaterial={structureMaterial}
+                        isAluminium={fixedWallAddons.some(a => a.location === 'left' && a.name?.includes('Aluminium'))}
                     />
                     <Wedge
                         side="right"
                         depth={depthM}
                         pitchAngle={pitchAngle}
                         position={[widthM / 2, heightM - 0.15, 0]}
-                        glassMaterial={activeRoofMat}
+                        glassMaterial={fixedWallAddons.some(a => a.location === 'right' && a.name?.includes('Aluminium')) ? structureMaterial : activeRoofMat}
                         frameMaterial={structureMaterial}
+                        isAluminium={fixedWallAddons.some(a => a.location === 'right' && a.name?.includes('Aluminium'))}
                     />
                 </>
+            )}
+
+            {/* ALUMINUM WEDGE FILL — when sideWedges OFF but alu fixedWall is ON, fill the triangular gap */}
+            {!config.sideWedges && hasLeftFixed && fixedWallAddons.some(a => a.location === 'left' && a.name?.includes('Aluminium')) && (
+                <Wedge
+                    side="left"
+                    depth={depthM}
+                    pitchAngle={pitchAngle}
+                    position={[-widthM / 2, heightM - 0.15, 0]}
+                    glassMaterial={structureMaterial}
+                    frameMaterial={structureMaterial}
+                    isAluminium={true}
+                />
+            )}
+            {!config.sideWedges && hasRightFixed && fixedWallAddons.some(a => a.location === 'right' && a.name?.includes('Aluminium')) && (
+                <Wedge
+                    side="right"
+                    depth={depthM}
+                    pitchAngle={pitchAngle}
+                    position={[widthM / 2, heightM - 0.15, 0]}
+                    glassMaterial={structureMaterial}
+                    frameMaterial={structureMaterial}
+                    isAluminium={true}
+                />
             )}
 
             {/* LED LIGHTING */}
@@ -505,6 +537,59 @@ export const PatioCoverModel: React.FC<PatioCoverModelProps> = ({ config, struct
                     width={depthM}
                     height={heightM - 0.15}
                     material={glassWallMaterial}
+                />
+            )}
+
+            {/* FIXED GLASS WALLS (Festglas/Alu-Wand) — FRONT */}
+            {hasFrontFixed && !hasFrontSlidingGlass && (
+                <group>
+                    {postEls.filter(p => p.type === 'front').slice(0, -1).map((_, i) => {
+                        const allFrontPosts = postEls.filter(p => p.type === 'front');
+                        const p1 = allFrontPosts[i];
+                        const p2 = allFrontPosts[i + 1];
+                        if (!p1 || !p2) return null;
+                        const x1 = p1.position[0];
+                        const x2 = p2.position[0];
+                        const midX = (x1 + x2) / 2;
+                        const w = Math.abs(x2 - x1) - POST_SIZE;
+                        const h = p1.height;
+                        const z = p1.position[2] + POST_SIZE / 2 - 0.05;
+                        const isAlu = fixedWallAddons.some(a => a.location === 'front' && a.name?.includes('Aluminium'));
+                        return (
+                            <GlassWallPanel
+                                key={`front-fixed-${i}`}
+                                position={[midX, h / 2, z]}
+                                width={w}
+                                height={h}
+                                material={isAlu ? structureMaterial : glassWallMaterial}
+                                isFrameless={isAlu}
+                            />
+                        );
+                    })}
+                </group>
+            )}
+
+            {/* FIXED GLASS WALLS — LEFT */}
+            {hasLeftFixed && !hasLeftSlidingGlass && (
+                <GlassWallSide
+                    side="left"
+                    position={[-widthM / 2, (heightM - 0.15) / 2, 0]}
+                    width={depthM}
+                    height={heightM - 0.15}
+                    material={fixedWallAddons.some(a => a.location === 'left' && a.name?.includes('Aluminium')) ? structureMaterial : glassWallMaterial}
+                    isFrameless={fixedWallAddons.some(a => a.location === 'left' && a.name?.includes('Aluminium'))}
+                />
+            )}
+
+            {/* FIXED GLASS WALLS — RIGHT */}
+            {hasRightFixed && !hasRightSlidingGlass && (
+                <GlassWallSide
+                    side="right"
+                    position={[widthM / 2, (heightM - 0.15) / 2, 0]}
+                    width={depthM}
+                    height={heightM - 0.15}
+                    material={fixedWallAddons.some(a => a.location === 'right' && a.name?.includes('Aluminium')) ? structureMaterial : glassWallMaterial}
+                    isFrameless={fixedWallAddons.some(a => a.location === 'right' && a.name?.includes('Aluminium'))}
                 />
             )}
 
@@ -887,9 +972,10 @@ interface WedgeProps {
     position: [number, number, number];
     glassMaterial: THREE.Material;
     frameMaterial: THREE.Material;
+    isAluminium?: boolean;
 }
 
-const Wedge: React.FC<WedgeProps> = ({ side: _side, depth, pitchAngle, position, glassMaterial, frameMaterial }) => {
+const Wedge: React.FC<WedgeProps> = ({ side: _side, depth, pitchAngle, position, glassMaterial, frameMaterial, isAluminium }) => {
     const rise = depth * Math.tan(pitchAngle);
     const hypotenuse = depth / Math.cos(pitchAngle);
     const frameSize = 0.05;
@@ -929,24 +1015,34 @@ const Wedge: React.FC<WedgeProps> = ({ side: _side, depth, pitchAngle, position,
                     <boxGeometry args={[frameSize, frameSize, hypotenuse]} />
                 </mesh>
 
-                {/* 4. Glass Panel */}
+                {/* 4. Fill Panel — Glass (transparent) or Aluminium (solid) */}
                 <mesh position={[0, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
                     <shapeGeometry args={[
                         new THREE.Shape()
-                            .moveTo(-depth / 2, frameSize)         // Front Bottom (Low)
-                            .lineTo(depth / 2, frameSize)          // Back Bottom (Low)
-                            .lineTo(depth / 2, rise - frameSize)   // Back Top (High)
-                            .lineTo(-depth / 2, frameSize)         // Close at Front Bottom
+                            .moveTo(-depth / 2, isAluminium ? -0.01 : frameSize)
+                            .lineTo(depth / 2, isAluminium ? -0.01 : frameSize)
+                            .lineTo(depth / 2, isAluminium ? rise + 0.01 : rise - frameSize)
+                            .lineTo(-depth / 2, isAluminium ? -0.01 : frameSize)
                     ]} />
-                    <meshPhysicalMaterial
-                        color={(glassMaterial as THREE.MeshPhysicalMaterial).color}
-                        transmission={0.9}
-                        opacity={0.3}
-                        transparent={true}
-                        roughness={0}
-                        metalness={0}
-                        side={THREE.DoubleSide}
-                    />
+                    {isAluminium ? (
+                        <meshStandardMaterial
+                            color={(frameMaterial as THREE.MeshStandardMaterial).color}
+                            roughness={0.25}
+                            metalness={0.85}
+                            envMapIntensity={1.2}
+                            side={THREE.DoubleSide}
+                        />
+                    ) : (
+                        <meshPhysicalMaterial
+                            color={(glassMaterial as THREE.MeshPhysicalMaterial).color}
+                            transmission={0.9}
+                            opacity={0.3}
+                            transparent={true}
+                            roughness={0}
+                            metalness={0}
+                            side={THREE.DoubleSide}
+                        />
+                    )}
                 </mesh>
             </group>
         </group>
@@ -962,13 +1058,14 @@ interface GlassWallSideProps {
     width: number;
     height: number;
     material: THREE.Material;
+    isFrameless?: boolean;
 }
 
-const GlassWallSide: React.FC<GlassWallSideProps> = ({ side: _side, position, width, height, material }) => {
+const GlassWallSide: React.FC<GlassWallSideProps> = ({ side: _side, position, width, height, material, isFrameless }) => {
     // Rotated panel for side
     return (
         <group position={position} rotation={[0, Math.PI / 2, 0]} name={`glass-side-${_side}`}>
-            <GlassWallPanel position={[0, 0, 0]} width={width} height={height} material={material} />
+            <GlassWallPanel position={[0, 0, 0]} width={width} height={height} material={material} isFrameless={isFrameless} />
         </group>
     );
 };
@@ -994,13 +1091,17 @@ const GlassWallPanel: React.FC<GlassWallPanelProps> = ({ position, width, height
                 <boxGeometry args={[width, height, 0.02]} />
             </mesh>
 
-            {/* Rails / Frames */}
-            <mesh position={[0, height / 2 - 0.02, 0]} material={frameMat}>
-                <boxGeometry args={[width, 0.04, 0.04]} />
-            </mesh>
-            <mesh position={[0, -height / 2 + 0.02, 0]} material={frameMat}>
-                <boxGeometry args={[width, 0.04, 0.04]} />
-            </mesh>
+            {/* Rails / Frames — hidden for frameless/alu panels */}
+            {!isFrameless && (
+                <>
+                    <mesh position={[0, height / 2 - 0.02, 0]} material={frameMat}>
+                        <boxGeometry args={[width, 0.04, 0.04]} />
+                    </mesh>
+                    <mesh position={[0, -height / 2 + 0.02, 0]} material={frameMat}>
+                        <boxGeometry args={[width, 0.04, 0.04]} />
+                    </mesh>
+                </>
+            )}
 
             {/* Vertical Lines simulating sliding panes overlap (3-track?) */}
             {/* Dynamic Vertical Lines for Sliding Panes - HIDE FOR FRAMELESS PANORAMA */}

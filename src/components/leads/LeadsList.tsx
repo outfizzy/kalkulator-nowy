@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatPhoneDisplay } from '../../utils/phone';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
@@ -124,20 +125,24 @@ export const LeadsList: React.FC = () => {
     });
 
     const getStatusBadge = (status: LeadStatus) => {
-        const styles: Record<LeadStatus, string> = {
+        const styles: Record<string, string> = {
             new: 'bg-blue-100 text-blue-800',
             contacted: 'bg-yellow-100 text-yellow-800',
+            formularz: 'bg-teal-100 text-teal-800',
             measurement_scheduled: 'bg-cyan-100 text-cyan-800',
+            measurement_completed: 'bg-purple-100 text-purple-800',
             offer_sent: 'bg-indigo-100 text-indigo-800',
             negotiation: 'bg-purple-100 text-purple-800',
             won: 'bg-green-100 text-green-800',
             lost: 'bg-red-100 text-red-800',
             fair: 'bg-pink-100 text-pink-800'
         };
-        const labels: Record<LeadStatus, string> = {
+        const labels: Record<string, string> = {
             new: 'Nowy',
             contacted: 'Skontaktowano',
+            formularz: '📋 Formularz',
             measurement_scheduled: 'Umówiony na pomiar',
+            measurement_completed: 'Pomiar odbył się',
             offer_sent: 'Oferta Wysłana',
             negotiation: 'Negocjacje',
             won: 'Wygrany',
@@ -233,7 +238,7 @@ export const LeadsList: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4">
                                     {lead.customerData.phone && (
-                                        <div className="text-slate-700">{lead.customerData.phone}</div>
+                                        <div className="text-slate-700">{formatPhoneDisplay(lead.customerData.phone)}</div>
                                     )}
                                     {lead.customerData.email && (
                                         <div className="text-xs text-slate-500">{lead.customerData.email}</div>
@@ -392,7 +397,9 @@ export const LeadsList: React.FC = () => {
                             <option value="new">Nowy</option>
                             <option value="fair">Targi (Nowy)</option>
                             <option value="contacted">Skontaktowano</option>
+                            <option value="formularz">📋 Formularz</option>
                             <option value="measurement_scheduled">Umówiony na pomiar</option>
+                            <option value="measurement_completed">Pomiar odbył się</option>
                             <option value="offer_sent">Oferta</option>
                             <option value="negotiation">Negocjacje</option>
                             <option value="won">Wygrany</option>

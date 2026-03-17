@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
 import { DatabaseService } from '../../services/database';
+import { supabase } from '../../lib/supabase';
 import type { InstallationTeam, User } from '../../types';
 import { toast } from 'react-hot-toast';
 
@@ -16,6 +17,15 @@ export const InstallerTeamsPage: React.FC = () => {
     const [selectedInstallerId, setSelectedInstallerId] = useState('');
     const [virtualMemberName, setVirtualMemberName] = useState('');
     const [memberRate, setMemberRate] = useState<string>('');
+
+    // Create account modal
+    const [showCreateAccount, setShowCreateAccount] = useState(false);
+    const [createAccountTeamId, setCreateAccountTeamId] = useState<string>('');
+    const [accountLogin, setAccountLogin] = useState('');
+    const [accountPassword, setAccountPassword] = useState('');
+    const [accountFirstName, setAccountFirstName] = useState('');
+    const [accountLastName, setAccountLastName] = useState('');
+    const [creatingAccount, setCreatingAccount] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -37,6 +47,64 @@ export const InstallerTeamsPage: React.FC = () => {
             setLoading(false);
         }
     };
+
+    const createInstallerAccount = async () => {
+        if (!accountLogin || !accountPassword || !accountFirstName || !accountLastName) {
+            toast.error('Wypełnij wszystkie pola');
+            return;
+        }
+        if (accountPassword.length < 6) {
+            toast.error('Hasło musi mieć minimum 6 znaków');
+            return;
+        }
+
+        setCreatingAccount(true);
+        try {
+            const fullName = `${accountFirstName} ${accountLastName}`.trim();
+            const fakeEmail = `${accountLogin.toLowerCase().replace(/[^a-z0-9]/g, '')}@installer.local`;
+
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                email: fakeEmail,
+                password: accountPassword,
+                options: {
+                    data: {
+                        full_name: fullName,
+                        first_name: accountFirstName,
+                        last_name: accountLastName,
+                        role: 'installer',
+                        username: accountLogin,
+                    }
+                }
+            });
+
+            if (signUpError) throw signUpError;
+            if (!signUpData.user) throw new Error('Nie udało się utworzyć użytkownika');
+
+            // Update profile with correct data
+            const { error: profileError } = await supabase.from('profiles').update({
+                full_name: fullName,
+                role: 'installer',
+                status: 'active',
+            }).eq('id', signUpData.user.id);
+
+            if (profileError) console.warn('Profile update warning:', profileError);
+
+            toast.success(`Konto utworzone! Login: ${accountLogin}`);
+            setShowCreateAccount(false);
+            setAccountLogin('');
+            setAccountPassword('');
+            setAccountFirstName('');
+            setAccountLastName('');
+            setCreateAccountTeamId('');
+            loadData();
+        } catch (err: any) {
+            console.error('Create account error:', err);
+            toast.error(err?.message || 'Błąd tworzenia konta');
+        } finally {
+            setCreatingAccount(false);
+        }
+    };
+
 
     const handleSave = async () => {
         try {
@@ -213,7 +281,7 @@ export const InstallerTeamsPage: React.FC = () => {
                                             <span>{member.firstName} {member.lastName}</span>
                                         </div>
                                         <div className="text-xs text-slate-500 font-mono">
-                                            {member.hourlyRate ? `${member.hourlyRate} PLN/h` : '-'}
+                                            {member.hourlyRate ? `${member.hourlyRate} EUR/h` : '-'}
                                         </div>
                                     </div>
                                 ))}
@@ -221,6 +289,22 @@ export const InstallerTeamsPage: React.FC = () => {
                                     <div className="text-sm text-slate-400 italic">Brak członków</div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Create Account Button */}
+                        <div className="border-t border-slate-100 pt-3 mt-3">
+                            <button
+                                onClick={() => {
+                                    setCreateAccountTeamId(team.id);
+                                    setShowCreateAccount(true);
+                                }}
+                                className="w-full text-sm bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-2 rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                </svg>
+                                Utwórz konto lidera
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -408,7 +492,7 @@ export const InstallerTeamsPage: React.FC = () => {
                                                 placeholder="Stawka"
                                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                                             />
-                                            <span className="absolute right-2 top-2 text-xs text-slate-400">PLN/h</span>
+                                            <span className="absolute right-2 top-2 text-xs text-slate-400">EUR/h</span>
                                         </div>
                                     </div>
                                     <button
@@ -429,7 +513,7 @@ export const InstallerTeamsPage: React.FC = () => {
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-medium text-slate-700">{member.firstName} {member.lastName}</span>
                                                     <span className="text-xs text-slate-500">
-                                                        {member.hourlyRate ? `${member.hourlyRate} PLN/h` : 'Stawka domyślna'}
+                                                        {member.hourlyRate ? `${member.hourlyRate} EUR/h` : 'Stawka domyślna'}
                                                         {member.type === 'virtual' && ' (Wirtualny)'}
                                                     </span>
                                                 </div>
@@ -463,6 +547,86 @@ export const InstallerTeamsPage: React.FC = () => {
                                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200 font-medium transition-all transform active:scale-95"
                             >
                                 Zapisz Brygadę
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Installer Account Modal */}
+            {showCreateAccount && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCreateAccount(false)}>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-800">Utwórz konto montażysty</h3>
+                            <button onClick={() => setShowCreateAccount(false)} className="text-slate-400 hover:text-slate-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-700">
+                                <p className="font-medium">ℹ️ Email nie jest wymagany</p>
+                                <p className="text-xs mt-1">Montażysta loguje się używając samego loginu i hasła.</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Imię</label>
+                                    <input
+                                        type="text"
+                                        value={accountFirstName}
+                                        onChange={e => setAccountFirstName(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        placeholder="Jan"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nazwisko</label>
+                                    <input
+                                        type="text"
+                                        value={accountLastName}
+                                        onChange={e => setAccountLastName(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        placeholder="Kowalski"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Login</label>
+                                <input
+                                    type="text"
+                                    value={accountLogin}
+                                    onChange={e => setAccountLogin(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    placeholder="np. jan.kowalski"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Hasło</label>
+                                <input
+                                    type="password"
+                                    value={accountPassword}
+                                    onChange={e => setAccountPassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    placeholder="Minimum 6 znaków"
+                                />
+                            </div>
+                            <button
+                                onClick={createInstallerAccount}
+                                disabled={creatingAccount}
+                                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {creatingAccount ? (
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                        </svg>
+                                        Utwórz konto
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

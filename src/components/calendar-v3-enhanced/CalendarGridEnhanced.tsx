@@ -6,7 +6,7 @@ import { CalendarMonthView } from '../calendar-v2/CalendarMonthView';
 import { CalendarTimeline } from '../calendar-v2/CalendarTimeline';
 import { CalendarMap } from '../calendar-v2/CalendarMap';
 import { InstallationService } from '../../services/database/installation.service';
-import type { Installation, InstallationTeam, TeamUnavailability } from '../../types';
+import type { Installation, InstallationTeam, TeamUnavailability, ServiceTicket, Contract } from '../../types';
 import type { LocationForecast } from '../../services/weather.service';
 import toast from 'react-hot-toast';
 
@@ -20,6 +20,11 @@ interface CalendarGridEnhancedProps {
     onEditInstallation?: (installation: Installation) => void;
     onReportClick?: (installation: Installation) => void;
     weatherData?: Map<string, LocationForecast>;
+    showGoogleEvents?: boolean;
+    onGCalEventClick?: (event: any) => void;
+    serviceTickets?: ServiceTicket[];
+    contracts?: Contract[];
+    followUps?: Installation[];
 }
 
 export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
@@ -31,7 +36,12 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
     onRefresh,
     onEditInstallation,
     onReportClick,
-    weatherData
+    weatherData,
+    showGoogleEvents,
+    onGCalEventClick,
+    serviceTickets,
+    contracts,
+    followUps
 }) => {
     return (
         <div className="h-full bg-white">
@@ -44,6 +54,8 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
                     onEditInstallation={onEditInstallation}
                     onReportClick={onReportClick}
                     weatherData={weatherData}
+                    showGoogleEvents={showGoogleEvents}
+                    onGCalEventClick={onGCalEventClick}
                 />
             )}
             {viewMode === 'month' && (
@@ -71,6 +83,9 @@ export const CalendarGridEnhanced: React.FC<CalendarGridEnhancedProps> = ({
                     currentDate={currentDate}
                     installations={installations}
                     teams={teams}
+                    serviceTickets={serviceTickets}
+                    contracts={contracts}
+                    followUps={followUps}
                     onEditInstallation={onEditInstallation}
                 />
             )}

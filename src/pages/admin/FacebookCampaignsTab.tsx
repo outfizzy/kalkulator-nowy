@@ -17,9 +17,9 @@ const STOCK_IMAGES = [
 ];
 
 const AD_FORMATS = [
-    { value: 'single', label: '🖼️ Pojedyncze zdjęcie', desc: 'Jeden obraz z tekstem i CTA' },
-    { value: 'carousel', label: '🎠 Karuzela (2-10 zdjęć)', desc: 'Przewijane karty z osobnymi nagłówkami' },
-    { value: 'collection', label: '📱 Kolaż / Collection', desc: 'Główne zdjęcie + 3 miniaturki' },
+    { value: 'single', label: '🖼️ Einzelbild', desc: 'Ein Bild mit Text und CTA' },
+    { value: 'carousel', label: '🎠 Karussell (2-10 Bilder)', desc: 'Scrollbare Karten mit eigenen Headlines' },
+    { value: 'collection', label: '📱 Kollektion', desc: 'Hauptbild + 3 Vorschaubilder' },
 ];
 
 const AD_IMAGES: Record<string, string> = Object.fromEntries(STOCK_IMAGES.map(i => [i.key, i.src]));
@@ -39,10 +39,10 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Terrassenüberdachung — Mehr Anfragen',
         objective: 'OUTCOME_TRAFFIC',
         daily_budget: '15',
-        description: 'Ruch na stronę www. Targetowanie właścicieli domów w Niemczech, 30-65 lat, zainteresowania: Haus & Garten, Terrasse, Renovierung.',
+        description: 'Traffic auf die Webseite. Targeting: Hauseigentümer in DE, 30-65 Jahre, Interessen: Haus & Garten, Terrasse, Renovierung.',
         audience_hint: 'Hauseigentümer, 30-65, DE, Interessen: Terrasse, Garten, Renovierung',
         ad_copy_hint: '🏠 Ihre Traumterrasse wartet! Aluminium-Terrassenüberdachung ab €X — kostenlose Beratung & Aufmaß',
-        tags: ['Ruch', 'Sezon'],
+        tags: ['Traffic', 'Saison'],
         color: 'from-green-500 to-emerald-600',
         icon: '🏠',
         season: 'Frühling/Sommer',
@@ -59,10 +59,10 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Terrassendach — Lead-Formular',
         objective: 'OUTCOME_LEADS',
         daily_budget: '20',
-        description: 'Leady bezpośrednio z Facebook. Formularz: imię, telefon, kod pocztowy, typ zadaszenia.',
+        description: 'Leads direkt über Facebook-Formulare: Name, Telefon, PLZ, Überdachungstyp.',
         audience_hint: 'Custom Audience: Webseitenbesucher + Lookalike 1-3%, DE',
         ad_copy_hint: '✅ Jetzt unverbindliches Angebot anfordern!',
-        tags: ['Leady', 'Terrassendach'],
+        tags: ['Leads', 'Terrassendach'],
         color: 'from-blue-500 to-indigo-600',
         icon: '📋',
         season: 'Ganzjährig',
@@ -78,10 +78,10 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Carport Aluminium — Anfragen sammeln',
         objective: 'OUTCOME_LEADS',
         daily_budget: '18',
-        description: 'Zbieranie zapytań na carporty aluminiowe. Targetowanie: właściciele domów z garażem/podjazdem.',
+        description: 'Anfragen für Aluminium-Carports sammeln. Targeting: Hausbesitzer mit Garage/Einfahrt.',
         audience_hint: 'Hausbesitzer mit Garage/Einfahrt, 35-60, PLZ-Regionen',
         ad_copy_hint: '🚗 Aluminium Carport — Schutz für Ihr Auto!',
-        tags: ['Leady', 'Carport'],
+        tags: ['Leads', 'Carport'],
         color: 'from-sky-500 to-blue-600',
         icon: '🚗',
         season: 'Herbst/Winter',
@@ -97,7 +97,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Bioklimatische Pergola — Premium',
         objective: 'OUTCOME_TRAFFIC',
         daily_budget: '25',
-        description: 'Kampania premium na pergole bioklimatyczne z lamelami. Targetowanie zamożnych klientów, domy 150m²+.',
+        description: 'Premium-Kampagne für bioklimatische Pergolen mit Lamellen. Targeting: einkommensstarke Kunden, Häuser 150m²+.',
         audience_hint: 'High-Income, Hausbesitzer 150m²+, Interesse: Luxus, Design, Architektur',
         ad_copy_hint: '🌿 Bioklimatische Pergola — Intelligenter Sonnenschutz mit verstellbaren Lamellen. Premium-Qualität.',
         tags: ['Premium', 'Pergola'],
@@ -114,7 +114,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Polendach24 Markenbekanntheit',
         objective: 'OUTCOME_AWARENESS',
         daily_budget: '10',
-        description: 'Budowanie świadomości marki Polendach24 w regionie DACH. Video-Ads z realizacjami.',
+        description: 'Markenbekanntheit für Polendach24 in der DACH-Region aufbauen. Video-Ads mit Referenzprojekten.',
         audience_hint: 'Broad: 25-65, DE/AT/CH, Interessen: Hausbau, Immobilien',
         ad_copy_hint: '📢 Polendach24 — Ihr Partner für Aluminium-Überdachungen. 500+ Montagen in Deutschland!',
         tags: ['Branding'],
@@ -131,7 +131,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Kundenbewertungen & Referenzen',
         objective: 'OUTCOME_ENGAGEMENT',
         daily_budget: '10',
-        description: 'Social proof — promowanie opinii klientów, zdjęcia realizacji, video-referencje.',
+        description: 'Social Proof — Kundenbewertungen, Referenzfotos und Video-Testimonials promoten.',
         audience_hint: 'Custom Audience: Webseitenbesucher 30 Tage + Page Fans',
         ad_copy_hint: '⭐⭐⭐⭐⭐ "Perfekte Arbeit, schnelle Montage!" — Sehen Sie, was unsere Kunden sagen',
         tags: ['Social Proof'],
@@ -148,10 +148,10 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Sommer-Aktion — Terrassendach -15%',
         objective: 'OUTCOME_SALES',
         daily_budget: '30',
-        description: 'Kampania sprzedażowa letnia — rabat 15% na zadaszenia z montażem. Limitowana oferta czasowa.',
+        description: 'Sommer-Verkaufskampagne — 15% Rabatt auf Überdachungen mit Montage. Zeitlich begrenztes Angebot.',
         audience_hint: 'Retargeting: Webseitenbesucher + Engaged Users + Lookalike',
         ad_copy_hint: '🔥 NUR JETZT: 15% Rabatt auf Terrassenüberdachungen! Inklusive Montage. Angebot endet am [Datum]',
-        tags: ['Sprzedaż', 'Rabat'],
+        tags: ['Verkauf', 'Rabatt'],
         color: 'from-red-500 to-rose-600',
         icon: '🔥',
         season: 'Sommer',
@@ -165,10 +165,10 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Retargeting — Webseitenbesucher',
         objective: 'OUTCOME_TRAFFIC',
         daily_budget: '8',
-        description: 'Retargeting użytkowników strony, którzy nie wysłali zapytania. Niski budżet, wysoka konwersja.',
+        description: 'Retargeting von Webseitenbesuchern ohne Anfrage. Niedriges Budget, hohe Conversion-Rate.',
         audience_hint: 'Custom Audience: Webseitenbesucher 7-30 Tage (ohne Conversions)',
         ad_copy_hint: '👋 Sie haben sich unsere Überdachungen angesehen — Jetzt kostenloses Angebot anfordern!',
-        tags: ['Retargeting', 'Konwersja'],
+        tags: ['Retargeting', 'Conversion'],
         color: 'from-teal-500 to-cyan-600',
         icon: '🔄',
         season: 'Ganzjährig',
@@ -182,10 +182,10 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Wintergarten — Regionale Kampagne',
         objective: 'OUTCOME_LEADS',
         daily_budget: '18',
-        description: 'Kampania regionalna (Bayern, NRW, Baden-Württemberg) na ogrody zimowe.',
+        description: 'Regionale Kampagne (Bayern, NRW, Baden-Württemberg) für Wintergärten aus Aluminium.',
         audience_hint: 'PLZ-Targeting: Bayern, NRW, BW, Hessen — Hausbesitzer 40-65',
         ad_copy_hint: '🏡 Wintergarten aus Aluminium — Genießen Sie Ihren Garten das ganze Jahr! Regionale Montage.',
-        tags: ['Regionalna', 'Wintergarten'],
+        tags: ['Regional', 'Wintergarten'],
         color: 'from-indigo-500 to-blue-600',
         icon: '🏡',
         season: 'Herbst',
@@ -199,7 +199,7 @@ const AI_CAMPAIGN_TEMPLATES = [
         name: 'Video Showcase — Montage-Zeitraffer',
         objective: 'OUTCOME_ENGAGEMENT',
         daily_budget: '12',
-        description: 'Video-kampania z timelapse montażu. Efekt WOW — wysoka viralność, niski koszt za wyświetlenie.',
+        description: 'Video-Kampagne mit Montage-Zeitraffer. WOW-Effekt — hohe Viralität, niedriger CPM.',
         audience_hint: 'Broad: 25-55, DE, Video Viewers Retargeting',
         ad_copy_hint: '🎬 Von der Planung bis zur fertigen Überdachung in 60 Sekunden! Sehen Sie unsere Arbeit.',
         tags: ['Video', 'Viral'],
@@ -326,7 +326,7 @@ export default function CampaignsTab() {
             const data = await FacebookService.getCampaigns();
             setCampaigns(data.data || []);
         } catch (err: any) {
-            setError(err.message || 'Nie udało się załadować kampanii');
+            setError(err.message || 'Kampagnen konnten nicht geladen werden');
         }
         finally { setLoading(false); }
     };
@@ -339,25 +339,25 @@ export default function CampaignsTab() {
     };
 
     const objectiveLabels: Record<string, string> = {
-        OUTCOME_TRAFFIC: '🌐 Ruch na stronę',
-        OUTCOME_ENGAGEMENT: '💬 Zaangażowanie',
-        OUTCOME_LEADS: '📋 Leady / Formularze',
-        OUTCOME_AWARENESS: '📢 Świadomość marki',
-        OUTCOME_SALES: '🛒 Sprzedaż / Konwersje',
-        OUTCOME_APP_PROMOTION: '📱 Promocja aplikacji',
+        OUTCOME_TRAFFIC: '🌐 Traffic',
+        OUTCOME_ENGAGEMENT: '💬 Engagement',
+        OUTCOME_LEADS: '📋 Leads / Formulare',
+        OUTCOME_AWARENESS: '📢 Bekanntheit',
+        OUTCOME_SALES: '🛒 Verkauf / Conversions',
+        OUTCOME_APP_PROMOTION: '📱 App-Werbung',
     };
 
     // ═══ FULL PIPELINE: Campaign → Ad Set → Ad ═══
     const handleCreate = async () => {
-        if (!newCampaign.name.trim()) return toast.error('Podaj nazwę kampanii');
-        if (selectedImages.length === 0) return toast.error('Wybierz przynajmniej jedno zdjęcie');
+        if (!newCampaign.name.trim()) return toast.error('Bitte Kampagnenname eingeben');
+        if (selectedImages.length === 0) return toast.error('Bitte mindestens ein Bild auswählen');
         setCreating(true);
         setCreateStep(1);
         let campaignId = '';
         let adSetId = '';
         try {
             // STEP 1: Create Campaign
-            toast('📦 Krok 1/3 — Tworzenie kampanii...', { icon: '🔄' });
+            toast('📦 Schritt 1/3 — Kampagne wird erstellt...', { icon: '🔄' });
             try {
                 const campaignResult = await FacebookService.createCampaign({
                     name: newCampaign.name,
@@ -372,7 +372,7 @@ export default function CampaignsTab() {
 
             // STEP 2: Create Ad Set with placements & targeting
             setCreateStep(2);
-            toast('🎯 Krok 2/3 — Ustawienia grupy reklam...', { icon: '🔄' });
+            toast('🎯 Schritt 2/3 — Anzeigengruppe wird erstellt...', { icon: '🔄' });
             try {
                 const adSetParams: any = {
                     campaign_id: campaignId,
@@ -449,7 +449,7 @@ export default function CampaignsTab() {
 
             // STEP 3: Create Ad with creative
             setCreateStep(3);
-            toast('🎨 Krok 3/3 — Tworzenie reklamy z kreacją...', { icon: '🔄' });
+            toast('🎨 Schritt 3/3 — Anzeige wird erstellt...', { icon: '🔄' });
             try {
                 const imageUrl = selectedImages[0]?.startsWith('http')
                     ? selectedImages[0]
@@ -473,7 +473,7 @@ export default function CampaignsTab() {
                 throw new Error(`❌ Krok 3 (Ad/Creative, adset ${adSetId}) — ${e3.message}`);
             }
 
-            toast.success('✅ Kampania + Grupa Reklam + Reklama — wszystko utworzone na Facebooku!');
+            toast.success('✅ Kampagne + Anzeigengruppe + Anzeige — alles erfolgreich erstellt!');
             setShowCreator(false);
             setCreateStep(0);
             setNewCampaign({ name: '', objective: 'OUTCOME_TRAFFIC', daily_budget: '', status: 'PAUSED', primary_text: '', headline: '', link_description: '', cta: 'LEARN_MORE', link_url: 'https://polendach24.de', image_key: 'terrasse' });
@@ -509,7 +509,7 @@ export default function CampaignsTab() {
     const handleCloneCampaign = (c: any) => {
         const ins = c.insights?.data?.[0] || {};
         setNewCampaign({
-            name: `${c.name} — Kopia`,
+            name: `${c.name} — Kopie`,
             objective: c.objective || 'OUTCOME_TRAFFIC',
             daily_budget: c.daily_budget ? String(c.daily_budget / 100) : '20',
             status: 'PAUSED',
@@ -523,7 +523,7 @@ export default function CampaignsTab() {
         setSelectedImages(['/fb-terrasse.png']);
         setShowCreator(true);
         setShowTemplates(false);
-        toast.success(`📋 Sklonowano "${c.name}" — edytuj i utwórz!`);
+        toast.success(`📋 "${c.name}" geklont — bearbeiten und erstellen!`);
     };
 
     // ═══ UTM BUILDER ═══
@@ -587,15 +587,15 @@ export default function CampaignsTab() {
         setAdFormat('single');
         setShowTemplates(false);
         setShowCreator(true);
-        toast.success('🤖 Szablon zastosowany — edytuj i utwórz kampanię!');
+        toast.success('🤖 Vorlage angewendet — bearbeiten und Kampagne erstellen!');
     };
 
     const toggleImage = (src: string) => {
         setSelectedImages(prev => {
             if (prev.includes(src)) return prev.filter(s => s !== src);
             if (adFormat === 'single') return [src];
-            if (adFormat === 'collection' && prev.length >= 4) { toast('Max 4 zdjęcia dla kolaża'); return prev; }
-            if (prev.length >= 10) { toast('Max 10 zdjęć w karuzeli'); return prev; }
+            if (adFormat === 'collection' && prev.length >= 4) { toast('Max 4 Bilder für Kollektion'); return prev; }
+            if (prev.length >= 10) { toast('Max 10 Bilder im Karussell'); return prev; }
             return [...prev, src];
         });
     };
@@ -613,7 +613,7 @@ export default function CampaignsTab() {
             const url = urlData.publicUrl;
             setUploadedImages(prev => [url, ...prev]);
             setSelectedImages(prev => adFormat === 'single' ? [url] : [...prev, url]);
-            toast.success('📸 Zdjęcie dodane!');
+            toast.success('📸 Bild hinzugefügt!');
         } catch (err: any) {
             toast.error('Upload error: ' + err.message);
         }
@@ -772,7 +772,7 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
                 <div className="relative">
                     <div className="flex items-center justify-between flex-wrap gap-3">
                         <div>
-                            <h2 className="text-xl font-bold">🎯 Kampanie reklamowe</h2>
+                            <h2 className="text-xl font-bold">🎯 Werbekampagnen</h2>
                             <p className="text-blue-100 text-sm mt-1">Aluminium-Überdachungen • Deutscher Markt • Polendach24</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -785,10 +785,10 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
                                 {generatingAI ? '⏳ AI generuje...' : '✨ AI Stwórz kampanię A-Z'}
                             </button>
                             <button onClick={() => { setShowTemplates(!showTemplates); setShowCreator(false); }} className="px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 shadow-lg">
-                                🤖 AI Szablony
+                                🤖 AI Vorlagen
                             </button>
                             <button onClick={() => { setShowCreator(!showCreator); setShowTemplates(false); }} className="px-3 py-2 bg-white text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-50 shadow-lg">
-                                ➕ Nowa kampania
+                                ➕ Neue Kampagne
                             </button>
                         </div>
                     </div>
@@ -797,23 +797,23 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
                         <div className="flex gap-6 mt-4 pt-4 border-t border-white/20">
                             <div>
                                 <p className="text-2xl font-bold">{campaigns.length}</p>
-                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Kampanii</p>
+                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Kampagnen</p>
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-green-300">{activeCnt}</p>
-                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Aktywnych</p>
+                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Aktiv</p>
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-yellow-300">{pausedCnt}</p>
-                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Wstrzymanych</p>
+                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Pausiert</p>
                             </div>
                             {totalSpend > 0 && <div>
                                 <p className="text-2xl font-bold">€{totalSpend.toFixed(0)}</p>
-                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Łącznie wydano</p>
+                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Gesamtausgaben</p>
                             </div>}
                             {totalReach > 0 && <div>
                                 <p className="text-2xl font-bold">{totalReach.toLocaleString()}</p>
-                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Zasięg łączny</p>
+                                <p className="text-[10px] text-blue-200 uppercase tracking-wider">Gesamtreichweite</p>
                             </div>}
                         </div>
                     )}
@@ -824,10 +824,10 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
             {error && (
                 <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex items-start justify-between">
                     <div>
-                        <p className="text-sm font-bold text-red-800">❌ Błąd ładowania kampanii</p>
+                        <p className="text-sm font-bold text-red-800">❌ Fehler beim Laden der Kampagnen</p>
                         <p className="text-xs text-red-700 mt-1">{error}</p>
                     </div>
-                    <button onClick={loadCampaigns} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 ml-3">🔄 Ponów</button>
+                    <button onClick={loadCampaigns} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 ml-3">🔄 Erneut</button>
                 </div>
             )}
 
@@ -840,8 +840,8 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
                                 📊
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-indigo-900">Heatmapa klientów — dane z CRM</h3>
-                                <p className="text-[10px] text-indigo-500">Twoje regiony wg liczby leadów. Używaj do targetowania Facebook Ads.</p>
+                                <h3 className="text-sm font-bold text-indigo-900">Kunden-Heatmap — CRM-Daten</h3>
+                                <p className="text-[10px] text-indigo-500">Ihre Top-Regionen nach Leads. Nutzen Sie diese für das Facebook-Ads-Targeting.</p>
                             </div>
                         </div>
                         <div className="text-right">
@@ -877,15 +877,15 @@ Erstelle DIE BESTE MÖGLICHE Kampagne basierend auf: aktuellem Monat, Saison, CR
                     <div className="flex items-center gap-4 bg-white/70 rounded-xl p-3 border border-indigo-100">
                         <div className="flex-1">
                             <p className="text-[10px] text-indigo-600">
-                                💡 <strong>Główny rynek:</strong> Ostdeutschland (Sachsen, Brandenburg, Berlin, Sachsen-Anhalt).
-                                <strong> Ekspansja:</strong> NRW, Bayern, Hamburg — nowe tereny z potencjałem.
+                                💡 <strong>Hauptmarkt:</strong> Ostdeutschland (Sachsen, Brandenburg, Berlin, Sachsen-Anhalt).
+                                <strong> Expansion:</strong> NRW, Bayern, Hamburg — neue Regionen mit Potenzial.
                             </p>
                         </div>
                         <button
                             onClick={() => { setShowCreator(true); setShowTemplates(false); }}
                             className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap shadow-sm"
                         >
-                            🎯 Utwórz kampanię z tych regionów
+                            🎯 Kampagne aus diesen Regionen erstellen
                         </button>
                         <button
                             onClick={async () => {
@@ -969,7 +969,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                 <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">🤖</span>
                                 AI Kampagnen-Vorlagen
                             </h3>
-                            <p className="text-xs text-amber-700 mt-1">Gotowe szablony zoptymalizowane pod <strong>zadaszenia aluminiowe w Niemczech</strong>. Kliknij aby użyć.</p>
+                            <p className="text-xs text-amber-700 mt-1">Fertige Vorlagen optimiert für <strong>Aluminium-Überdachungen in Deutschland</strong>. Klicken zum Anwenden.</p>
                         </div>
                         <button onClick={() => setShowTemplates(false)} className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 hover:bg-amber-300 flex items-center justify-center text-sm font-bold">✕</button>
                     </div>
@@ -998,16 +998,16 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
 
                                         {/* Audience hint */}
                                         <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 mt-2">
-                                            <p className="text-[10px] text-blue-600"><strong>🎯 Grupa docelowa:</strong> {tpl.audience_hint}</p>
+                                            <p className="text-[10px] text-blue-600"><strong>🎯 Zielgruppe:</strong> {tpl.audience_hint}</p>
                                         </div>
 
                                         {/* Ad copy hint */}
                                         <div className="bg-green-50 rounded-lg px-2.5 py-1.5 mt-1.5">
-                                            <p className="text-[10px] text-green-700"><strong>📝 Tekst reklamy:</strong> {tpl.ad_copy_hint}</p>
+                                            <p className="text-[10px] text-green-700"><strong>📝 Anzeigentext:</strong> {tpl.ad_copy_hint}</p>
                                         </div>
 
                                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">€{tpl.daily_budget}/dzień</span>
+                                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">€{tpl.daily_budget}/Tag</span>
                                             <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{objectiveLabels[tpl.objective]?.split(' ').slice(1).join(' ')}</span>
                                             <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">📅 {tpl.season}</span>
                                             {tpl.tags.map(tag => (
@@ -1022,14 +1022,14 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
 
                     {/* Pro tips */}
                     <div className="bg-white/80 rounded-xl p-4 border border-amber-200">
-                        <p className="text-xs font-bold text-amber-800 mb-2">💡 Wskazówki kampanii — Aluminium Überdachungen DE:</p>
+                        <p className="text-xs font-bold text-amber-800 mb-2">💡 Kampagnen-Tipps — Aluminium Überdachungen DE:</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-amber-700">
-                            <p>• <strong>Najlepszy CPC:</strong> €0.15–0.40 dla ruchu, €1–3 dla leadów</p>
-                            <p>• <strong>Sezon:</strong> Marzec–Czerwiec = peak season, niższe CPL</p>
-                            <p>• <strong>Grupa 1:</strong> Hausbesitzer 35-55, Einkommen &gt;40k, Terrasse/Garten</p>
-                            <p>• <strong>Grupa 2:</strong> Retargeting webseitenbesucher (7-30 dni)</p>
-                            <p>• <strong>Format:</strong> Karuzela zdjęć realizacji = najlepszy CTR</p>
-                            <p>• <strong>Video:</strong> Timelapse montażu 15-30s = niski CPM, wysoki reach</p>
+                            <p>• <strong>Bester CPC:</strong> €0.15–0.40 für Traffic, €1–3 für Leads</p>
+                            <p>• <strong>Saison:</strong> März–Juni = Peak Season, niedrigerer CPL</p>
+                            <p>• <strong>Zielgruppe 1:</strong> Hausbesitzer 35-55, Einkommen &gt;40k, Terrasse/Garten</p>
+                            <p>• <strong>Zielgruppe 2:</strong> Retargeting Webseitenbesucher (7-30 Tage)</p>
+                            <p>• <strong>Format:</strong> Karussell mit Referenzfotos = bester CTR</p>
+                            <p>• <strong>Video:</strong> Montage-Zeitraffer 15-30s = niedriger CPM, hohe Reichweite</p>
                         </div>
                     </div>
                 </div>
@@ -1041,7 +1041,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                             <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm">➕</span>
-                            Utwórz kampanię z reklamą
+                            Kampagne mit Anzeige erstellen
                         </h3>
                         <button onClick={() => setShowCreator(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center text-sm">✕</button>
                     </div>
@@ -1049,11 +1049,11 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* LEFT: Form fields */}
                         <div className="space-y-4">
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">📋 Ustawienia kampanii</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">📋 Kampagneneinstellungen</p>
 
                             {/* Name + AI */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-600 mb-1 block">Nazwa kampanii</label>
+                                <label className="text-xs font-semibold text-slate-600 mb-1 block">Kampagnenname</label>
                                 <div className="flex gap-2">
                                     <input value={newCampaign.name} onChange={e => setNewCampaign(p => ({ ...p, name: e.target.value }))} placeholder="np. Terrassenüberdachung 2026" className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                     <button onClick={generateAICampaignName} disabled={generatingAI} className="px-3 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:opacity-90 disabled:opacity-50 whitespace-nowrap shadow-md">
@@ -1064,39 +1064,39 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
 
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Cel</label>
+                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Ziel</label>
                                     <select value={newCampaign.objective} onChange={e => setNewCampaign(p => ({ ...p, objective: e.target.value }))} className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none">
                                         {Object.entries(objectiveLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Budżet €/dzień</label>
+                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Budget €/Tag</label>
                                     <input type="number" value={newCampaign.daily_budget} onChange={e => setNewCampaign(p => ({ ...p, daily_budget: e.target.value }))} placeholder="20" className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold text-slate-600 mb-1 block">Status</label>
                                     <select value={newCampaign.status} onChange={e => setNewCampaign(p => ({ ...p, status: e.target.value }))} className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none">
-                                        <option value="PAUSED">⏸️ Wstrzymana</option>
-                                        <option value="ACTIVE">▶️ Aktywna</option>
+                                        <option value="PAUSED">⏸️ Pausiert</option>
+                                        <option value="ACTIVE">▶️ Aktiv</option>
                                     </select>
                                 </div>
                             </div>
 
                             {/* ═══ PLACEMENTS & TARGETING ═══ */}
                             <hr className="border-slate-100" />
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">📍 Umiejscowienia i targetowanie</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">📍 Platzierungen & Targeting</p>
 
                             {/* Placement mode */}
                             <div className="grid grid-cols-2 gap-2">
                                 <button onClick={() => setPlacementMode('advantage')}
                                     className={`p-2 rounded-lg border text-left transition-all ${placementMode === 'advantage' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300' : 'border-slate-200 hover:border-slate-300'}`}>
-                                    <p className="text-xs font-bold text-slate-700">🚀 Advantage+ (Zalecane)</p>
-                                    <p className="text-[9px] text-slate-400 mt-0.5">Facebook AI optymalizuje umiejscowienia automatycznie</p>
+                                    <p className="text-xs font-bold text-slate-700">🚀 Advantage+ (Empfohlen)</p>
+                                    <p className="text-[9px] text-slate-400 mt-0.5">Facebook AI optimiert Platzierungen automatisch</p>
                                 </button>
                                 <button onClick={() => setPlacementMode('manual')}
                                     className={`p-2 rounded-lg border text-left transition-all ${placementMode === 'manual' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300' : 'border-slate-200 hover:border-slate-300'}`}>
-                                    <p className="text-xs font-bold text-slate-700">🎯 Manualne</p>
-                                    <p className="text-[9px] text-slate-400 mt-0.5">Ty decydujesz: FB, IG, Reels, Stories, Messenger...</p>
+                                    <p className="text-xs font-bold text-slate-700">🎯 Manuell</p>
+                                    <p className="text-[9px] text-slate-400 mt-0.5">Sie entscheiden: FB, IG, Reels, Stories, Messenger...</p>
                                 </button>
                             </div>
 
@@ -1141,7 +1141,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                         <p className="text-[10px] font-bold text-purple-600 mb-1">💬 Messenger</p>
                                         <div className="flex flex-wrap gap-x-3 gap-y-1">
                                             {[
-                                                { key: 'messenger_home', label: 'Skrzynka' },
+                                                { key: 'messenger_home', label: 'Posteingang' },
                                                 { key: 'messenger_stories', label: 'Stories' },
                                             ].map(p => (
                                                 <label key={p.key} className="flex items-center gap-1 text-[10px] text-slate-600 cursor-pointer">
@@ -1158,36 +1158,36 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                             {/* Targeting */}
                             <div className="grid grid-cols-4 gap-2">
                                 <div>
-                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">🌍 Kraj</label>
+                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">🌍 Land</label>
                                     <select value={targeting.countries[0]} onChange={e => setTargeting(p => ({ ...p, countries: [e.target.value] }))} className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] focus:ring-2 focus:ring-blue-400 focus:outline-none">
-                                        <option value="DE">🇩🇪 Niemcy</option>
-                                        <option value="AT">🇦🇹 Austria</option>
-                                        <option value="CH">🇨🇭 Szwajcaria</option>
-                                        <option value="PL">🇵🇱 Polska</option>
-                                        <option value="NL">🇳🇱 Holandia</option>
+                                        <option value="DE">🇩🇪 Deutschland</option>
+                                        <option value="AT">🇦🇹 Österreich</option>
+                                        <option value="CH">🇨🇭 Schweiz</option>
+                                        <option value="PL">🇵🇱 Polen</option>
+                                        <option value="NL">🇳🇱 Niederlande</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">👤 Wiek od</label>
+                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">👤 Alter von</label>
                                     <input type="number" value={targeting.age_min} min={18} max={65} onChange={e => setTargeting(p => ({ ...p, age_min: Number(e.target.value) }))} className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">👤 Wiek do</label>
+                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">👤 Alter bis</label>
                                     <input type="number" value={targeting.age_max} min={18} max={65} onChange={e => setTargeting(p => ({ ...p, age_max: Number(e.target.value) }))} className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">⚧️ Płeć</label>
+                                    <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">⚧️ Geschlecht</label>
                                     <select value={targeting.gender} onChange={e => setTargeting(p => ({ ...p, gender: Number(e.target.value) }))} className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] focus:ring-2 focus:ring-blue-400 focus:outline-none">
-                                        <option value={0}>Wszyscy</option>
-                                        <option value={1}>Mężczyźni</option>
-                                        <option value={2}>Kobiety</option>
+                                        <option value={0}>Alle</option>
+                                        <option value={1}>Männer</option>
+                                        <option value={2}>Frauen</option>
                                     </select>
                                 </div>
                             </div>
 
                             {/* Advanced targeting: Interests */}
                             <div>
-                                <p className="text-[10px] font-bold text-slate-500 mb-1">🎯 Zainteresowania (im więcej, tym szerszy zasięg):</p>
+                                <p className="text-[10px] font-bold text-slate-500 mb-1">🎯 Interessen (mehr = breitere Reichweite):</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {[
                                         { id: '6003349442621', name: 'Hausbau' },
@@ -1217,7 +1217,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
 
                             {/* Advanced targeting: Cities */}
                             <div>
-                                <p className="text-[10px] font-bold text-slate-500 mb-1">🏙️ Miasta (opcjonalnie — zostaw puste dla całego kraju):</p>
+                                <p className="text-[10px] font-bold text-slate-500 mb-1">🏙️ Städte (optional — leer lassen für ganzes Land):</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {[
                                         { key: '2950159', name: 'Berlin' },
@@ -1254,19 +1254,19 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                         <div>
                                             <p className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
                                                 <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[10px]">📊</span>
-                                                Heatmapa klientów (dane z CRM)
+                                                Kunden-Heatmap (CRM-Daten)
                                             </p>
-                                            <p className="text-[9px] text-indigo-500 mt-0.5">Regiony z największą liczbą leadów — kieruj reklamy tam, gdzie masz klientów + nowe tereny</p>
+                                            <p className="text-[9px] text-indigo-500 mt-0.5">Regionen mit den meisten Leads — schalten Sie Anzeigen dort, wo Ihre Kunden sind</p>
                                         </div>
                                         <button
                                             onClick={() => {
                                                 // Auto-select top 5 regions as targeting
                                                 const topRegions = customerRegions.slice(0, 5).map(r => r.region);
-                                                toast.success(`🎯 Załadowano Top 5 regionów z CRM: ${topRegions.join(', ')}`);
+                                                toast.success(`🎯 Top 5 CRM-Regionen geladen: ${topRegions.join(', ')}`);
                                             }}
                                             className="px-2.5 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
                                         >
-                                            🎯 Zastosuj Top 5
+                                            🎯 Top 5 anwenden
                                         </button>
                                     </div>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
@@ -1292,7 +1292,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                         })}
                                     </div>
                                     <p className="text-[9px] text-indigo-400 text-center">
-                                        💡 Tip: Twoim głównym rynkiem jest Ostdeutschland (Sachsen, Brandenburg, Berlin). Rozważ ekspansję na NRW / Bayern.
+                                        💡 Tipp: Ihr Hauptmarkt ist Ostdeutschland (Sachsen, Brandenburg, Berlin). Erwägen Sie Expansion nach NRW / Bayern.
                                     </p>
                                 </div>
                             )}
@@ -1300,19 +1300,19 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                             {/* ═══ AD SCHEDULE ═══ */}
                             <hr className="border-slate-100" />
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">⏰ Harmonogram wyświetlania</p>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">⏰ Anzeigenplanung</p>
                                 <label className="flex items-center gap-1.5 cursor-pointer">
                                     <input type="checkbox" checked={adSchedule.enabled} onChange={e => setAdSchedule(p => ({ ...p, enabled: e.target.checked }))}
                                         className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-400" />
-                                    <span className="text-[10px] text-slate-500">{adSchedule.enabled ? 'Włączony' : 'Wyłączony (24/7)'}</span>
+                                    <span className="text-[10px] text-slate-500">{adSchedule.enabled ? 'Aktiviert' : 'Deaktiviert (24/7)'}</span>
                                 </label>
                             </div>
                             {adSchedule.enabled && (
                                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 space-y-2">
                                     <div>
-                                        <p className="text-[10px] font-bold text-slate-600 mb-1">📅 Dni tygodnia:</p>
+                                        <p className="text-[10px] font-bold text-slate-600 mb-1">📅 Wochentage:</p>
                                         <div className="flex gap-1">
-                                            {[{d: 1, l: 'Pn'}, {d: 2, l: 'Wt'}, {d: 3, l: 'Śr'}, {d: 4, l: 'Cz'}, {d: 5, l: 'Pt'}, {d: 6, l: 'So'}, {d: 0, l: 'Nd'}].map(day => (
+                                            {[{d: 1, l: 'Mo'}, {d: 2, l: 'Di'}, {d: 3, l: 'Mi'}, {d: 4, l: 'Do'}, {d: 5, l: 'Fr'}, {d: 6, l: 'Sa'}, {d: 0, l: 'So'}].map(day => (
                                                 <button key={day.d} onClick={() => setAdSchedule(p => ({
                                                     ...p, days: p.days.includes(day.d) ? p.days.filter(d => d !== day.d) : [...p.days, day.d]
                                                 }))}
@@ -1324,24 +1324,24 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label className="text-[10px] text-slate-500">Od godziny:</label>
+                                            <label className="text-[10px] text-slate-500">Von Uhr:</label>
                                             <input type="number" min={0} max={23} value={adSchedule.startHour} onChange={e => setAdSchedule(p => ({ ...p, startHour: Number(e.target.value) }))}
                                                 className="w-full px-2 py-1 rounded border border-slate-200 text-[10px]" />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-slate-500">Do godziny:</label>
+                                            <label className="text-[10px] text-slate-500">Bis Uhr:</label>
                                             <input type="number" min={0} max={23} value={adSchedule.endHour} onChange={e => setAdSchedule(p => ({ ...p, endHour: Number(e.target.value) }))}
                                                 className="w-full px-2 py-1 rounded border border-slate-200 text-[10px]" />
                                         </div>
                                     </div>
-                                    <p className="text-[9px] text-slate-400">💡 Reklamy wyświetlane {adSchedule.startHour}:00–{adSchedule.endHour}:00 w wybrane dni. Strefa czasowa użytkownika.</p>
+                                    <p className="text-[9px] text-slate-400">💡 Anzeigen werden {adSchedule.startHour}:00–{adSchedule.endHour}:00 an ausgewählten Tagen geschaltet. Benutzer-Zeitzone.</p>
                                 </div>
                             )}
 
                             {/* ═══ UTM PREVIEW ═══ */}
                             {newCampaign.name && (
                                 <div className="bg-emerald-50 rounded-lg p-2.5 border border-emerald-200">
-                                    <p className="text-[10px] font-bold text-emerald-700 mb-1">🔗 UTM Tracking (automatyczny)</p>
+                                    <p className="text-[10px] font-bold text-emerald-700 mb-1">🔗 UTM Tracking (automatisch)</p>
                                     <p className="text-[9px] text-emerald-600 font-mono break-all leading-relaxed">
                                         {buildUtmUrl(newCampaign.link_url || 'https://polendach24.de', newCampaign.name)}
                                     </p>
@@ -1351,11 +1351,11 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                             {/* ═══ ALERT RULES ═══ */}
                             <div className="bg-orange-50 rounded-lg p-2.5 border border-orange-200">
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <p className="text-[10px] font-bold text-orange-700">🚨 Auto-alerty wydajności</p>
+                                    <p className="text-[10px] font-bold text-orange-700">🚨 Performance-Alerts</p>
                                     <label className="flex items-center gap-1 cursor-pointer">
                                         <input type="checkbox" checked={alertRules.enabled} onChange={e => setAlertRules(p => ({ ...p, enabled: e.target.checked }))}
                                             className="w-3 h-3 rounded border-orange-300 text-orange-600 focus:ring-orange-400" />
-                                        <span className="text-[9px] text-orange-500">{alertRules.enabled ? 'Aktywne' : 'Wyłączone'}</span>
+                                        <span className="text-[9px] text-orange-500">{alertRules.enabled ? 'Aktiv' : 'Deaktiviert'}</span>
                                     </label>
                                 </div>
                                 {alertRules.enabled && (
@@ -1380,11 +1380,11 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                             </div>
 
                             <hr className="border-slate-100" />
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">📝 Kreacja reklamowa</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">📝 Anzeigenkreation</p>
 
                             {/* Ad Format picker */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Format reklamy</label>
+                                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Anzeigenformat</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {AD_FORMATS.map(f => (
                                         <button key={f.value} onClick={() => { setAdFormat(f.value as any); if (f.value === 'single') setSelectedImages(prev => prev.slice(0, 1)); }}
@@ -1398,30 +1398,30 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
 
                             {/* Primary text */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-600 mb-1 block">Tekst główny reklamy (DE)</label>
+                                <label className="text-xs font-semibold text-slate-600 mb-1 block">Primärtext der Anzeige</label>
                                 <textarea value={newCampaign.primary_text} onChange={e => setNewCampaign(p => ({ ...p, primary_text: e.target.value }))} rows={4} placeholder="🏠 Ihre Traumterrasse wartet!&#10;&#10;Aluminium-Terrassenüberdachung nach Maß..." className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Nagłówek</label>
+                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Headline</label>
                                     <input value={newCampaign.headline} onChange={e => setNewCampaign(p => ({ ...p, headline: e.target.value }))} placeholder="Terrassenüberdachung nach Maß" className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Opis pod linkiem</label>
+                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Link-Beschreibung</label>
                                     <input value={newCampaign.link_description} onChange={e => setNewCampaign(p => ({ ...p, link_description: e.target.value }))} placeholder="Kostenlose Beratung & Montage" className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Przycisk CTA</label>
+                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">CTA-Button</label>
                                     <select value={newCampaign.cta} onChange={e => setNewCampaign(p => ({ ...p, cta: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none">
                                         {CTA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Link docelowy</label>
+                                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Ziel-Link</label>
                                     <input value={newCampaign.link_url} onChange={e => setNewCampaign(p => ({ ...p, link_url: e.target.value }))} placeholder="https://polendach24.de" className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
                                 </div>
                             </div>
@@ -1430,10 +1430,10 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-xs font-bold text-slate-600">
-                                        📸 Zdjęcia ({selectedImages.length} wybrano{adFormat === 'carousel' ? ', max 10' : adFormat === 'collection' ? ', max 4' : ''})
+                                        📸 Bilder ({selectedImages.length} ausgewählt{adFormat === 'carousel' ? ', max 10' : adFormat === 'collection' ? ', max 4' : ''})
                                     </label>
                                     <label className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg text-[10px] font-bold cursor-pointer hover:opacity-90 shadow-sm">
-                                        ⬆️ Dodaj własne zdjęcie
+                                        ⬆️ Eigenes Bild hochladen
                                         <input type="file" accept="image/*" className="hidden" onChange={handleUploadImage} />
                                     </label>
                                 </div>
@@ -1463,7 +1463,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                 {/* Uploaded images */}
                                 {uploadedImages.length > 0 && (
                                     <div>
-                                        <p className="text-[10px] text-slate-400 font-semibold mb-1">Twoje zdjęcia:</p>
+                                        <p className="text-[10px] text-slate-400 font-semibold mb-1">Ihre Bilder:</p>
                                         <div className="grid grid-cols-3 gap-2">
                                             {uploadedImages.map((url, i) => {
                                                 const isSelected = selectedImages.includes(url);
@@ -1490,32 +1490,32 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
 
                             {/* ═══ CONFIG PREVIEW ═══ */}
                             <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2">
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">📋 Podgląd konfiguracji</p>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">📋 Konfigurationsübersicht</p>
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-                                    <div><span className="text-slate-400">Nazwa:</span> <span className="font-medium text-slate-700">{newCampaign.name || '—'}</span></div>
-                                    <div><span className="text-slate-400">Cel:</span> <span className="font-medium text-slate-700">{newCampaign.objective}</span></div>
-                                    <div><span className="text-slate-400">Budżet/dzień:</span> <span className="font-medium text-slate-700">{newCampaign.daily_budget || '20'}€</span></div>
+                                    <div><span className="text-slate-400">Name:</span> <span className="font-medium text-slate-700">{newCampaign.name || '—'}</span></div>
+                                    <div><span className="text-slate-400">Ziel:</span> <span className="font-medium text-slate-700">{newCampaign.objective}</span></div>
+                                    <div><span className="text-slate-400">Budget/Tag:</span> <span className="font-medium text-slate-700">{newCampaign.daily_budget || '20'}€</span></div>
                                     <div><span className="text-slate-400">Status:</span> <span className="font-medium text-slate-700">{newCampaign.status || 'PAUSED'}</span></div>
-                                    <div><span className="text-slate-400">Kraje:</span> <span className="font-medium text-slate-700">{targeting.countries.join(', ')}</span></div>
-                                    <div><span className="text-slate-400">Wiek:</span> <span className="font-medium text-slate-700">{targeting.age_min}–{targeting.age_max}</span></div>
-                                    <div><span className="text-slate-400">Płeć:</span> <span className="font-medium text-slate-700">{targeting.gender === 0 ? 'Wszystkie' : targeting.gender === 1 ? 'Mężczyźni' : 'Kobiety'}</span></div>
-                                    <div><span className="text-slate-400">Umiejscowienia:</span> <span className="font-medium text-slate-700">{placementMode === 'advantage' ? 'Advantage+' : 'Ręczne'}</span></div>
-                                    <div><span className="text-slate-400">Interests:</span> <span className="font-medium text-slate-700">{interests.length > 0 ? `${interests.length} wybranych` : 'Broad (auto)'}</span></div>
+                                    <div><span className="text-slate-400">Länder:</span> <span className="font-medium text-slate-700">{targeting.countries.join(', ')}</span></div>
+                                    <div><span className="text-slate-400">Alter:</span> <span className="font-medium text-slate-700">{targeting.age_min}–{targeting.age_max}</span></div>
+                                    <div><span className="text-slate-400">Geschlecht:</span> <span className="font-medium text-slate-700">{targeting.gender === 0 ? 'Alle' : targeting.gender === 1 ? 'Männer' : 'Frauen'}</span></div>
+                                    <div><span className="text-slate-400">Platzierungen:</span> <span className="font-medium text-slate-700">{placementMode === 'advantage' ? 'Advantage+' : 'Manuell'}</span></div>
+                                    <div><span className="text-slate-400">Interessen:</span> <span className="font-medium text-slate-700">{interests.length > 0 ? `${interests.length} ausgewählt` : 'Broad (auto)'}</span></div>
                                     <div><span className="text-slate-400">Format:</span> <span className="font-medium text-slate-700">{adFormat}</span></div>
-                                    <div className="col-span-2"><span className="text-slate-400">Copy:</span> <span className="font-medium text-slate-700 truncate block">{newCampaign.primary_text?.substring(0, 80) || '—'}{(newCampaign.primary_text?.length || 0) > 80 ? '...' : ''}</span></div>
+                                    <div className="col-span-2"><span className="text-slate-400">Text:</span> <span className="font-medium text-slate-700 truncate block">{newCampaign.primary_text?.substring(0, 80) || '—'}{(newCampaign.primary_text?.length || 0) > 80 ? '...' : ''}</span></div>
                                     <div><span className="text-slate-400">Headline:</span> <span className="font-medium text-slate-700">{newCampaign.headline || '—'}</span></div>
                                     <div><span className="text-slate-400">CTA:</span> <span className="font-medium text-slate-700">{newCampaign.cta || 'LEARN_MORE'}</span></div>
                                     <div><span className="text-slate-400">Link:</span> <span className="font-medium text-slate-700 truncate block">{newCampaign.link_url || 'https://polendach24.de'}</span></div>
-                                    <div><span className="text-slate-400">Obraz:</span> <span className="font-medium text-slate-700">{selectedImages[0]?.split('/').pop() || '—'}</span></div>
+                                    <div><span className="text-slate-400">Bild:</span> <span className="font-medium text-slate-700">{selectedImages[0]?.split('/').pop() || '—'}</span></div>
                                 </div>
                             </div>
 
                             <div className="flex gap-3 pt-2">
                                 <button onClick={handleCreate} disabled={creating} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-blue-200 text-sm">
-                                    {creating ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> {createStep === 1 ? 'Kampania...' : createStep === 2 ? 'Ad Set...' : 'Reklama...'} ({createStep}/3)</> : <>🚀 Utwórz kampanię + reklamę</>}
+                                    {creating ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> {createStep === 1 ? 'Kampagne...' : createStep === 2 ? 'Ad Set...' : 'Anzeige...'} ({createStep}/3)</> : <>🚀 Kampagne + Anzeige erstellen</>}
                                 </button>
                                 <button onClick={() => { setShowTemplates(true); setShowCreator(false); }} className="px-4 py-2.5 bg-amber-100 text-amber-700 rounded-xl font-medium hover:bg-amber-200 text-sm">
-                                    🤖 Szablony
+                                    🤖 Vorlagen
                                 </button>
                             </div>
                         </div>
@@ -1523,7 +1523,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                         {/* RIGHT: Live Facebook Ad Preview */}
                         <div>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                                👁️ Podgląd: {AD_FORMATS.find(f => f.value === adFormat)?.label || 'Pojedyncze zdjęcie'}
+                                👁️ Vorschau: {AD_FORMATS.find(f => f.value === adFormat)?.label || 'Einzelbild'}
                             </p>
                             <div className="bg-white rounded-xl border border-slate-300 shadow-md max-w-[400px] mx-auto overflow-hidden">
                                 {/* FB Post header */}
@@ -1539,7 +1539,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                 {/* Primary text */}
                                 <div className="px-4 pb-2">
                                     <p className="text-[13px] text-slate-800 leading-relaxed whitespace-pre-line">
-                                        {newCampaign.primary_text || '(Tekst główny reklamy — wypełnij po lewej lub użyj szablonu AI)'}
+                                        {newCampaign.primary_text || '(Primärtext — links ausfüllen oder AI-Vorlage verwenden)'}
                                     </p>
                                 </div>
 
@@ -1557,8 +1557,8 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                                 <div key={i} className="flex-shrink-0 w-[75%] snap-start relative">
                                                     <img src={src} alt={`Card ${i + 1}`} className="w-full h-48 object-cover" />
                                                     <div className="absolute bottom-0 left-0 right-0 bg-white/95 px-3 py-2 border-t">
-                                                        <p className="text-[11px] font-bold text-slate-800 truncate">{newCampaign.headline || 'Nagłówek'} {i > 0 ? `(${i + 1})` : ''}</p>
-                                                        <p className="text-[9px] text-slate-400 truncate">{newCampaign.link_description || 'Opis linku'}</p>
+                                                        <p className="text-[11px] font-bold text-slate-800 truncate">{newCampaign.headline || 'Headline'} {i > 0 ? `(${i + 1})` : ''}</p>
+                                                        <p className="text-[9px] text-slate-400 truncate">{newCampaign.link_description || 'Link-Beschreibung'}</p>
                                                         <span className="inline-block mt-0.5 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[8px] font-bold">{CTA_OPTIONS.find(o => o.value === newCampaign.cta)?.label || 'Mehr erfahren'}</span>
                                                     </div>
                                                 </div>
@@ -1595,8 +1595,8 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                 {adFormat === 'single' && (
                                     <div className="px-4 py-2.5 bg-slate-50 border-t border-b border-slate-200">
                                         <p className="text-[10px] text-slate-400 uppercase tracking-wider">{(newCampaign.link_url || 'polendach24.de').replace(/https?:\/\//, '')}</p>
-                                        <p className="text-[13px] font-bold text-slate-800 leading-tight mt-0.5">{newCampaign.headline || 'Nagłówek reklamy'}</p>
-                                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{newCampaign.link_description || 'Opis pod linkiem'}</p>
+                                        <p className="text-[13px] font-bold text-slate-800 leading-tight mt-0.5">{newCampaign.headline || 'Anzeigen-Headline'}</p>
+                                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{newCampaign.link_description || 'Link-Beschreibung'}</p>
                                     </div>
                                 )}
 
@@ -1643,9 +1643,9 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
             {/* ═══════════ FILTER TABS ═══════════ */}
             <div className="flex items-center gap-2">
                 {([
-                    { value: 'all' as const, label: 'Wszystkie', count: campaigns.filter(c => c.status !== 'DELETED').length },
-                    { value: 'ACTIVE' as const, label: '▶️ Aktywne', count: activeCnt },
-                    { value: 'PAUSED' as const, label: '⏸️ Wstrzymane', count: pausedCnt },
+                    { value: 'all' as const, label: 'Alle', count: campaigns.filter(c => c.status !== 'DELETED').length },
+                    { value: 'ACTIVE' as const, label: '▶️ Aktiv', count: activeCnt },
+                    { value: 'PAUSED' as const, label: '⏸️ Pausiert', count: pausedCnt },
                 ]).map(f => (
                     <button
                         key={f.value}
@@ -1665,17 +1665,17 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
             {loading ? (
                 <div className="text-center py-8">
                     <div className="w-8 h-8 mx-auto mb-2 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-slate-400 text-sm">Ładuję kampanie z Facebook...</p>
+                    <p className="text-slate-400 text-sm">Kampagnen werden geladen...</p>
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
                     <p className="text-4xl mb-3">🎯</p>
                     <p className="text-slate-500 font-medium">
-                        {filter !== 'all' ? `Brak kampanii ze statusem "${filter}"` : 'Brak kampanii'}
+                        {filter !== 'all' ? `Keine Kampagnen mit Status "${filter}"` : 'Keine Kampagnen'}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">Kliknij "🤖 AI Szablony" aby utworzyć pierwszą kampanię</p>
+                    <p className="text-xs text-slate-400 mt-1">Klicken Sie auf "🤖 AI Vorlagen" um Ihre erste Kampagne zu erstellen</p>
                     <button onClick={() => setShowTemplates(true)} className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600">
-                        🤖 Otwórz szablony AI
+                        🤖 AI Vorlagen öffnen
                     </button>
                 </div>
             ) : (
@@ -1707,7 +1707,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                                     </span>
                                                     {c.daily_budget && (
                                                         <span className="text-[10px] text-emerald-600 font-medium">
-                                                            €{(c.daily_budget / 100).toFixed(2)}/dzień
+                                                            €{(c.daily_budget / 100).toFixed(2)}/Tag
                                                         </span>
                                                     )}
                                                 </div>
@@ -1716,12 +1716,12 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                         <div className="flex gap-1.5 flex-shrink-0 ml-3">
                                             <button onClick={() => loadCampaignDetails(c.id)}
                                                 className="px-2 py-1.5 rounded-lg text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors font-medium"
-                                                title="Szczegóły">
+                                                title="Details">
                                                 {expandedCampaign === c.id ? '▲' : '▼'} Info
                                             </button>
                                             <button onClick={() => handleCloneCampaign(c)}
                                                 className="px-2 py-1.5 rounded-lg text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                                                title="Klonuj kampanię">
+                                                title="Kampagne klonen">
                                                 📋
                                             </button>
                                             <button
@@ -1736,7 +1736,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                             <button
                                                 onClick={() => handleDeleteCampaign(c.id, c.name)}
                                                 className="px-2 py-1.5 rounded-lg text-xs text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
-                                                title="Usuń kampanię">
+                                                title="Kampagne löschen">
                                                 🗑️
                                             </button>
                                         </div>
@@ -1747,15 +1747,15 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                         <div className="grid grid-cols-5 gap-2 bg-gradient-to-r from-slate-50 to-blue-50/30 rounded-lg p-3">
                                             <div className="text-center">
                                                 <p className="text-sm font-bold text-slate-700">{Number(ins.impressions || 0).toLocaleString()}</p>
-                                                <p className="text-[9px] text-slate-400 uppercase">Wyświetlenia</p>
+                                                <p className="text-[9px] text-slate-400 uppercase">Impressionen</p>
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-sm font-bold text-blue-600">{Number(ins.reach || 0).toLocaleString()}</p>
-                                                <p className="text-[9px] text-slate-400 uppercase">Zasięg</p>
+                                                <p className="text-[9px] text-slate-400 uppercase">Reichweite</p>
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-sm font-bold text-purple-600">{Number(ins.clicks || 0).toLocaleString()}</p>
-                                                <p className="text-[9px] text-slate-400 uppercase">Kliknięcia</p>
+                                                <p className="text-[9px] text-slate-400 uppercase">Klicks</p>
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-sm font-bold text-teal-600">{Number(ins.ctr || 0).toFixed(2)}%</p>
@@ -1763,7 +1763,7 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-sm font-bold text-orange-600">€{Number(ins.spend || 0).toFixed(2)}</p>
-                                                <p className="text-[9px] text-slate-400 uppercase">Wydano</p>
+                                                <p className="text-[9px] text-slate-400 uppercase">Ausgaben</p>
                                             </div>
                                         </div>
                                     )}
@@ -1786,13 +1786,13 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                         {loadingDetails ? (
                                             <div className="flex items-center gap-2 text-xs text-blue-500">
                                                 <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                                                Ładuję szczegóły...
+                                                Lade Details...
                                             </div>
                                         ) : campaignDetails[c.id] ? (
                                             <div className="space-y-2">
-                                                <p className="text-[10px] font-bold text-blue-700 uppercase">📊 Ad Sets ({campaignDetails[c.id].adSets?.length || 0})</p>
+                                                <p className="text-[10px] font-bold text-blue-700 uppercase">📊 Anzeigengruppen ({campaignDetails[c.id].adSets?.length || 0})</p>
                                                 {(campaignDetails[c.id].adSets || []).length === 0
-                                                    ? <p className="text-[10px] text-slate-400">Brak grup reklam</p>
+                                                    ? <p className="text-[10px] text-slate-400">Keine Anzeigengruppen</p>
                                                     : (campaignDetails[c.id].adSets || []).map((as2: any, j: number) => {
                                                         const asIns = as2.insights?.data?.[0] || {};
                                                         return (
@@ -1828,16 +1828,16 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                                             </div>
                                                         );
                                                     })}
-                                                <p className="text-[10px] font-bold text-indigo-700 uppercase mt-2">🎨 Reklamy ({campaignDetails[c.id].ads?.length || 0})</p>
+                                                <p className="text-[10px] font-bold text-indigo-700 uppercase mt-2">🎨 Anzeigen ({campaignDetails[c.id].ads?.length || 0})</p>
                                                 {(campaignDetails[c.id].ads || []).length === 0
-                                                    ? <p className="text-[10px] text-slate-400">Brak reklam</p>
+                                                    ? <p className="text-[10px] text-slate-400">Keine Anzeigen</p>
                                                     : (campaignDetails[c.id].ads || []).slice(0, 5).map((ad: any, k: number) => {
                                                         const adIns = ad.insights?.data?.[0] || {};
                                                         return (
                                                             <div key={k} className="bg-white rounded-lg p-2 border border-indigo-100 flex items-center justify-between">
                                                                 <div>
                                                                     <p className="text-[11px] font-medium text-slate-700">{ad.name}</p>
-                                                                    <p className="text-[9px] text-slate-400">{ad.status} {adIns.impressions ? `• ${Number(adIns.impressions).toLocaleString()} wyświetleń` : ''}</p>
+                                                                    <p className="text-[9px] text-slate-400">{ad.status} {adIns.impressions ? `• ${Number(adIns.impressions).toLocaleString()} Impressionen` : ''}</p>
                                                                 </div>
                                                                 {adIns.spend && (
                                                                     <div className="text-right">
@@ -1856,8 +1856,8 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                                 {/* Campaign footer */}
                                 <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
                                     <span>
-                                        Budżet: {c.daily_budget ? `€${(c.daily_budget / 100).toFixed(2)}/dzień` : c.lifetime_budget ? `€${(c.lifetime_budget / 100).toFixed(2)} łącznie` : 'nieokreślony'}
-                                        {c.start_time && ` • Start: ${new Date(c.start_time).toLocaleDateString('pl-PL')}`}
+                                        Budget: {c.daily_budget ? `€${(c.daily_budget / 100).toFixed(2)}/Tag` : c.lifetime_budget ? `€${(c.lifetime_budget / 100).toFixed(2)} gesamt` : 'nicht festgelegt'}
+                                        {c.start_time && ` • Start: ${new Date(c.start_time).toLocaleDateString('de-DE')}`}
                                     </span>
                                     <span className="text-slate-300">ID: {c.id}</span>
                                 </div>
@@ -1875,30 +1875,30 @@ BUDGET RANGE: 10-50€/Tag pro Kampagne möglich`;
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                        <p className="text-xs font-bold text-green-400 mb-1">🟢 Funnel: TOFU (Góra)</p>
+                        <p className="text-xs font-bold text-green-400 mb-1">🟢 Funnel: TOFU (Oben)</p>
                         <p className="text-[11px] text-slate-300">
-                            <strong>Cel:</strong> Awareness + Traffic<br/>
-                            <strong>Budżet:</strong> €10-20/dzień<br/>
-                            <strong>Format:</strong> Video timelapse, karuzela zdjęć<br/>
-                            <strong>Audience:</strong> Broad, 30-65, DE, Haus & Garten
+                            <strong>Ziel:</strong> Awareness + Traffic<br/>
+                            <strong>Budget:</strong> €10-20/Tag<br/>
+                            <strong>Format:</strong> Video-Zeitraffer, Bildkarussell<br/>
+                            <strong>Zielgruppe:</strong> Broad, 30-65, DE, Haus & Garten
                         </p>
                     </div>
                     <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                        <p className="text-xs font-bold text-yellow-400 mb-1">🟡 Funnel: MOFU (Środek)</p>
+                        <p className="text-xs font-bold text-yellow-400 mb-1">🟡 Funnel: MOFU (Mitte)</p>
                         <p className="text-[11px] text-slate-300">
-                            <strong>Cel:</strong> Leads + Engagement<br/>
-                            <strong>Budżet:</strong> €15-30/dzień<br/>
-                            <strong>Format:</strong> Lead Forms, opinie klientów<br/>
-                            <strong>Audience:</strong> Webseitenbesucher, Engaged Users
+                            <strong>Ziel:</strong> Leads + Engagement<br/>
+                            <strong>Budget:</strong> €15-30/Tag<br/>
+                            <strong>Format:</strong> Lead-Formulare, Kundenbewertungen<br/>
+                            <strong>Zielgruppe:</strong> Webseitenbesucher, Engaged Users
                         </p>
                     </div>
                     <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                        <p className="text-xs font-bold text-red-400 mb-1">🔴 Funnel: BOFU (Dół)</p>
+                        <p className="text-xs font-bold text-red-400 mb-1">🔴 Funnel: BOFU (Unten)</p>
                         <p className="text-[11px] text-slate-300">
-                            <strong>Cel:</strong> Conversions + Sales<br/>
-                            <strong>Budżet:</strong> €20-50/dzień<br/>
-                            <strong>Format:</strong> Rabaty, oferty limitowane<br/>
-                            <strong>Audience:</strong> Retargeting 7-30 dni, Lookalike 1%
+                            <strong>Ziel:</strong> Conversions + Sales<br/>
+                            <strong>Budget:</strong> €20-50/Tag<br/>
+                            <strong>Format:</strong> Rabatte, limitierte Angebote<br/>
+                            <strong>Zielgruppe:</strong> Retargeting 7-30 Tage, Lookalike 1%
                         </p>
                     </div>
                 </div>

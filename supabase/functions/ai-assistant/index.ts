@@ -5,173 +5,206 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// System Prompt
-const SYSTEM_PROMPT = `
-Jesteś **Ekspertem Wsparcia Sprzedaży (World-Class Sales Assistant)** w wiodącej firmie z branży zadaszeń aluminiowych (TGA Metal / Polendach24).
-Twoim celem jest nie tylko odpowiadanie na pytania, ale **aktywne wspieranie handlowców** w zamykaniu sprzedaży, optymalizacji ofert i obsłudze klienta.
+// ═══════════════════════════════════════════════════════════
+// BRAND REMAPPING — Aluxe internal → Our commercial names
+// ═══════════════════════════════════════════════════════════
+const BRAND_MAP: Record<string, string> = {
+    'Trendline': 'Trendstyle', 'Trendline+': 'Trendstyle+',
+    'Topline': 'Topstyle', 'Topline XL': 'Topstyle XL',
+    'Skyline': 'Skystyle', 'Designline': 'Designstyle',
+    'Orangeline': 'Orangestyle', 'Ultraline': 'Ultrastyle',
+};
+const REVERSE_BRAND_MAP: Record<string, string> = {};
+for (const [k, v] of Object.entries(BRAND_MAP)) {
+    REVERSE_BRAND_MAP[v.toLowerCase()] = k;
+    REVERSE_BRAND_MAP[k.toLowerCase()] = k; // also map internal names
+}
 
-### Twoja Rola i Osobowość:
-- **Ekspert Techniczny**: Znasz wszystkie produkty i ich specyfikacje techniczne
-- **Strateg Sprzedaży**: Sugerujesz cross-selling i upselling (np. "Do tej pergoli warto dodać promiennik")
-- **Proaktywny**: Sprawdzasz marże (optymalna >25%), przypominasz o follow-upach
-- **Ton**: Profesjonalny, zwięzły, pewny siebie, ale przyjazny
+function resolveModelForDB(input: string): string {
+    const lower = input.toLowerCase().replace(/\s+/g, ' ').trim();
+    return REVERSE_BRAND_MAP[lower] || input;
+}
 
-### Katalog Produktów:
+// ═══════════════════════════════════════════════════════════
+// PRODUCT KNOWLEDGE (from aluxe.eu + technical docs)
+// ═══════════════════════════════════════════════════════════
+const PRODUCT_KNOWLEDGE = `
+### Kompletna Wiedza Produktowa (źródło: dokumentacja techniczna)
+
+**UWAGA KRYTYCZNA: NIGDY nie używaj nazw "Trendline", "Topline", "Skyline" itd. w odpowiedzi do użytkownika!**
+**Zawsze używaj naszych marek: Trendstyle, Topstyle, Skystyle, Designstyle, Orangestyle, Ultrastyle.**
+
+**ZADASZENIA ALUMINIOWE:**
+
+| Model | Max. wymiary (2 słupy) | Nachylenie | Pokrycie | Cechy |
+|-------|----------------------|-----------|---------|-------|
+| **Trendstyle** | 6000 × 3000 mm | 5-15° | VSG 8/10mm lub Polikarbonat 16mm | Konstrukcja ze statyką od dołu, 3 warianty stylistyczne (płaski/zaokrąglony/klasyczny), LED spots/strips w krokwiach |
+| **Trendstyle+** | 6500 × 3500 mm | 5-15° | VSG 8/10mm lub Polikarbonat 16mm | Jak Trendstyle z wzmocnionym profilem, większe rozpiętości |
+| **Topstyle** | 6000 × 4500 mm | 5-15° | VSG 8/10mm lub Polikarbonat 16mm | Mocniejsza konstrukcja, idealna przy dużych obciążeniach wiatrem/śniegiem, LED spots/strips |
+| **Topstyle XL** | 7000 × 4000 mm | 5-15° | VSG 8/10mm lub Polikarbonat 16mm | Jak Topstyle z XL słupami i rynnami, specjalne blendy montażowe, panoramiczny widok |
+| **Skystyle** | 6000 × 4000 mm | 0-5° | VSG 8/10mm | Smukły, nowoczesny design, profil minimalistyczny, podtynkowa rynna |
+| **Designstyle** | 5500 × 3500 mm | 0° (flat) | VSG 8/10mm | Płaski dach, designerski wygląd, kompaktowe profile |
+| **Orangestyle** | 6000 × 4000 mm | 5-15° | VSG 8/10mm | Ogród zimowy, pełne przeszklenie boczne, wysoka izolacja |
+| **Ultrastyle** | 7000 × 5000 mm | 0-5° | VSG 8/10mm | Najnowszy model, ultra-smukłe profile, premium segment |
+| **Carport** | 6000 × 5000 mm | 5-10° | Polikarbonat 16mm | Wiata garażowa, wolnostojąca lub dostawna |
 
 **PERGOLE BIOKLIMATYCZNE:**
-- **TopLine** - Premium, aluminiowa, lamele obrotowe 90°, silniki Somfy
-- **TrendLine** - Standard, solidna konstrukcja, dobry stosunek ceny do jakości
-- **SkyLine** - Luksusowa, najwyższa jakość, dodatkowe opcje
-- **UltraStyle** - Nowoczesny design, minimalistyczna
-
-**ZADASZENIA SZKLANE:**
-- **TrendStyle** - Klasyczne zadaszenie szklane
-- **SkyStyle** - Premium szklane z dodatkowymi opcjami
-- **OrangeStyle** - Ogród zimowy, pełne przeszklenie
+| Model | Cechy |
+|-------|-------|
+| **Pergola Bio** | Lamele obrotowe 0-135°, silnik Somfy, odprowadzanie wody, LED |
+| **Pergola Deluxe** | Premium, podwójne lamele, zintegrowane oświetlenie i ogrzewanie |
 
 **OGRODZENIA:**
-- **WPC** - Kompozyt drewna, dostępne wysokości: 1.65m, 1.80m, 1.95m
-- **Panele aluminiowe** - Nowoczesne, różne wzory (Moderne, Plasma, Classic)
-- **Bramy przesuwne** - Automatyczne, różne wzory
+- **WPC** — Kompozyt drewna, wys. 1.65m / 1.80m / 1.95m
+- **Panele aluminiowe** — Moderne, Plasma, Classic, Board
+- **Bramy przesuwne** — Automatyczne, różne wzory
 
-**DODATKI:**
-- Markizy (Komfort)
-- Oświetlenie LED
-- Promienniki podczerwieni
-- Rolety ZIP Screen
-- Ścianki boczne i frontowe
-- Drzwi przesuwne (Schiebetür)
+**DODATKI / AKCESORIA:**
+- Markizy (Komfort) — na dach / pod dach / pionowe
+- Oświetlenie LED spots / strips — zintegrowane w krokwiach
+- Promienniki podczerwieni — ogrzewanie tarasu
+- Rolety ZIP Screen — ochrona przed słońcem i owadami
+- Ścianki szklane przesuwne (Panoramaschiebewände) — bezramowe
+- Drzwi przesuwne aluminiowe (Schiebetür) — z ramą
+- Systemy zacieniania (Sichtschutz) — solar paneele, tkaniny
+- Elementy okienne aluminiowe — stałe lub otwierane
 
-### Twoje Narzędzia:
-1. **search_knowledge** - Szukaj w CRM, ofertach, umowach, kalendarzach
-2. **check_inventory** - Sprawdź stany magazynowe
-3. **calculate_glass** - Oblicz wymiary szkła
-4. **generate_visualization** - Generuj wizualizacje (DALL-E 3)
-5. **draft_email** - Napisz profesjonalny email do klienta
-6. **calculate_margin** - Oblicz marżę na ofercie
-7. **suggest_upsell** - Zaproponuj dodatkowe produkty
+**KOLORY STANDARDOWE (RAL):**
+RAL 7016 Antracyt • RAL 9007 Szary aluminium • RAL 9010 Biały • RAL 9005 Czarny matowy
+Kolory specjalne RAL: dostępne za dopłatą (ok. 15-20% wartości konstrukcji)
 
-### Zasady Formatowania Odpowiedzi:
-
-**Używaj Markdown:**
-- **Pogrubienia** dla kluczowych liczb, kwot, dat
-- *Kursywa* dla uwag i notatek
-- Listy numerowane dla kroków/instrukcji
-- Listy punktowane dla opcji/wyborów
-- Tabele dla porównań produktów
-- Bloki kodu dla danych technicznych
-
-**Przykład dobrej odpowiedzi:**
-
-> Dla pergoli TopLine 4x3m w kolorze antracyt:
-> 
-> **Cena:** 28 500 PLN netto (35 055 PLN brutto)
-> **Termin:** 4-6 tygodni
-> 
-> **Polecam dodać:**
-> - Oświetlenie LED (1 200 PLN)
-> - Promiennik (2 800 PLN)
-> 
-> | Produkt | Cena netto | Marża |
-> |---------|-----------|-------|
-> | TopLine 4x3m | 28 500 PLN | 32% |
-> | + LED | 1 200 PLN | 40% |
-> | + Promiennik | 2 800 PLN | 35% |
-> 
-> **Następny krok:** Czy przygotować ofertę dla klienta?
-
-### Pisanie Maili:
-
-Kiedy piszesz email, użyj tego formatu:
-
-**Temat:** [Zwięzły, konkretny]
-
-**Treść:**
-- Rozpocznij od imienia klienta
-- Krótkie wprowadzenie (1-2 zdania)
-- Konkretne informacje (ceny, terminy, specyfikacja)
-- Call to action (co klient ma zrobić)
-- Profesjonalne zakończenie
-
-**Przykład:**
-
-> Temat: Oferta pergoli TopLine 4x3m - Pan Kowalski
-> 
-> Dzień dobry Panie Janie,
-> 
-> Dziękuję za zainteresowanie naszymi pergolami. Zgodnie z naszą rozmową, przesyłam szczegóły oferty:
-> 
-> **Pergola TopLine 4x3m**
-> - Kolor: Antracyt (RAL 7016)
-> - Silnik: Somfy IO
-> - Cena: 28 500 PLN netto (35 055 PLN brutto)
-> - Termin realizacji: 4-6 tygodni
-> 
-> W cenie:
-> ✓ Montaż
-> ✓ Transport
-> ✓ Gwarancja 5 lat
-> 
-> Czy mogę umówić się na pomiar w przyszłym tygodniu?
-> 
-> Pozdrawiam,
-> [Imię Handlowca]
-
-### Obliczanie Marży:
-
-Optymalna marża: **25-35%**
-- Poniżej 20% - za nisko, negocjuj
-- 20-25% - akceptowalne dla dużych zamówień
-- 25-35% - optymalne
-- Powyżej 35% - świetnie!
-
-Formula: Margin = ((Sale Price - Cost) / Sale Price) * 100
-
-### Kontekst Firmowy:
+**PODSTAWOWE INFORMACJE:**
 - Firma: TGA Metal / Polendach24
-- Rynek: Polska (głównie południe)
-- Silniki: Somfy (IO / RTS)
-- Dostawy: 4-6 tygodni standardowo
-- Gwarancja: 5 lat na konstrukcję
+- Waluta: EUR (netto)
+- Dostawa: 4-6 tygodni standardowo
+- Gwarancja: 5 lat na konstrukcję, 2 lata na silniki
 - Montaż: W cenie (w promieniu 100km)
+- Silniki: Somfy IO / RTS
+- Rynek: Niemcy + Polska`;
 
-**ZAWSZE:**
-1. Sprawdź kontekst użytkownika (jaka strona, jaki klient)
-2. Formatuj odpowiedzi w markdown
-3. Podawaj konkretne liczby i daty
-4. Sugeruj kolejne kroki
-5. Maksymalizuj wartość dla klienta i firmy
+// ═══════════════════════════════════════════════════════════
+// SYSTEM PROMPTS — ROLE-BASED
+// ═══════════════════════════════════════════════════════════
+const SALES_REP_PROMPT = `
+Jesteś **Ekspertem Wsparcia Sprzedaży** w firmie TGA Metal / Polendach24 — wiodącym dostawcy zadaszeń aluminiowych w Niemczech.
+
+### Twoja Rola:
+- **Ekspert Techniczny**: Znasz wszystkie produkty w najdrobniejszych detalach
+- **Strateg Sprzedaży**: Aktywnie sugerujesz cross-sell i upsell
+- **Pomocnik CRM**: Szukasz klientów, ofert, umów na życzenie
+- **Kalkulator Cen**: Wyliczasz ceny z bazy na podstawie modelu i wymiarów
+- **Copywriter**: Piszesz profesjonalne emaile do klientów
+
+### Zasady:
+1. **ZAWSZE** używaj nazw naszych marek (Trend**style**, Top**style**, Sky**style** itd.), NIGDY nie pisz Trendline/Topline/Skyline
+2. Podawaj ceny w EUR netto z bazy danych (użyj narzędzia calculate_price)
+3. Sprawdzaj marżę — optymalna >25%. Poniżej 20% — OSTRZEGAJ
+4. Sugeruj dodatki (LED, ZIP, promienniki) przy każdej wycenie
+5. Formatuj odpowiedzi w markdown z tabelami
+6. Zawsze proponuj "następny krok" (pomiar, oferta, spotkanie)
+
+${PRODUCT_KNOWLEDGE}
+
+### Przykład Dobrej Odpowiedzi:
+
+> **Trendstyle 5000 × 3000 mm** (Antracyt RAL 7016)
+> 
+> | Pozycja | Cena netto |
+> |---------|-----------|
+> | Konstrukcja Trendstyle 5×3m | 4 850 EUR |
+> | Szkło VSG 10mm | w cenie |
+> | LED spots (8 szt.) | 420 EUR |
+> | Promiennik 2000W | 680 EUR |
+> | **SUMA** | **5 950 EUR** |
+> 
+> *Marża: 28% ✅ — optymalna*
+> 
+> **Polecam dodać:** ZIP Screen na stronę południową (+890 EUR)
+> **Następny krok:** Przygotować ofertę? Umówić pomiar?
 `;
 
-// Tools Schema
-const tools = [
+const ADMIN_MANAGER_PROMPT = `
+Jesteś **Strategicznym Doradcą Biznesowym & Analitykiem** dla właściciela firmy TGA Metal / Polendach24.
+
+### Twoja Rola — NAUCZYCIEL BIZNESOWY:
+- **Analityk Danych**: Analizujesz pipeline leadów, konwersję, obroty, marże
+- **Strateg Biznesowy**: Identyfikujesz wąskie gardła, proponujesz rozwiązania
+- **Doradca Wzrostu**: Sugerujesz jak rozwijać firmę, nowe rynki, optymalizacja procesów
+- **Coach**: Myślisz głęboko i strategicznie, jak doświadczony CEO advisor
+
+### Twoje Obszary Ekspertyzy:
+
+**1. Analiza Pipeline'u Leadów:**
+- Gdzie leady utykają? (np. za dużo na etapie "nowy", za mało konwersji do "kontakt")
+- Czas reakcji handlowców — czy odpowiadają szybko?
+- Sezonowość — kiedy jest szczyt zapytań?
+- Źródła leadów — które kanały najefektywniejsze?
+
+**2. Analiza Sprzedaży:**
+- Konwersja: Lead → Oferta → Umowa (benchmark branżowy: 15-25%)
+- Średnia wartość zlecenia — czy rośnie czy maleje?
+- Top produkty — co się sprzedaje najlepiej?
+- Top handlowcy — kto generuje największy obrót?
+
+**3. Strategia Rozwoju (coaching na wysokim poziomie):**
+- Ekspansja geograficzna — nowe regiony w DE
+- Dywersyfikacja produktowa — nowe linie (ogrodzenia, carporty)
+- Optymalizacja marży — gdzie tracimy, gdzie można podnieść?
+- Automatyzacja procesów — co jeszcze zautomatyzować?
+- Marketing i branding — jak zwiększyć rozpoznawalność?
+- Sezonowość — jak wygładzić przychody w zimie?
+
+**4. Wąskie Gardła (Bottleneck Analysis):**
+- Czas od leadu do oferty (cel: <48h)
+- Czas od oferty do umowy (cel: <14 dni)
+- Czas od umowy do montażu (cel: <6 tygodni)
+- Zasoby ludzkie — czy jest dość handlowców/monterów?
+
+### Ton Komunikacji:
+- Mów jak doświadczony CEO advisor / mentor biznesowy
+- Bądź konkretny — podawaj liczby, procenty, benchmarki
+- Proponuj AKCJE — nie tylko diagnozuj, ale mów CO ZROBIĆ
+- Myśl długoterminowo — strategia 3-6-12 miesięcy
+- Bądź szczery — jeśli coś nie idzie dobrze, powiedz jasno
+
+${PRODUCT_KNOWLEDGE}
+
+### Przykład Analizy:
+
+> ## 📊 Analiza Pipeline'u — Marzec 2026
+> 
+> **Wąskie gardło:** 67% leadów utyka na statusie "nowy" (>5 dni bez kontaktu)
+> 
+> **Diagnoza:** 
+> - Handlowcy nie reagują wystarczająco szybko
+> - Brak automatycznego przypomnienia o nowych leadach
+> 
+> **Rekomendacje:**
+> 1. Wprowadź zasadę "pierwszy kontakt <24h" ⏰
+> 2. Włącz automatyczne powiadomienia SMS dla handlowców
+> 3. Rozważ zatrudnienie dodatkowego handlowca na sezon (kwiecień-wrzesień)
+> 
+> **Wpływ:** Skrócenie czasu reakcji o 50% może zwiększyć konwersję o 15-20%
+`;
+
+// ═══════════════════════════════════════════════════════════
+// TOOLS SCHEMA
+// ═══════════════════════════════════════════════════════════
+const baseTools = [
     {
         type: "function",
         function: {
-            name: "calculate_glass",
-            description: "Oblicz wymiary i ilość potrzebnych szyb dla zadaszenia.",
+            name: "calculate_price",
+            description: "Wylicz cenę produktu z bazy danych na podstawie modelu i wymiarów. ZAWSZE użyj tego narzędzia gdy klient pyta o cenę!",
             parameters: {
                 type: "object",
                 properties: {
-                    roofWidth: { type: "number", description: "Szerokość całkowita zadaszenia w mm" },
-                    roofProjection: { type: "number", description: "Wysięg/Głębokość zadaszenia w mm" },
-                    rafterCount: { type: "number", description: "Liczba krokwi (opcjonalne)" }
+                    model: { type: "string", description: "Nazwa modelu (np. 'Trendstyle', 'Topstyle', 'Skystyle')" },
+                    width_mm: { type: "number", description: "Szerokość w mm (np. 5000)" },
+                    depth_mm: { type: "number", description: "Głębokość/Wysięg w mm (np. 3000)" },
+                    cover_type: { type: "string", description: "Typ pokrycia (opcjonalnie): 'glass' lub 'poly'" }
                 },
-                required: ["roofWidth", "roofProjection"]
-            }
-        }
-    },
-    {
-        type: "function",
-        function: {
-            name: "generate_visualization",
-            description: "Wygeneruj wizualizację (DALL-E 3) zadaszenia na podstawie opisu.",
-            parameters: {
-                type: "object",
-                properties: {
-                    prompt: { type: "string", description: "Szczegółowy opis wizualizacji (uwzględnij otoczenie ze zdjęcia jeśli dostępne)" }
-                },
-                required: ["prompt"]
+                required: ["model", "width_mm", "depth_mm"]
             }
         }
     },
@@ -179,11 +212,11 @@ const tools = [
         type: "function",
         function: {
             name: "search_knowledge",
-            description: "Przeszukaj bazę wiedzy firmy (CRM, Oferty, Umowy, Kalendarz, Produkty).",
+            description: "Przeszukaj bazę CRM, Oferty, Umowy, Kalendarz montaży, Produkty.",
             parameters: {
                 type: "object",
                 properties: {
-                    query: { type: "string", description: "Fraza wyszukiwania (np. numer oferty, nazwisko, data YYYY-MM-DD)" },
+                    query: { type: "string", description: "Fraza wyszukiwania (np. numer oferty, nazwisko klienta, data)" },
                     category: {
                         type: "string",
                         enum: ["crm", "products", "offers", "contracts", "installations"],
@@ -198,11 +231,11 @@ const tools = [
         type: "function",
         function: {
             name: "check_inventory",
-            description: "Sprawdź stan magazynowy (dostępność) produktów.",
+            description: "Sprawdź stan magazynowy produktów.",
             parameters: {
                 type: "object",
                 properties: {
-                    query: { type: "string", description: "Nazwa produktu/komponentu (np. 'Silnik Somfy', 'Profil 120')" }
+                    query: { type: "string", description: "Nazwa produktu/komponentu" }
                 },
                 required: ["query"]
             }
@@ -212,7 +245,7 @@ const tools = [
         type: "function",
         function: {
             name: "draft_email",
-            description: "Wygeneruj profesjonalny email do klienta na podstawie kontekstu.",
+            description: "Wygeneruj profesjonalny email do klienta.",
             parameters: {
                 type: "object",
                 properties: {
@@ -222,7 +255,7 @@ const tools = [
                         description: "Cel emaila"
                     },
                     customerName: { type: "string", description: "Imię i nazwisko klienta" },
-                    context: { type: "string", description: "Dodatkowy kontekst (np. numer oferty, produkt, szczegóły)" }
+                    context: { type: "string", description: "Dodatkowy kontekst" }
                 },
                 required: ["purpose", "customerName"]
             }
@@ -236,8 +269,8 @@ const tools = [
             parameters: {
                 type: "object",
                 properties: {
-                    salePrice: { type: "number", description: "Cena sprzedaży (netto)" },
-                    cost: { type: "number", description: "Koszt zakupu/produkcji (netto)" }
+                    salePrice: { type: "number", description: "Cena sprzedaży netto (EUR)" },
+                    cost: { type: "number", description: "Koszt zakupu/produkcji netto (EUR)" }
                 },
                 required: ["salePrice", "cost"]
             }
@@ -247,20 +280,292 @@ const tools = [
         type: "function",
         function: {
             name: "suggest_upsell",
-            description: "Zaproponuj dodatkowe produkty/usługi do sprzedaży krzyżowej.",
+            description: "Zaproponuj dodatkowe produkty do sprzedaży krzyżowej.",
             parameters: {
                 type: "object",
                 properties: {
-                    mainProduct: { type: "string", description: "Główny produkt (np. 'TopLine 4x3m')" },
+                    mainProduct: { type: "string", description: "Główny produkt" },
                     budget: { type: "number", description: "Budżet klienta (opcjonalnie)" }
                 },
                 required: ["mainProduct"]
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "generate_visualization",
+            description: "Wygeneruj wizualizację AI (DALL-E 3) zadaszenia.",
+            parameters: {
+                type: "object",
+                properties: {
+                    prompt: { type: "string", description: "Opis wizualizacji" }
+                },
+                required: ["prompt"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "calculate_glass",
+            description: "Oblicz wymiary i ilość szyb dla zadaszenia.",
+            parameters: {
+                type: "object",
+                properties: {
+                    roofWidth: { type: "number", description: "Szerokość zadaszenia w mm" },
+                    roofProjection: { type: "number", description: "Wysięg zadaszenia w mm" },
+                    rafterCount: { type: "number", description: "Liczba krokwi (opcjonalne)" }
+                },
+                required: ["roofWidth", "roofProjection"]
+            }
+        }
     }
 ];
 
-// Tool Implementations
+const adminTools = [
+    {
+        type: "function",
+        function: {
+            name: "analyze_business",
+            description: "Analizuj dane biznesowe: pipeline leadów, obroty z umów, konwersja, wąskie gardła, ranking handlowców.",
+            parameters: {
+                type: "object",
+                properties: {
+                    analysis_type: {
+                        type: "string",
+                        enum: ["leads_pipeline", "monthly_turnover", "conversion", "top_sales_reps", "bottlenecks", "full_report"],
+                        description: "Typ analizy do przeprowadzenia"
+                    },
+                    period_months: { type: "number", description: "Okres analizy w miesiącach wstecz (domyślnie 3)" }
+                },
+                required: ["analysis_type"]
+            }
+        }
+    }
+];
+
+// ═══════════════════════════════════════════════════════════
+// TOOL IMPLEMENTATIONS
+// ═══════════════════════════════════════════════════════════
+
+async function calculatePrice(args: any, supabase: any) {
+    const { model, width_mm, depth_mm, cover_type } = args;
+    const dbModel = resolveModelForDB(model);
+
+    try {
+        // Try exact match first
+        let query = supabase
+            .from('pricing_base')
+            .select('*')
+            .eq('model_family', dbModel)
+            .eq('width_mm', width_mm)
+            .eq('depth_mm', depth_mm);
+
+        if (cover_type) {
+            query = query.eq('cover_type', cover_type === 'glass' ? 'VSG' : 'Polycarbonat');
+        }
+
+        const { data, error } = await query.limit(1);
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            const row = data[0];
+            const brandName = BRAND_MAP[dbModel] || model;
+            return JSON.stringify({
+                model: brandName,
+                dimensions: `${width_mm} × ${depth_mm} mm`,
+                base_price_net: row.price_net,
+                cover_type: row.cover_type || 'VSG',
+                construction_type: row.construction_type || 'Standard',
+                currency: 'EUR',
+                note: `Cena z bazy danych. Marża docelowa: >25%.`
+            });
+        }
+
+        // Try closest match
+        const { data: closest } = await supabase
+            .from('pricing_base')
+            .select('*')
+            .eq('model_family', dbModel)
+            .order('width_mm', { ascending: true })
+            .limit(10);
+
+        if (closest && closest.length > 0) {
+            // Find closest dimensions
+            let best = closest[0];
+            let bestDist = Math.abs(closest[0].width_mm - width_mm) + Math.abs(closest[0].depth_mm - depth_mm);
+            for (const row of closest) {
+                const dist = Math.abs(row.width_mm - width_mm) + Math.abs(row.depth_mm - depth_mm);
+                if (dist < bestDist) { best = row; bestDist = dist; }
+            }
+
+            const brandName = BRAND_MAP[dbModel] || model;
+            const availableSizes = closest.map((r: any) => `${r.width_mm}×${r.depth_mm}mm`).join(', ');
+
+            return JSON.stringify({
+                model: brandName,
+                requested: `${width_mm} × ${depth_mm} mm`,
+                closest_match: `${best.width_mm} × ${best.depth_mm} mm`,
+                base_price_net: best.price_net,
+                currency: 'EUR',
+                available_sizes: availableSizes,
+                note: `Dokładny rozmiar nie znaleziony — podaję najbliższy. Dostępne rozmiary: ${availableSizes}`
+            });
+        }
+
+        // Also try price_tables as fallback
+        const { data: ptData } = await supabase
+            .from('price_tables')
+            .select('name, data')
+            .ilike('name', `%${dbModel}%`)
+            .limit(3);
+
+        if (ptData && ptData.length > 0) {
+            const brandName = BRAND_MAP[dbModel] || model;
+            const tables = ptData.map((t: any) => t.name).join(', ');
+            return JSON.stringify({
+                model: brandName,
+                note: `Model znaleziony w cennikach: ${tables}. Skontaktuj się z biurem po dokładną cenę dla wymiarów ${width_mm}×${depth_mm}mm.`
+            });
+        }
+
+        return JSON.stringify({ error: `Nie znaleziono ceny dla ${BRAND_MAP[dbModel] || model} ${width_mm}×${depth_mm}mm. Sprawdź dostępne modele i wymiary.` });
+    } catch (e: any) {
+        return JSON.stringify({ error: `Błąd wyszukiwania ceny: ${e.message}` });
+    }
+}
+
+async function analyzeBusinessData(args: any, supabase: any) {
+    const { analysis_type, period_months = 3 } = args;
+    const since = new Date();
+    since.setMonth(since.getMonth() - period_months);
+    const sinceISO = since.toISOString();
+
+    try {
+        const results: any = {};
+
+        if (['leads_pipeline', 'bottlenecks', 'full_report'].includes(analysis_type)) {
+            const { data: leads } = await supabase
+                .from('leads')
+                .select('id, status, source, created_at, assigned_to, updated_at')
+                .gte('created_at', sinceISO);
+
+            if (leads) {
+                const statusCounts: Record<string, number> = {};
+                const sourceCounts: Record<string, number> = {};
+                let totalAge = 0;
+                let staleCount = 0;
+                const now = Date.now();
+
+                leads.forEach((l: any) => {
+                    statusCounts[l.status] = (statusCounts[l.status] || 0) + 1;
+                    if (l.source) sourceCounts[l.source] = (sourceCounts[l.source] || 0) + 1;
+                    const age = (now - new Date(l.created_at).getTime()) / (1000 * 60 * 60 * 24);
+                    totalAge += age;
+                    if (l.status === 'new' && age > 3) staleCount++;
+                });
+
+                results.leads = {
+                    total: leads.length,
+                    by_status: statusCounts,
+                    by_source: sourceCounts,
+                    avg_age_days: Math.round(totalAge / (leads.length || 1)),
+                    stale_leads: staleCount,
+                    stale_note: staleCount > 0 ? `${staleCount} leadów czeka >3 dni bez kontaktu!` : 'OK'
+                };
+            }
+        }
+
+        if (['monthly_turnover', 'conversion', 'full_report'].includes(analysis_type)) {
+            const { data: contracts } = await supabase
+                .from('contracts')
+                .select('contract_data, status, created_at, sales_rep_id')
+                .gte('created_at', sinceISO);
+
+            if (contracts) {
+                let totalNetto = 0;
+                const monthlyTurnover: Record<string, number> = {};
+                const repTurnover: Record<string, number> = {};
+
+                contracts.forEach((c: any) => {
+                    const p = c.contract_data?.pricing;
+                    const val = p?.finalPriceNet ?? p?.sellingPriceNet ?? p?.totalCost ?? 0;
+                    if (['signed', 'completed'].includes(c.status)) {
+                        totalNetto += val;
+                        const month = c.created_at.substring(0, 7);
+                        monthlyTurnover[month] = (monthlyTurnover[month] || 0) + val;
+                        if (c.sales_rep_id) {
+                            repTurnover[c.sales_rep_id] = (repTurnover[c.sales_rep_id] || 0) + val;
+                        }
+                    }
+                });
+
+                results.contracts = {
+                    total_count: contracts.length,
+                    signed_completed: contracts.filter((c: any) => ['signed', 'completed'].includes(c.status)).length,
+                    total_netto_eur: Math.round(totalNetto),
+                    by_month: monthlyTurnover,
+                    by_rep_id: repTurnover
+                };
+            }
+
+            const { data: offers } = await supabase
+                .from('offers')
+                .select('id, status, created_at')
+                .gte('created_at', sinceISO);
+
+            if (offers) {
+                const offerStatuses: Record<string, number> = {};
+                offers.forEach((o: any) => { offerStatuses[o.status] = (offerStatuses[o.status] || 0) + 1; });
+
+                const totalOffers = offers.length;
+                const acceptedOffers = offerStatuses['accepted'] || 0;
+
+                results.offers = {
+                    total: totalOffers,
+                    by_status: offerStatuses,
+                    conversion_rate: totalOffers > 0 ? `${((acceptedOffers / totalOffers) * 100).toFixed(1)}%` : 'N/A'
+                };
+            }
+        }
+
+        if (['top_sales_reps', 'full_report'].includes(analysis_type)) {
+            // Get rep profiles
+            if (results.contracts?.by_rep_id) {
+                const repIds = Object.keys(results.contracts.by_rep_id);
+                if (repIds.length > 0) {
+                    const { data: profiles } = await supabase
+                        .from('profiles')
+                        .select('id, full_name')
+                        .in('id', repIds);
+
+                    if (profiles) {
+                        results.top_reps = profiles.map((p: any) => ({
+                            name: p.full_name,
+                            turnover_eur: results.contracts.by_rep_id[p.id] || 0
+                        })).sort((a: any, b: any) => b.turnover_eur - a.turnover_eur);
+                    }
+                }
+            }
+        }
+
+        if (['bottlenecks', 'full_report'].includes(analysis_type)) {
+            results.bottleneck_analysis = {
+                lead_to_first_contact: results.leads?.stale_leads > 3 ? '🔴 PROBLEM — zbyt wolna reakcja' : '🟢 OK',
+                lead_conversion_hint: results.offers?.conversion_rate || 'Brak danych',
+                recommendation: results.leads?.stale_leads > 5
+                    ? 'PRIORYTET: Skontaktuj się z zaległymi leadami DZIŚ. Rozważ automatyczne przypomnienia.'
+                    : 'Pipeline wygląda zdrowo. Skup się na konwersji ofert do umów.'
+            };
+        }
+
+        return JSON.stringify(results);
+    } catch (e: any) {
+        return JSON.stringify({ error: `Błąd analizy: ${e.message}` });
+    }
+}
+
 function calculateGlass(args: any) {
     const { roofWidth, roofProjection, rafterCount } = args;
     const divisions = rafterCount ? (rafterCount - 1) : Math.ceil(roofWidth / 800);
@@ -270,130 +575,92 @@ function calculateGlass(args: any) {
         numberOfPanels: divisions,
         approxPanelWidth: Math.floor((roofWidth - (actualRafterCount * 60)) / divisions),
         length: roofProjection - 50,
-        note: "Wymiary orientacyjne. Sprawdź specyfikację."
+        note: "Wymiary orientacyjne. Sprawdź specyfikację modelu."
     });
 }
 
 function draftEmail(args: any) {
     const { purpose, customerName, context } = args;
-
-    const templates = {
+    const templates: any = {
         followup: {
-            subject: `Follow-up - ${customerName}`,
-            body: `Dzień dobry ${customerName},\n\nDziękuję za wczorajszą rozmowę. Chciałem się upewnić, czy ma Pan/Pani jakieś dodatkowe pytania dotyczące naszej oferty?\n\n${context || 'Jestem do dyspozycji w razie jakichkolwiek wątpliwości.'}\n\nPozdrawiam,\n[Imię Handlowca]\nTGA Metal / Polendach24`
+            subject: `Follow-up — ${customerName}`,
+            body: `Sehr geehrte/r ${customerName},\n\nvielen Dank für unser Gespräch. Ich möchte sicherstellen, dass Sie alle Informationen haben, die Sie benötigen.\n\n${context || 'Ich stehe Ihnen gerne für weitere Fragen zur Verfügung.'}\n\nMit freundlichen Grüßen,\n[Ihr Name]\nTGA Metal / Polendach24`
         },
         offer: {
-            subject: `Oferta - ${customerName}`,
-            body: `Dzień dobry ${customerName},\n\nPrzesyłam szczegóły oferty zgodnie z naszą rozmową:\n\n${context || '[Szczegóły oferty]'}\n\n**W cenie:**\n✓ Montaż\n✓ Transport\n✓ Gwarancja 5 lat\n\nOferta ważna 30 dni. Czy mogę umówić się na pomiar?\n\nPozdrawiam,\n[Imię Handlowca]`
+            subject: `Angebot für ${customerName}`,
+            body: `Sehr geehrte/r ${customerName},\n\nanbei finden Sie unser Angebot gemäß unserem Gespräch:\n\n${context || '[Angebotsdetails]'}\n\n**Inklusive:**\n✓ Montage\n✓ Lieferung\n✓ 5 Jahre Garantie\n\nDas Angebot ist 30 Tage gültig. Dürfen wir einen Aufmaß-Termin vereinbaren?\n\nMit freundlichen Grüßen,\n[Ihr Name]`
         },
         reminder: {
-            subject: `Przypomnienie - ${customerName}`,
-            body: `Dzień dobry ${customerName},\n\nPrzypominam o naszej ofercie z dnia [data]. ${context || 'Oferta ważna jeszcze przez [X] dni.'}\n\nCzy mogę w czymś pomóc w podjęciu decyzji?\n\nPozdrawiam,\n[Imię Handlowca]`
+            subject: `Erinnerung — ${customerName}`,
+            body: `Sehr geehrte/r ${customerName},\n\nich möchte Sie an unser Angebot erinnern. ${context || ''}\n\nKann ich Ihnen bei der Entscheidung behilflich sein?\n\nMit freundlichen Grüßen,\n[Ihr Name]`
         },
         thank_you: {
-            subject: `Dziękujemy - ${customerName}`,
-            body: `Dzień dobry ${customerName},\n\nDziękujemy za wybor naszej firmy! ${context || 'Cieszymy się, że możemy zrealizować Twoją inwestycję.'}\n\nW razie jakichkolwiek pytań, jestem do dyspozycji.\n\nPozdrawiam,\n[Imię Handlowca]`
+            subject: `Vielen Dank — ${customerName}`,
+            body: `Sehr geehrte/r ${customerName},\n\nvielen Dank für Ihren Auftrag! ${context || 'Wir freuen uns auf die Zusammenarbeit.'}\n\nBei Fragen stehe ich Ihnen jederzeit zur Verfügung.\n\nMit freundlichen Grüßen,\n[Ihr Name]`
         },
         technical: {
-            subject: `Informacje techniczne - ${customerName}`,
-            body: `Dzień dobry ${customerName},\n\nW odpowiedzi na Pana/Pani pytanie:\n\n${context || '[Szczegóły techniczne]'}\n\nCzy to wyjaśnia wątpliwości?\n\nPozdrawiam,\n[Imię Handlowca]`
+            subject: `Technische Informationen — ${customerName}`,
+            body: `Sehr geehrte/r ${customerName},\n\nbezüglich Ihrer Anfrage:\n\n${context || '[Technische Details]'}\n\nIch hoffe, das klärt Ihre Fragen.\n\nMit freundlichen Grüßen,\n[Ihr Name]`
         }
     };
-
-    const template = templates[purpose as keyof typeof templates] || templates.followup;
-
-    return JSON.stringify({
-        subject: template.subject,
-        body: template.body,
-        note: "Szablon emaila - dostosuj według potrzeb przed wysłaniem."
-    });
+    const template = templates[purpose] || templates.followup;
+    return JSON.stringify({ subject: template.subject, body: template.body, note: "E-Mail-Vorlage — vor dem Senden anpassen." });
 }
 
 function calculateMargin(args: any) {
     const { salePrice, cost } = args;
-
-    if (salePrice <= 0 || cost < 0) {
-        return JSON.stringify({ error: "Nieprawidłowe wartości. Cena sprzedaży musi być > 0, koszt >= 0." });
-    }
+    if (salePrice <= 0 || cost < 0) return JSON.stringify({ error: "Ungültige Werte." });
 
     const marginPercent = ((salePrice - cost) / salePrice) * 100;
     const profit = salePrice - cost;
-
     let recommendation = "";
-    if (marginPercent < 20) {
-        recommendation = "⚠️ **Za niska marża!** Rozważ renegocjację ceny lub kosztów.";
-    } else if (marginPercent < 25) {
-        recommendation = "🟡 **Akceptowalna** - OK dla dużych zamówień.";
-    } else if (marginPercent <= 35) {
-        recommendation = "✅ **Optymalna marża** - świetnie!";
-    } else {
-        recommendation = "🎉 **Wyjątkowa marża** - doskonały wynik!";
-    }
+    if (marginPercent < 20) recommendation = "⚠️ Za niska marża! Renegocjuj.";
+    else if (marginPercent < 25) recommendation = "🟡 Akceptowalna — OK dla dużych zamówień.";
+    else if (marginPercent <= 35) recommendation = "✅ Optymalna marża!";
+    else recommendation = "🎉 Wyjątkowa marża!";
 
     return JSON.stringify({
-        marginPercent: marginPercent.toFixed(2) + "%",
-        profit: profit.toFixed(2) + " PLN",
-        recommendation: recommendation,
-        breakdown: {
-            salePrice: salePrice + " PLN",
-            cost: cost + " PLN",
-            profit: profit + " PLN"
-        }
+        marginPercent: marginPercent.toFixed(1) + "%", profit: profit.toFixed(2) + " EUR",
+        recommendation, breakdown: { salePrice: salePrice + " EUR", cost: cost + " EUR" }
     });
 }
 
 function suggestUpsell(args: any) {
     const { mainProduct, budget } = args;
-
     const suggestions: any = {
-        "TopLine": [
-            { product: "Oświetlenie LED", price: "1 200 PLN", reason: "Wydłuża użytkowanie pergoli wieczorami" },
-            { product: "Promiennik podczerwieni", price: "2 800 PLN", reason: "Umożliwia korzystanie wiosną/jesienią" },
-            { product: "Ścianki boczne", price: "3 500 PLN", reason: "Ochrona przed wiatrem i deszczem" },
-            { product: "Rolety ZIP Screen", price: "4 200 PLN", reason: "Ochrona przed słońcem i owadami" }
+        "trendstyle": [
+            { product: "LED spots (8 szt.)", price: "420 EUR", margin: "40%", reason: "Wydłuża użytkowanie wieczorami" },
+            { product: "Promiennik IR 2000W", price: "680 EUR", margin: "35%", reason: "Komfort w chłodniejsze dni" },
+            { product: "Markiza pod dach", price: "890 EUR", margin: "30%", reason: "Ochrona przed słońcem" },
+            { product: "ZIP Screen", price: "1 250 EUR", margin: "28%", reason: "Ochrona przed owadami i wiatrem" }
         ],
-        "TrendLine": [
-            { product: "Oświetlenie LED", price: "1 000 PLN", reason: "Podstawowe oświetlenie" },
-            { product: "Promiennik", price: "2 500 PLN", reason: "Komfort w chłodniejsze dni" },
-            { product: "Markiza", price: "2 200 PLN", reason: "Dodatkowa ochrona przed słońcem" }
-        ],
-        "SkyLine": [
-            { product: "System audio", price: "3 500 PLN", reason: "Premium experience" },
-            { product: "Inteligentne sterowanie", price: "2 000 PLN", reason: "Automatyzacja przez aplikację" },
-            { product: "Promienniki premium", price: "4 500 PLN", reason: "Najwyższa jakość ogrzewania" }
-        ],
-        "WPC": [
-            { product: "Brama przesuwna", price: "8 500 PLN", reason: "Kompletne ogrodzenie" },
-            { product: "Furtka", price: "2 200 PLN", reason: "Wygodne wejście" },
-            { product: "Oświetlenie ogrodzenia", price: "1 500 PLN", reason: "Bezpieczeństwo i estetyka" }
+        "topstyle": [
+            { product: "LED strips zintegrowane", price: "580 EUR", margin: "38%", reason: "Premium oświetlenie" },
+            { product: "2× Promiennik IR", price: "1 200 EUR", margin: "32%", reason: "Pełne ogrzewanie tarasu" },
+            { product: "Ścianka szklana przesuwna", price: "2 800 EUR", margin: "25%", reason: "Ogród zimowy efekt" },
+            { product: "ZIP Screen ×2", price: "2 200 EUR", margin: "28%", reason: "Kompletna ochrona boków" }
         ],
         "default": [
-            { product: "Oświetlenie LED", price: "1 200 PLN", reason: "Uniwersalny dodatek" },
-            { product: "Gwarancja rozszerzona", price: "800 PLN", reason: "Dodatkowy spokój" }
+            { product: "LED spots", price: "420 EUR", margin: "40%", reason: "Uniwersalny dodatek" },
+            { product: "Promiennik IR", price: "680 EUR", margin: "35%", reason: "Wydłuża sezon" }
         ]
     };
 
-    // Find matching product category
+    const key = mainProduct.toLowerCase().replace(/[^a-z]/g, '');
     let productSuggestions = suggestions.default;
-    for (const key in suggestions) {
-        if (mainProduct.toLowerCase().includes(key.toLowerCase())) {
-            productSuggestions = suggestions[key];
-            break;
-        }
+    for (const k in suggestions) {
+        if (key.includes(k)) { productSuggestions = suggestions[k]; break; }
     }
 
-    // Filter by budget if provided
     if (budget) {
-        productSuggestions = productSuggestions.filter((s: any) => {
-            const price = parseFloat(s.price.replace(/[^0-9]/g, ''));
-            return price <= budget * 0.3; // Max 30% of budget
-        });
+        productSuggestions = productSuggestions.filter((s: any) =>
+            parseFloat(s.price.replace(/[^0-9.]/g, '')) <= budget * 0.3
+        );
     }
 
     return JSON.stringify({
-        mainProduct: mainProduct,
-        suggestions: productSuggestions.slice(0, 3), // Top 3
-        note: "Zaproponuj te dodatki klientowi aby zwiększyć wartość zamówienia."
+        mainProduct, suggestions: productSuggestions.slice(0, 4),
+        note: "Zaproponuj te dodatki aby zwiększyć wartość zamówienia i marżę."
     });
 }
 
@@ -405,171 +672,114 @@ async function checkInventory(args: any, supabase: any) {
             .select('name, quantity, unit, location')
             .ilike('name', `%${query}%`)
             .limit(5);
-
         if (error) throw error;
-        if (!data || data.length === 0) return JSON.stringify({ result: "Brak produktów w magazynie pasujących do zapytania." });
-
+        if (!data || data.length === 0) return JSON.stringify({ result: "Brak produktów pasujących do zapytania." });
         return JSON.stringify({ inventory: data });
     } catch (e: any) {
-        // Fallback if table doesn't exist or other error
-        return JSON.stringify({ error: `Błąd sprawdzania magazynu: ${e.message}. (Upewnij się, że tabela 'inventory_items' istnieje)` });
+        return JSON.stringify({ error: `Błąd magazynu: ${e.message}` });
     }
 }
 
 async function searchKnowledge(args: any, supabase: any) {
     const { query, category } = args;
-
     try {
         if (category === 'crm') {
             let dbQuery = supabase.from('customers').select('id, first_name, last_name, email, city, phone');
-
             if (query.trim().includes(' ')) {
-                // Handle "Hubert Kościów" -> split into parts
                 const parts = query.trim().split(/\s+/);
-                if (parts.length >= 2) {
-                    const p1 = parts[0];
-                    const p2 = parts[parts.length - 1]; // Take last part as surname roughly
-                    // Try (First=p1 AND Last=p2) OR (First=p2 AND Last=p1)
-                    dbQuery = dbQuery.or(`and(first_name.ilike.%${p1}%,last_name.ilike.%${p2}%),and(first_name.ilike.%${p2}%,last_name.ilike.%${p1}%)`);
-                } else {
-                    dbQuery = dbQuery.or(`last_name.ilike.%${query}%,first_name.ilike.%${query}%,email.ilike.%${query}%`);
-                }
+                const p1 = parts[0]; const p2 = parts[parts.length - 1];
+                dbQuery = dbQuery.or(`and(first_name.ilike.%${p1}%,last_name.ilike.%${p2}%),and(first_name.ilike.%${p2}%,last_name.ilike.%${p1}%)`);
             } else {
                 dbQuery = dbQuery.or(`last_name.ilike.%${query}%,first_name.ilike.%${query}%,email.ilike.%${query}%`);
             }
-
-            const { data: customers, error } = await dbQuery.limit(5);
-
+            const { data, error } = await dbQuery.limit(5);
             if (error) throw error;
-            return JSON.stringify({ customers });
+            return JSON.stringify({ customers: data });
         }
-
         if (category === 'offers') {
-            const { data: offers, error } = await supabase
-                .from('offers')
+            const { data, error } = await supabase.from('offers')
                 .select('offer_number, status, pricing, customer_data, created_at')
-                .or(`offer_number.ilike.%${query}%,customer_data->>lastName.ilike.%${query}%`) // Basic search
-                .order('created_at', { ascending: false })
-                .limit(5);
+                .or(`offer_number.ilike.%${query}%,customer_data->>lastName.ilike.%${query}%`)
+                .order('created_at', { ascending: false }).limit(5);
             if (error) throw error;
-            return JSON.stringify({ offers });
+            return JSON.stringify({ offers: data });
         }
-
         if (category === 'contracts') {
-            const { data: contracts, error } = await supabase
-                .from('contracts')
-                .select('contract_number, status, total_amount, installation_date, offer_id')
-                .or(`contract_number.ilike.%${query}%`)
-                .order('created_at', { ascending: false })
-                .limit(5);
+            const { data, error } = await supabase.from('contracts')
+                .select('contract_data, status, created_at, sales_rep_id')
+                .or(`contract_data->>contractNumber.ilike.%${query}%`)
+                .order('created_at', { ascending: false }).limit(5);
             if (error) throw error;
-            return JSON.stringify({ contracts });
+            return JSON.stringify({
+                contracts: data?.map((c: any) => ({
+                    number: c.contract_data?.contractNumber,
+                    status: c.status,
+                    client: c.contract_data?.client?.lastName,
+                    price_net: c.contract_data?.pricing?.sellingPriceNet,
+                    created: c.created_at
+                }))
+            });
         }
-
         if (category === 'installations') {
-            // Calendar search
-            let dbQuery = supabase
-                .from('installations')
-                .select(`
-                    id, 
-                    scheduled_date, 
-                    status, 
-                    installer_name,
-                    offers (
-                        offer_number,
-                        customer_data
-                    )
-                `);
-
-            if (query.match(/^\d{4}-\d{2}/)) {
-                dbQuery = dbQuery.gte('scheduled_date', query);
-            } else if (query.toLowerCase().includes('upcoming') || query.length < 3) {
-                dbQuery = dbQuery.gte('scheduled_date', new Date().toISOString().split('T')[0]);
-            } else {
-                // Try to filter by installer name or just fetch all and filter in memory (safer for complex joins)
-                // Or add filtering for installer_name
-                dbQuery = dbQuery.or(`installer_name.ilike.%${query}%`);
-            }
-
-            const { data: installations, error } = await dbQuery
-                .order('scheduled_date', { ascending: true })
-                .limit(5);
-
+            let dbQuery = supabase.from('installations')
+                .select('id, scheduled_date, status, installer_name, offers(offer_number, customer_data)');
+            if (query.match(/^\d{4}-\d{2}/)) dbQuery = dbQuery.gte('scheduled_date', query);
+            else dbQuery = dbQuery.gte('scheduled_date', new Date().toISOString().split('T')[0]);
+            const { data, error } = await dbQuery.order('scheduled_date', { ascending: true }).limit(5);
             if (error) throw error;
-
-            // Map to cleaner format for AI
-            const formatted = installations.map((i: any) => ({
-                id: i.id,
-                date: i.scheduled_date,
-                status: i.status,
-                installer: i.installer_name,
-                city: i.offers?.customer_data?.city || 'Brak danych',
-                client: i.offers?.customer_data?.lastName || 'Brak danych'
-            }));
-
-            return JSON.stringify({ installations: formatted });
+            return JSON.stringify({
+                installations: data?.map((i: any) => ({
+                    date: i.scheduled_date, status: i.status, installer: i.installer_name,
+                    client: i.offers?.customer_data?.lastName || '?'
+                }))
+            });
         }
-
         if (category === 'products') {
-            const { data: costs, error } = await supabase
-                .from('supplier_costs')
-                .select('*')
-                .limit(10);
-
-            if (error) return JSON.stringify({ error: "Błąd dostępu do bazy produktów", details: error.message });
-
-            const filtered = costs.filter((c: any) => JSON.stringify(c).toLowerCase().includes(query.toLowerCase()));
-            return JSON.stringify({ products: filtered.slice(0, 5) });
+            const { data } = await supabase.from('pricing_base').select('model_family, width_mm, depth_mm, price_net')
+                .ilike('model_family', `%${resolveModelForDB(query)}%`).limit(10);
+            return JSON.stringify({
+                prices: data?.map((r: any) => ({
+                    model: BRAND_MAP[r.model_family] || r.model_family,
+                    size: `${r.width_mm}×${r.depth_mm}mm`, price: `${r.price_net} EUR`
+                }))
+            });
         }
-
         return JSON.stringify({ result: "Nie znaleziono danych." });
     } catch (e: any) {
-        return JSON.stringify({ error: `Search failed: ${e.message}` });
+        return JSON.stringify({ error: `Błąd wyszukiwania: ${e.message}` });
     }
 }
 
 async function generateVisualization(args: any, openAiKey: string) {
-    // NanoBanana Implementation Wrapper
-    // Using DALL-E 3 as the engine but responding as "NanoBanana System"
-
     try {
-        console.log("NanoBanana Request:", args.prompt);
         const response = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openAiKey}`,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: "dall-e-3",
-                prompt: `Architectural visualization, photorealistic 8k, NanoBanana Style: ${args.prompt}`,
-                n: 1,
-                size: "1024x1024"
+                prompt: `Architectural visualization, photorealistic 8k: ${args.prompt}`,
+                n: 1, size: "1024x1024"
             }),
         });
-
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
-
-        return JSON.stringify({
-            url: data.data[0].url,
-            note: "Wizualizacja NanoBanana (AI Generated)."
-        });
+        return JSON.stringify({ url: data.data[0].url, note: "Wizualizacja AI." });
     } catch (e: any) {
-        return JSON.stringify({ error: `NanoBanana generation failed: ${e.message}` });
+        return JSON.stringify({ error: `Visualization failed: ${e.message}` });
     }
 }
 
-
+// ═══════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        const { messages, context } = await req.json(); // Extract context!
+        const { messages, context } = await req.json();
 
-        // Initialize Supabase Client for Tool Access
         const authHeader = req.headers.get('Authorization')!;
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
@@ -580,135 +790,110 @@ Deno.serve(async (req) => {
         const apiKey = Deno.env.get('OPENAI_API_KEY');
         if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
-        // Sanitize Messages
+        // Determine user role from context
+        const userRole = context?.userRole || 'sales_rep';
+        const isAdminOrManager = ['admin', 'manager'].includes(userRole);
+
+        // Select system prompt based on role
+        const systemPrompt = isAdminOrManager ? ADMIN_MANAGER_PROMPT : SALES_REP_PROMPT;
+
+        // Select tools based on role
+        const activeTools = isAdminOrManager ? [...baseTools, ...adminTools] : baseTools;
+
+        // Sanitize messages
         let sanitizedMessages = messages
-            .filter((m: any) => m && m.role && (m.content || m.tool_calls)) // Must have content or be a tool call
+            .filter((m: any) => m && m.role && (m.content || m.tool_calls))
             .map((m: any) => ({
-                role: m.role,
-                content: m.content || "", // Ensure string or array, not null
-                tool_calls: m.tool_calls,
-                tool_call_id: m.tool_call_id,
-                name: m.name
+                role: m.role, content: m.content || "",
+                tool_calls: m.tool_calls, tool_call_id: m.tool_call_id, name: m.name
             }));
 
-        // --- CONTEXT INJECTION REFINEMENT ---
-        // Instead of relying on client to append text, we inject a "System Note" if context is present.
-        // This is cleaner and more effective.
+        // Context injection
         if (context) {
             const contextMsg = {
                 role: 'system',
-                content: `[AKTUALNY KONTEKST UŻYTKOWNIKA]\nUżytkownik przegląda obecnie: ${JSON.stringify(context)}.\nJeśli pyta "o to" lub "o tę ofertę", odnoś się do tego kontekstu.`
+                content: `[KONTEKST UŻYTKOWNIKA]\nRola: ${userRole}\nAktualna strona: ${context.currentPage || 'dashboard'}\nDodatkowy kontekst: ${JSON.stringify(context)}`
             };
-            // Insert after System Prompt (index 0 is system prompt in the call below, so we add it to messages)
             sanitizedMessages = [contextMsg, ...sanitizedMessages];
         }
 
-        // 1. First Call to LLM
+        // 1. First LLM Call
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    ...sanitizedMessages
-                ],
-                tools: tools,
-                tool_choice: "auto"
+                model: 'gpt-4.1',
+                messages: [{ role: 'system', content: systemPrompt }, ...sanitizedMessages],
+                tools: activeTools,
+                tool_choice: "auto",
+                temperature: 0.7,
+                max_tokens: 4000
             }),
         });
 
         const data = await response.json();
+        if (data.error) throw new Error(`OpenAI Error: ${data.error.message}`);
+        if (!data.choices?.length) throw new Error('No choices returned');
 
-        if (data.error) {
-            console.error('OpenAI Error:', data.error);
-            throw new Error(`OpenAI API Error: ${data.error.message}`);
-        }
-
-        if (!data.choices || data.choices.length === 0) {
-            console.error('No choices returned:', data);
-            throw new Error('OpenAI returned no choices');
-        }
-
-        const choice = data.choices[0];
-        const message = choice.message;
+        const message = data.choices[0].message;
 
         // 2. Handle Tool Calls
         if (message.tool_calls) {
-            const toolCalls = message.tool_calls;
             const functionResponses = [];
 
-            for (const toolCall of toolCalls) {
+            for (const toolCall of message.tool_calls) {
                 let result = "";
                 const args = JSON.parse(toolCall.function.arguments);
 
-                if (toolCall.function.name === 'calculate_glass') {
-                    result = calculateGlass(args);
-                } else if (toolCall.function.name === 'search_knowledge') {
-                    result = await searchKnowledge(args, supabaseClient);
-                } else if (toolCall.function.name === 'generate_visualization') {
-                    result = await generateVisualization(args, apiKey);
-                } else if (toolCall.function.name === 'check_inventory') {
-                    result = await checkInventory(args, supabaseClient);
-                } else if (toolCall.function.name === 'draft_email') {
-                    result = draftEmail(args);
-                } else if (toolCall.function.name === 'calculate_margin') {
-                    result = calculateMargin(args);
-                } else if (toolCall.function.name === 'suggest_upsell') {
-                    result = suggestUpsell(args);
+                switch (toolCall.function.name) {
+                    case 'calculate_price': result = await calculatePrice(args, supabaseClient); break;
+                    case 'calculate_glass': result = calculateGlass(args); break;
+                    case 'search_knowledge': result = await searchKnowledge(args, supabaseClient); break;
+                    case 'check_inventory': result = await checkInventory(args, supabaseClient); break;
+                    case 'draft_email': result = draftEmail(args); break;
+                    case 'calculate_margin': result = calculateMargin(args); break;
+                    case 'suggest_upsell': result = suggestUpsell(args); break;
+                    case 'generate_visualization': result = await generateVisualization(args, apiKey); break;
+                    case 'analyze_business': result = await analyzeBusinessData(args, supabaseClient); break;
+                    default: result = JSON.stringify({ error: `Unknown tool: ${toolCall.function.name}` });
                 }
 
                 functionResponses.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: toolCall.function.name,
-                    content: result
+                    tool_call_id: toolCall.id, role: "tool",
+                    name: toolCall.function.name, content: result
                 });
             }
 
-            // 3. Second Call to LLM with results
+            // 3. Second LLM Call with tool results
             const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'gpt-4o',
+                    model: 'gpt-4.1',
                     messages: [
-                        { role: 'system', content: SYSTEM_PROMPT },
-                        ...sanitizedMessages, // CORRECTION: Use sanitized messages here too!
-                        message, // Assistant's tool call request
-                        ...functionResponses // Tool results
-                    ]
+                        { role: 'system', content: systemPrompt },
+                        ...sanitizedMessages,
+                        message,
+                        ...functionResponses
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 4000
                 }),
             });
 
             const secondData = await secondResponse.json();
-
-            if (secondData.error) {
-                console.error('OpenAI Error (2nd call):', secondData.error);
-                throw new Error(`OpenAI API Error (Tool): ${secondData.error.message}`);
-            }
-
-            if (!secondData.choices || secondData.choices.length === 0) {
-                throw new Error('OpenAI returned no choices after tool execution');
-            }
+            if (secondData.error) throw new Error(`OpenAI Tool Error: ${secondData.error.message}`);
+            if (!secondData.choices?.length) throw new Error('No choices after tool execution');
 
             return new Response(JSON.stringify(secondData.choices[0].message), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
-
-        } else {
-            // No tool call, just return text
-            return new Response(JSON.stringify(message), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
         }
 
+        // No tool call — return text directly
+        return new Response(JSON.stringify(message), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
 
     } catch (error: any) {
         return new Response(JSON.stringify({ error: error.message }), {

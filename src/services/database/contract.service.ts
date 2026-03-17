@@ -1,5 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import type { Contract } from '../../types';
+import { getEurPlnRate } from '../exchange-rate.service';
+import { FuelPriceService } from '../fuel-price.service';
 
 export const ContractService = {
     async getContracts(): Promise<Contract[]> {
@@ -17,7 +19,7 @@ export const ContractService = {
         contracts.forEach(c => {
             if (c.signed_by) userIds.add(c.signed_by);
             if (c.sales_rep_id) userIds.add(c.sales_rep_id);
-            // We could also fetch creator (user_id) if needed, but not mapping it currently in return type except implicitly?
+            if (c.advance_paid_by) userIds.add(c.advance_paid_by);
         });
 
         // 3. Fetch Profiles manually to avoid Ambiguous Foreign Key issues
@@ -55,6 +57,8 @@ export const ContractService = {
                 comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
                 attachments: row.contract_data.attachments || [],
                 installationNotes: row.contract_data.installationNotes || '',
+                plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
+                dachrechnerData: row.contract_data.dachrechnerData || undefined,
                 createdAt: new Date(row.created_at),
                 signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
                 signedBy: row.signed_by,
@@ -66,7 +70,21 @@ export const ContractService = {
                 salesRep: salesRepProfile ? {
                     firstName: (salesRepProfile.full_name || '').split(' ')[0] || '',
                     lastName: (salesRepProfile.full_name || '').split(' ').slice(1).join(' ') || ''
-                } : undefined
+                } : undefined,
+                // Advance payment: prefer column, fallback to pricing JSON
+                advanceAmount: (row.advance_amount && Number(row.advance_amount) > 0)
+                    ? Number(row.advance_amount)
+                    : (row.contract_data?.pricing?.advancePayment
+                        ? Number(row.contract_data.pricing.advancePayment)
+                        : undefined),
+                advancePaid: row.advance_paid ?? false,
+                advancePaidAt: row.advance_paid_at || undefined,
+                advancePaidBy: row.advance_paid_by || undefined,
+                advancePaidByUser: row.advance_paid_by ? (() => {
+                    const p = profileMap.get(row.advance_paid_by);
+                    return p ? { firstName: (p.full_name || '').split(' ')[0] || '', lastName: (p.full_name || '').split(' ').slice(1).join(' ') || '' } : undefined;
+                })() : undefined,
+                advanceNotes: row.advance_notes || undefined,
             };
         });
     },
@@ -98,7 +116,7 @@ export const ContractService = {
 
         if (calculatedCommission <= 0) {
             try {
-                const netPrice = contract.pricing?.sellingPriceNet || contract.pricing?.finalPriceNet || 0;
+                const netPrice = Number(contract.pricing?.finalPriceNet) || Number(contract.pricing?.sellingPriceNet) || 0;
                 if (netPrice > 0) {
                     const { data: profile } = await supabase
                         .from('profiles')
@@ -130,18 +148,23 @@ export const ContractService = {
             attachments: contract.attachments,
             orderedItems: contract.orderedItems || [],
             installation_days_estimate: contract.installation_days_estimate,
-            installationNotes: contract.installationNotes || ''
+            installationNotes: contract.installationNotes || '',
+            plannedInstallationWeeks: contract.plannedInstallationWeeks || undefined,
         };
 
         const { data, error } = await supabase
             .from('contracts')
             .insert({
-                offer_id: contract.offerId,
+                offer_id: contract.offerId || null,
                 user_id: user.id,
                 contract_data: contractData,
                 status: contract.status,
                 signed_at: contract.signedAt ? contract.signedAt.toISOString() : null,
-                sales_rep_id: user.id // Default to creator
+                sales_rep_id: user.id, // Default to creator
+                // Sync advance payment to dedicated column so lists/procurement can read it
+                advance_amount: contract.pricing?.advancePayment || contract.advanceAmount || null,
+                // Sync installation days to dedicated column
+                installation_days_estimate: contract.pricing?.installationCosts?.days || contract.installation_days_estimate || 1,
             })
             .select()
             .single();
@@ -233,13 +256,34 @@ export const ContractService = {
             updates.sales_rep_id = contract.salesRepId;
         }
 
+        // Handle advance payment updates (direct columns)
+        if (contract.advanceAmount !== undefined) {
+            updates.advance_amount = contract.advanceAmount;
+        }
+        if (contract.advancePaid !== undefined) {
+            updates.advance_paid = contract.advancePaid;
+            if (contract.advancePaid) {
+                updates.advance_paid_at = new Date().toISOString();
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) updates.advance_paid_by = user.id;
+            } else {
+                updates.advance_paid_at = null;
+                updates.advance_paid_by = null;
+            }
+        }
+        if (contract.advanceNotes !== undefined) {
+            updates.advance_notes = contract.advanceNotes;
+        }
+
         // 4. Handle contract_data updates with safe JSONB merge
         const needsDataUpdate = contract.client || contract.product ||
             contract.pricing || contract.comments ||
             contract.requirements || contract.attachments ||
-            contract.orderedItems ||
+            contract.orderedItems || contract.dachrechnerData ||
             contract.contractNumber || contract.commission !== undefined ||
-            contract.installationNotes !== undefined;
+            contract.installationNotes !== undefined ||
+            contract.plannedInstallationWeeks !== undefined ||
+            contract.installation_days_estimate !== undefined;
 
         if (needsDataUpdate) {
             // [AUTOMATION] Always recalculate commission when pricing changes
@@ -254,8 +298,8 @@ export const ContractService = {
             if ((pricingChanged || commissionMissing) && repId) {
                 try {
                     const netPrice = Math.max(
-                        Number(pricingToUse?.sellingPriceNet) || 0,
-                        Number(pricingToUse?.finalPriceNet) || 0
+                        Number(pricingToUse?.finalPriceNet) || 0,
+                        Number(pricingToUse?.sellingPriceNet) || 0
                     );
 
                     if (netPrice > 0) {
@@ -289,9 +333,25 @@ export const ContractService = {
                 orderedItems: contract.orderedItems ?? current.orderedItems ?? [],
                 comments: contract.comments ?? current.comments,
                 attachments: contract.attachments ?? current.attachments,
-                installationNotes: contract.installationNotes ?? current.installationNotes ?? ''
+                installationNotes: contract.installationNotes ?? current.installationNotes ?? '',
+                plannedInstallationWeeks: contract.plannedInstallationWeeks ?? current.plannedInstallationWeeks ?? undefined,
+                dachrechnerData: contract.dachrechnerData ?? current.dachrechnerData ?? undefined,
+                installation_days_estimate: contract.installation_days_estimate ?? current.installation_days_estimate ?? 1
             };
             updates.contract_data = updatedData;
+
+            // Sync installation_days_estimate to dedicated column
+            const daysValue = contract.installation_days_estimate ?? current.installation_days_estimate;
+            if (daysValue) {
+                updates.installation_days_estimate = daysValue;
+            }
+
+            // [AUTOMATION] Sync advance_amount column from pricing.advancePayment
+            // This ensures column always matches JSON regardless of how the advance was set
+            const advanceFromPricing = pricingToUse?.advancePayment;
+            if (advanceFromPricing !== undefined && advanceFromPricing !== null) {
+                updates.advance_amount = advanceFromPricing;
+            }
         }
 
         // 5. Execute update only if there are changes
@@ -422,6 +482,8 @@ export const ContractService = {
                 comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
                 attachments: row.contract_data.attachments || [],
                 installationNotes: row.contract_data.installationNotes || '',
+                plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
+                dachrechnerData: row.contract_data.dachrechnerData || undefined,
                 createdAt: new Date(row.created_at),
                 signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
                 signedBy: row.signed_by,
@@ -514,6 +576,8 @@ export const ContractService = {
             comments: data.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: data.contract_data.attachments || [],
             installationNotes: data.contract_data.installationNotes || '',
+            plannedInstallationWeeks: data.contract_data.plannedInstallationWeeks || undefined,
+            dachrechnerData: data.contract_data.dachrechnerData || undefined,
             createdAt: new Date(data.created_at),
             signedAt: data.signed_at ? new Date(data.signed_at) : undefined,
             signedBy: data.signed_by,
@@ -572,6 +636,8 @@ export const ContractService = {
             comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
             attachments: row.contract_data.attachments || [],
             installationNotes: row.contract_data.installationNotes || '',
+            plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
+            dachrechnerData: row.contract_data.dachrechnerData || undefined,
             createdAt: new Date(row.created_at),
             signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
             signedBy: row.signed_by,
@@ -684,6 +750,24 @@ export const ContractService = {
             additionalCosts: number;
             total: number;
         };
+        baseSalary: {
+            total: number;
+            totalPLN: number;
+            monthlySalary: number;
+            monthlySalaryCurrency: string;
+            contractsInMonth: number;
+            salesRepName: string;
+        } | null;
+        fuelCost: {
+            total: number;
+            monthlyTotal: number;
+            monthlyTotalPLN: number;
+            totalLiters: number;
+            contractsInMonth: number;
+            internalCount: number;
+            externalCount: number;
+            salesRepName: string;
+        } | null;
         grandTotal: number;
     }> {
         // 1. Load contract
@@ -737,7 +821,7 @@ export const ContractService = {
         // 3b. Measurement trip costs — from measurement_reports (km cost in PLN → EUR)
         let measurementTripItems: { description: string; amount: number; amountPLN: number; date: string }[] = [];
         let measurementTripTotal = 0;
-        const PLN_TO_EUR = 4.30; // Average exchange rate
+        const PLN_TO_EUR = await getEurPlnRate(); // Live NBP rate (cached 1h)
 
         if (contractData?.client) {
             const clientName = `${contractData.client.firstName || ''} ${contractData.client.lastName || ''}`.trim().toLowerCase();
@@ -853,7 +937,147 @@ export const ContractService = {
         }
 
         const installationTotal = laborCost + fuelCost + hotelCost + consumablesCost + additionalCosts;
-        const grandTotal = logisticsTotal + measurementTotal + measurementTripTotal + commission + installationTotal;
+
+        // 5. Base Salary — dynamic split across monthly contracts
+        let baseSalaryData: {
+            total: number;
+            totalPLN: number;
+            monthlySalary: number;
+            monthlySalaryCurrency: string;
+            contractsInMonth: number;
+            salesRepName: string;
+        } | null = null;
+
+        const salesRepId = contractRow.sales_rep_id;
+        if (salesRepId) {
+            try {
+                const { data: repProfile } = await supabase
+                    .from('profiles')
+                    .select('base_salary, base_salary_currency, full_name')
+                    .eq('id', salesRepId)
+                    .single();
+
+                const baseSalary = repProfile?.base_salary ? Number(repProfile.base_salary) : 0;
+                const currency = repProfile?.base_salary_currency || 'PLN';
+                const repName = repProfile?.full_name || 'Handlowiec';
+
+                if (baseSalary > 0) {
+                    // Determine the month of this contract
+                    const contractDate = new Date(contractRow.created_at);
+                    const monthStart = new Date(contractDate.getFullYear(), contractDate.getMonth(), 1).toISOString();
+                    const monthEnd = new Date(contractDate.getFullYear(), contractDate.getMonth() + 1, 1).toISOString();
+
+                    // Count contracts for this sales rep in the same month
+                    const { count } = await supabase
+                        .from('contracts')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('sales_rep_id', salesRepId)
+                        .in('status', ['signed', 'completed', 'draft'])
+                        .gte('created_at', monthStart)
+                        .lt('created_at', monthEnd);
+
+                    const contractsInMonth = count || 1;
+                    const perContractPLN = Math.round((baseSalary / contractsInMonth) * 100) / 100;
+                    const perContractEUR = currency === 'EUR' ? perContractPLN : Math.round((perContractPLN / PLN_TO_EUR) * 100) / 100;
+
+                    baseSalaryData = {
+                        total: perContractEUR,
+                        totalPLN: currency === 'PLN' ? perContractPLN : Math.round((perContractPLN * PLN_TO_EUR) * 100) / 100,
+                        monthlySalary: baseSalary,
+                        monthlySalaryCurrency: currency,
+                        contractsInMonth,
+                        salesRepName: repName
+                    };
+                }
+            } catch (err) {
+                console.error('[BaseSalary] Error calculating:', err);
+            }
+        }
+
+        // 6. Fuel Cost — dynamic split across monthly contracts (same pattern as baseSalary)
+        let fuelCostData: {
+            total: number;
+            monthlyTotal: number;
+            totalLiters: number;
+            contractsInMonth: number;
+            internalCount: number;
+            externalCount: number;
+            salesRepName: string;
+        } | null = null;
+
+        if (salesRepId) {
+            try {
+                const contractDate = new Date(contractRow.created_at);
+                const monthStart = new Date(contractDate.getFullYear(), contractDate.getMonth(), 1).toISOString().split('T')[0];
+                const monthEnd = new Date(contractDate.getFullYear(), contractDate.getMonth() + 1, 0).toISOString().split('T')[0];
+
+                // Get fuel logs AND fuel prices in parallel
+                const [fuelLogsResult, fuelPrices] = await Promise.all([
+                    supabase
+                        .from('fuel_logs')
+                        .select('liters, cost, net_cost, fueling_type, log_date')
+                        .eq('user_id', salesRepId)
+                        .gte('log_date', monthStart)
+                        .lte('log_date', monthEnd),
+                    FuelPriceService.getAllPricesSorted()
+                ]);
+
+                const fuelLogs = fuelLogsResult.data;
+
+                if (fuelLogs && fuelLogs.length > 0) {
+                    const totalLiters = fuelLogs.reduce((sum: number, log: any) => sum + (Number(log.liters) || 0), 0);
+                    // Calculate monthly total using price history for internal logs
+                    let monthlyTotal = 0;
+                    for (const log of fuelLogs) {
+                        let logCost = Number(log.cost) || Number(log.net_cost) || 0;
+                        if (logCost === 0 && (Number(log.liters) || 0) > 0 && log.fueling_type === 'internal') {
+                            const pricePerLiter = FuelPriceService.getPriceForDateFromList(log.log_date, fuelPrices);
+                            if (pricePerLiter) {
+                                logCost = (Number(log.liters) || 0) * pricePerLiter;
+                            }
+                        }
+                        monthlyTotal += logCost;
+                    }
+                    const internalCount = fuelLogs.filter((l: any) => l.fueling_type === 'internal').length;
+                    const externalCount = fuelLogs.filter((l: any) => l.fueling_type === 'external').length;
+
+                    // Count contracts for this sales rep in the same month
+                    const contractMonthStart = new Date(contractDate.getFullYear(), contractDate.getMonth(), 1).toISOString();
+                    const contractMonthEnd = new Date(contractDate.getFullYear(), contractDate.getMonth() + 1, 1).toISOString();
+                    const { count: contractCount } = await supabase
+                        .from('contracts')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('sales_rep_id', salesRepId)
+                        .in('status', ['signed', 'completed', 'draft'])
+                        .gte('created_at', contractMonthStart)
+                        .lt('created_at', contractMonthEnd);
+
+                    const contractsInMonth = contractCount || 1;
+                    // Convert to EUR if monthly total is in PLN
+                    const monthlyTotalEUR = Math.round((monthlyTotal / PLN_TO_EUR) * 100) / 100;
+                    const perContract = Math.round((monthlyTotalEUR / contractsInMonth) * 100) / 100;
+
+                    const repName = baseSalaryData?.salesRepName || 'Handlowiec';
+
+                    fuelCostData = {
+                        total: perContract,
+                        monthlyTotal: monthlyTotalEUR,
+                        monthlyTotalPLN: Math.round(monthlyTotal * 100) / 100,
+                        totalLiters: Math.round(totalLiters * 100) / 100,
+                        contractsInMonth,
+                        internalCount,
+                        externalCount,
+                        salesRepName: repName
+                    };
+                }
+            } catch (err) {
+                console.error('[FuelCost] Error calculating:', err);
+            }
+        }
+
+        const baseSalaryCost = baseSalaryData?.total || 0;
+        const repFuelCost = fuelCostData?.total || 0;
+        const grandTotal = logisticsTotal + measurementTotal + measurementTripTotal + commission + installationTotal + baseSalaryCost + repFuelCost;
 
         return {
             logistics: { total: logisticsTotal, items: logisticsItems },
@@ -869,6 +1093,8 @@ export const ContractService = {
                 additionalCosts,
                 total: installationTotal
             },
+            baseSalary: baseSalaryData,
+            fuelCost: fuelCostData,
             grandTotal
         };
     },
@@ -893,6 +1119,11 @@ export const ContractService = {
             installationDays?: number;
             paymentMethod?: 'cash' | 'transfer';
             installationNotes?: string;
+            plannedInstallDate?: string;
+            deliveryAddress?: {
+                street?: string;
+                city?: string;
+            };
         };
         productConfig?: {
             modelId?: string;
@@ -900,12 +1131,15 @@ export const ContractService = {
             width?: number;
             projection?: number;
             addons?: string[];
+            postsCount?: number;
+            drainageDirection?: string;
             measurements?: {
                 unterkRinne?: number;
                 unterkWand?: number;
                 slopeLeft?: number;
                 slopeRight?: number;
                 slopeFront?: number;
+                needsLevelingProfiles?: boolean;
                 wallType?: string;
                 mountType?: string;
                 hasElectrical?: boolean;
@@ -975,6 +1209,10 @@ export const ContractService = {
                     isManual: true,
                     manualDescription: productSummary,
                     measurements: productConfig?.measurements || {},
+                    postsCount: productConfig?.postsCount || 2,
+                    drainageDirection: productConfig?.drainageDirection,
+                    plannedInstallDate: contractDetails.plannedInstallDate,
+                    deliveryAddress: contractDetails.deliveryAddress,
                     customItems: items.map(i => ({
                         id: i.id,
                         name: i.description,
@@ -1015,8 +1253,13 @@ export const ContractService = {
                 projection: productConfig?.projection || 0,
                 color: productConfig?.color || 'N/A',
                 roofType: 'other',
-                installationType: 'wall',
+                installationType: productConfig?.measurements?.mountType || 'wall',
                 addons: formattedAddons,
+                numberOfPosts: productConfig?.postsCount || 2,
+                measurements: productConfig?.measurements || {},
+                drainageDirection: productConfig?.drainageDirection,
+                plannedInstallDate: contractDetails.plannedInstallDate,
+                deliveryAddress: contractDetails.deliveryAddress,
                 customItems: items.map(i => ({
                     id: i.id,
                     name: i.description,
@@ -1056,16 +1299,86 @@ export const ContractService = {
             attachments: [],
             contractNumber: contractDetails.contractNumber?.trim() || undefined,
             installationNotes: contractDetails.installationNotes || undefined,
-            orderedItems: items.map(i => ({
-                id: i.id,
-                category: 'Other' as const,
-                name: i.description,
-                details: i.modelId !== 'other' && i.modelId !== 'addon' ? `Model: ${i.modelId}` : undefined,
-                status: 'pending' as const,
-                plannedDeliveryDate: undefined,
-                orderedAt: undefined,
-                purchaseCost: undefined
-            })),
+            plannedInstallationWeeks: contractDetails.plannedInstallationWeeks || undefined,
+            orderedItems: items.map(i => {
+                // Build technicalSpec from productConfig for non-addon items
+                const specParts: string[] = [];
+                if (i.modelId !== 'other' && i.modelId !== 'addon') {
+                    const model = i.modelId.charAt(0).toUpperCase() + i.modelId.slice(1);
+                    specParts.push(model);
+                }
+                if (productConfig?.width && productConfig?.projection) {
+                    specParts.push(`${productConfig.width}×${productConfig.projection}mm`);
+                }
+                if (productConfig?.color) {
+                    specParts.push(productConfig.color);
+                }
+                if (productConfig?.measurements?.mountType) {
+                    const mountLabels: Record<string, string> = { wall: 'Wandmontage', ceiling: 'Deckenmontage', freestanding: 'Freistand' };
+                    specParts.push(mountLabels[productConfig.measurements.mountType] || productConfig.measurements.mountType);
+                }
+
+                // Build details with measurement data
+                const detailParts: string[] = [];
+                if (i.modelId !== 'other' && i.modelId !== 'addon') {
+                    detailParts.push(`Model: ${i.modelId}`);
+                }
+                if (productConfig?.measurements) {
+                    const m = productConfig.measurements;
+                    if (m.unterkRinne) detailParts.push(`H3: ${m.unterkRinne}mm`);
+                    if (m.unterkWand) detailParts.push(`H1: ${m.unterkWand}mm`);
+                    if (m.needsLevelingProfiles) {
+                        const parts = [];
+                        if (m.slopeLeft) parts.push(`L:${m.slopeLeft}mm`);
+                        if (m.slopeFront) parts.push(`V:${m.slopeFront}mm`);
+                        if (m.slopeRight) parts.push(`R:${m.slopeRight}mm`);
+                        detailParts.push(`📐 Ausgleichsprofile: ${parts.length > 0 ? parts.join('/') : 'Ja'}`);
+                    }
+                    if (m.wallType) {
+                        const wallLabels: Record<string, string> = { massiv: 'Massivwand', daemmung: 'Dämmung/WDVS', holz: 'Holzwand', blech: 'Blechfassade', fertighaus: 'Fertighaus' };
+                        detailParts.push(`Wand: ${wallLabels[m.wallType] || m.wallType}`);
+                    }
+                    if (m.hasElectrical) detailParts.push('⚡ Strom');
+                    if (m.hasDrainage) {
+                        const drDir = productConfig?.drainageDirection;
+                        const drLabels: Record<string, string> = { links: '← Links', rechts: 'Rechts →', beidseitig: '← Beidseitig →' };
+                        detailParts.push(`🌧️ Entwässerung ${drDir ? drLabels[drDir] || drDir : ''}`);
+                    }
+                    if (m.technicalNotes) detailParts.push(m.technicalNotes);
+                }
+                if (productConfig?.postsCount && productConfig.postsCount > 2) {
+                    detailParts.push(`${productConfig.postsCount} Pfosten`);
+                }
+
+                // Smart category detection
+                const detectCategory = (desc: string, model: string): string => {
+                    const d = desc.toLowerCase();
+                    const m = model.toLowerCase();
+                    if (d.includes('senkrechtmarkise') || d.includes('zip')) return 'ZIP Screen';
+                    if (d.includes('schiebewand') || d.includes('szyb') || d.includes('sliding')) return 'Sliding Glass';
+                    if (d.includes('seitenwand') || d.includes('ściana') || d.includes('festwand')) return 'Side Wall';
+                    if (d.includes('markise') || d.includes('markiza')) return 'Awning';
+                    if (d.includes('led') || d.includes('heizstrahler') || d.includes('lautsprecher') || d.includes('rinne')) return 'Accessories';
+                    if (d.includes('wpc') || d.includes('boden') || d.includes('podłog')) return 'Flooring';
+                    if (d.includes('profil') || d.includes('ausgleich') || d.includes('wandanschluss')) return 'Profiles';
+                    if (m === 'addon') return 'Accessories';
+                    if (m !== 'other' && m !== 'addon') return 'Roofing';
+                    return 'Other';
+                };
+
+                return {
+                    id: i.id,
+                    category: detectCategory(i.description, i.modelId) as any,
+                    name: i.description,
+                    details: detailParts.length > 0 ? detailParts.join(' | ') : undefined,
+                    technicalSpec: specParts.length > 0 ? specParts.join(', ') : undefined,
+                    status: 'pending' as const,
+                    quantity: i.quantity || 1,
+                    plannedDeliveryDate: undefined,
+                    orderedAt: undefined,
+                    purchaseCost: undefined
+                };
+            }),
             installation_days_estimate: installDays
         });
     }

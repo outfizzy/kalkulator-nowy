@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import type { Task, TaskStatus, TaskPriority, TaskType } from '../../types';
+import { NotificationService } from './notification.service';
 
 export const TaskService = {
     async getTasks(filters?: { leadId?: string; customerId?: string; status?: TaskStatus; userId?: string; allUsers?: boolean; deleted?: boolean }): Promise<Task[]> {
@@ -124,11 +125,30 @@ export const TaskService = {
             due_date: task.dueDate,
             status: task.status,
             priority: task.priority,
-            type: task.type
+            type: task.type,
+            created_by: user.id
         };
 
         const { data, error } = await supabase.from('tasks').insert(payload).select().single();
         if (error) throw error;
+
+        // Send notification if assigned to someone else
+        if (userIdToUse !== user.id) {
+            try {
+                const { data: creatorProfile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                const creatorName = creatorProfile?.full_name || 'Ktoś';
+                const priorityLabel = task.priority === 'high' ? '🔴 Wysoki' : task.priority === 'medium' ? '🟡 Średni' : '🔵 Niski';
+                await NotificationService.createNotification(
+                    userIdToUse,
+                    task.priority === 'high' ? 'warning' : 'info',
+                    `📋 Nowe zadanie od ${creatorName}`,
+                    `${task.title}${task.dueDate ? ` • Termin: ${new Date(task.dueDate).toLocaleDateString('pl-PL')}` : ''} • Priorytet: ${priorityLabel}`,
+                    '/tasks'
+                );
+            } catch (notifErr) {
+                console.error('Failed to send task notification:', notifErr);
+            }
+        }
 
         return {
             ...task,
@@ -142,16 +162,37 @@ export const TaskService = {
     },
 
     async updateTask(id: string, updates: Partial<Task>): Promise<void> {
+        const { data: { user } } = await supabase.auth.getUser();
         const dbUpdates: any = { updated_at: new Date().toISOString() };
         if (updates.title) dbUpdates.title = updates.title;
         if (updates.description !== undefined) dbUpdates.description = updates.description;
         if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.priority) dbUpdates.priority = updates.priority;
+
+        // Track reassignment
+        const oldUserId = updates.userId; // We'll check if it changed
         if (updates.userId && updates.userId.trim()) dbUpdates.user_id = updates.userId;
 
         const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
         if (error) throw error;
+
+        // Send notification on reassignment
+        if (updates.userId && updates.userId.trim() && user && updates.userId !== user.id) {
+            try {
+                const { data: creatorProfile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                const creatorName = creatorProfile?.full_name || 'Ktoś';
+                await NotificationService.createNotification(
+                    updates.userId,
+                    'info',
+                    `📋 Zadanie przypisane od ${creatorName}`,
+                    `${updates.title || 'Zadanie'} zostało Ci przypisane`,
+                    '/tasks'
+                );
+            } catch (notifErr) {
+                console.error('Failed to send reassignment notification:', notifErr);
+            }
+        }
     },
 
     async deleteTask(id: string): Promise<void> {

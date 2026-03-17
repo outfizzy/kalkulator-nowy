@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import type { Installation, User, InstallationTeam, TeamUnavailability, OrderItem, OrderItemStatus, ProductConfig, SelectedAddon, InstallationWorkLog, Contract, ServiceTicket } from '../../types';
 import { UserService } from './user.service';
 import { InstallationTeamService } from './installation-team.service';
+import { GoogleCalendarService } from '../google-calendar.service';
 
 interface InstallationData {
     client?: Installation['client'];
@@ -20,6 +21,47 @@ interface InstallationData {
 }
 
 export const InstallationService = {
+    /**
+     * Fire-and-forget Google Calendar sync helper.
+     * Never blocks the main operation — errors are logged and swallowed.
+     */
+    async _syncToGoogleCalendar(installationId: string, installation?: Partial<Installation>): Promise<void> {
+        try {
+            // Fetch full installation if not provided
+            let fullInstallation = installation;
+            if (!fullInstallation?.scheduledDate || !fullInstallation?.client) {
+                const allInstallations = await this.getInstallations();
+                fullInstallation = allInstallations.find(i => i.id === installationId);
+            }
+            if (!fullInstallation?.scheduledDate) return; // No date = no calendar event
+
+            // Get existing google_event_id
+            const { data: row } = await supabase
+                .from('installations')
+                .select('google_event_id')
+                .eq('id', installationId)
+                .single();
+
+            const googleEventId = row?.google_event_id || null;
+
+            // Sync to Google Calendar
+            const newEventId = await GoogleCalendarService.syncInstallation(
+                fullInstallation as Installation,
+                googleEventId
+            );
+
+            // Store google_event_id if new
+            if (newEventId && newEventId !== googleEventId) {
+                await supabase
+                    .from('installations')
+                    .update({ google_event_id: newEventId })
+                    .eq('id', installationId);
+            }
+        } catch (err) {
+            console.warn('[GCal] Auto-sync failed (non-blocking):', err);
+        }
+    },
+
     async checkAndAutoCompleteInstallations(): Promise<number> {
         const today = new Date().toISOString().split('T')[0];
 
@@ -616,7 +658,8 @@ export const InstallationService = {
                 sourceId: rowTyped.source_id,
                 title: rowTyped.title,
                 customerFeedback: rowTyped.customer_feedback,
-                completionReport: (installationData as any).completionReport
+                completionReport: (installationData as any).completionReport,
+                measurementTasks: (installationData as any).measurementTasks || []
             };
         });
     },
@@ -658,11 +701,16 @@ export const InstallationService = {
 
         if (error) throw error;
 
-        return {
+        const created = {
             ...installation,
             id: data.id,
             createdAt: new Date(data.created_at)
         } as Installation;
+
+        // Fire-and-forget Google Calendar sync
+        this._syncToGoogleCalendar(data.id, created);
+
+        return created;
     },
 
     async createManualInstallation(data: {
@@ -703,7 +751,7 @@ export const InstallationService = {
 
         if (error) throw error;
 
-        return {
+        const created = {
             id: newInst.id,
             client: data.client,
             productSummary: data.description,
@@ -716,6 +764,11 @@ export const InstallationService = {
             title: data.title,
             expectedDuration: newInst.expected_duration
         } as Installation;
+
+        // Fire-and-forget Google Calendar sync
+        this._syncToGoogleCalendar(newInst.id, created);
+
+        return created;
     },
 
     async updateInstallation(id: string, updates: Partial<Installation>): Promise<void> {
@@ -772,6 +825,11 @@ export const InstallationService = {
             .eq('id', id);
 
         if (error) throw error;
+
+        // Fire-and-forget Google Calendar sync (for date/status changes)
+        if (updates.scheduledDate || updates.status || updates.client || updates.teamId) {
+            this._syncToGoogleCalendar(id);
+        }
     },
     async getInstallationTeams(): Promise<InstallationTeam[]> {
         return InstallationTeamService.getTeams();
@@ -1726,11 +1784,19 @@ export const InstallationService = {
             })
             .eq('id', ticket.id);
 
-        return {
+        const created = {
             id: newInst.id,
-            // ... minimal fields
+            client: installationData.client,
+            productSummary: installationData.productSummary,
+            scheduledDate: scheduledDate,
+            sourceType: 'service' as const,
             createdAt: new Date(newInst.created_at)
         } as Installation;
+
+        // Fire-and-forget Google Calendar sync
+        this._syncToGoogleCalendar(newInst.id, created);
+
+        return created;
     },
 
     async createFollowUpInstallation(originalInstallationId: string, scheduledDate: string, teamId: string): Promise<Installation> {
@@ -1785,10 +1851,17 @@ export const InstallationService = {
 
         if (insertError) throw insertError;
 
-        return {
+        const createdFollowUp = {
             id: newInst.id,
+            scheduledDate: scheduledDate,
+            sourceType: 'followup' as const,
             createdAt: new Date(newInst.created_at)
         } as Installation;
+
+        // Fire-and-forget Google Calendar sync
+        this._syncToGoogleCalendar(newInst.id);
+
+        return createdFollowUp;
     },
 
     async createManualFollowUp(originalInstallationId: string, description: string): Promise<Installation> {

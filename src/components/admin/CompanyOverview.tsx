@@ -14,12 +14,12 @@ interface DailySummary {
     emails: number;
 }
 
-const TAB_CONFIG: Record<OverviewTab, { label: string; icon: string; color: string; activeColor: string }> = {
-    summary: { label: 'Podsumowanie', icon: '📊', color: 'text-blue-600 bg-blue-50/50', activeColor: 'bg-blue-600' },
-    sales: { label: 'Sprzedaż', icon: '💰', color: 'text-emerald-600 bg-emerald-50/50', activeColor: 'bg-emerald-600' },
-    installations: { label: 'Montaże', icon: '🔧', color: 'text-purple-600 bg-purple-50/50', activeColor: 'bg-purple-600' },
-    contracts: { label: 'Umowy', icon: '📑', color: 'text-orange-600 bg-orange-50/50', activeColor: 'bg-orange-600' },
-    leads: { label: 'Leady', icon: '🎯', color: 'text-yellow-600 bg-yellow-50/50', activeColor: 'bg-yellow-600' },
+const TAB_CONFIG: Record<OverviewTab, { label: string; icon: React.ReactNode; color: string; activeColor: string }> = {
+    summary: { label: 'Podsumowanie', icon: (<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>), color: 'text-blue-600 bg-blue-50/50', activeColor: 'bg-blue-600' },
+    sales: { label: 'Sprzedaż', icon: (<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>), color: 'text-emerald-600 bg-emerald-50/50', activeColor: 'bg-emerald-600' },
+    installations: { label: 'Montaże', icon: (<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>), color: 'text-purple-600 bg-purple-50/50', activeColor: 'bg-purple-600' },
+    contracts: { label: 'Umowy', icon: (<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>), color: 'text-orange-600 bg-orange-50/50', activeColor: 'bg-orange-600' },
+    leads: { label: 'Leady', icon: (<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>), color: 'text-yellow-600 bg-yellow-50/50', activeColor: 'bg-yellow-600' },
 };
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
@@ -74,12 +74,12 @@ export const CompanyOverview: React.FC = () => {
                 offersRes, contractsRes, installationsRes, leadsRes, profilesRes,
                 measurementsRes, emailsRes
             ] = await Promise.all([
-                supabase.from('offers').select('id, status, created_at, user_id, pricing, customer_name'),
+                supabase.from('offers').select('id, status, created_at, user_id, pricing'),
                 supabase.from('contracts').select('id, status, created_at, contract_data'),
                 supabase.from('installations').select('id, status, scheduled_date, updated_at, created_at, offer_id'),
-                supabase.from('leads').select('id, status, source, created_at, assigned_to, name'),
+                supabase.from('leads').select('id, status, source, created_at, assigned_to'),
                 supabase.from('profiles').select('id, full_name'),
-                supabase.from('measurements').select('id, status, scheduled_date, created_at, customer_name, sales_rep_id'),
+                supabase.from('measurements').select('id, status, scheduled_date, created_at, sales_rep_id'),
                 supabase.from('customer_communications').select('id, created_at, type').gte('created_at', since14ISO).limit(500),
             ]);
 
@@ -269,7 +269,7 @@ export const CompanyOverview: React.FC = () => {
                                 ${isActive ? cfg.color : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                         >
                             <div className="flex items-center justify-center gap-1.5">
-                                <span className="text-sm">{cfg.icon}</span>
+                                <span className="shrink-0">{cfg.icon}</span>
                                 <span className="hidden sm:inline">{cfg.label}</span>
                             </div>
                             {isActive && <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${cfg.activeColor}`} />}

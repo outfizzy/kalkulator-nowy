@@ -7,6 +7,7 @@ import { ManualInstallationModal } from './ManualInstallationModal';
 import { UnifiedInstallationCalendar } from './UnifiedInstallationCalendar';
 import { InstallationCalendarV2 } from '../calendar-v2';
 import { CalendarV3Enhanced } from '../calendar-v3-enhanced';
+import { CalendarMap } from '../calendar-v2/CalendarMap';
 import { InstallationReports } from './reports/InstallationReports';
 import { ContractBulkSelectionPanel } from './ContractBulkSelectionPanel';
 import { GroupingControls } from './GroupingControls';
@@ -242,50 +243,58 @@ export const InstallationDashboard: React.FC = () => {
     const stats = {
         total: installations.length,
         scheduled: installations.filter(i => i.status === 'scheduled').length,
+        inProgress: installations.filter(i => i.status === 'in_progress').length,
         completed: installations.filter(i => i.status === 'completed').length,
+        verification: installations.filter(i => i.status === 'verification').length,
         unassigned: installations.filter(i => !i.teamId).length
     };
 
 
 
     return (
-        <div className="space-y-6 pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
+        <div className="space-y-4 pb-20">
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Planowanie Montaży</h1>
-                    <p className="text-slate-400 mt-1">Zarządzaj harmonogramem i zespołami montażowymi</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Planowanie Montaży</h1>
+                    <p className="text-slate-500 mt-1 text-sm">Zarządzaj harmonogramem i zespołami montażowymi</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap">
                     <button
                         onClick={() => setIsManualModalOpen(true)}
-                        className="px-4 py-2 bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        className="group px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 text-sm"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        Dodaj Ręcznie
+                        Dodaj Montaż
                     </button>
-
-                    <a
-                        href={`/reports/new?date=${new Date().toISOString().split('T')[0]}`}
-                        className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-500 transition-colors flex items-center gap-2"
+                    {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                        <button
+                            onClick={() => navigate('/admin/installers')}
+                            className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 flex items-center gap-2 text-sm"
+                        >
+                            🔧 Zarządzanie Ekipami
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setView('reports')}
+                        className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 flex items-center gap-2 text-sm"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Generuj Raport
-                    </a>
-
+                        Raporty
+                    </button>
                     <button
                         onClick={handleGeocodeMissing}
                         disabled={isGeocoding}
-                        className={`px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-500 transition-colors flex items-center gap-2 ${isGeocoding ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 flex items-center gap-2 text-sm ${isGeocoding ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isGeocoding ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                         ) : (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
@@ -295,50 +304,48 @@ export const InstallationDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* View Tabs */}
-            <div className="bg-slate-100 p-1 rounded-full flex gap-1 self-start">
-                {[
-                    { id: 'calendarV3', label: '🗓️ Kalendarz' },
-                    { id: 'list', label: '📍 Mapa/Lista' },
-                    { id: 'reports', label: '📈 Raporty' },
-                    { id: 'contracts', label: '📝 Umowy' }
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setView(tab.id as typeof view)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${view === tab.id
-                            ? 'bg-white shadow text-slate-900'
-                            : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            {/* ── Tab Bar + Inline Stats ── */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                {/* View Tabs */}
+                <div className="bg-slate-100 p-1 rounded-lg flex gap-0.5">
+                    {[
+                        { id: 'calendarV3', label: '🗓️ Kalendarz' },
+                        { id: 'list', label: '📍 Mapa/Lista' },
+                        { id: 'reports', label: '📈 Raporty' },
+                        { id: 'contracts', label: '📝 Umowy' }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setView(tab.id as typeof view)}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ${view === tab.id
+                                ? 'bg-white shadow-sm text-slate-900'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                    { label: 'Wszystkie', value: stats.total, tone: 'slate' },
-                    { label: 'Zaplanowane', value: stats.scheduled, tone: 'blue' },
-                    { label: 'Zakończone', value: stats.completed, tone: 'green' },
-                    { label: 'Nieprzypisane', value: stats.unassigned, tone: 'amber' }
-                ].map(card => (
-                    <div
-                        key={card.label}
-                        className={`bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col gap-1`}
-                    >
-                        <span className="text-xs uppercase tracking-wide text-slate-500">{card.label}</span>
-                        <span className="text-2xl font-bold text-slate-900">{card.value}</span>
-                        <div className={`h-1 rounded-full ${card.tone === 'blue'
-                            ? 'bg-blue-200'
-                            : card.tone === 'green'
-                                ? 'bg-green-200'
-                                : card.tone === 'amber'
-                                    ? 'bg-amber-200'
-                                    : 'bg-slate-200'
-                            }`} />
-                    </div>
-                ))}
+                {/* Separator */}
+                <div className="hidden sm:block w-px h-8 bg-slate-200" />
+
+                {/* Inline Stats */}
+                <div className="flex flex-wrap gap-3 sm:gap-4">
+                    {[
+                        { label: 'Wszystkie', value: stats.total, color: 'bg-slate-100 text-slate-700' },
+                        { label: 'Zaplanowane', value: stats.scheduled, color: 'bg-blue-50 text-blue-700' },
+                        { label: 'Weryfikacja', value: stats.verification, color: 'bg-orange-50 text-orange-700' },
+                        { label: 'Zakończone', value: stats.completed, color: 'bg-emerald-50 text-emerald-700' },
+                        { label: 'Nieprzypisane', value: stats.unassigned, color: 'bg-amber-50 text-amber-700' }
+                    ].map(stat => (
+                        <div key={stat.label} className="flex items-center gap-1.5">
+                            <span className={`text-sm font-bold ${stat.color} px-2 py-0.5 rounded-md`}>
+                                {stat.value}
+                            </span>
+                            <span className="text-xs text-slate-500 hidden lg:inline">{stat.label}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* Feedback Request Widget — only for admin/manager */}
@@ -374,149 +381,16 @@ export const InstallationDashboard: React.FC = () => {
                         />
                     </div>
                 ) : view === 'list' ? (
-                    <>
-                        {/* Left Panel: List */}
-                        <div className="w-full lg:w-1/3 bg-white rounded-xl border border-slate-200 flex flex-col shadow-sm">
-                            <div className="p-4 border-b border-slate-100 space-y-3">
-                                <GroupingControls
-                                    groupBy={groupBy}
-                                    onGroupByChange={setGroupBy}
-                                    sortBy={sortBy}
-                                    onSortByChange={setSortBy}
-                                />
-
-                                <div className="flex gap-2">
-                                    <select
-                                        value={filterStatus}
-                                        onChange={(e) => setFilterStatus(e.target.value)}
-                                        className="w-full p-2 border rounded-lg text-sm"
-                                    >
-                                        <option value="all">Wszystkie</option>
-                                        <option value="ready_unscheduled">Gotowe do zaplanowania</option>
-                                        <option value="pending">Oczekujące</option>
-                                        <option value="unassigned">Nieprzypisane</option>
-                                        <option value="scheduled">Zaplanowane</option>
-                                        <option value="verification">Do weryfikacji</option>
-                                        <option value="completed">Zakończone</option>
-                                    </select>
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    Zaznaczono: {selectedIds.length}
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                                {Object.entries(groupedInstallations).map(([groupName, groupItems]) => (
-                                    <div key={groupName} className="mb-4">
-                                        {groupBy !== 'none' && (
-                                            <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg mb-2 sticky top-0 z-10 border border-slate-100 shadow-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={groupItems.every(i => selectedIds.includes(i.id))}
-                                                        onChange={(e) => {
-                                                            const ids = groupItems.map(i => i.id);
-                                                            if (e.target.checked) {
-                                                                setSelectedIds(prev => [...new Set([...prev, ...ids])]);
-                                                            } else {
-                                                                setSelectedIds(prev => prev.filter(id => !ids.includes(id)));
-                                                            }
-                                                        }}
-                                                        className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4"
-                                                    />
-                                                    <h3 className="font-bold text-slate-700 text-sm">{groupName}</h3>
-                                                </div>
-                                                <span className="text-xs font-medium bg-white text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
-                                                    {groupItems.length}
-                                                </span>
-                                            </div>
-                                        )}
-                                        <div className="space-y-2">
-                                            {groupItems.map(inst => (
-                                                <div
-                                                    key={inst.id}
-                                                    onClick={() => handleSelect(inst.id)}
-                                                    className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedIds.includes(inst.id)
-                                                        ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                                                        : 'border-slate-200 hover:border-slate-300'
-                                                        }`}
-                                                >
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex items-center gap-2">
-                                                            <h3 className="font-bold text-slate-800">{inst.client.city}</h3>
-                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${getStatusColor(inst.status)}`}>
-                                                                {getStatusLabel(inst.status)}
-                                                            </span>
-                                                        </div>
-                                                        {inst.teamId && (
-                                                            <span
-                                                                className="w-3 h-3 rounded-full"
-                                                                style={{ backgroundColor: teams.find(t => t.id === inst.teamId)?.color || (salesReps.find(r => r.id === inst.teamId) ? '#8b5cf6' : '#cbd5e1') }}
-                                                                title={teams.find(t => t.id === inst.teamId)?.name || salesReps.find(r => r.id === inst.teamId)?.firstName}
-                                                            />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex justify-between items-end mt-2">
-                                                        <div>
-                                                            <p className="text-sm text-slate-600">{inst.client.firstName} {inst.client.lastName}</p>
-                                                            <p className="text-xs text-slate-400 mt-1">{inst.productSummary}</p>
-                                                            {inst.scheduledDate && (
-                                                                <p className="text-xs font-medium text-blue-600 mt-1">
-                                                                    📅 {new Date(inst.scheduledDate).toLocaleDateString('pl-PL', {
-                                                                        day: '2-digit',
-                                                                        month: 'short',
-                                                                        year: 'numeric'
-                                                                    })}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleEdit(inst);
-                                                            }}
-                                                            className="p-1 text-slate-400 hover:text-accent transition-colors"
-                                                            title="Edytuj szczegóły"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                    {!inst.client.coordinates && (
-                                                        <div className="mt-2 flex items-center gap-1 text-red-500">
-                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                            </svg>
-                                                            <span className="text-[10px] font-bold">Brak GPS</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                                {filteredInstallations.length === 0 && (
-                                    <div className="text-center p-8 text-slate-400 text-sm">
-                                        Brak montaży spełniających kryteria.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Right Panel: Map */}
-                        <div className="hidden lg:block flex-1 bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
-                            <InstallationMap
-                                installations={filteredInstallations}
-                                allInstallations={installations}
-                                teams={teams}
-                                selectedIds={selectedIds}
-                                onSelect={handleSelect}
-                                onEdit={handleEdit}
-                                previewRoute={assignDate && assignTargetId ? { date: assignDate, teamId: assignTargetId } : undefined}
-                            />
-                        </div>
-                    </>
+                    <div className="w-full h-[calc(100vh-300px)] bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+                        <CalendarMap
+                            installations={installations}
+                            teams={teams}
+                            serviceTickets={serviceTickets}
+                            contracts={contracts}
+                            followUps={followUps}
+                            onEditInstallation={handleEdit}
+                        />
+                    </div>
                 ) : view === 'reports' ? (
                     <div className="w-full h-full overflow-y-auto bg-white rounded-xl shadow border border-slate-200 p-6">
                         <InstallationReports installations={installations} teams={teams} />

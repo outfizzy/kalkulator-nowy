@@ -222,7 +222,7 @@ export const TasksList: React.FC<TasksListProps> = ({
                                             )}
                                         </div>
                                     ) : (
-                                        isAdmin && (
+                                        (
                                             <button
                                                 onClick={(e) => handleDeleteTask(e, task.id)}
                                                 className="ml-2 w-6 h-6 flex items-center justify-center rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
@@ -243,7 +243,7 @@ export const TasksList: React.FC<TasksListProps> = ({
                                 </span>
                                 <span className="text-xs text-slate-400 capitalize">{task.type === 'task' ? 'Zadanie' : task.type === 'call' ? 'Telefon' : task.type === 'email' ? 'Email' : 'Spotkanie'}</span>
 
-                                {isAdmin && task.assignee && (
+                                {task.assignee && (
                                     <span className="text-xs text-indigo-600 font-medium px-1.5 py-0.5 bg-indigo-50 rounded border border-indigo-100 flex items-center gap-1">
                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

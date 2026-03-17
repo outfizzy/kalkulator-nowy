@@ -11,6 +11,15 @@ interface ContactInfo {
     type: 'lead' | 'customer' | null;
     id: string | null;
     name: string | null;
+    leadStatus?: string | null;
+    assignedToName?: string | null;
+}
+
+interface QueuedCall {
+    call: Call;
+    from: string;
+    contact: ContactInfo;
+    timestamp: Date;
 }
 
 export const SoftphoneWidget: React.FC = () => {
@@ -20,7 +29,6 @@ export const SoftphoneWidget: React.FC = () => {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
     const [connectionError, setConnectionError] = useState<string | null>(null);
     const [activeCall, setActiveCall] = useState<Call | null>(null);
-    const [incomingCall, setIncomingCall] = useState<Call | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const [dialNumber, setDialNumber] = useState('');
     const [callerInfo, setCallerInfo] = useState<ContactInfo>({ type: null, id: null, name: null });
@@ -30,11 +38,17 @@ export const SoftphoneWidget: React.FC = () => {
     const [lastCallId, setLastCallId] = useState<string | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+    // ─── CALL QUEUE for multiple simultaneous incoming calls ───
+    const [callQueue, setCallQueue] = useState<QueuedCall[]>([]);
+    const [showQueue, setShowQueue] = useState(false);
+
+    // Get primary incoming call (first in queue)
+    const primaryIncoming = callQueue.length > 0 ? callQueue[0] : null;
+
     // ─── ACTIVATE / DEACTIVATE ───
 
     const activate = useCallback(async () => {
         if (deviceRef.current) {
-            // Already have a device — just re-register
             try {
                 deviceRef.current.register();
                 return;
@@ -52,6 +66,8 @@ export const SoftphoneWidget: React.FC = () => {
             const device = new Device(token, {
                 codecPreferences: ['opus', 'pcmu'] as any,
                 logLevel: 1,
+                // Allow multiple incoming calls
+                allowIncomingWhileBusy: true,
             });
 
             device.on('registered', () => {
@@ -75,29 +91,74 @@ export const SoftphoneWidget: React.FC = () => {
             });
 
             device.on('incoming', (call: Call) => {
-                console.log('☎️ Incoming call:', call.parameters.From);
-                setIncomingCall(call);
-                setState('incoming');
-                setIsMinimized(false);
+                const from = call.parameters.From || 'Nieznany';
+                console.log('☎️ Incoming call:', from);
 
-                const from = call.parameters.From || '';
+                // Look up contact info
                 TelephonyService.lookupContact(from).then(info => {
-                    setCallerInfo(info);
-                    toast(
-                        info.name ? `📞 ${info.name}` : `📞 ${from}`,
-                        { duration: 8000, icon: '📱' }
-                    );
-                });
+                    const queueEntry: QueuedCall = {
+                        call,
+                        from,
+                        contact: info,
+                        timestamp: new Date(),
+                    };
 
-                call.on('disconnect', () => handleCallEnd());
-                call.on('reject', () => {
-                    setIncomingCall(null);
-                    setState('idle');
-                });
-                call.on('cancel', () => {
-                    setIncomingCall(null);
-                    setState('idle');
-                    toast('Połączenie nieodebrane', { icon: '📵' });
+                    setCallQueue(prev => {
+                        const isFirst = prev.length === 0 && state !== 'active';
+                        if (isFirst) {
+                            // First call — show full incoming UI with ringtone
+                            setState('incoming');
+                            setIsMinimized(false);
+                            setCallerInfo(info);
+                            toast(
+                                info.name ? `📞 ${info.name}` : `📞 ${from}`,
+                                { duration: 8000, icon: '📱' }
+                            );
+                        } else {
+                            // 2nd+ call — mute ringtone, show in queue silently
+                            try {
+                                // Mute the incoming call's ringtone on the device
+                                // The Twilio SDK plays audio automatically; we just show a subtle toast
+                            } catch { }
+                            toast(
+                                `📋 W kolejce: ${info.name || from}`,
+                                { duration: 4000, icon: '📞' }
+                            );
+                        }
+                        return [...prev, queueEntry];
+                    });
+
+                    // Handle call lifecycle
+                    call.on('disconnect', () => {
+                        setCallQueue(prev => prev.filter(q => q.call !== call));
+                    });
+                    call.on('reject', () => {
+                        setCallQueue(prev => prev.filter(q => q.call !== call));
+                    });
+                    call.on('cancel', () => {
+                        setCallQueue(prev => {
+                            const updated = prev.filter(q => q.call !== call);
+                            if (prev[0]?.call === call && updated.length === 0) {
+                                // Primary call was cancelled and no more in queue
+                                toast('Połączenie nieodebrane', { icon: '📵' });
+                                setState(s => s === 'incoming' ? 'idle' : s);
+                            } else if (prev[0]?.call === call && updated.length > 0) {
+                                // Primary cancelled but queue has more — promote next
+                                setCallerInfo(updated[0].contact);
+                                toast('Połączenie nieodebrane — następne w kolejce', { icon: '📵' });
+                            }
+                            return updated;
+                        });
+                    });
+                }).catch(() => {
+                    // Fallback if lookup fails
+                    const queueEntry: QueuedCall = {
+                        call,
+                        from,
+                        contact: { type: null, id: null, name: null },
+                        timestamp: new Date(),
+                    };
+                    setCallQueue(prev => [...prev, queueEntry]);
                 });
             });
 
@@ -122,7 +183,7 @@ export const SoftphoneWidget: React.FC = () => {
             setConnectionError(err?.message || 'Nie udało się połączyć z Twilio');
             toast.error('Nie udało się aktywować telefonu');
         }
-    }, []);
+    }, [state]);
 
     const deactivate = useCallback(() => {
         if (deviceRef.current) {
@@ -137,21 +198,22 @@ export const SoftphoneWidget: React.FC = () => {
         setConnectionStatus('disconnected');
         setConnectionError(null);
         setState('idle');
+        setCallQueue([]);
         toast('Telefon wyłączony', { icon: '📴', duration: 2000 });
     }, []);
 
     // Clean up on unmount
     useEffect(() => {
-        // Listen for click-to-call events from other pages
         const handleClickToCall = (e: Event) => {
-            const { number, name } = (e as CustomEvent).detail;
+            const { number, name, leadId } = (e as CustomEvent).detail;
             if (number) {
                 setDialNumber(number);
                 setIsMinimized(false);
                 if (name) {
-                    setCallerInfo({ type: null, id: null, name });
+                    setCallerInfo({ type: leadId ? 'lead' : null, id: leadId || null, name });
                 }
-                // Auto-activate if not connected
+                // Store leadId for auto-linking the call log
+                (window as any).__softphone_leadId = leadId || null;
                 if (connectionStatus !== 'connected') {
                     activate().then(() => {
                         setTimeout(() => handleDial(), 1000);
@@ -188,9 +250,21 @@ export const SoftphoneWidget: React.FC = () => {
 
     const handleCallEnd = useCallback(() => {
         setActiveCall(null);
-        setIncomingCall(null);
         setIsMuted(false);
-        setState('post-call');
+
+        // Check if there are queued calls → show next one
+        setCallQueue(prev => {
+            if (prev.length > 0) {
+                const next = prev[0];
+                setCallerInfo(next.contact);
+                setState('incoming');
+                setIsMinimized(false);
+                toast(`📞 Następne połączenie: ${next.contact.name || next.from}`, { icon: '📱' });
+            } else {
+                setState('post-call');
+            }
+            return prev;
+        });
     }, []);
 
     // ─── ACTIONS ───
@@ -224,16 +298,19 @@ export const SoftphoneWidget: React.FC = () => {
             });
 
             const { data: { user } } = await supabase.auth.getUser();
+            const pendingLeadId = (window as any).__softphone_leadId || null;
             const logEntry = {
                 direction: 'outbound' as const,
                 from_number: 'app',
                 to_number: dialNumber,
                 status: 'initiated' as const,
                 user_id: user?.id || null,
-                lead_id: info.type === 'lead' ? info.id : null,
+                lead_id: pendingLeadId || (info.type === 'lead' ? info.id : null),
                 customer_id: info.type === 'customer' ? info.id : null,
                 started_at: new Date().toISOString(),
             };
+            // Clear after use
+            (window as any).__softphone_leadId = null;
 
             const { data: callLog } = await supabase
                 .from('call_logs')
@@ -250,20 +327,33 @@ export const SoftphoneWidget: React.FC = () => {
         }
     };
 
-    const handleAnswer = () => {
-        if (!incomingCall) return;
-        incomingCall.accept();
-        setActiveCall(incomingCall);
-        setIncomingCall(null);
+    const handleAnswer = (queuedCall?: QueuedCall) => {
+        const callToAnswer = queuedCall || primaryIncoming;
+        if (!callToAnswer) return;
+
+        callToAnswer.call.accept();
+        setActiveCall(callToAnswer.call);
+        setCallerInfo(callToAnswer.contact);
+        // Remove from queue
+        setCallQueue(prev => prev.filter(q => q.call !== callToAnswer.call));
         setState('active');
     };
 
-    const handleReject = () => {
-        if (incomingCall) {
-            incomingCall.reject();
-            setIncomingCall(null);
-            setState('idle');
-        }
+    const handleReject = (queuedCall?: QueuedCall) => {
+        const callToReject = queuedCall || primaryIncoming;
+        if (!callToReject) return;
+
+        callToReject.call.reject();
+        setCallQueue(prev => {
+            const updated = prev.filter(q => q.call !== callToReject.call);
+            if (updated.length === 0 && state === 'incoming') {
+                setState('idle');
+            } else if (updated.length > 0 && state === 'incoming') {
+                // Promote next call
+                setCallerInfo(updated[0].contact);
+            }
+            return updated;
+        });
     };
 
     const handleHangup = () => {
@@ -296,7 +386,16 @@ export const SoftphoneWidget: React.FC = () => {
         setPostCallNotes('');
         setLastCallId(null);
         setCallerInfo({ type: null, id: null, name: null });
-        setState('idle');
+
+        // If there are queued calls, show the next one
+        if (callQueue.length > 0) {
+            const next = callQueue[0];
+            setCallerInfo(next.contact);
+            setState('incoming');
+            setIsMinimized(false);
+        } else {
+            setState('idle');
+        }
     };
 
     const handleDialPadKey = (key: string) => {
@@ -312,6 +411,47 @@ export const SoftphoneWidget: React.FC = () => {
         return `${m}:${s}`;
     };
 
+    // Lead status label map
+    const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+        new: { label: 'Nowy', color: 'bg-blue-100 text-blue-700' },
+        formularz: { label: 'Formularz', color: 'bg-teal-100 text-teal-700' },
+        contacted: { label: 'Skontaktowano', color: 'bg-indigo-100 text-indigo-700' },
+        offer_sent: { label: 'Oferta wysłana', color: 'bg-yellow-100 text-yellow-800' },
+        measurement_scheduled: { label: 'Pomiar umówiony', color: 'bg-cyan-100 text-cyan-700' },
+        measurement_completed: { label: 'Pomiar odbył się', color: 'bg-purple-100 text-purple-700' },
+        negotiation: { label: 'Negocjacje', color: 'bg-orange-100 text-orange-700' },
+        won: { label: 'Wygrane', color: 'bg-green-100 text-green-700' },
+        lost: { label: 'Przegrane', color: 'bg-red-100 text-red-700' },
+    };
+
+    const LeadContextBadge = ({ info }: { info: ContactInfo }) => {
+        if (!info.leadStatus) return null;
+        const statusInfo = LEAD_STATUS_LABELS[info.leadStatus] || { label: info.leadStatus, color: 'bg-slate-100 text-slate-600' };
+        return (
+            <div className="mt-2 flex flex-col items-center gap-1">
+                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${statusInfo.color}`}>
+                    {statusInfo.label}
+                </span>
+                {info.assignedToName && (
+                    <span className="text-[10px] text-slate-400">Opiekun: {info.assignedToName}</span>
+                )}
+            </div>
+        );
+    };
+
+    const OpenLeadButton = ({ info }: { info: ContactInfo }) => {
+        if (info.type !== 'lead' || !info.id) return null;
+        return (
+            <button
+                onClick={() => window.location.href = `/leads/${info.id}`}
+                className="mt-2 w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+            >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                Otwórz Lead
+            </button>
+        );
+    };
+
     // ─── STATUS COLORS & LABELS ───
     const statusConfig = {
         disconnected: { color: 'bg-slate-400', ring: '', label: 'Nieaktywny', textColor: 'text-slate-400' },
@@ -321,11 +461,90 @@ export const SoftphoneWidget: React.FC = () => {
     };
     const status = statusConfig[connectionStatus];
 
+    // ─── QUEUE BADGE (floating above minimized widget) ───
+    const QueueBadge = () => {
+        if (callQueue.length === 0) return null;
+        return (
+            <div className="absolute -top-2 -left-2 min-w-[22px] h-[22px] bg-orange-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white animate-pulse z-10">
+                {callQueue.length}
+            </div>
+        );
+    };
+
+    // ─── QUEUE LIST PANEL ───
+    const QueuePanel = () => {
+        if (callQueue.length <= 1 && state !== 'active') return null;
+
+        const waitingCalls = state === 'active' ? callQueue : callQueue.slice(1);
+        if (waitingCalls.length === 0) return null;
+
+        return (
+            <div className="border-t border-slate-200 bg-amber-50/60">
+                <button
+                    onClick={() => setShowQueue(!showQueue)}
+                    className="w-full px-4 py-2 flex items-center justify-between text-xs font-semibold text-amber-800 hover:bg-amber-100/50 transition-colors"
+                >
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
+                        W kolejce: {waitingCalls.length}
+                    </span>
+                    <svg className={`w-3.5 h-3.5 transition-transform ${showQueue ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                {showQueue && (
+                    <div className="px-3 pb-2 space-y-1.5 max-h-40 overflow-y-auto">
+                        {waitingCalls.map((q, i) => {
+                            const waitSec = Math.floor((Date.now() - q.timestamp.getTime()) / 1000);
+                            return (
+                                <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm border border-amber-100">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-slate-700 truncate">
+                                            {q.contact.name || q.from}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 font-mono">
+                                            {q.from} · {waitSec > 60 ? `${Math.floor(waitSec / 60)}m` : `${waitSec}s`} czeka
+                                        </p>
+                                        {q.contact.type && (
+                                            <span className={`inline-block mt-0.5 px-1.5 py-0 rounded text-[9px] font-bold ${q.contact.type === 'lead' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                {q.contact.type === 'lead' ? 'Lead' : 'Klient'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => handleAnswer(q)}
+                                            className="w-7 h-7 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center transition-colors"
+                                            title="Odbierz"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => handleReject(q)}
+                                            className="w-7 h-7 bg-red-100 hover:bg-red-200 text-red-600 rounded-full flex items-center justify-center transition-colors"
+                                            title="Odrzuć"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     // ─── MINIMIZED STATE ───
     if (isMinimized && state === 'idle') {
         return (
             <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
-                {/* Active/Inactive toggle button */}
                 {connectionStatus === 'disconnected' || connectionStatus === 'error' ? (
                     <button
                         onClick={() => { activate(); }}
@@ -348,7 +567,6 @@ export const SoftphoneWidget: React.FC = () => {
                         Łączenie...
                     </button>
                 ) : (
-                    /* Connected — show phone icon + status */
                     <div className="flex items-center gap-2">
                         <button
                             onClick={deactivate}
@@ -362,6 +580,7 @@ export const SoftphoneWidget: React.FC = () => {
                             className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center justify-center hover:scale-105 relative"
                             title="Otwórz telefon"
                         >
+                            <QueueBadge />
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
@@ -371,11 +590,6 @@ export const SoftphoneWidget: React.FC = () => {
                 )}
             </div>
         );
-    }
-
-    // Show incoming call UI even when minimized
-    if (state === 'incoming' && incomingCall) {
-        // Force expanded view for incoming calls
     }
 
     const DIAL_PAD = [
@@ -395,6 +609,12 @@ export const SoftphoneWidget: React.FC = () => {
                     <span className={`text-[10px] font-medium ${connectionStatus === 'connected' ? 'text-green-300' : connectionStatus === 'error' ? 'text-red-300' : 'text-slate-400'}`}>
                         {status.label}
                     </span>
+                    {/* Queue badge in header */}
+                    {callQueue.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-full animate-pulse">
+                            {callQueue.length} w kolejce
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center gap-1">
                     {connectionStatus === 'connected' && (
@@ -527,7 +747,7 @@ export const SoftphoneWidget: React.FC = () => {
             )}
 
             {/* ── INCOMING ── */}
-            {state === 'incoming' && incomingCall && (
+            {state === 'incoming' && primaryIncoming && (
                 <div className="p-6 text-center">
                     <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center animate-bounce">
                         <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -536,17 +756,18 @@ export const SoftphoneWidget: React.FC = () => {
                     </div>
                     <p className="text-sm font-medium text-slate-500">Połączenie przychodzące</p>
                     <p className="text-lg font-bold text-slate-800 mt-1">
-                        {callerInfo.name || incomingCall.parameters.From || 'Nieznany numer'}
+                        {primaryIncoming.contact.name || primaryIncoming.from || 'Nieznany numer'}
                     </p>
-                    {callerInfo.type && (
-                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${callerInfo.type === 'lead' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                            {callerInfo.type === 'lead' ? 'Lead' : 'Klient'}
+                    {primaryIncoming.contact.type && (
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${primaryIncoming.contact.type === 'lead' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {primaryIncoming.contact.type === 'lead' ? 'Lead' : 'Klient'}
                         </span>
                     )}
+                    <LeadContextBadge info={primaryIncoming.contact} />
 
                     <div className="flex gap-3 justify-center mt-5">
                         <button
-                            onClick={handleReject}
+                            onClick={() => handleReject()}
                             className="p-4 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors shadow-lg"
                         >
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -554,7 +775,7 @@ export const SoftphoneWidget: React.FC = () => {
                             </svg>
                         </button>
                         <button
-                            onClick={handleAnswer}
+                            onClick={() => handleAnswer()}
                             className="p-4 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors shadow-lg shadow-green-200 animate-pulse"
                         >
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -575,6 +796,8 @@ export const SoftphoneWidget: React.FC = () => {
                         {callerInfo.name || dialNumber || 'Rozmowa'}
                     </p>
                     <p className="text-2xl font-mono text-slate-600 mt-1">{formatTime(callDuration)}</p>
+                    <LeadContextBadge info={callerInfo} />
+                    <OpenLeadButton info={callerInfo} />
 
                     <div className="grid grid-cols-3 gap-2 mt-5">
                         <button
@@ -615,6 +838,8 @@ export const SoftphoneWidget: React.FC = () => {
                         <p className="text-sm text-slate-500">Rozmowa zakończona</p>
                         <p className="text-lg font-bold text-slate-800">{callerInfo.name || dialNumber || '—'}</p>
                         <p className="text-sm font-mono text-slate-400">{formatTime(callDuration)}</p>
+                        <LeadContextBadge info={callerInfo} />
+                        <OpenLeadButton info={callerInfo} />
                     </div>
 
                     <textarea
@@ -629,7 +854,7 @@ export const SoftphoneWidget: React.FC = () => {
                             onClick={handleSkipPostCall}
                             className="flex-1 py-2 text-sm font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
                         >
-                            Pomiń
+                            {callQueue.length > 0 ? `Następne (${callQueue.length})` : 'Pomiń'}
                         </button>
                         <button
                             onClick={handleSavePostCall}
@@ -640,6 +865,9 @@ export const SoftphoneWidget: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* ── CALL QUEUE PANEL ── */}
+            <QueuePanel />
         </div>
     );
 };

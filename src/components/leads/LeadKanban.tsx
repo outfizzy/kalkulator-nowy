@@ -12,6 +12,9 @@ interface LeadKanbanProps {
 const COLUMNS: { id: LeadStatus; label: string; color: string }[] = [
     { id: 'new', label: 'Nowy', color: 'bg-blue-50 border-blue-200' },
     { id: 'contacted', label: 'Skontaktowano', color: 'bg-yellow-50 border-yellow-200' },
+    { id: 'formularz', label: '📋 Formularz', color: 'bg-teal-50 border-teal-200' },
+    { id: 'measurement_scheduled', label: 'Umówiony', color: 'bg-cyan-50 border-cyan-200' },
+    { id: 'measurement_completed', label: 'Pomiar odbył się', color: 'bg-purple-50 border-purple-200' },
     { id: 'offer_sent', label: 'Oferta Wysłana', color: 'bg-indigo-50 border-indigo-200' },
     { id: 'negotiation', label: 'Negocjacje', color: 'bg-purple-50 border-purple-200' },
     { id: 'won', label: 'Wygrany', color: 'bg-green-50 border-green-200' },
@@ -94,6 +97,25 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ leads, onLeadUpdate }) =
                                             <div className="text-xs text-slate-500 truncate">
                                                 {lead.customerData.companyName}
                                             </div>
+                                        )}
+                                    </div>
+
+                                    {/* Client event indicators */}
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {lead.customerData.offerViewedAt && (
+                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-bold border border-blue-100" title={`Otwarto: ${new Date(lead.customerData.offerViewedAt).toLocaleString()}`}>
+                                                👁️ Otwarto
+                                            </span>
+                                        )}
+                                        {lead.customerData.measurementRequestedAt && (
+                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[9px] font-bold border border-amber-100" title={`Pomiar: ${new Date(lead.customerData.measurementRequestedAt).toLocaleString()}`}>
+                                                📐 Pomiar
+                                            </span>
+                                        )}
+                                        {lead.customerData.offerAcceptedAt && (
+                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[9px] font-bold border border-green-100" title={`Zaakceptowano: ${new Date(lead.customerData.offerAcceptedAt).toLocaleString()}`}>
+                                                ✅ Akceptacja
+                                            </span>
                                         )}
                                     </div>
 

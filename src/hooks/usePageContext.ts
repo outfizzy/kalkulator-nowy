@@ -5,6 +5,7 @@ export interface PageContext {
     name?: string;
     id?: string;
     summary?: string;
+    currentPage?: string;
 }
 
 export const usePageContext = (): { context: PageContext } => {
@@ -64,7 +65,8 @@ export const usePageContext = (): { context: PageContext } => {
         // General context
         return {
             type: 'general',
-            summary: 'Jestem gotowy aby pomóc!'
+            summary: 'Jestem gotowy aby pomóc!',
+            currentPage: path
         };
     };
 

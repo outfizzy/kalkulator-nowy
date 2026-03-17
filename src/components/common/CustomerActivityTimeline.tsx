@@ -102,7 +102,7 @@ export const CustomerActivityTimeline: React.FC<CustomerActivityTimelineProps> =
                                         )}
                                         {interaction.eventData?.preferredDays && (
                                             <div className="text-xs text-slate-500">
-                                                Dni: {interaction.eventData.preferredDays.join(', ')}
+                                                Dni: {Array.isArray(interaction.eventData.preferredDays) ? interaction.eventData.preferredDays.join(', ') : String(interaction.eventData.preferredDays)}
                                             </div>
                                         )}
                                     </div>

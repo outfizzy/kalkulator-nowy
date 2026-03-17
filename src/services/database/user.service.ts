@@ -27,7 +27,11 @@ export const UserService = {
             partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined,
             commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined,
             hourlyRateCurrency: row.hourly_rate_currency,
-            commissionConfig: row.commission_config
+            baseSalary: typeof row.base_salary === 'number' ? row.base_salary : undefined,
+            baseSalaryCurrency: row.base_salary_currency || undefined,
+            commissionConfig: row.commission_config,
+            clientPhone: row.client_phone || undefined,
+            clientEmail: row.client_email || undefined
         }));
     },
 
@@ -58,7 +62,11 @@ export const UserService = {
             substituteUserId: data.substitute_user_id,
             substituteUntil: data.substitute_until ? new Date(data.substitute_until) : undefined,
             hourlyRateCurrency: data.hourly_rate_currency,
-            commissionConfig: data.commission_config
+            baseSalary: typeof data.base_salary === 'number' ? data.base_salary : undefined,
+            baseSalaryCurrency: data.base_salary_currency || undefined,
+            commissionConfig: data.commission_config,
+            clientPhone: data.client_phone || undefined,
+            clientEmail: data.client_email || undefined
         };
     },
 
@@ -108,6 +116,8 @@ export const UserService = {
         }
         if (profile.phone !== undefined) updates.phone = profile.phone;
         if (profile.monthlyTarget !== undefined) updates.monthly_target = profile.monthlyTarget;
+        if (profile.clientPhone !== undefined) updates.client_phone = profile.clientPhone;
+        if (profile.clientEmail !== undefined) updates.client_email = profile.clientEmail;
         if (profile.emailConfig !== undefined || profile.mailboxes !== undefined) {
             // Store mailboxes inside the email_config JSONB as __mailboxes key
             const existingConfig = profile.emailConfig || {};
@@ -175,7 +185,11 @@ export const UserService = {
             partnerMargin: typeof row.partner_margin === 'number' ? row.partner_margin : undefined,
             commissionRate: typeof row.commission_rate === 'number' ? row.commission_rate : undefined,
             hourlyRate: typeof row.hourly_rate === 'number' ? row.hourly_rate : undefined,
-            commissionConfig: row.commission_config
+            baseSalary: typeof row.base_salary === 'number' ? row.base_salary : undefined,
+            baseSalaryCurrency: row.base_salary_currency || undefined,
+            commissionConfig: row.commission_config,
+            clientPhone: row.client_phone || undefined,
+            clientEmail: row.client_email || undefined
         }));
     },
 
@@ -234,6 +248,19 @@ export const UserService = {
             .update({
                 hourly_rate: rate,
                 hourly_rate_currency: currency,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
+    async updateBaseSalary(userId: string, salary: number, currency: 'PLN' | 'EUR' = 'PLN'): Promise<void> {
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                base_salary: salary,
+                base_salary_currency: currency,
                 updated_at: new Date().toISOString()
             })
             .eq('id', userId);

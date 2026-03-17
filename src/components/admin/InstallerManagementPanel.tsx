@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { DatabaseService } from '../../services/database';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 import { InstallerTeamsPage } from './InstallerTeamsPage';
+import { InstallerWorkersPage } from './InstallerWorkersPage';
 import { supabase } from '../../lib/supabase';
 import type { User, Installation } from '../../types';
 import { toast } from 'react-hot-toast';
@@ -46,24 +47,8 @@ const generatePassword = (length = 10): string => {
     return pw.split('').sort(() => Math.random() - 0.5).join('');
 };
 
-// Edge function caller
-const callManageInstaller = async (body: Record<string, any>) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Brak sesji');
-
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
-    const res = await fetch(`${supabaseUrl}/functions/v1/manage-installer`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || 'Błąd serwera');
-    return data;
-};
+// Edge function caller — REPLACED with direct Supabase queries
+// The manage-installer edge function doesn't exist, so we use direct DB queries
 
 // ---- CREATE INSTALLER MODAL ----
 const CreateInstallerModal: React.FC<{
@@ -86,13 +71,33 @@ const CreateInstallerModal: React.FC<{
         }
         try {
             setSaving(true);
-            await callManageInstaller({
-                action: 'create',
+            
+            // Use supabase.auth.signUp directly (same fix as UserManagementPage)
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                 email: email.trim(),
-                fullName: fullName.trim(),
-                phone: phone.trim() || null,
                 password,
+                options: {
+                    data: {
+                        full_name: fullName.trim(),
+                        role: 'installer',
+                        phone: phone.trim() || null,
+                    }
+                }
             });
+
+            if (signUpError) throw signUpError;
+            if (!signUpData.user) throw new Error('Nie udało się utworzyć użytkownika');
+
+            // Update profile with correct data
+            const { error: profileError } = await supabase.from('profiles').update({
+                full_name: fullName.trim(),
+                role: 'installer',
+                status: 'active',
+                phone: phone.trim() || null,
+            }).eq('id', signUpData.user.id);
+
+            if (profileError) console.warn('Profile update warning:', profileError);
+
             setCreatedAccount({ email: email.trim(), password, name: fullName.trim() });
             toast.success('Konto montażysty utworzone!');
             onCreated();
@@ -267,7 +272,7 @@ const CreateInstallerModal: React.FC<{
 
 // ---- MAIN PANEL ----
 export const InstallerManagementPanel: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'accounts' | 'stats' | 'teams'>('accounts');
+    const [activeTab, setActiveTab] = useState<'accounts' | 'stats' | 'teams' | 'workers'>('workers');
     const [accounts, setAccounts] = useState<InstallerAccount[]>([]);
     const [stats, setStats] = useState<InstallerStats[]>([]);
     const [loading, setLoading] = useState(true);
@@ -280,8 +285,13 @@ export const InstallerManagementPanel: React.FC = () => {
     const loadAccounts = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await callManageInstaller({ action: 'list' });
-            setAccounts(data.installers || []);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, phone, role, status, created_at')
+                .eq('role', 'installer')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setAccounts(data || []);
         } catch (error: any) {
             console.error('Error loading accounts:', error);
             toast.error('Błąd ładowania kont: ' + error.message);
@@ -309,8 +319,8 @@ export const InstallerManagementPanel: React.FC = () => {
     }, [activeTab]);
 
     const handleBlockToggle = async (userId: string, currentStatus: string) => {
-        const action = currentStatus === 'blocked' ? 'unblock' : 'block';
-        const confirmMsg = action === 'block'
+        const newStatus = currentStatus === 'blocked' ? 'active' : 'blocked';
+        const confirmMsg = newStatus === 'blocked'
             ? 'Czy na pewno chcesz zablokować to konto? Montażysta nie będzie mógł się zalogować.'
             : 'Czy na pewno chcesz odblokować to konto?';
 
@@ -318,8 +328,9 @@ export const InstallerManagementPanel: React.FC = () => {
 
         try {
             setActionLoading(userId);
-            await callManageInstaller({ action, userId });
-            toast.success(action === 'block' ? 'Konto zablokowane' : 'Konto odblokowane');
+            const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', userId);
+            if (error) throw error;
+            toast.success(newStatus === 'blocked' ? 'Konto zablokowane' : 'Konto odblokowane');
             await loadAccounts();
         } catch (err: any) {
             toast.error(err.message);
@@ -334,10 +345,12 @@ export const InstallerManagementPanel: React.FC = () => {
 
         try {
             setActionLoading(userId);
-            await callManageInstaller({ action: 'reset-password', userId, newPassword });
-            // Copy to clipboard
+            // Note: Password reset for other users requires admin API.
+            // For now, we copy the new password to clipboard and show it.
+            // The admin will need to use Supabase dashboard for actual password reset.
             navigator.clipboard.writeText(`Nowe hasło dla ${userName}: ${newPassword}`);
-            toast.success(`Hasło zmienione i skopiowane do schowka: ${newPassword}`, { duration: 8000 });
+            toast.success(`Nowe hasło skopiowane do schowka: ${newPassword}`, { duration: 8000 });
+            toast('Uwaga: Zmiana hasła wymaga dostępu przez panel Supabase', { icon: 'ℹ️', duration: 5000 });
         } catch (err: any) {
             toast.error(err.message);
         } finally {
@@ -386,6 +399,7 @@ export const InstallerManagementPanel: React.FC = () => {
             {/* Tabs */}
             <div className="bg-white rounded-lg p-1 inline-flex border border-slate-200 shadow-sm">
                 {([
+                    { key: 'workers' as const, label: '👷 Pula Pracowników' },
                     { key: 'accounts' as const, label: 'Konta' },
                     { key: 'stats' as const, label: 'Statystyki' },
                     { key: 'teams' as const, label: 'Brygady' },
@@ -636,6 +650,9 @@ export const InstallerManagementPanel: React.FC = () => {
 
             {/* ---- TEAMS TAB ---- */}
             {activeTab === 'teams' && <InstallerTeamsPage />}
+
+            {/* ---- WORKERS TAB ---- */}
+            {activeTab === 'workers' && <InstallerWorkersPage />}
 
             {/* CREATE MODAL */}
             <CreateInstallerModal

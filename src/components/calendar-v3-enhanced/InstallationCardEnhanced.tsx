@@ -148,6 +148,35 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                 </div>
             )}
 
+            {/* Cost info (admin) */}
+            {(() => {
+                const totalCost = (installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0);
+                return totalCost > 0 ? (
+                    <div className="px-1.5 pb-0.5 flex items-center gap-1 flex-wrap">
+                        {(installation.additionalCosts || 0) > 0 && <span className="text-[8px] text-blue-600 bg-blue-50 px-1 rounded">👷 {installation.additionalCosts?.toFixed(0)}€</span>}
+                        {(installation.consumablesCost || 0) > 0 && <span className="text-[8px] text-amber-600 bg-amber-50 px-1 rounded">⛽ {installation.consumablesCost?.toFixed(0)}€</span>}
+                        {(installation.hotelCost || 0) > 0 && <span className="text-[8px] text-purple-600 bg-purple-50 px-1 rounded">🏨 {installation.hotelCost?.toFixed(0)}€</span>}
+                        <span className="text-[8px] font-bold text-red-600 ml-auto">Σ {totalCost.toFixed(0)}€</span>
+                    </div>
+                ) : null;
+            })()}
+
+            {/* Duration + parts */}
+            {((installation.expectedDuration || 1) > 1 || installation.partsStatus) && (
+                <div className="px-1.5 pb-0.5 flex items-center gap-1">
+                    {(installation.expectedDuration || 1) > 1 && <span className="text-[8px] text-slate-500">{installation.expectedDuration} dni</span>}
+                    {installation.partsStatus && (
+                        <span className={`text-[8px] ml-auto font-bold px-1 rounded ${
+                            installation.partsStatus === 'all_delivered' ? 'text-emerald-600 bg-emerald-50' :
+                            installation.partsStatus === 'partial' ? 'text-amber-600 bg-amber-50' :
+                            'text-red-500 bg-red-50'
+                        }`}>
+                            {installation.partsStatus === 'all_delivered' ? '📦✓' : installation.partsStatus === 'partial' ? '📦…' : '📦✗'}
+                        </span>
+                    )}
+                </div>
+            )}
+
             {/* Footer: team + status */}
             <div className="px-1.5 pb-1 pt-0.5 flex items-center justify-between border-t border-slate-50">
                 <div className="flex items-center gap-1 min-w-0">

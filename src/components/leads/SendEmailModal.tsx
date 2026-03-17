@@ -8,6 +8,7 @@ import { generateOfferPDFData } from '../../utils/pdfGenerator';
 import { OfferService } from '../../services/database/offer.service';
 import { SALES_TEMPLATES, type EmailTemplate } from '../../data/emailTemplates';
 import { supabase } from '../../lib/supabase';
+import { TelephonyService } from '../../services/database/telephony.service';
 
 interface SendEmailModalProps {
     isOpen: boolean;
@@ -47,8 +48,8 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
     // Effect to auto-enable template if offer is present (either prop or selected)
     useEffect(() => {
         if (isOpen && subject === '' && selectedOffer) {
-            // Pre-fill subject if offer is present
-            setEmailSubject(`Ihr Angebot #${selectedOffer.offerNumber || selectedOffer.id.substring(0, 8)} - PolenDach24`);
+            // Pre-fill subject if offer is present (will be updated with offerIndex on send)
+            setEmailSubject(`Ihr Angebot #${selectedOffer.offerNumber || selectedOffer.id.substring(0, 8)} — PolenDach24`);
             setUseOfferTemplate(true);
         }
     }, [isOpen, subject, selectedOffer]);
@@ -180,6 +181,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
             }
 
             let finalBody = body;
+            let finalSubject = emailSubject;
             let attachments: any[] = [];
 
             if (useOfferTemplate && selectedOffer) {
@@ -210,7 +212,36 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     const link = `${window.location.origin}/p/offer/${token}`;
 
                     const customerFullName = [leadData?.firstName, leadData?.lastName].filter(Boolean).join(' ') || undefined;
-                    finalBody = getOfferEmailHtml([{ number: selectedOffer.offerNumber || selectedOffer.id.substring(0, 8), url: link }], customerFullName);
+                    const repInfo = {
+                        name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : '',
+                        phone: currentUser?.phone || '',
+                        email: currentUser?.email || '',
+                        clientPhone: (currentUser as any)?.clientPhone || '',
+                        clientEmail: (currentUser as any)?.clientEmail || ''
+                    };
+
+                    // Count how many offers have already been sent for this lead
+                    let offerIndex = 1;
+                    if (leadId) {
+                        try {
+                            const { count } = await supabase
+                                .from('offers')
+                                .select('id', { count: 'exact', head: true })
+                                .eq('lead_id', leadId);
+                            offerIndex = (count || 1);
+                        } catch (err) {
+                            console.warn('Could not count lead offers:', err);
+                        }
+                    }
+
+                    // Adapt email subject based on offer index
+                    const offerNum = selectedOffer.offerNumber || selectedOffer.id.substring(0, 8);
+                    if (offerIndex > 1) {
+                        finalSubject = `Ihr aktualisiertes Angebot #${offerNum} — PolenDach24`;
+                        setEmailSubject(finalSubject);
+                    }
+
+                    finalBody = getOfferEmailHtml([{ number: offerNum, url: link }], customerFullName, repInfo, offerIndex);
                     toast.dismiss('pdf-gen');
                 } catch (err: any) {
                     console.error('Token Gen Error', err);
@@ -238,7 +269,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                 body: JSON.stringify({
                     userId: currentUser.id,
                     to,
-                    subject: emailSubject,
+                    subject: finalSubject,
                     body: finalBody,
                     config: sendConfig,
                     leadId,     // Pass for logging
@@ -257,6 +288,63 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     toast.success('Status leada zmieniony na "Oferta Wysłana"');
                 } catch (err) {
                     console.error('Failed to update lead status', err);
+                }
+
+                // Auto-SMS to client after offer email
+                // Get the lead's phone from DB
+                try {
+                    const { data: leadRecord } = await supabase
+                        .from('leads')
+                        .select('customer_data')
+                        .eq('id', leadId)
+                        .single();
+
+                    const customerPhone = leadRecord?.customer_data?.phone;
+                    if (customerPhone) {
+                        const repName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'PolenDach24';
+                        const repClientPhone = (currentUser as any)?.clientPhone || currentUser?.phone || '';
+                        const customerFirstName = leadData?.firstName || leadRecord?.customer_data?.firstName || '';
+
+                        // Count offers for context-aware SMS
+                        let smsOfferIndex = 1;
+                        try {
+                            const { count } = await supabase
+                                .from('offers')
+                                .select('id', { count: 'exact', head: true })
+                                .eq('lead_id', leadId);
+                            smsOfferIndex = (count || 1);
+                        } catch { /* ignore */ }
+
+                        let smsBody = '';
+                        if (smsOfferIndex <= 1) {
+                            // First offer
+                            smsBody = `Hallo${customerFirstName ? ' ' + customerFirstName : ''} 👋, hier ist ${repName} von PolenDach24. Ich habe Ihnen gerade ein Angebot per E-Mail geschickt 📩 Schauen Sie gerne rein! Bei Fragen bin ich jederzeit für Sie da. Herzliche Grüße, ${repName}${repClientPhone ? ' 📞 ' + repClientPhone : ''}`;
+                        } else if (smsOfferIndex === 2) {
+                            // Second offer — updated
+                            smsBody = `Hallo${customerFirstName ? ' ' + customerFirstName : ''} 😊, hier ist ${repName} von PolenDach24. Ich habe Ihr Angebot wie besprochen angepasst und Ihnen die aktualisierte Version per E-Mail geschickt 📩 Schauen Sie gerne rein! Ich freue mich auf Ihre Rückmeldung. Herzliche Grüße, ${repName}${repClientPhone ? ' 📞 ' + repClientPhone : ''}`;
+                        } else {
+                            // Third+ offer — follow-up
+                            smsBody = `Hallo${customerFirstName ? ' ' + customerFirstName : ''} 👋, ${repName} hier von PolenDach24. Ihre neue Angebotsversion ist soeben per E-Mail raus 📩 Ich hoffe, diese Variante trifft es genau! Melden Sie sich gerne jederzeit. Beste Grüße, ${repName}${repClientPhone ? ' 📞 ' + repClientPhone : ''}`;
+                        }
+
+                        // Get first active phone number for sending
+                        const { data: phoneNumbers } = await supabase
+                            .from('phone_numbers')
+                            .select('id')
+                            .eq('is_active', true)
+                            .limit(1);
+
+                        const fromNumberId = phoneNumbers?.[0]?.id;
+                        if (fromNumberId) {
+                            await TelephonyService.sendSMS(customerPhone, smsBody, fromNumberId);
+                            toast.success('📱 SMS wysłany do klienta');
+                        } else {
+                            console.warn('No active phone number for SMS');
+                        }
+                    }
+                } catch (smsErr) {
+                    console.error('Auto-SMS failed:', smsErr);
+                    // Don't block the flow if SMS fails
                 }
             }
 

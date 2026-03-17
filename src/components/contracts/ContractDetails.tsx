@@ -223,12 +223,12 @@ export const ContractDetails: React.FC = () => {
 
     if (!contract) return <div className="flex items-center justify-center h-full text-slate-400">Ładowanie...</div>;
 
-    const netPrice = contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet;
+    const netPrice = contract.pricing?.finalPriceNet || contract.pricing?.sellingPriceNet || 0;
     const grossPrice = netPrice * 1.23;
-    const commissionRate = netPrice > 0 ? (contract.commission / netPrice) * 100 : 0;
-    const advancePercent = contract.pricing.advancePayment ? Math.round((contract.pricing.advancePayment / grossPrice) * 100) : 0;
-    const allImages = contract.attachments.filter(a => a.type === 'image');
-    const allDocuments = contract.attachments.filter(a => a.type === 'document');
+    const commissionRate = netPrice > 0 ? ((contract.commission || 0) / netPrice) * 100 : 0;
+    const advancePercent = contract.pricing?.advancePayment ? Math.round((contract.pricing.advancePayment / grossPrice) * 100) : 0;
+    const allImages = (contract.attachments || []).filter(a => a.type === 'image');
+    const allDocuments = (contract.attachments || []).filter(a => a.type === 'document');
 
     return (
         <div className="h-full flex flex-col bg-slate-50 p-4 md:p-6 overflow-y-auto">
@@ -308,6 +308,86 @@ export const ContractDetails: React.FC = () => {
                 </div>
             </div>
 
+            {/* ── ADVANCE PAYMENT (Zaliczka) ── */}
+            <div className={`mb-6 p-4 rounded-xl shadow-sm border-2 ${contract.advancePaid ? 'bg-green-50 border-green-300' : (contract.advanceAmount && contract.advanceAmount > 0) ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${contract.advancePaid ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                            <span className="text-lg">{contract.advancePaid ? '✅' : '💰'}</span>
+                        </div>
+                        <div>
+                            <div className="text-xs font-bold text-slate-500 uppercase">Zaliczka</div>
+                            {isEditing ? (
+                                <div className="flex items-center gap-2 mt-1">
+                                    <input
+                                        type="number" step="0.01" min="0"
+                                        value={contract.advanceAmount || ''}
+                                        onChange={e => setContract({ ...contract, advanceAmount: parseFloat(e.target.value) || 0 })}
+                                        className="w-32 px-2 py-1 border rounded text-sm font-bold"
+                                        placeholder="Kwota zaliczki"
+                                    />
+                                    <span className="text-sm text-slate-500">€</span>
+                                    <input
+                                        value={contract.advanceNotes || ''}
+                                        onChange={e => setContract({ ...contract, advanceNotes: e.target.value })}
+                                        className="w-48 px-2 py-1 border rounded text-sm"
+                                        placeholder="Notatka..."
+                                    />
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`font-bold text-lg ${contract.advancePaid ? 'text-green-700' : 'text-amber-700'}`}>
+                                        {contract.advanceAmount ? `${contract.advanceAmount.toFixed(2)} €` : 'Nie ustawiona'}
+                                    </span>
+                                    {contract.advancePaid ? (
+                                        <span className="text-[10px] font-bold bg-green-200 text-green-800 px-2 py-0.5 rounded-full uppercase">Opłacona</span>
+                                    ) : contract.advanceAmount && contract.advanceAmount > 0 ? (
+                                        <span className="text-[10px] font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded-full uppercase animate-pulse">Nieopłacona</span>
+                                    ) : null}
+                                </div>
+                            )}
+                            {/* Who confirmed & when */}
+                            {contract.advancePaid && contract.advancePaidAt && (
+                                <div className="text-[10px] text-green-600 mt-0.5">
+                                    Potwierdzona {new Date(contract.advancePaidAt).toLocaleDateString('pl-PL')} o {new Date(contract.advancePaidAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                                    {contract.advancePaidByUser && ` przez ${contract.advancePaidByUser.firstName} ${contract.advancePaidByUser.lastName}`}
+                                </div>
+                            )}
+                            {contract.advanceNotes && !isEditing && (
+                                <div className="text-xs text-slate-500 mt-0.5">📝 {contract.advanceNotes}</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Mark as paid / unpaid button */}
+                    {!isEditing && contract.advanceAmount && contract.advanceAmount > 0 && (
+                        <button
+                            onClick={async () => {
+                                const newPaidState = !contract.advancePaid;
+                                if (!newPaidState && !window.confirm('Czy na pewno cofnąć potwierdzenie zaliczki?')) return;
+                                try {
+                                    await DatabaseService.updateContract(contract.id, { advancePaid: newPaidState } as any);
+                                    // Reload to get updated advancePaidBy/At
+                                    const contracts = await DatabaseService.getContracts();
+                                    const updated = contracts.find(c => c.id === contract.id);
+                                    if (updated) setContract(updated);
+                                    toast.success(newPaidState ? '✅ Zaliczka potwierdzona!' : '↩️ Potwierdzenie zaliczki cofnięte');
+                                } catch (err) {
+                                    toast.error('Błąd aktualizacji zaliczki');
+                                }
+                            }}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-sm ${
+                                contract.advancePaid
+                                    ? 'bg-white text-amber-700 border border-amber-300 hover:bg-amber-50'
+                                    : 'bg-green-600 text-white hover:bg-green-700 shadow-green-200'
+                            }`}
+                        >
+                            {contract.advancePaid ? '↩️ Cofnij potwierdzenie' : '✅ Potwierdź wpłatę zaliczki'}
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* ── Key Info Bar ── */}
             <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Handlowiec */}
@@ -361,6 +441,20 @@ export const ContractDetails: React.FC = () => {
                             <input type="number" min="1" max="14" value={contract.installation_days_estimate || 1} onChange={(e) => setContract({ ...contract, installation_days_estimate: parseInt(e.target.value) || 1 })} className="w-16 p-1 border rounded text-sm font-bold" />
                         ) : (
                             <div className="font-bold text-slate-800 text-sm">{contract.installation_days_estimate || 1} dni</div>
+                        )}
+                    </div>
+                </div>
+                {/* Planowany montaż (tygodnie) */}
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-teal-50 text-teal-600 rounded-lg flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase">Montaż za (tyg.)</div>
+                        {isEditing ? (
+                            <input type="number" min="1" max="52" value={contract.plannedInstallationWeeks || ''} onChange={(e) => setContract({ ...contract, plannedInstallationWeeks: parseInt(e.target.value) || undefined })} className="w-16 p-1 border rounded text-sm font-bold" placeholder="—" />
+                        ) : (
+                            <div className="font-bold text-slate-800 text-sm">{contract.plannedInstallationWeeks ? `${contract.plannedInstallationWeeks} tyg.` : '—'}</div>
                         )}
                     </div>
                 </div>
@@ -510,13 +604,15 @@ export const ContractDetails: React.FC = () => {
 
                         {/* Main product card */}
                         <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200 mb-4">
-                            <div className="text-base font-bold text-slate-800">{contract.product.modelId.toUpperCase()}</div>
-                            <div className="text-sm text-slate-600 mt-1">{contract.product.width} × {contract.product.projection} mm</div>
+                            <div className="text-base font-bold text-slate-800">{contract.product?.modelId ? contract.product.modelId.toUpperCase() : 'Brak produktu'}</div>
+                            {contract.product?.width && contract.product?.projection && (
+                                <div className="text-sm text-slate-600 mt-1">{contract.product.width} × {contract.product.projection} mm</div>
+                            )}
                             <div className="flex flex-wrap gap-2 mt-3">
                                 {contract.product.color && (
                                     <span className="text-[10px] font-bold uppercase bg-white px-2 py-1 rounded border border-slate-200 text-slate-600">Kolor: {contract.product.color}</span>
                                 )}
-                                {contract.product.roofType && (
+                                {contract.product.roofType && contract.product.roofType !== 'other' && (
                                     <span className="text-[10px] font-bold uppercase bg-white px-2 py-1 rounded border border-slate-200 text-slate-600">Dach: {contract.product.roofType}</span>
                                 )}
                                 {contract.product.numberOfPosts && (
@@ -525,8 +621,73 @@ export const ContractDetails: React.FC = () => {
                                 {contract.product.numberOfFields && (
                                     <span className="text-[10px] font-bold uppercase bg-white px-2 py-1 rounded border border-slate-200 text-slate-600">Pola: {contract.product.numberOfFields}</span>
                                 )}
+                                {(contract.product as any).installationType && (
+                                    <span className="text-[10px] font-bold uppercase bg-white px-2 py-1 rounded border border-slate-200 text-slate-600">
+                                        {{ wall: '🔩 Ściana', ceiling: '🔩 Sufit', freestanding: '🏗️ Wolnostojący' }[(contract.product as any).installationType] || (contract.product as any).installationType}
+                                    </span>
+                                )}
+                                {(contract.product as any).drainageDirection && (
+                                    <span className="text-[10px] font-bold uppercase bg-emerald-50 px-2 py-1 rounded border border-emerald-200 text-emerald-700">
+                                        🌧️ {{ links: '← Links', rechts: 'Rechts →', beidseitig: '← Beids. →' }[(contract.product as any).drainageDirection] || (contract.product as any).drainageDirection}
+                                    </span>
+                                )}
                             </div>
+
+                            {/* Measurement details */}
+                            {(contract.product as any).measurements && (() => {
+                                const m = (contract.product as any).measurements;
+                                const hasMeasurements = m.unterkRinne || m.unterkWand || m.wallType || m.hasElectrical || m.hasDrainage || m.needsLevelingProfiles;
+                                if (!hasMeasurements) return null;
+                                return (
+                                    <div className="mt-3 pt-3 border-t border-slate-200">
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5">Dane Pomiarowe</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {m.unterkRinne && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium">H3: {m.unterkRinne}mm</span>}
+                                            {m.unterkWand && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium">H1: {m.unterkWand}mm</span>}
+                                            {m.wallType && <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">
+                                                {{ massiv: 'Massivwand', daemmung: 'Dämmung', holz: 'Holz', blech: 'Blech', fertighaus: 'Fertighaus' }[m.wallType as string] || m.wallType}
+                                            </span>}
+                                            {m.hasElectrical && <span className="text-[10px] bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded font-medium">⚡ Strom</span>}
+                                            {m.hasDrainage && <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">🌧️ Entwässerung</span>}
+                                            {m.needsLevelingProfiles && (
+                                                <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-medium">
+                                                    📐 Ausgleichsprofile {m.slopeLeft || m.slopeFront || m.slopeRight ?
+                                                        `(L:${m.slopeLeft || 0}/V:${m.slopeFront || 0}/R:${m.slopeRight || 0}mm)` : ''}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {m.technicalNotes && (
+                                            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">{m.technicalNotes}</div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
+
+                        {/* Planned Installation & Delivery */}
+                        {((contract.product as any).plannedInstallDate || (contract.product as any).deliveryAddress) && (
+                            <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg mb-4">
+                                <div className="flex flex-wrap gap-4">
+                                    {(contract.product as any).plannedInstallDate && (
+                                        <div>
+                                            <div className="text-[10px] font-bold text-violet-500 uppercase">📅 Planowany montaż</div>
+                                            <div className="text-sm font-bold text-violet-800">
+                                                {new Date((contract.product as any).plannedInstallDate).toLocaleDateString('de-DE')}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(contract.product as any).deliveryAddress && (
+                                        <div>
+                                            <div className="text-[10px] font-bold text-violet-500 uppercase">📦 Adres dostawy (inny niż klient)</div>
+                                            <div className="text-sm font-medium text-violet-800">
+                                                {(contract.product as any).deliveryAddress.street}{' '}
+                                                {(contract.product as any).deliveryAddress.city}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Custom Items (manual contract) */}
                         {contract.product.customItems && contract.product.customItems.length > 0 && (
@@ -630,10 +791,49 @@ export const ContractDetails: React.FC = () => {
                                 </>
                             )}
 
+                            {/* Advance Payment Status */}
+                            <div className={`flex justify-between items-center py-3 px-3 rounded-lg text-sm ${contract.advancePaid ? 'bg-green-50' : 'bg-amber-50'}`}>
+                                <span className={`font-medium ${contract.advancePaid ? 'text-green-800' : 'text-amber-800'}`}>
+                                    {contract.advancePaid ? '✅ Zaliczka wpłacona' : '⚠️ Zaliczka niewpłacona'}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    {contract.advancePaidAt && (
+                                        <span className="text-[10px] text-slate-500">{new Date(contract.advancePaidAt).toLocaleDateString('pl-PL')}</span>
+                                    )}
+                                    {isEditing ? (
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={contract.advancePaid || false}
+                                                onChange={e => setContract({
+                                                    ...contract,
+                                                    advancePaid: e.target.checked,
+                                                    advancePaidAt: e.target.checked ? new Date().toISOString() : undefined
+                                                })}
+                                                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                                            />
+                                            <span className="text-xs font-bold text-slate-600">Wpłacona</span>
+                                        </label>
+                                    ) : (
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${contract.advancePaid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {contract.advancePaid ? 'TAK' : 'NIE'}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Remaining Payment */}
+                            {contract.pricing.advancePayment && contract.pricing.advancePayment > 0 && (
+                                <div className="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
+                                    <span className="text-slate-600">Do zapłaty (po montażu)</span>
+                                    <span className="font-bold text-slate-800">{(grossPrice - (contract.pricing.advancePayment || 0)).toFixed(2)} €</span>
+                                </div>
+                            )}
+
                             {/* Commission */}
                             <div className="flex justify-between items-center py-3 bg-green-50 px-3 rounded-lg text-sm">
                                 <span className="text-green-800 font-medium">Prowizja ({commissionRate.toFixed(1)}%)</span>
-                                <span className="font-bold text-green-700">{contract.commission.toFixed(2)} €</span>
+                                <span className="font-bold text-green-700">{(contract.commission || 0).toFixed(2)} €</span>
                             </div>
                         </div>
                     </div>
@@ -671,49 +871,28 @@ export const ContractDetails: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Measurement */}
+                                    {/* Fuel Cost — per-contract share (replaces old "Koszty operacyjne") */}
                                     <div className="py-2 border-b border-slate-100">
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-600 flex items-center gap-2">
-                                                <span className="text-base">📐</span> Koszty operacyjne (pomiary, materiały)
+                                                <span className="text-base">⛽</span> Paliwo {costBreakdown.fuelCost ? `(${costBreakdown.fuelCost.salesRepName})` : ''}
                                             </span>
-                                            <span className={`font-bold ${costBreakdown.measurement.total > 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                                                {costBreakdown.measurement.total > 0 ? `-${costBreakdown.measurement.total.toFixed(2)} €` : '0.00 €'}
+                                            <span className={`font-bold ${costBreakdown.fuelCost && costBreakdown.fuelCost.total > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                                {costBreakdown.fuelCost && costBreakdown.fuelCost.total > 0 ? `-${costBreakdown.fuelCost.total.toFixed(2)} €` : '0.00 €'}
                                             </span>
                                         </div>
-                                        {costBreakdown.measurement.items.length > 0 && (
+                                        {costBreakdown.fuelCost && costBreakdown.fuelCost.total > 0 && (
                                             <div className="mt-1 pl-7 space-y-0.5">
-                                                {costBreakdown.measurement.items.map((item: any, i: number) => (
-                                                    <div key={i} className="flex justify-between text-[11px] text-slate-500">
-                                                        <span>{item.description}</span>
-                                                        <span>{item.amount.toFixed(2)} €</span>
-                                                    </div>
-                                                ))}
+                                                <div className="flex justify-between text-[11px] text-slate-500">
+                                                    <span>Mies. koszt: {costBreakdown.fuelCost.monthlyTotalPLN?.toFixed(2) || costBreakdown.fuelCost.monthlyTotal?.toFixed(2)} PLN → {costBreakdown.fuelCost.monthlyTotal.toFixed(2)} € ({costBreakdown.fuelCost.totalLiters.toFixed(1)} L)</span>
+                                                    <span>÷ {costBreakdown.fuelCost.contractsInMonth} umów</span>
+                                                </div>
+                                                <div className="flex justify-between text-[11px] text-slate-500">
+                                                    <span>💳 {costBreakdown.fuelCost.internalCount} wewn. / 🧾 {costBreakdown.fuelCost.externalCount} zewn.</span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Measurement Trip Costs (km) */}
-                                    {costBreakdown.measurementTrip && costBreakdown.measurementTrip.total > 0 && (
-                                        <div className="py-2 border-b border-slate-100">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-slate-600 flex items-center gap-2">
-                                                    <span className="text-base">🚗</span> Koszt dojazdu na pomiar
-                                                </span>
-                                                <span className="font-bold text-red-600">
-                                                    -{costBreakdown.measurementTrip.total.toFixed(2)} €
-                                                </span>
-                                            </div>
-                                            <div className="mt-1 pl-7 space-y-0.5">
-                                                {costBreakdown.measurementTrip.items.map((item: any, i: number) => (
-                                                    <div key={i} className="flex justify-between text-[11px] text-slate-500">
-                                                        <span>{item.description}</span>
-                                                        <span>{item.amountPLN.toFixed(2)} PLN → {item.amount.toFixed(2)} €</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
 
                                     {/* Commission */}
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
@@ -899,7 +1078,76 @@ export const ContractDetails: React.FC = () => {
                             Montaż
                         </h3>
                         {installation ? (
-                            <InstallationStatusCard installation={installation} team={teams.find(t => t.id === installation.teamId)} variant="full" onEdit={() => setIsInstallationModalOpen(true)} showCalendarLink={true} />
+                            <>
+                                <InstallationStatusCard installation={installation} team={teams.find(t => t.id === installation.teamId)} variant="full" onEdit={() => setIsInstallationModalOpen(true)} showCalendarLink={true} />
+
+                                {/* ── Protokół Odbioru ── */}
+                                {(installation as any).completionReport ? (() => {
+                                    const report = (installation as any).completionReport;
+                                    return (
+                                        <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                                            <h4 className="font-bold text-emerald-800 mb-3 flex items-center gap-2 text-xs uppercase tracking-wider">
+                                                <span className="text-base">✅</span>
+                                                Protokół Odbioru
+                                                {report.submittedAt && (
+                                                    <span className="ml-auto text-[10px] text-emerald-600 font-normal normal-case">
+                                                        {new Date(report.submittedAt).toLocaleDateString('pl-PL')} {new Date(report.submittedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                )}
+                                            </h4>
+
+                                            {/* Checklist */}
+                                            {report.checklist && (
+                                                <div className="space-y-1 mb-3">
+                                                    {Object.entries(report.checklist).map(([key, val]: [string, any]) => (
+                                                        <div key={key} className="flex items-center gap-2 text-xs">
+                                                            <span className={val ? 'text-emerald-600' : 'text-red-400'}>{val ? '✅' : '❌'}</span>
+                                                            <span className="text-slate-700">{key}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Notes */}
+                                            {report.notes && (
+                                                <div className="bg-white p-2.5 rounded-lg text-xs text-slate-700 mb-3 border border-emerald-100">
+                                                    <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1">Uwagi</span>
+                                                    {report.notes}
+                                                </div>
+                                            )}
+
+                                            {/* Photos */}
+                                            {report.photos && report.photos.length > 0 && (
+                                                <div className="mb-3">
+                                                    <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1.5">📸 Zdjęcia ({report.photos.length})</span>
+                                                    <div className="grid grid-cols-4 gap-1.5">
+                                                        {report.photos.map((url: string, i: number) => (
+                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 hover:opacity-80 transition-opacity">
+                                                                <img src={url} alt={`Zdjęcie ${i + 1}`} className="w-full h-full object-cover" />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Signature */}
+                                            {report.signatureData && (
+                                                <div>
+                                                    <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1">✍️ Podpis klienta</span>
+                                                    <div className="bg-white rounded-lg p-2 border border-emerald-100 inline-block">
+                                                        <img src={report.signatureData} alt="Podpis" className="h-16 w-auto" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })() : installation.status === 'completed' || installation.status === 'verification' ? (
+                                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-center gap-2">
+                                        <span>⚠️</span>
+                                        <span>Brak protokołu odbioru — oczekuje na wypełnienie przez ekipę montażową</span>
+                                    </div>
+                                ) : null}
+                            </>
                         ) : (
                             <div className="space-y-3">
                                 <button onClick={handlePlanInstallation} disabled={contract.status !== 'signed'} title={contract.status !== 'signed' ? 'Podpisz umowę aby zaplanować montaż' : ''} className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-white transition-colors text-sm ${contract.status === 'signed' ? 'bg-purple-600 hover:bg-purple-700 shadow-md' : 'bg-slate-300 cursor-not-allowed'}`}>
@@ -912,6 +1160,7 @@ export const ContractDetails: React.FC = () => {
                     </div>
                 </div>
             </div>
+
 
             {/* ── Ordered Items (full-width below the grid) ── */}
             <OrderedItemsModule

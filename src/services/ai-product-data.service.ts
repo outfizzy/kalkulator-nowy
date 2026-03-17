@@ -206,6 +206,8 @@ export class AIProductDataService {
         if (name.includes('orangeline')) return '/images/models/orangeline.jpg';
         if (name.includes('skyline')) return '/images/models/skyline.jpg';
         if (name.includes('carport')) return '/images/models/carport.jpg';
+        if (name.includes('pergola') && name.includes('deluxe')) return '/images/models/pergola-deluxe.jpg';
+        if (name.includes('pergola')) return '/images/models/pergola.jpg';
         if (name.includes('schiebe')) return '/images/models/schiebewand.jpg';
 
         return '/images/models/topline.webp'; // default

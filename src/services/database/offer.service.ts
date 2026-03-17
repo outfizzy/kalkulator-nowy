@@ -577,6 +577,8 @@ export const OfferService = {
             updatedAt: new Date(row.updated_at),
             createdBy: row.user_id,
             leadId: row.lead_id,
+            viewCount: row.view_count,
+            lastViewedAt: row.last_viewed_at ? new Date(row.last_viewed_at) : undefined,
             clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined,
             settings: row.settings_data
         }));
@@ -751,6 +753,25 @@ export const OfferService = {
         };
     },
 
+    /**
+     * Get all offers for the same customer (for multi-offer comparison on public page)
+     */
+    async getSiblingOffers(token: string): Promise<{ id: string; offerNumber: string; product: any; pricing: any; publicToken: string; createdAt: Date }[]> {
+        const { data, error } = await supabase.rpc('get_sibling_offers', { token_input: token });
+        if (error || !data) {
+            console.error('Error getting sibling offers:', error);
+            return [];
+        }
+        return data.map((row: any) => ({
+            id: row.id,
+            offerNumber: row.offer_number,
+            product: row.product_config,
+            pricing: row.pricing,
+            publicToken: row.public_token,
+            createdAt: new Date(row.created_at),
+        }));
+    },
+
     async markAsViewed(token: string): Promise<boolean> {
         const { data, error } = await supabase.rpc('mark_offer_viewed', { token_input: token });
         if (error) {
@@ -759,13 +780,38 @@ export const OfferService = {
         }
         return data;
     },
+    /**
+     * Notify the offer owner (sales rep) about a customer action on the public offer page.
+     * Creates a notification visible in the bell icon and logs the interaction.
+     */
+    async notifyOfferAction(
+        token: string,
+        actionType: 'offer_accepted' | 'measurement_requested' | 'message_sent',
+        actionData?: Record<string, any>
+    ): Promise<boolean> {
+        try {
+            const { data, error } = await supabase.rpc('notify_offer_action', {
+                token_input: token,
+                action_type: actionType,
+                action_data: actionData || {}
+            });
+            if (error) {
+                console.error('Error notifying offer action:', error);
+                return false;
+            }
+            return !!data;
+        } catch (err) {
+            console.error('Error notifying offer action:', err);
+            return false;
+        }
+    },
 
     /**
      * Track customer interaction with public offer page
      */
     async trackInteraction(
         offerId: string,
-        eventType: 'offer_view' | 'pdf_click' | 'measurement_request' | 'message_sent' | 'addon_inquiry' | 'contact_request' | 'offer_accept',
+        eventType: 'offer_view' | 'pdf_click' | 'pdf_download' | 'measurement_request' | 'message_sent' | 'addon_inquiry' | 'contact_request' | 'offer_accept' | 'upgrade_request',
         eventData?: Record<string, any>
     ): Promise<boolean> {
         try {

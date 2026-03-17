@@ -18,6 +18,11 @@ interface ProcurementViewRow {
     purchase_cost: number;
     created_at: string;
     owner_id: string;
+    advance_paid: boolean | null;
+    sales_rep_name: string | null;
+    signed_at: string | null;
+    details: string | null;
+    technical_spec: string | null;
 }
 
 export const ProcurementService = {
@@ -33,8 +38,8 @@ export const ProcurementService = {
         const rawData = data as unknown as ProcurementViewRow[];
 
         return rawData.map(row => ({
-            id: row.unique_id, // Map unique_id from view to id in interface
-            uniqueId: row.unique_id, // Also keep uniqueId if needed, but id is cleaner
+            id: row.unique_id,
+            uniqueId: row.unique_id,
             sourceType: row.source_type,
             sourceId: row.source_id,
             itemId: row.item_id,
@@ -49,8 +54,109 @@ export const ProcurementService = {
             confirmed_delivery_date: row.confirmed_delivery_date || undefined,
             purchaseCost: Number(row.purchase_cost),
             createdAt: row.created_at,
-            ownerId: row.owner_id
+            ownerId: row.owner_id,
+            advancePaid: row.advance_paid ?? false,
+            salesRepName: row.sales_rep_name || undefined,
+            signedAt: row.signed_at || undefined,
+            details: row.details || undefined,
+            technicalSpec: row.technical_spec || undefined
         }));
+    },
+
+    async getItemsEnriched(): Promise<ProcurementItem[]> {
+        const items = await this.getItems();
+
+        // Enrich contract items with plannedInstallationWeeks + advance info
+        const contractIds = [...new Set(items.filter(i => i.sourceType === 'contract').map(i => i.sourceId))];
+        if (contractIds.length > 0) {
+            const { data: contractRows } = await supabase
+                .from('contracts')
+                .select('id, contract_data, advance_paid, advance_amount')
+                .in('id', contractIds);
+
+            if (contractRows) {
+                const contractMap = new Map<string, any>();
+                contractRows.forEach((row: any) => contractMap.set(row.id, row));
+
+                return items.map(item => {
+                    if (item.sourceType === 'contract') {
+                        const row = contractMap.get(item.sourceId);
+                        if (row) {
+                            const advanceAmount = Number(row.advance_amount) || 0;
+                            return {
+                                ...item,
+                                plannedInstallationWeeks: row.contract_data?.plannedInstallationWeeks,
+                                // Key fix: if no advance amount, treat as paid (don't block)
+                                advancePaid: advanceAmount > 0 ? (row.advance_paid ?? false) : true,
+                                advanceAmount,
+                            } as any;
+                        }
+                    }
+                    return item;
+                });
+            }
+        }
+        return items;
+    },
+
+    // ── Audit Log ──
+    async logAction(action: string, itemName: string, contractId?: string, contractRef?: string, itemId?: string, details?: Record<string, any>) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            let userName = 'System';
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+                userName = profile?.full_name || user.email || 'Unknown';
+            }
+            await supabase.from('procurement_audit_log').insert({
+                user_id: user?.id,
+                user_name: userName,
+                action,
+                item_id: itemId,
+                item_name: itemName,
+                contract_id: contractId,
+                contract_ref: contractRef,
+                details: details || {},
+            });
+        } catch (err) {
+            console.error('Audit log failed (non-critical):', err);
+        }
+    },
+
+    async getAuditLog(limit = 50): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('procurement_audit_log')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
+        if (error) { console.error('Audit log fetch error:', error); return []; }
+        return data || [];
+    },
+
+    async getProcurementStats(): Promise<{ pending: number; ordered: number; delivered: number; pendingValue: number; orderedValue: number; contractsReady: number }> {
+        const items = await this.getItems();
+        const pending = items.filter(i => i.status === 'pending');
+        const ordered = items.filter(i => i.status === 'ordered');
+        const delivered = items.filter(i => i.status === 'delivered');
+
+        // Contracts where ALL items are delivered
+        const contractGroups = new Map<string, { total: number; delivered: number }>();
+        items.filter(i => i.sourceType === 'contract').forEach(i => {
+            const g = contractGroups.get(i.sourceId) || { total: 0, delivered: 0 };
+            g.total++;
+            if (i.status === 'delivered') g.delivered++;
+            contractGroups.set(i.sourceId, g);
+        });
+        const contractsReady = [...contractGroups.values()].filter(g => g.total > 0 && g.delivered === g.total).length;
+
+        return {
+            pending: pending.length,
+            ordered: ordered.length,
+            delivered: delivered.length,
+            pendingValue: pending.reduce((s, i) => s + (i.purchaseCost || 0), 0),
+            orderedValue: ordered.reduce((s, i) => s + (i.purchaseCost || 0), 0),
+            contractsReady,
+        };
     },
 
     async updateItemStatus(sourceType: string, sourceId: string, itemId: string, updates: Partial<OrderedItem> & { delivery_week?: string; confirmed_delivery_date?: string | null }) {
@@ -87,6 +193,41 @@ export const ProcurementService = {
         items[index] = { ...items[index], ...updates };
 
         // 3. Write back
+        const { error: updateError } = await supabase
+            .from('contracts')
+            .update({
+                contract_data: {
+                    ...contractData,
+                    orderedItems: items
+                }
+            })
+            .eq('id', contractId);
+
+        if (updateError) throw updateError;
+    },
+
+    async batchUpdateContractItems(contractId: string, itemUpdates: { itemId: string; updates: Partial<OrderedItem> }[]) {
+        // 1. Fetch current contract data ONCE
+        const { data: contract, error: fetchError } = await supabase
+            .from('contracts')
+            .select('contract_data')
+            .eq('id', contractId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const contractData = contract.contract_data || {};
+        const items = (contractData.orderedItems || []) as OrderedItem[];
+
+        // 2. Apply ALL updates to the items array
+        for (const { itemId, updates } of itemUpdates) {
+            const index = items.findIndex(i => i.id === itemId);
+            if (index !== -1) {
+                items[index] = { ...items[index], ...updates };
+            }
+        }
+
+        // 3. Write back ONCE
         const { error: updateError } = await supabase
             .from('contracts')
             .update({

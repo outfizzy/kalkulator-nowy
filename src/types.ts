@@ -58,7 +58,12 @@ export interface User {
     mailboxes?: MailboxConfig[];
     hourlyRate?: number;
     hourlyRateCurrency?: 'PLN' | 'EUR';
+    baseSalary?: number;
+    baseSalaryCurrency?: 'PLN' | 'EUR';
     commissionConfig?: CommissionConfig;
+    // Client-facing contact fields (shown on offers/interactive pages)
+    clientPhone?: string;
+    clientEmail?: string;
 }
 
 export interface CommissionConfig {
@@ -145,7 +150,7 @@ export type RoofType = 'polycarbonate' | 'glass' | 'tin';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
 // --- Leads Types ---
-export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair';
+export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair' | 'formularz';
 export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'targi' | 'other';
 
 export interface Lead {
@@ -194,6 +199,9 @@ export interface Lead {
     lostBy?: string;        // User ID who marked the lead as lost
     lostByName?: string;    // Display name (joined from profiles)
     lostAt?: Date;          // When the lead was marked as lost
+    wonReason?: string;
+    wonValue?: number;       // Contract value in EUR
+    wonAt?: Date;
     attachments?: { name: string; url: string; type: string; size: number }[];
 }
 
@@ -707,13 +715,25 @@ export interface ContractRequirements {
 
 export interface OrderedItem {
     id: string;
-    category: 'Roofing' | 'Awning' | 'ZIP Screen' | 'Sliding Glass' | 'Accessories' | 'Flooring' | 'Other';
+    category: 'Roofing' | 'Awning' | 'ZIP Screen' | 'Sliding Glass' | 'Side Wall' | 'Accessories' | 'Profiles' | 'Flooring' | 'Other';
     name: string;
     details?: string;
-    status: 'pending' | 'ordered' | 'delivered';
+    quantity?: number; // default 1
+    technicalSpec?: string; // e.g. "3500x2100mm, RAL 7016"
+    supplier?: string; // e.g. "Aluxe", "Deponti", "Selt"
+    notes?: string; // internal notes
+    orderReference?: string; // supplier order number
+    status: 'pending' | 'ordered' | 'in_production' | 'shipped' | 'delivered';
     plannedDeliveryDate?: string; // ISO date string
+    confirmedDeliveryDate?: string; // ISO date string — confirmed by supplier
+    deliveryWeek?: string; // e.g. "2026-W15"
     orderedAt?: string; // ISO date string
     purchaseCost?: number; // Cost in EUR, visible only to admin
+    // Grouped ordering
+    orderGroupId?: string; // Links items ordered together
+    orderGroupTotal?: number; // Total price for the group
+    // Order documents (PDF, images)
+    orderDocuments?: { name: string; url: string; uploadedAt: string }[];
 }
 
 export interface InstallationSettings {
@@ -757,6 +777,31 @@ export interface Contract {
     completedAt?: Date;
     installation_days_estimate?: number; // Estimated number of days for installation, set by Sales Rep
     installationNotes?: string; // Team-specific notes for installation crew
+    plannedInstallationWeeks?: number; // How many weeks until planned installation
+
+    // Dachrechner data (saved from interactive calculator in contract)
+    dachrechnerData?: {
+        modelId: string;
+        inputs: {
+            h3?: number;
+            depth: number;
+            h1?: number;
+            overhang?: number;
+            width?: number;
+            postCount?: number;
+        };
+        results: Record<string, number | null>;
+        savedAt: string; // ISO date
+        savedBy?: string; // User name
+    };
+
+    // Payment tracking
+    advanceAmount?: number; // How much advance is required
+    advancePaid?: boolean; // Has the client paid the advance?
+    advancePaidAt?: string; // ISO date string — when was it paid
+    advancePaidBy?: string; // User ID who confirmed payment
+    advancePaidByUser?: { firstName: string; lastName: string };
+    advanceNotes?: string; // Notes about the advance payment
 }
 
 // Centralized photo storage tied to offer
@@ -931,19 +976,23 @@ export interface OrderRequest {
 // --- Fuel Logs Types ---
 
 export type FuelLogType = 'sales_rep' | 'installer';
+export type FuelingType = 'internal' | 'external';
 
 export interface FuelLog {
     id: string;
     userId: string;
     vehiclePlate?: string;
-    odometerReading: number;
+    odometerReading?: number;
     odometerPhotoUrl?: string;
     receiptPhotoUrl?: string;
     liters: number;
-    cost: number;
+    cost?: number;
+    netCost?: number;
     currency: 'PLN' | 'EUR';
     logDate: string; // ISO Date
     type: FuelLogType;
+    fuelingType: FuelingType;
+    stationName?: string;
     createdAt: Date;
     userName?: string; // Joined user data
     // Joined user data
@@ -974,6 +1023,11 @@ export interface ProcurementItem {
     purchaseCost: number;
     createdAt: string;
     ownerId?: string;
+    advancePaid?: boolean; // Whether client paid the advance
+    salesRepName?: string; // Sales rep full name
+    signedAt?: string; // Contract signing date
+    details?: string; // Technical details (H1/H3, slopes, wall type)
+    technicalSpec?: string; // Short spec (model, dimensions, color)
 }
 
 // --- Tasks Module Types ---

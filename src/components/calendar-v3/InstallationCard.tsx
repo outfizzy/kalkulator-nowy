@@ -84,6 +84,17 @@ export const InstallationCard: React.FC<InstallationCardProps> = ({
                                 {installation.productSummary}
                             </div>
                         )}
+                        {/* Cost indicators */}
+                        {((installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0)) > 0 && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                                {(installation.hotelCost || 0) > 0 && (
+                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded" title={`Hotel: ${installation.hotelCost} €`}>🏨</span>
+                                )}
+                                <span className="text-[9px] text-slate-400 font-mono">
+                                    {((installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0)).toFixed(0)}€
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -145,25 +156,33 @@ export const InstallationCard: React.FC<InstallationCardProps> = ({
                         </div>
                     )}
 
-                    {/* Row 5: Team name */}
-                    {team && (
-                        <div className="flex items-center gap-1 mt-1">
-                            <div
-                                className="w-2 h-2 rounded-full shrink-0"
-                                style={{ backgroundColor: teamColor }}
-                            />
-                            <span className="text-[11px] font-medium text-slate-600 truncate">
-                                {team.name}
+                    {/* Row 5: Team name + Cost indicators */}
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {team && (
+                            <>
+                                <div
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: teamColor }}
+                                />
+                                <span className="text-[11px] font-medium text-slate-600 truncate">
+                                    {team.name}
+                                </span>
+                            </>
+                        )}
+                        {!team && (
+                            <span className="text-[10px] text-orange-500 italic">⚠️ Brak ekipy</span>
+                        )}
+                        {((installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0)) > 0 && (
+                            <span className="ml-auto flex items-center gap-1">
+                                {(installation.hotelCost || 0) > 0 && (
+                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded" title={`Hotel: ${installation.hotelCost} €`}>🏨</span>
+                                )}
+                                <span className="text-[10px] font-bold text-slate-500">
+                                    {((installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0)).toFixed(0)}€
+                                </span>
                             </span>
-                        </div>
-                    )}
-
-                    {/* No team assigned */}
-                    {!team && (
-                        <div className="flex items-center gap-1 mt-1 text-[10px] text-orange-500 italic">
-                            ⚠️ Brak ekipy
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

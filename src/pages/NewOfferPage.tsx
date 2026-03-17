@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-// import { calculatePrice } from '../utils/pricing'; // Removed legacy import
 import { calculateCommission } from '../utils/commission';
 import { DatabaseService } from '../services/database';
 import { PricingService } from '../services/pricing.service';
@@ -11,6 +10,7 @@ import { ProductConfigurator } from '../components/ProductConfigurator';
 import { ManualOfferConfigurator } from '../components/ManualOfferConfigurator';
 import { MarginControl } from '../components/MarginControl';
 import { OfferSummary } from '../components/OfferSummary';
+import { ConfiguratorService, type LeadConfiguration } from '../services/database/configurator.service';
 import type { Customer, SnowZoneInfo, ProductConfig, Offer } from '../types';
 
 type Step = 'customer' | 'product' | 'summary';
@@ -30,13 +30,17 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
     const state = location.state as any;
     const leadData = (state?.customer || state) as Partial<Customer> | undefined;
     const leadId = state?.leadId as string | undefined;
+    const leadNotes = state?.leadNotes as string | undefined;
+    const leadCustomerData = state?.leadCustomerData as any;
 
     const [step, setStep] = useState<Step>('customer');
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
     const [product, setProduct] = useState<ProductConfig | null>(null);
     const [offer, setOffer] = useState<Offer | null>(null);
-    const [isManualMode, setIsManualMode] = useState(false); // Toggle for manual mode
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [leadConfig, setLeadConfig] = useState<LeadConfiguration | null>(null);
+    const [contextOpen, setContextOpen] = useState(true);
 
     // Initialize margin based on mode and user
     const [margin, setMargin] = useState<number>(() => {
@@ -50,6 +54,16 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
     React.useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [step]);
+
+    // Load configurator form data for the lead (if exists)
+    useEffect(() => {
+        if (leadId) {
+            ConfiguratorService.getByLeadId(leadId).then(configs => {
+                const completed = configs.find(c => c.status === 'completed') || configs[0];
+                if (completed) setLeadConfig(completed);
+            }).catch(console.error);
+        }
+    }, [leadId]);
 
     const handleCustomerComplete = (data: Customer, zone: SnowZoneInfo) => {
         setCustomer(data);
@@ -273,6 +287,123 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
 
                 {step === 'product' && (
                     <div className="space-y-6">
+                        {/* Lead Context Panel — only visible when creating from a lead */}
+                        {leadId && (leadConfig || leadNotes || leadCustomerData?.configuredModel) && (
+                            <div className="bg-white rounded-xl shadow-sm border border-indigo-200 overflow-hidden">
+                                <button
+                                    onClick={() => setContextOpen(!contextOpen)}
+                                    className="w-full flex items-center justify-between px-5 py-3 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                                >
+                                    <span className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                                        📋 Ściąga z leada
+                                        {leadConfig?.status === 'completed' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px]">Formularz ✅</span>}
+                                    </span>
+                                    <svg className={`w-4 h-4 text-indigo-500 transition-transform ${contextOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                {contextOpen && (
+                                    <div className="px-5 py-4 space-y-4 text-sm">
+                                        {/* Configuration from form */}
+                                        {(leadConfig || leadCustomerData?.configuredModel) && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">⚙️ Konfiguracja klienta</h4>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                    {(leadConfig?.modelDisplayName || leadCustomerData?.configuredModel) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Model</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.modelDisplayName || leadCustomerData?.configuredModel}</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.width || leadCustomerData?.configuredWidth) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Szerokość</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.width || leadCustomerData?.configuredWidth} mm</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.projection || leadCustomerData?.configuredProjection) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Wysięg</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.projection || leadCustomerData?.configuredProjection} mm</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.mountingType || leadCustomerData?.configuredMounting) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Montaż</div>
+                                                            <div className="font-bold text-slate-800 capitalize">{leadConfig?.mountingType || leadCustomerData?.configuredMounting}</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.color || leadCustomerData?.configuredColor) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Kolor</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.color || leadCustomerData?.configuredColor}</div>
+                                                        </div>
+                                                    )}
+                                                    {(leadConfig?.roofCovering || leadCustomerData?.configuredRoofCovering) && (
+                                                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                                            <div className="text-[10px] text-slate-400 uppercase">Pokrycie</div>
+                                                            <div className="font-bold text-slate-800">{leadConfig?.roofCovering || leadCustomerData?.configuredRoofCovering}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Extras */}
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    {(leadConfig?.heater || leadCustomerData?.configuredHeater) && (
+                                                        <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-200">🔥 Grzejnik</span>
+                                                    )}
+                                                    {(leadConfig?.led || leadCustomerData?.configuredLed) && (
+                                                        <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200">💡 LED</span>
+                                                    )}
+                                                    {leadConfig?.glazingSides && Object.entries(leadConfig.glazingSides).filter(([, v]) => v).map(([side, type]) => (
+                                                        <span key={side} className="bg-sky-50 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold border border-sky-200">🪟 {side}: {type}</span>
+                                                    ))}
+                                                    {leadConfig?.zipScreen?.enabled && (
+                                                        <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200">🔲 ZipScreen</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Notes from form */}
+                                        {(leadConfig?.notes || leadCustomerData?.configuredNotes) && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">💬 Uwagi klienta (z formularza)</h4>
+                                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-slate-700 text-sm whitespace-pre-wrap">
+                                                    {leadConfig?.notes || leadCustomerData?.configuredNotes}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Lead Notizen */}
+                                        {leadNotes && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">📝 Notizen</h4>
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-slate-700 text-sm whitespace-pre-wrap">
+                                                    {leadNotes}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Photos from form */}
+                                        {leadConfig?.photos && leadConfig.photos.length > 0 && (
+                                            <div>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">📸 Zdjęcia klienta</h4>
+                                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                                    {leadConfig.photos.map((url, i) => (
+                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                            <img src={url} alt={`Foto ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-slate-200 hover:ring-2 ring-indigo-400 transition-all" />
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Mode Toggle */}
                         <div className="flex justify-center mb-6">
                             <div className="bg-slate-100 p-1 rounded-xl flex gap-1 shadow-inner">

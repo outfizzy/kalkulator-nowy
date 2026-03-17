@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { normalizePhone } from '../../utils/phone';
 import {
     DndContext,
     DragOverlay,
@@ -28,8 +29,12 @@ import { format, differenceInDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { LostLeadModal } from './LostLeadModal';
+import { WonLeadModal } from './WonLeadModal';
 import { MeasurementModal } from '../measurements/MeasurementModal';
 import type { Measurement } from '../../types';
+import { ConfiguratorService } from '../../services/database/configurator.service';
+import { LeadAutoAssignService } from '../../services/database/lead-auto-assign.service';
+import { OfferService } from '../../services/database/offer.service';
 
 interface LeadsKanbanProps {
     leads: Lead[];
@@ -38,10 +43,11 @@ interface LeadsKanbanProps {
 
 const COLUMNS: { id: LeadStatus; title: string; color: string }[] = [
     { id: 'new', title: 'Nowe', color: 'bg-blue-50 border-blue-100 text-blue-700' },
+    { id: 'formularz', title: '📋 Formularz', color: 'bg-teal-50 border-teal-100 text-teal-700' },
     { id: 'contacted', title: 'Skontaktowano', color: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
+    { id: 'offer_sent', title: 'Wysłano Ofertę', color: 'bg-yellow-50 border-yellow-100 text-yellow-700' },
     { id: 'measurement_scheduled', title: 'Umówiony na pomiar', color: 'bg-cyan-50 border-cyan-100 text-cyan-700' },
     { id: 'measurement_completed', title: 'Pomiar odbył się', color: 'bg-purple-50 border-purple-100 text-purple-700' },
-    { id: 'offer_sent', title: 'Wysłano Ofertę', color: 'bg-yellow-50 border-yellow-100 text-yellow-700' },
     { id: 'negotiation', title: 'Negocjacje', color: 'bg-orange-50 border-orange-100 text-orange-700' },
     { id: 'won', title: 'Wygrane', color: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
     { id: 'lost', title: 'Utracone', color: 'bg-red-50 border-red-100 text-red-700' },
@@ -49,14 +55,66 @@ const COLUMNS: { id: LeadStatus; title: string; color: string }[] = [
 ];
 
 
-// Helper to identify stale leads (> 3 days no contact)
-const isLeadStale = (lead: Lead) => {
-    if (lead.status === 'won' || lead.status === 'lost') return false; // Won/Lost don't get stale
-    const lastDate = lead.lastContactDate ? new Date(lead.lastContactDate) : new Date(lead.createdAt);
-    return differenceInDays(new Date(), lastDate) > 3;
+// Stage-specific stale thresholds (days without contact)
+const STALE_THRESHOLDS: Record<string, number> = {
+    new: 1, formularz: 2, contacted: 3,
+    measurement_scheduled: 2, measurement_completed: 3,
+    offer_sent: 5, negotiation: 7
 };
 
-const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean }) => {
+const isLeadStale = (lead: Lead) => {
+    if (lead.status === 'won' || lead.status === 'lost' || lead.status === 'fair') return false;
+    const threshold = STALE_THRESHOLDS[lead.status] || 3;
+    const lastDate = lead.lastContactDate ? new Date(lead.lastContactDate) : new Date(lead.createdAt);
+    return differenceInDays(new Date(), lastDate) > threshold;
+};
+
+// SLA Timer: applies to ALL active pipeline stages
+const getSlaInfo = (lead: Lead): { level: 'green' | 'yellow' | 'red' | 'dead'; label: string; pulse: boolean } => {
+    if (['won', 'lost', 'fair'].includes(lead.status)) return { level: 'green', label: '', pulse: false };
+    const lastDate = lead.lastContactDate ? new Date(lead.lastContactDate) : new Date(lead.createdAt);
+    const now = new Date();
+    const hoursElapsed = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60);
+    const threshold = (STALE_THRESHOLDS[lead.status] || 3) * 24;
+    const ratio = hoursElapsed / threshold;
+    if (hoursElapsed < 2) return { level: 'green', label: `${Math.round(hoursElapsed * 60)}min`, pulse: false };
+    const label = hoursElapsed < 24 ? `${Math.round(hoursElapsed)}h` : `${Math.floor(hoursElapsed / 24)}d`;
+    if (ratio < 0.5) return { level: 'green', label, pulse: false };
+    if (ratio < 0.8) return { level: 'yellow', label, pulse: false };
+    if (ratio < 1.0) return { level: 'red', label, pulse: true };
+    return { level: 'dead', label, pulse: true };
+};
+
+// Lead Priority Scoring: 0-5 stars
+const getLeadPriority = (lead: Lead, formCompleted?: boolean): number => {
+    let score = 0;
+    if (formCompleted) score += 1;
+    if (lead.aiScore && lead.aiScore > 70) score += 1;
+    if (lead.aiScore && lead.aiScore > 50) score += 1;
+    // Check customer data for extras hints
+    const notes = (lead.notes || '').toLowerCase();
+    if (notes.includes('heizung') || notes.includes('grzejnik') || notes.includes('led') || notes.includes('heater')) score += 1;
+    // Fast response bonus
+    if (lead.lastContactDate && lead.createdAt) {
+        const responseHours = (new Date(lead.lastContactDate).getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60);
+        if (responseHours < 2 && responseHours > 0) score += 1;
+    }
+    return Math.min(score, 5);
+};
+
+type OfferCardInfo = {
+    viewed: boolean;
+    viewCount: number;
+    lastViewedAt?: Date;
+    measurementRequested?: boolean;
+    messageSent?: boolean;
+    offerAccepted?: boolean;
+    messageText?: string;
+    interactionCount: number;
+};
+
+const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo }) => {
+    const navigate = useNavigate();
     const {
         attributes,
         listeners,
@@ -82,15 +140,28 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
 
     const handleQuickContact = async (e: React.MouseEvent) => {
         e.stopPropagation();
+        // Open phone dialer with customer's number
+        const phone = lead.customerData?.phone || (lead.customerData as any)?.telefon;
+        if (phone) {
+            window.open(`tel:${normalizePhone(phone)}`, '_self');
+        }
         try {
-            await DatabaseService.updateLead(lead.id, { status: 'contacted' });
-            toast.success('Oznaczono jako skontaktowano');
+            await DatabaseService.updateLead(lead.id, { status: 'contacted', lastContactDate: new Date() });
+            toast.success('📞 Oznaczono jako skontaktowano');
             onUpdate();
         } catch (error) {
             console.error('Error updating lead:', error);
             toast.error('Błąd aktualizacji');
         }
     };
+
+    const handleQuickEmail = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Navigate to lead details where user can compose real email
+        navigate(`/leads/${lead.id}`);
+    };
+
+    const sla = getSlaInfo(lead);
 
     const handleScheduleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -109,7 +180,14 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
             {...attributes}
             {...listeners}
             onClick={() => onClick(lead.id)}
-            className={`bg-white p-3 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer group relative ${isStale ? 'border-red-200 ring-1 ring-red-50' : 'border-slate-200'}`}
+            className={`p-3 rounded-lg shadow-sm border hover:shadow-md transition-all cursor-pointer group relative ${formCompleted
+                ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200 shadow-emerald-100'
+                : lead.status === 'formularz'
+                    ? 'bg-teal-50/50 border-teal-200'
+                    : isStale
+                        ? 'bg-white border-red-200 ring-1 ring-red-50'
+                        : 'bg-white border-slate-200'
+                }`}
         >
             <div className="flex justify-between items-start mb-2">
                 <div className="pr-6">
@@ -166,13 +244,13 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
             </div>
 
             <div className="text-xs text-slate-600 space-y-1 mb-3">
-                {lead.customerData.address && (
+                {(lead.customerData.address || (lead.customerData as any).street) && (
                     <div className="flex items-center gap-1.5">
                         <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span className="truncate">{lead.customerData.address}</span>
+                        <span className="truncate">{lead.customerData.address || (lead.customerData as any).street}</span>
                     </div>
                 )}
                 {(lead.customerData.city || lead.customerData.postalCode) && (
@@ -183,8 +261,8 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
                 )}
             </div>
 
-            {/* AI Score Badge */}
-            <div className="mb-3 flex items-center gap-2">
+            {/* AI Score + Priority Stars */}
+            <div className="mb-3 flex items-center gap-2 flex-wrap">
                 {lead.aiScore !== undefined ? (
                     <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${lead.aiScore > 70 ? 'bg-orange-50 text-orange-700 border-orange-100' : lead.aiScore < 30 ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-50 text-slate-600 border-slate-100'}`} title={lead.aiSummary}>
                         <span className="text-sm">{lead.aiScore > 70 ? '🔥' : lead.aiScore < 30 ? '❄️' : '😐'}</span>
@@ -212,7 +290,24 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
                         AI OCENA
                     </button>
                 )}
+                {(() => {
+                    const stars = getLeadPriority(lead, formCompleted);
+                    return stars > 0 ? (
+                        <span className="text-xs" title={`Priorytet: ${stars}/5`}>{'⭐'.repeat(stars)}</span>
+                    ) : null;
+                })()}
             </div>
+
+            {/* Formularz Status Badge */}
+            {lead.status === 'formularz' && (
+                <div className={`mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold ${formCompleted
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-teal-100 text-teal-700 border border-teal-200'
+                    }`}>
+                    <span>{formCompleted ? '✅' : '⏳'}</span>
+                    <span>{formCompleted ? 'Formularz wypełniony!' : 'Czeka na formularz...'}</span>
+                </div>
+            )}
 
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
@@ -235,41 +330,259 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin }: 
                     )}
                 </div>
 
-                <div className="text-[10px] text-slate-400">
-                    {format(new Date(lead.createdAt), 'dd.MM', { locale: pl })}
+                <div className="flex items-center gap-1.5">
+                    {/* SLA Timer Badge — inline next to date */}
+                    {sla.label && (
+                        <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                            sla.level === 'green' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                            sla.level === 'yellow' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                            sla.level === 'red' ? 'bg-red-50 text-red-600 border-red-200' :
+                            'bg-red-100 text-red-700 border-red-300'
+                        } ${sla.pulse ? 'animate-pulse' : ''}`} title={`Czas od utworzenia leada: ${sla.label}`}>
+                            {sla.level === 'green' ? '🟢' : sla.level === 'yellow' ? '🟡' : sla.level === 'red' ? '🔴' : '💀'}
+                            {sla.label}
+                        </span>
+                    )}
+                    <span className="text-[10px] text-slate-400">
+                        {format(new Date(lead.createdAt), 'dd.MM', { locale: pl })}
+                    </span>
                 </div>
             </div>
+
+            {/* Customer Interaction Badges — show on all stages */}
+            {(() => {
+                const hasOfferInfo = offerViewInfo && offerViewInfo.interactionCount > 0;
+                const hasCustomerEvents = lead.customerData?.offerViewedAt || lead.customerData?.measurementRequestedAt || lead.customerData?.offerAcceptedAt;
+                if (!hasOfferInfo && !hasCustomerEvents) return null;
+                return (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                        {(offerViewInfo?.viewed || lead.customerData?.offerViewedAt) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-bold"
+                                title={offerViewInfo?.lastViewedAt ? `Ostatnio: ${new Date(offerViewInfo.lastViewedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} ${new Date(offerViewInfo.lastViewedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : lead.customerData?.offerViewedAt ? `Otwarto: ${new Date(lead.customerData.offerViewedAt).toLocaleString()}` : ''}
+                            >
+                                👁️ Otwarta {offerViewInfo?.viewCount ? `${offerViewInfo.viewCount}×` : lead.customerData?.offerViewCount ? `${lead.customerData.offerViewCount}×` : ''}
+                            </span>
+                        )}
+                        {(offerViewInfo?.offerAccepted || lead.customerData?.offerAcceptedAt) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[9px] font-bold animate-pulse">
+                                ✅ Zaakceptowana!
+                            </span>
+                        )}
+                        {(offerViewInfo?.measurementRequested || lead.customerData?.measurementRequestedAt) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-50 text-violet-700 border border-violet-200 rounded text-[9px] font-bold">
+                                📏 Pomiar proszony
+                            </span>
+                        )}
+                        {offerViewInfo?.messageSent && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[9px] font-bold"
+                                title={offerViewInfo.messageText || ''}
+                            >
+                                💬 Wiadomość
+                            </span>
+                        )}
+                    </div>
+                );
+            })()}
+
+            {/* One-Click Pipeline Actions — stage-specific */}
+            {!['won', 'lost', 'fair'].includes(lead.status) && (
+                <div className="mt-2 pt-2 border-t border-slate-100 flex gap-1">
+                    {/* Early stages: Dzwonię + Mail + Pomiar */}
+                    {['new', 'formularz', 'contacted'].includes(lead.status) && (
+                        <>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (lead.customerData?.phone) {
+                                        window.dispatchEvent(new CustomEvent('softphone-dial', { detail: { number: normalizePhone(lead.customerData.phone), name: `${lead.customerData.firstName || ''} ${lead.customerData.lastName || ''}`.trim(), leadId: lead.id } }));
+                                    }
+                                    handleQuickContact(e as any);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold border border-emerald-200 transition-colors"
+                                title={lead.customerData?.phone || 'Brak numeru'}
+                            >
+                                📞 Dzwonię
+                            </button>
+                            <button
+                                onClick={handleQuickEmail}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-[10px] font-bold border border-blue-200 transition-colors"
+                                title="Wysłałem mail"
+                            >
+                                📧 Mail
+                            </button>
+                            <button
+                                onClick={handleScheduleClick}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-md text-[10px] font-bold border border-violet-200 transition-colors"
+                                title="Umów pomiar"
+                            >
+                                🗓️ Pomiar
+                            </button>
+                        </>
+                    )}
+                    {/* Measurement stages: Dzwonię + Nowa Oferta */}
+                    {['measurement_scheduled', 'measurement_completed'].includes(lead.status) && (
+                        <>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (lead.customerData?.phone) {
+                                        window.dispatchEvent(new CustomEvent('softphone-dial', { detail: { number: normalizePhone(lead.customerData.phone), name: `${lead.customerData.firstName || ''} ${lead.customerData.lastName || ''}`.trim(), leadId: lead.id } }));
+                                    }
+                                    handleQuickContact(e as any);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold border border-emerald-200 transition-colors"
+                                title={lead.customerData?.phone || 'Brak numeru'}
+                            >
+                                📞 Dzwonię
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate('/new-offer', { state: {
+                                        customer: lead.customerData,
+                                        leadId: lead.id,
+                                        leadNotes: lead.notes,
+                                        leadCustomerData: lead.customerData
+                                    }});
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-md text-[10px] font-bold border border-amber-200 transition-colors"
+                            >
+                                📄 Nowa Oferta
+                            </button>
+                        </>
+                    )}
+                    {/* Offer sent: View status + Zadzwoń + Przypomnij */}
+                    {lead.status === 'offer_sent' && (
+                        <>
+                            {/* Offer view status badge */}
+                            {offerViewInfo && (
+                                <div className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-bold border ${offerViewInfo.viewed ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}
+                                    title={offerViewInfo.viewed ? `Otwarta ${offerViewInfo.viewCount}× ${offerViewInfo.lastViewedAt ? '| Ostatnio: ' + new Date(offerViewInfo.lastViewedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(offerViewInfo.lastViewedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Klient nie otworzył oferty'}
+                                >
+                                    {offerViewInfo.viewed ? `👁️ Otwarta ${offerViewInfo.viewCount}×` : '❌ Nieotwarta'}
+                                </div>
+                            )}
+                            {lead.customerData?.phone && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.dispatchEvent(new CustomEvent('softphone-dial', { detail: { number: normalizePhone(lead.customerData!.phone), name: `${lead.customerData!.firstName || ''} ${lead.customerData!.lastName || ''}`.trim(), leadId: lead.id } }));
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold border border-emerald-200 transition-colors"
+                                >
+                                    📞 Zadzwoń
+                                </button>
+                            )}
+                            <button
+                                onClick={handleQuickEmail}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-[10px] font-bold border border-blue-200 transition-colors"
+                            >
+                                📧 Przypomnij
+                            </button>
+                        </>
+                    )}
+                    {/* Negotiation: Dzwonię + Nowa Oferta + Wygrane */}
+                    {lead.status === 'negotiation' && (
+                        <>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (lead.customerData?.phone) {
+                                        window.dispatchEvent(new CustomEvent('softphone-dial', { detail: { number: normalizePhone(lead.customerData.phone), name: `${lead.customerData.firstName || ''} ${lead.customerData.lastName || ''}`.trim(), leadId: lead.id } }));
+                                    }
+                                    handleQuickContact(e as any);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold border border-emerald-200 transition-colors"
+                                title={lead.customerData?.phone || 'Brak numeru'}
+                            >
+                                📞 Dzwonię
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate('/new-offer', { state: {
+                                        customer: lead.customerData,
+                                        leadId: lead.id,
+                                        leadNotes: lead.notes,
+                                        leadCustomerData: lead.customerData
+                                    }});
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-md text-[10px] font-bold border border-amber-200 transition-colors"
+                            >
+                                📄 Oferta
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
         </div >
     );
 };
 
 // Extracted Column Component with useDroppable
-const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean }) => {
+const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, offerViewMap }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; completedFormLeadIds: Set<string>; onAutoAssign?: () => void; offerViewMap: Record<string, OfferCardInfo> }) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
 
+    const unassignedCount = leads.filter(l => !l.assignedTo).length;
+
+    // Sort: completed forms first, then by most recently updated
+    const sortedLeads = useMemo(() => {
+        return [...leads].sort((a, b) => {
+            // Completed forms always first in formularz column
+            if (column.id === 'formularz' && completedFormLeadIds.size > 0) {
+                const aCompleted = completedFormLeadIds.has(a.id);
+                const bCompleted = completedFormLeadIds.has(b.id);
+                if (aCompleted && !bCompleted) return -1;
+                if (!aCompleted && bCompleted) return 1;
+            }
+            // Secondary: most recently updated first
+            const aDate = new Date(a.updatedAt || a.createdAt).getTime();
+            const bDate = new Date(b.updatedAt || b.createdAt).getTime();
+            return bDate - aDate;
+        });
+    }, [leads, column.id, completedFormLeadIds]);
+
     return (
         <div ref={setNodeRef} className="flex-shrink-0 w-72 flex flex-col h-full rounded-xl bg-slate-50/50 border border-slate-200/50">
             {/* Column Header */}
-            <div className={`p-3 border-b border-slate-100 rounded-t-xl flex justify-between items-center ${column.color.replace('text-', 'bg-').replace('50', '50/50')}`}>
-                <h3 className={`font-semibold text-sm ${column.color.split(' ')[2]}`}>
-                    {column.title}
-                </h3>
-                <span className="bg-white/60 px-2 py-0.5 rounded-full text-xs font-bold text-slate-600 shadow-sm">
-                    {leads.length}
-                </span>
+            <div className={`p-3 border-b border-slate-100 rounded-t-xl ${column.color.replace('text-', 'bg-').replace('50', '50/50')}`}>
+                <div className="flex justify-between items-center">
+                    <h3 className={`font-semibold text-sm ${column.color.split(' ')[2]}`}>
+                        {column.title}
+                    </h3>
+                    <div className="flex items-center gap-1.5">
+                        {unassignedCount > 0 && ['new', 'formularz', 'contacted'].includes(column.id) && (
+                            <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold" title={`${unassignedCount} bez opiekuna`}>
+                                {unassignedCount} ⚠️
+                            </span>
+                        )}
+                        <span className="bg-white/60 px-2 py-0.5 rounded-full text-xs font-bold text-slate-600 shadow-sm">
+                            {leads.length}
+                        </span>
+                    </div>
+                </div>
+                {/* Auto-assign button */}
+                {isAdmin && unassignedCount > 0 && ['new', 'formularz', 'contacted'].includes(column.id) && onAutoAssign && (
+                    <button
+                        onClick={onAutoAssign}
+                        className="mt-2 w-full flex items-center justify-center gap-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-200 transition-colors"
+                    >
+                        🤖 Przydziel automatycznie ({unassignedCount})
+                    </button>
+                )}
             </div>
 
             {/* Column Content */}
             <div className="p-2 flex-1 overflow-y-auto space-y-2 min-h-[100px]">
                 <SortableContext
                     id={column.id}
-                    items={leads.map(l => l.id)}
+                    items={sortedLeads.map(l => l.id)}
                     strategy={verticalListSortingStrategy}
                 >
                     <div className="space-y-2 min-h-[50px]">
-                        {leads.map(lead => (
+                        {sortedLeads.map(lead => (
                             <KanbanCard
                                 key={lead.id}
                                 lead={lead}
@@ -278,6 +591,8 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                                 onSchedule={onSchedule}
                                 onDelete={onDelete}
                                 isAdmin={isAdmin}
+                                formCompleted={completedFormLeadIds.has(lead.id)}
+                                offerViewInfo={offerViewMap[lead.id]}
                             />
                         ))}
                     </div>
@@ -293,6 +608,8 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const [activeId, setActiveId] = useState<string | null>(null);
 
     // Modal State
+    const [wonModalOpen, setWonModalOpen] = useState(false);
+    const [pendingWonLeadId, setPendingWonLeadId] = useState<string | null>(null);
     const [lostModalOpen, setLostModalOpen] = useState(false);
     const [pendingLostLeadId, setPendingLostLeadId] = useState<string | null>(null);
     const [measurementLead, setMeasurementLead] = useState<Lead | null>(null);
@@ -312,6 +629,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         const cols: Record<LeadStatus, Lead[]> = {
             new: [],
             contacted: [],
+            formularz: [],
             measurement_scheduled: [],
             measurement_completed: [],
             offer_sent: [],
@@ -326,6 +644,68 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             }
         });
         return cols;
+    }, [leads]);
+
+    // Track which formularz leads have completed configurations
+    const [completedFormLeadIds, setCompletedFormLeadIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        const formularzLeads = leads.filter(l => l.status === 'formularz');
+        if (formularzLeads.length === 0) { setCompletedFormLeadIds(new Set()); return; }
+
+        const checkForms = async () => {
+            const completed = new Set<string>();
+            for (const lead of formularzLeads) {
+                try {
+                    const cfgs = await ConfiguratorService.getByLeadId(lead.id);
+                    if (cfgs.some(c => c.status === 'completed')) {
+                        completed.add(lead.id);
+                    }
+                } catch { /* ignore */ }
+            }
+            setCompletedFormLeadIds(completed);
+        };
+        checkForms();
+    }, [leads]);
+
+    // Track offer view status + customer interactions for offer_sent/negotiation leads
+    const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({}); 
+    useEffect(() => {
+        const relevantLeads = leads.filter(l => ['offer_sent', 'negotiation'].includes(l.status));
+        if (relevantLeads.length === 0) { setOfferViewMap({}); return; }
+
+        const fetchOfferViews = async () => {
+            const viewMap: Record<string, OfferCardInfo> = {};
+            for (const lead of relevantLeads) {
+                try {
+                    // Fetch offers for view count
+                    const offers = await OfferService.getLeadOffers(lead.id);
+                    const latest = offers.length > 0 ? offers[0] : null;
+
+                    // Fetch interactions
+                    const interactions = await OfferService.getLeadInteractions(lead.id);
+
+                    const measurementRequested = interactions.some(i => i.eventType === 'measurement_request');
+                    const offerAccepted = interactions.some(i => i.eventType === 'offer_accept');
+                    const messageSent = interactions.some(i => i.eventType === 'message_sent');
+                    const lastMessage = interactions.find(i => i.eventType === 'message_sent');
+
+                    viewMap[lead.id] = {
+                        viewed: latest ? (latest.viewCount || 0) > 0 : false,
+                        viewCount: latest?.viewCount || 0,
+                        lastViewedAt: latest?.lastViewedAt,
+                        measurementRequested,
+                        offerAccepted,
+                        messageSent,
+                        messageText: lastMessage?.eventData?.message || lastMessage?.eventData?.text || undefined,
+                        interactionCount: interactions.length + ((latest?.viewCount || 0) > 0 ? 1 : 0)
+                    };
+                } catch {
+                    viewMap[lead.id] = { viewed: false, viewCount: 0, interactionCount: 0 };
+                }
+            }
+            setOfferViewMap(viewMap);
+        };
+        fetchOfferViews();
     }, [leads]);
 
     const handleDragStart = (event: DragStartEvent) => {
@@ -357,6 +737,13 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         if (newStatus) {
             const lead = leads.find(l => l.id === activeId);
             if (lead && lead.status !== newStatus) {
+
+                // Special handling for 'won' status -> Open WonLeadModal
+                if (newStatus === 'won') {
+                    setPendingWonLeadId(activeId);
+                    setWonModalOpen(true);
+                    return;
+                }
 
                 // Special handling for 'lost' status -> Open Modal
                 if (newStatus === 'lost') {
@@ -426,6 +813,22 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         setPendingLostLeadId(null);
     };
 
+    const handleWonConfirm = async (reason: string, value: string, notes: string) => {
+        if (!pendingWonLeadId) return;
+
+        const updateData: any = {
+            wonReason: reason,
+            wonValue: value ? parseFloat(value) : undefined,
+            wonAt: new Date(),
+            notes: notes ? ((leads.find(l => l.id === pendingWonLeadId)?.notes || '') + '\n\n[Wygrana]: ' + notes) : undefined
+        };
+
+        await updateLeadStatus(pendingWonLeadId, 'won', updateData);
+
+        toast.success('🏆 Gratulacje! Lead wygrany!');
+        setPendingWonLeadId(null);
+    };
+
     const handleSaveMeasurement = async (data: Partial<Measurement>) => {
         if (!measurementLead || !currentUser) return;
         try {
@@ -449,8 +852,104 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         }
     };
 
+    // === MINI-DASHBOARD ===
+    const pipelineStats = useMemo(() => {
+        // New leads = early funnel only
+        const newLeads = leads.filter(l => ['new', 'formularz', 'contacted'].includes(l.status));
+        // Advanced = past the contact stage
+        const advancedLeads = leads.filter(l => ['offer_sent', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
+        const wonLeads = leads.filter(l => l.status === 'won');
+        const lostLeads = leads.filter(l => l.status === 'lost');
+
+        // Win Rate: won / (won + lost) — only closed deals
+        const totalClosed = wonLeads.length + lostLeads.length;
+        const winRate = totalClosed > 0 ? Math.round((wonLeads.length / totalClosed) * 100) : 0;
+
+        // Offer conversion: leads that got at least to offer_sent / total non-fair leads
+        const allReal = leads.filter(l => l.status !== 'fair');
+        const pastOffer = leads.filter(l => ['offer_sent', 'negotiation', 'measurement_scheduled', 'measurement_completed', 'won', 'lost'].includes(l.status));
+        const offerRate = allReal.length > 0 ? Math.round((pastOffer.length / allReal.length) * 100) : 0;
+
+        // Average pipeline time for won leads
+        let avgDays = 0;
+        if (wonLeads.length > 0) {
+            const totalDays = wonLeads.reduce((sum, l) => {
+                const endDate = l.wonAt ? new Date(l.wonAt) : new Date(l.updatedAt);
+                return sum + differenceInDays(endDate, new Date(l.createdAt));
+            }, 0);
+            avgDays = Math.round(totalDays / wonLeads.length);
+        }
+
+        // Total won value this month
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthWonValue = wonLeads
+            .filter(l => new Date(l.wonAt || l.updatedAt) >= monthStart)
+            .reduce((sum, l) => sum + ((l as any).wonValue || 0), 0);
+
+        return {
+            newCount: newLeads.length,
+            advancedCount: advancedLeads.length,
+            wonCount: wonLeads.length,
+            winRate,
+            offerRate,
+            avgDays,
+            monthWonValue
+        };
+    }, [leads]);
+
     return (
         <>
+            {/* Pipeline Mini-Dashboard */}
+            <div className="mb-4 px-2">
+                <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-blue-200 rounded-lg px-3 py-2">
+                        <span className="text-lg">📥</span>
+                        <div>
+                            <div className="text-[10px] text-blue-500 font-medium">Nowe leady</div>
+                            <div className="text-sm font-bold text-blue-700">{pipelineStats.newCount}</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-amber-200 rounded-lg px-3 py-2">
+                        <span className="text-lg">🔥</span>
+                        <div>
+                            <div className="text-[10px] text-amber-600 font-medium">W procesie</div>
+                            <div className="text-sm font-bold text-amber-700">{pipelineStats.advancedCount}</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="text-lg">🎯</span>
+                        <div>
+                            <div className="text-[10px] text-slate-500 font-medium">Oferta %</div>
+                            <div className="text-sm font-bold text-slate-800">{pipelineStats.offerRate}%</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
+                        <span className="text-lg">🏆</span>
+                        <div>
+                            <div className="text-[10px] text-emerald-600 font-medium">Win Rate</div>
+                            <div className="text-sm font-bold text-emerald-700">{pipelineStats.winRate}%</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="text-lg">⏱️</span>
+                        <div>
+                            <div className="text-[10px] text-slate-500 font-medium">Śr. pipeline</div>
+                            <div className="text-sm font-bold text-slate-800">{pipelineStats.avgDays}d</div>
+                        </div>
+                    </div>
+                    {pipelineStats.monthWonValue > 0 && (
+                        <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
+                            <span className="text-lg">💰</span>
+                            <div>
+                                <div className="text-[10px] text-emerald-600 font-medium">Wygrane (mies.)</div>
+                                <div className="text-sm font-bold text-emerald-700">€{pipelineStats.monthWonValue.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <DndContext
                 sensors={sensors}
                 collisionDetection={closestCorners}
@@ -468,6 +967,24 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             onSchedule={setMeasurementLead}
                             onDelete={handleDeleteLead}
                             isAdmin={isAdmin()}
+                            completedFormLeadIds={completedFormLeadIds}
+                            offerViewMap={offerViewMap}
+                            onAutoAssign={['new', 'formularz', 'contacted'].includes(column.id) ? async () => {
+                                const toastId = toast.loading('🤖 Przydzielam leady...');
+                                try {
+                                    const result = await LeadAutoAssignService.autoAssignUnassignedLeads();
+                                    toast.dismiss(toastId);
+                                    if (result.assigned > 0) {
+                                        toast.success(`✅ Przydzielono ${result.assigned} leadów automatycznie`);
+                                    } else {
+                                        toast.success('Wszystkie leady mają już opiekuna');
+                                    }
+                                    onLeadUpdate();
+                                } catch {
+                                    toast.dismiss(toastId);
+                                    toast.error('Błąd automatycznego przydzielania');
+                                }
+                            } : undefined}
                         />
                     ))}
                 </div>
@@ -484,7 +1001,8 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                                         onUpdate={() => { }}
                                         onSchedule={() => { }}
                                         onDelete={() => { }}
-                                        isAdmin={false} // No delete in drag overlay needed
+                                        isAdmin={false}
+                                        formCompleted={false}
                                     />
                                 </div>
                             ) : null;
@@ -497,6 +1015,12 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 isOpen={lostModalOpen}
                 onClose={() => { setLostModalOpen(false); setPendingLostLeadId(null); }}
                 onConfirm={handleLostConfirm}
+            />
+
+            <WonLeadModal
+                isOpen={wonModalOpen}
+                onClose={() => { setWonModalOpen(false); setPendingWonLeadId(null); }}
+                onConfirm={handleWonConfirm}
             />
 
             {measurementLead && (

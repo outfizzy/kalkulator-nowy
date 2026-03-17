@@ -6,6 +6,8 @@ import { SmartSidebar } from './SmartSidebar';
 import { TeamPanelEnhanced } from './TeamPanelEnhanced';
 import { CalendarGridEnhanced } from './CalendarGridEnhanced';
 import { CompletionReportModal } from './CompletionReportModal';
+import { GoogleCalendarImportPanel } from './GoogleCalendarImportPanel';
+import { GCalEventActionModal } from './GCalEventActionModal';
 import { InstallationService } from '../../services/database/installation.service';
 import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability } from '../../types';
 import { getWeatherForInstallations, type LocationForecast } from '../../services/weather.service';
@@ -40,6 +42,10 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
     const [activeDragItem, setActiveDragItem] = useState<any>(null);
     const [weatherData, setWeatherData] = useState<Map<string, LocationForecast>>(new Map());
     const [reportInstallation, setReportInstallation] = useState<Installation | null>(null);
+    const [googleImportOpen, setGoogleImportOpen] = useState(false);
+    const [showGoogleEvents, setShowGoogleEvents] = useState(false);
+    const [gcalSelectedEvent, setGcalSelectedEvent] = useState<any>(null);
+    const [gcalDropTarget, setGcalDropTarget] = useState<{ teamId: string; date: string } | null>(null);
 
     // Fetch weather when week or installations change
     useEffect(() => {
@@ -122,6 +128,15 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                     targetTeamId
                 );
                 toast.success('Dokończenie zaplanowane', { id: toastId });
+            } else if (itemType === 'gcal_event') {
+                // Drop GCal event onto a team → open the modal pre-filled with team+date
+                const gcalEvent = dragData.gcalEvent;
+                if (gcalEvent) {
+                    setGcalDropTarget({ teamId: targetTeamId, date: targetDate });
+                    setGcalSelectedEvent(gcalEvent);
+                    toast.dismiss(toastId);
+                    return; // Don't call onRefresh — modal handles creation
+                }
             }
 
             onRefresh();
@@ -148,6 +163,9 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                         onRefresh={onRefresh}
                         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                         onToggleTeamPanel={() => setTeamPanelOpen(!teamPanelOpen)}
+                        onGoogleImport={() => setShowGoogleEvents(!showGoogleEvents)}
+                        onGoogleAIImport={() => setGoogleImportOpen(true)}
+                        showGoogleEvents={showGoogleEvents}
                         sidebarOpen={sidebarOpen}
                         teamPanelOpen={teamPanelOpen}
                     />
@@ -193,6 +211,11 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                                 onEditInstallation={onEditInstallation}
                                 onReportClick={setReportInstallation}
                                 weatherData={weatherData}
+                                showGoogleEvents={showGoogleEvents}
+                                onGCalEventClick={(event) => setGcalSelectedEvent(event)}
+                                serviceTickets={serviceTickets}
+                                contracts={contracts}
+                                followUps={followUps}
                             />
                         </div>
 
@@ -242,6 +265,23 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                     }}
                 />
             )}
+
+            {/* Google Calendar Import Panel */}
+            <GoogleCalendarImportPanel
+                isOpen={googleImportOpen}
+                onClose={() => setGoogleImportOpen(false)}
+                onImported={onRefresh}
+            />
+
+            {/* Google Calendar Event Action Modal */}
+            <GCalEventActionModal
+                event={gcalSelectedEvent}
+                isOpen={!!gcalSelectedEvent}
+                onClose={() => { setGcalSelectedEvent(null); setGcalDropTarget(null); }}
+                onCreated={onRefresh}
+                preSelectedTeamId={gcalDropTarget?.teamId}
+                preSelectedDate={gcalDropTarget?.date}
+            />
         </>
     );
 };

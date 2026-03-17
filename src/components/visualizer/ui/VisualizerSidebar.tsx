@@ -874,6 +874,50 @@ export const VisualizerSidebar: React.FC<VisualizerSidebarProps> = ({
                                     </div>
                                 </div>
 
+                                {/* Fixed Aluminum Walls */}
+                                <div className="bg-white/50 rounded-2xl p-4 border border-slate-100">
+                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ścianki Stałe (Aluminium)</div>
+                                    <div className="text-[10px] text-slate-400 mb-3">Stałe ścianki aluminiowe w kolorze konstrukcji</div>
+                                    <div className="flex gap-2">
+                                        {['left', 'front', 'right'].map((loc) => {
+                                            const location = loc as 'left' | 'front' | 'right';
+                                            const isActive = config.addons.some(a => a.type === 'fixedWall' && a.location === location && a.name?.includes('Aluminium'));
+
+                                            return (
+                                                <button
+                                                    key={location}
+                                                    onClick={() => {
+                                                        let newAddons = [...config.addons];
+                                                        if (isActive) {
+                                                            newAddons = newAddons.filter(a => !(a.type === 'fixedWall' && a.location === location && a.name?.includes('Aluminium')));
+                                                        } else {
+                                                            newAddons.push({
+                                                                id: `alu-wall-${location}-${Date.now()}`,
+                                                                type: 'fixedWall',
+                                                                name: `Aluminium-Wand (${location === 'front' ? 'Front' : location === 'left' ? 'Lewa' : 'Prawa'})`,
+                                                                location: location,
+                                                                price: 0,
+                                                                width: location === 'front' ? config.width : config.projection,
+                                                                height: config.postsHeight
+                                                            });
+                                                        }
+                                                        onChange({ addons: newAddons });
+                                                    }}
+                                                    className={`flex-1 py-3 px-2 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${isActive
+                                                        ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                                                        : 'border-slate-200 hover:border-slate-300 text-slate-400 hover:text-slate-600 bg-white'
+                                                        }`}
+                                                >
+                                                    <div className="text-xl">
+                                                        {location === 'left' ? '⬅️' : location === 'right' ? '➡️' : '⬆️'}
+                                                    </div>
+                                                    <div className="text-[10px] font-bold uppercase">{location === 'front' ? 'Przód' : location === 'left' ? 'Lewa' : 'Prawa'}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
                                 {/* HEATER - HIDE FOR PERGOLA */}
                                 {config.modelId !== 'pergola_bio' && (
                                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">

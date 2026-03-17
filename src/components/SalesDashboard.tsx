@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
@@ -8,13 +8,15 @@ import { calculateCommissionStats, calculateSalesRepStats } from '../utils/stati
 import type { SalesRepStats } from '../utils/statistics';
 import { useAuth } from '../contexts/AuthContext';
 import type { CommissionStats, Offer, SalesProfile, Lead } from '../types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { RingostatWidget } from './widgets/RingostatWidget';
+import { MiniTelephonyWidget } from './widgets/MiniTelephonyWidget';
 import { TasksList } from './tasks/TasksList';
 import { TaskModal } from './tasks/TaskModal';
 import { StaleLeadsWidget } from './widgets/StaleLeadsWidget';
 import { InstallationService } from '../services/database/installation.service';
 import { InstallationSettlementModal } from './installations/InstallationSettlementModal';
+import { supabase } from '../lib/supabase';
 import type { Installation } from '../types';
 
 export const SalesDashboard: React.FC = () => {
@@ -28,6 +30,30 @@ export const SalesDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
+    const navigate = useNavigate();
+
+    // Telephony Presence (persisted to DB)
+    const [availabilityStatus, setAvailabilityStatus] = useState<'available' | 'busy' | 'offline'>('available');
+
+    useEffect(() => {
+        // Load from DB
+        if (currentUser?.id) {
+            supabase.from('profiles').select('availability_status').eq('id', currentUser.id).single()
+                .then(({ data }) => {
+                    if (data?.availability_status) setAvailabilityStatus(data.availability_status);
+                });
+        }
+    }, [currentUser?.id]);
+
+    const cycleAvailability = async () => {
+        const order: ('available' | 'busy' | 'offline')[] = ['available', 'busy', 'offline'];
+        const nextIdx = (order.indexOf(availabilityStatus) + 1) % order.length;
+        const next = order[nextIdx];
+        setAvailabilityStatus(next);
+        if (currentUser?.id) {
+            await supabase.from('profiles').update({ availability_status: next }).eq('id', currentUser.id);
+        }
+    };
 
     // Settlement State
     const [unsettledInstallations, setUnsettledInstallations] = useState<Installation[]>([]);
@@ -177,11 +203,11 @@ export const SalesDashboard: React.FC = () => {
     const inProgressLeads = leads.filter(l => ['contacted', 'offer_sent', 'negotiation'].includes(l.status)).length;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8 px-1 sm:px-0">
             {/* Header & Filter */}
-            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 sm:gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-800">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">
                         Witaj, {profile?.firstName || 'Handlowcu'}! 👋
                     </h2>
                     <p className="text-slate-500 mt-1">Oto Twoje wyniki sprzedaży.</p>
@@ -209,53 +235,94 @@ export const SalesDashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* ── Telephony Presence Bar ── */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4 flex flex-wrap items-center gap-3 sm:gap-4">
+                {/* Availability Toggle */}
+                <button
+                    onClick={cycleAvailability}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
+                        availabilityStatus === 'available'
+                            ? 'bg-green-100 text-green-700 ring-2 ring-green-300 shadow-sm'
+                            : availabilityStatus === 'busy'
+                            ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-300 shadow-sm'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                >
+                    <div className={`w-3 h-3 rounded-full transition-all ${
+                        availabilityStatus === 'available' ? 'bg-green-500 animate-pulse'
+                        : availabilityStatus === 'busy' ? 'bg-amber-500'
+                        : 'bg-slate-400'
+                    }`} />
+                    {availabilityStatus === 'available' ? '📞 Dostępny' : availabilityStatus === 'busy' ? '🔴 Zajęty' : '📵 Niedostępny'}
+                </button>
+
+                <div className="w-px h-8 bg-slate-200 hidden sm:block" />
+
+                {/* Quick channel links */}
+                <Link to="/telephony/whatsapp" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+                    💬 WhatsApp
+                </Link>
+                <Link to="/telephony/whatsapp/campaigns" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+                    📢 Kampanie WA
+                </Link>
+                <Link to="/telephony/sms" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors">
+                    📱 SMS
+                </Link>
+                <Link to="/telephony/calls" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors">
+                    📞 Historia połączeń
+                </Link>
+                <Link to="/telephony/voicemail" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">
+                    📬 Poczta głosowa
+                </Link>
+            </div>
+
             {/* Quick Action Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
                 <Link
                     to="/new-offer"
-                    className="group bg-gradient-to-br from-accent to-orange-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                    className="group bg-gradient-to-br from-accent to-orange-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Nowa Oferta</h3>
-                        <p className="text-white/80 text-sm">Utwórz nową ofertę dla klienta</p>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Nowa Oferta</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Utwórz nową ofertę dla klienta</p>
                     </div>
                 </Link>
 
                 <Link
                     to="/fairs"
-                    className="group bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                    className="group bg-gradient-to-br from-indigo-500 to-purple-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Targi</h3>
-                        <p className="text-white/80 text-sm">Tryb obsługi na targach</p>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Targi</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Tryb obsługi na targach</p>
                     </div>
                 </Link>
 
                 <Link
                     to="/leads"
-                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                    className="group bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-yellow-500/20 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-500/10 rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-yellow-500/20 transition-colors">
                             <svg className="w-7 h-7 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Leady</h3>
-                        <p className="text-slate-600 text-sm">Zarządzaj potencjalnymi klientami</p>
+                        <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 sm:mb-2">Leady</h3>
+                        <p className="text-slate-600 text-xs sm:text-sm hidden sm:block">Zarządzaj potencjalnymi klientami</p>
                         {newLeads > 0 && (
                             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold">
                                 {newLeads} nowych
@@ -266,33 +333,33 @@ export const SalesDashboard: React.FC = () => {
 
                 <Link
                     to="/mail"
-                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                    className="group bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500/10 rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-purple-500/20 transition-colors">
                             <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Poczta</h3>
-                        <p className="text-slate-600 text-sm">Skrzynka odbiorcza</p>
+                        <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 sm:mb-2">Poczta</h3>
+                        <p className="text-slate-600 text-xs sm:text-sm hidden sm:block">Skrzynka odbiorcza</p>
                     </div>
                 </Link>
 
                 <Link
                     to="/offers"
-                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                    className="group bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent/10 rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-accent/20 transition-colors">
                             <svg className="w-7 h-7 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Zarządzaj Ofertami</h3>
-                        <p className="text-slate-600 text-sm">Zobacz i edytuj wszystkie oferty</p>
+                        <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 sm:mb-2">Oferty</h3>
+                        <p className="text-slate-600 text-xs sm:text-sm hidden sm:block">Zobacz i edytuj wszystkie oferty</p>
                         {stats.totalOffers > 0 && (
                             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-accent/10 text-accent rounded-full text-sm font-bold">
                                 {stats.totalOffers} ofert
@@ -303,71 +370,116 @@ export const SalesDashboard: React.FC = () => {
 
                 <Link
                     to="/reports"
-                    className="group bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
+                    className="group bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border-2 border-slate-200 hover:border-accent hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative overflow-hidden"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent/10 rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-accent/20 transition-colors">
                             <svg className="w-7 h-7 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Raporty</h3>
-                        <p className="text-slate-600 text-sm">Dodawaj i przeglądaj raporty</p>
+                        <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 sm:mb-2">Raporty</h3>
+                        <p className="text-slate-600 text-xs sm:text-sm hidden sm:block">Dodawaj i przeglądaj raporty</p>
                     </div>
                 </Link>
 
                 <Link
                     to="/visualizer"
-                    className="group bg-gradient-to-br from-cyan-500 to-teal-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                    className="group bg-gradient-to-br from-cyan-500 to-teal-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Wizualizator 3D</h3>
-                        <p className="text-white/80 text-sm">Konfiguruj dachy i ogrodzenia</p>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Wizualizator 3D</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Konfiguruj dachy i ogrodzenia</p>
                     </div>
                 </Link>
 
                 <Link
                     to="/measurements"
-                    className="group bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                    className="group bg-gradient-to-br from-blue-500 to-blue-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Kalendarz Pomiarowy</h3>
-                        <p className="text-white/80 text-sm">Planuj pomiary dla klientów</p>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Pomiary</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Planuj pomiary dla klientów</p>
                     </div>
                 </Link>
 
                 <Link
                     to="/installations"
-                    className="group bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                    className="group bg-gradient-to-br from-purple-500 to-purple-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Kalendarz Montażowy</h3>
-                        <p className="text-white/80 text-sm">Zobacz harmonogram montaży</p>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Montaże</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Zobacz harmonogram montaży</p>
+                    </div>
+                </Link>
+
+                {/* WhatsApp */}
+                <Link
+                    to="/telephony/whatsapp"
+                    className="group bg-gradient-to-br from-green-500 to-green-700 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
+                            <span className="text-2xl">💬</span>
+                        </div>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">WhatsApp</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Wiadomości i kampanie</p>
+                    </div>
+                </Link>
+
+                {/* Telefonia */}
+                <Link
+                    to="/telephony/calls"
+                    className="group bg-gradient-to-br from-orange-500 to-red-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
+                            <span className="text-2xl">📞</span>
+                        </div>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Telefonia</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Połączenia i nagrania</p>
+                    </div>
+                </Link>
+
+                {/* Tankowanie */}
+                <Link
+                    to="/my-fuel"
+                    className="group bg-gradient-to-br from-amber-500 to-yellow-600 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
+                            <span className="text-2xl">⛽</span>
+                        </div>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Tankowanie</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Rejestruj pobrane paliwo</p>
                     </div>
                 </Link>
             </div>
 
             {/* Tasks, Stale Leads & Ringostat Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 <div className="lg:col-span-1">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full flex flex-col min-h-[400px]">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
@@ -435,6 +547,13 @@ export const SalesDashboard: React.FC = () => {
 
             </div>
 
+            {/* Mini Telephony Widget — missed incoming calls */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                    <MiniTelephonyWidget />
+                </div>
+            </div>
+
             {/* Centrum Połączeń — full-width Ringostat section */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center gap-3">
@@ -476,11 +595,11 @@ export const SalesDashboard: React.FC = () => {
             )}
 
             {/* Monthly Settlement Card */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 rounded-xl shadow-lg">
-                <div className="flex justify-between items-start mb-4">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-4 sm:p-6 rounded-xl shadow-lg">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
                     <div>
                         <h3 className="text-lg font-medium text-slate-300">Rozliczenie: {months[selectedMonth]} {selectedYear}</h3>
-                        <div className="text-4xl font-bold mt-2 text-white">
+                        <div className="text-2xl sm:text-4xl font-bold mt-2 text-white">
                             {Number(monthlyCommission || 0).toLocaleString('de-DE', {
                                 style: 'currency',
                                 currency: 'EUR'
@@ -490,7 +609,7 @@ export const SalesDashboard: React.FC = () => {
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-slate-400">Przychód Netto</p>
-                        <p className="text-2xl font-bold text-emerald-400">
+                        <p className="text-xl sm:text-2xl font-bold text-emerald-400">
                             {Number(monthlyRevenue || 0).toLocaleString('de-DE', {
                                 style: 'currency',
                                 currency: 'EUR'
@@ -517,10 +636,10 @@ export const SalesDashboard: React.FC = () => {
             </div>
 
             {/* Key Metrics Grid (Global Stats) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6">
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Całkowity Przychód (YTD)</div>
-                    <div className="text-3xl font-bold text-slate-900">
+                    <div className="text-xl sm:text-3xl font-bold text-slate-900">
                         {Number(stats.totalRevenue || 0).toLocaleString('de-DE', {
                             style: 'currency',
                             currency: 'EUR'
@@ -528,9 +647,9 @@ export const SalesDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Całkowita Prowizja (YTD)</div>
-                    <div className="text-3xl font-bold text-green-600">
+                    <div className="text-xl sm:text-3xl font-bold text-green-600">
                         {Number(stats.totalCommission || 0).toLocaleString('de-DE', {
                             style: 'currency',
                             currency: 'EUR'
@@ -538,16 +657,16 @@ export const SalesDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Skuteczność (Win Rate)</div>
-                    <div className="text-3xl font-bold text-accent">
+                    <div className="text-xl sm:text-3xl font-bold text-accent">
                         {stats.totalOffers > 0 ? ((stats.soldOffers / stats.totalOffers) * 100).toFixed(1) : 0}%
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Lejek (Otwarte)</div>
-                    <div className="text-3xl font-bold text-orange-500">
+                    <div className="text-xl sm:text-3xl font-bold text-orange-500">
                         {Number(stats.projectedCommission || 0).toLocaleString('de-DE', {
                             style: 'currency',
                             currency: 'EUR'
@@ -555,19 +674,19 @@ export const SalesDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Leady (Nowe/W toku)</div>
-                    <div className="text-3xl font-bold text-yellow-600">
+                    <div className="text-xl sm:text-3xl font-bold text-yellow-600">
                         {newLeads} / {inProgressLeads}
                     </div>
                 </div>
             </div>
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
                 {/* Revenue Chart */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6">Przychód i Prowizja (Ostatnie 6 msc)</h3>
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-4 sm:mb-6">Przychód i Prowizja (6 msc)</h3>
                     <div className="h-64">
                         {monthlyData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
@@ -596,8 +715,8 @@ export const SalesDashboard: React.FC = () => {
                 </div>
 
                 {/* Status Distribution */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6">Status Ofert</h3>
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-4 sm:mb-6">Status Ofert</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -618,7 +737,7 @@ export const SalesDashboard: React.FC = () => {
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
-                    <div className="flex justify-center gap-4 mt-4">
+                    <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-3 sm:mt-4">
                         {statusData.map((entry, index) => (
                             <div key={index} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
@@ -631,57 +750,59 @@ export const SalesDashboard: React.FC = () => {
 
             {/* Monthly Transactions Table */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-slate-800">Transakcje: {months[selectedMonth]} {selectedYear}</h3>
+                <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-800">Transakcje: {months[selectedMonth]} {selectedYear}</h3>
                     <Link to="/offers" className="text-sm text-accent hover:underline">Zarządzaj ofertami</Link>
                 </div>
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-slate-500 font-medium">
-                        <tr>
-                            <th className="px-6 py-3">Data</th>
-                            <th className="px-6 py-3">Klient</th>
-                            <th className="px-6 py-3 text-right">Kwota Netto</th>
-                            <th className="px-6 py-3 text-right">Prowizja</th>
-                            <th className="px-6 py-3 text-center">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {monthlySoldOffers.length > 0 ? (
-                            monthlySoldOffers.map(offer => (
-                                <tr key={offer.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-4 text-slate-600">
-                                        {new Date(offer.createdAt).toLocaleDateString('pl-PL')}
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-slate-900">
-                                        {offer.customer.firstName} {offer.customer.lastName}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-slate-600">
-                                        {Number(
-                                            offer.pricing?.finalPriceNet ??
-                                            offer.pricing?.sellingPriceNet ??
-                                            0
-                                        ).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        {offer.pricing?.finalPriceNet && <span className="ml-2 text-xs text-blue-500 font-bold">(Umowa)</span>}
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-bold text-green-600">
-                                        +{Number(offer.commission || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">
-                                            Sprzedane
-                                        </span>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left min-w-[600px]">
+                        <thead className="bg-slate-50 text-slate-500 font-medium">
+                            <tr>
+                                <th className="px-6 py-3">Data</th>
+                                <th className="px-6 py-3">Klient</th>
+                                <th className="px-6 py-3 text-right">Kwota Netto</th>
+                                <th className="px-6 py-3 text-right">Prowizja</th>
+                                <th className="px-6 py-3 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {monthlySoldOffers.length > 0 ? (
+                                monthlySoldOffers.map(offer => (
+                                    <tr key={offer.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4 text-slate-600">
+                                            {new Date(offer.createdAt).toLocaleDateString('pl-PL')}
+                                        </td>
+                                        <td className="px-6 py-4 font-medium text-slate-900">
+                                            {offer.customer.firstName} {offer.customer.lastName}
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-slate-600">
+                                            {Number(
+                                                offer.pricing?.finalPriceNet ??
+                                                offer.pricing?.sellingPriceNet ??
+                                                0
+                                            ).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                            {offer.pricing?.finalPriceNet && <span className="ml-2 text-xs text-blue-500 font-bold">(Umowa)</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-green-600">
+                                            +{Number(offer.commission || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">
+                                                Sprzedane
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                                        Brak transakcji w wybranym miesiącu.
                                     </td>
                                 </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
-                                    Brak transakcji w wybranym miesiącu.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Admin: Team Performance Section */}
@@ -689,7 +810,7 @@ export const SalesDashboard: React.FC = () => {
                 <div className="mt-8">
                     <h2 className="text-2xl font-bold text-slate-800 mb-6">Wydajność Zespołu Sprzedaży</h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {teamStats.map(stat => (
                             <div key={stat.user.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                                 <div className="flex items-center gap-3 mb-4">

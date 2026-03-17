@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AIService, type ChatMessage } from '../services/ai.service';
 import { usePageContext } from '../hooks/usePageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { PresetPromptsPanel } from './PresetPromptsPanel';
 import { QuickActionsBar } from './QuickActionsBar';
@@ -16,6 +17,7 @@ interface AIAssistantSidebarProps {
 
 export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, onClose }) => {
     const { context } = usePageContext();
+    const { currentUser } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -103,12 +105,19 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
             // Include context only if it's the first message about this context? 
             // Or always inject it as "System Context"?
             // We pass it to service, service injects it.
+            const aiContext = {
+                ...context,
+                userRole: currentUser?.role || 'sales_rep',
+                userName: currentUser?.firstName || currentUser?.email?.split('@')[0],
+                currentPage: context.currentPage || window.location.pathname
+            };
+
             const response = await AIService.sendSessionMessage(
                 currentSessionId,
                 enrichedContent,
                 messages,
                 undefined, // image
-                context.type !== 'general' ? context : undefined // Inject context if specific
+                aiContext
             );
 
             if (response) {
@@ -201,8 +210,8 @@ export const AIAssistantSidebar: React.FC<AIAssistantSidebarProps> = ({ isOpen, 
                         {messages.map((msg, idx) => (
                             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} `}>
                                 <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === 'user'
-                                        ? 'bg-blue-600 text-white rounded-tr-none'
-                                        : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
+                                    ? 'bg-blue-600 text-white rounded-tr-none'
+                                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
                                     }`}>
                                     <MessageFormatter content={msg.content} role={msg.role} />
                                 </div>

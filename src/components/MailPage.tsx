@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -56,6 +56,17 @@ export const MailPage: React.FC = () => {
     const [emails, setEmails] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
+
+    // Feature 1: Search
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Feature 2: Auto-polling
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastEmailCountRef = useRef<number>(0);
+
+    // Feature 3: Smart Reply
+    const [smartReplies, setSmartReplies] = useState<string[]>([]);
+    const [smartReplyLoading, setSmartReplyLoading] = useState(false);
 
     // Fetch Converted Lead IDs
     React.useEffect(() => {
@@ -305,6 +316,128 @@ export const MailPage: React.FC = () => {
             fetchEmails();
         }
     }, [activeConfig, activeTab, isConfigured, refreshTrigger, boxName, CACHE_KEY]);
+
+    // ── Auto-Polling (every 30s, silent background fetch) ──
+    const silentFetchRef = useRef<() => Promise<void>>();
+    silentFetchRef.current = async () => {
+        if (!activeConfig?.imapHost || activeTab === 'compose') return;
+        try {
+            const response = await fetch('/api/fetch-emails', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: activeConfig, limit: 100, box: boxName })
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const newEmails = data.messages || [];
+
+            // Detect new emails
+            if (lastEmailCountRef.current > 0 && newEmails.length > lastEmailCountRef.current) {
+                const diff = newEmails.length - lastEmailCountRef.current;
+                toast(`📬 ${diff} ${diff === 1 ? 'nowa wiadomość' : 'nowe wiadomości'}`, { icon: '✉️', duration: 4000 });
+            }
+            lastEmailCountRef.current = newEmails.length;
+            setEmails(newEmails);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(newEmails));
+        } catch { /* silent fail */ }
+    };
+
+    useEffect(() => {
+        // Track initial count
+        lastEmailCountRef.current = emails.length;
+    }, [activeConfig, activeTab]);
+
+    useEffect(() => {
+        if (!isConfigured || activeTab === 'compose') {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            return;
+        }
+        pollingRef.current = setInterval(() => silentFetchRef.current?.(), 30000);
+        return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+    }, [isConfigured, activeTab, activeConfig, boxName]);
+
+    // ── Smart Reply Handler ──
+    const handleSmartReply = useCallback(async () => {
+        if (!selectedEmail) return;
+        setSmartReplyLoading(true);
+        setSmartReplies([]);
+
+        try {
+            const emailContext = `From: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`;
+            const userOpenaiKey = currentUser?.emailConfig?.openaiKey;
+
+            const { supabase } = await import('../lib/supabase');
+            const { data, error } = await supabase.functions.invoke('extract-lead-info', {
+                body: {
+                    text: `Wygeneruj dokładnie 3 krótkie propozycje odpowiedzi na poniższą wiadomość e-mail. Odpowiedzi powinny być po niemiecku, profesjonalne i zwięzłe (max 2 zdania każda). Zwróć TYLKO JSON array z 3 stringami, bez żadnego innego tekstu.\n\nFormat: ["reply1", "reply2", "reply3"]\n\nWiadomość:\n${emailContext}`,
+                    apiKey: userOpenaiKey,
+                    mode: 'smart_reply'
+                }
+            });
+
+            if (error) throw error;
+
+            // Parse the response — the edge function returns leadData but we hijacked it for smart reply
+            const raw = data?.leadData || data?.raw || data;
+            let replies: string[] = [];
+
+            if (typeof raw === 'string') {
+                const match = raw.match(/\[.*\]/s);
+                if (match) replies = JSON.parse(match[0]);
+            } else if (Array.isArray(raw)) {
+                replies = raw;
+            } else if (raw?.replies) {
+                replies = raw.replies;
+            }
+
+            if (replies.length === 0) {
+                // Fallback: generate simple replies
+                replies = [
+                    'Vielen Dank für Ihre Nachricht. Ich melde mich zeitnah bei Ihnen.',
+                    'Danke für Ihre Anfrage. Könnten Sie mir bitte weitere Details mitteilen?',
+                    'Vielen Dank! Ich werde das intern prüfen und mich bei Ihnen zurückmelden.'
+                ];
+            }
+
+            setSmartReplies(replies.slice(0, 3));
+        } catch (err) {
+            console.error('Smart Reply Error:', err);
+            // Fallback replies
+            setSmartReplies([
+                'Vielen Dank für Ihre Nachricht. Ich melde mich zeitnah bei Ihnen.',
+                'Danke für Ihre Anfrage. Könnten Sie mir bitte weitere Details mitteilen?',
+                'Vielen Dank! Ich werde das intern prüfen und mich bei Ihnen zurückmelden.'
+            ]);
+        } finally {
+            setSmartReplyLoading(false);
+        }
+    }, [selectedEmail, currentUser]);
+
+    const useSmartReply = (reply: string) => {
+        setActiveTab('compose');
+        const replyTo = selectedEmail?.from.includes('<') ? selectedEmail?.from.match(/<(.+?)>/)?.[1] || selectedEmail?.from : selectedEmail?.from || '';
+        setComposeData({
+            to: replyTo,
+            subject: selectedEmail?.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail?.subject || ''}`,
+            body: reply
+        });
+        setSmartReplies([]);
+    };
+
+    // Filtered emails for search
+    const filteredEmails = searchQuery.trim()
+        ? emails.filter(e => {
+            const q = searchQuery.toLowerCase();
+            return (
+                (e.from || '').toLowerCase().includes(q) ||
+                (e.subject || '').toLowerCase().includes(q) ||
+                (e.text || '').toLowerCase().includes(q)
+            );
+        })
+        : emails;
+
+    // Unread count for badge
+    const unreadCount = emails.filter(e => !e.flags?.includes('\\Seen')).length;
 
     const handleSelectEmail = async (uid: number | string) => {
         const emailIdAsNumber = Number(uid);
@@ -1114,6 +1247,27 @@ export const MailPage: React.FC = () => {
                 {/* Email List Column (Visible unless in Compose mode) */}
                 {activeTab !== 'compose' && (
                     <div className={`flex-col border-r border-slate-200 overflow-y-auto transition-all duration-300 ${selectedEmail ? 'w-80 hidden lg:flex' : 'w-full'}`}>
+                        {/* Search Bar */}
+                        <div className="px-3 py-2 border-b border-slate-100 bg-white">
+                            <div className="relative">
+                                <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Szukaj w wiadomościach..."
+                                    className="w-full pl-9 pr-8 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                )}
+                            </div>
+                            {searchQuery && <p className="text-[10px] text-slate-400 mt-1 px-1">Znaleziono: {filteredEmails.length} z {emails.length}</p>}
+                        </div>
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 min-h-[60px]">
                             {selectedEmailIds.size > 0 ? (
                                 <div className="flex items-center justify-between w-full animate-fade-in-up">
@@ -1164,8 +1318,11 @@ export const MailPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <>
-                                    <h2 className="text-lg font-bold text-slate-800">
+                                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                         {activeTab === 'inbox' ? 'Skrzynka Odbiorcza' : 'Wysłane'}
+                                        {activeTab === 'inbox' && unreadCount > 0 && (
+                                            <span className="px-2 py-0.5 text-xs font-bold bg-blue-600 text-white rounded-full animate-pulse">{unreadCount}</span>
+                                        )}
                                     </h2>
                                     <div className="flex gap-2">
                                         {activeTab === 'inbox' && (
@@ -1208,7 +1365,7 @@ export const MailPage: React.FC = () => {
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
-                                {emails.map(email => (
+                                {filteredEmails.map(email => (
                                     <div
                                         key={email.id}
                                         className={`p-3 border-b border-slate-50 transition-colors ${selectedEmail?.id === email.messageId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
@@ -1495,6 +1652,21 @@ export const MailPage: React.FC = () => {
                                                         <span className="hidden sm:inline">Przekaż</span>
                                                     </button>
                                                     <button
+                                                        onClick={handleSmartReply}
+                                                        disabled={smartReplyLoading}
+                                                        className="px-3 py-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                        title="AI zaproponuje 3 szybkie odpowiedzi"
+                                                    >
+                                                        {smartReplyLoading ? (
+                                                            <RefreshCw className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                                            </svg>
+                                                        )}
+                                                        <span className="hidden sm:inline">Smart Reply</span>
+                                                    </button>
+                                                    <button
                                                         onClick={handleCreateLead}
                                                         className="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                                                     >
@@ -1557,6 +1729,41 @@ export const MailPage: React.FC = () => {
                                                             </div>
                                                         ))}
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* Smart Reply Suggestions */}
+                                            {smartReplies.length > 0 && (
+                                                <div className="mt-6 pt-4 border-t border-slate-100">
+                                                    <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                                        </svg>
+                                                        AI Smart Reply — kliknij aby użyć
+                                                    </h4>
+                                                    <div className="space-y-2">
+                                                        {smartReplies.map((reply, i) => (
+                                                            <button
+                                                                key={i}
+                                                                onClick={() => useSmartReply(reply)}
+                                                                className="w-full text-left p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-sm text-slate-700 transition-all hover:shadow-md hover:scale-[1.01] active:scale-[0.99] group"
+                                                            >
+                                                                <div className="flex items-start gap-2">
+                                                                    <span className="text-emerald-500 font-bold text-xs mt-0.5">{i + 1}</span>
+                                                                    <span className="flex-1">{reply}</span>
+                                                                    <svg className="w-4 h-4 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                                                    </svg>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setSmartReplies([])}
+                                                        className="mt-2 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                                                    >
+                                                        Zamknij sugestie
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>

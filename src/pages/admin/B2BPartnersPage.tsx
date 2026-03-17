@@ -140,6 +140,24 @@ export function B2BPartnersPage() {
         try {
             if (selectedPartner) {
                 await B2BService.updatePartner(selectedPartner.id, formData);
+
+                // Sync margin to linked user profiles
+                try {
+                    const { supabase } = await import('../../lib/supabase');
+                    const { data: links } = await supabase
+                        .from('b2b_partner_users')
+                        .select('user_id')
+                        .eq('partner_id', selectedPartner.id);
+                    if (links && links.length > 0) {
+                        const userIds = links.map(l => l.user_id);
+                        await supabase
+                            .from('profiles')
+                            .update({ partner_margin: formData.margin_percent / 100, updated_at: new Date().toISOString() })
+                            .in('id', userIds);
+                    }
+                } catch (syncErr) {
+                    console.warn('Could not sync margin to user profiles:', syncErr);
+                }
             } else {
                 await B2BService.createPartner(formData as any);
             }

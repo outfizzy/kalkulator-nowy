@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Customer, User } from '../types';
 import { getSnowZone } from '../utils/snowZones';
+import { StructuralZonesService } from '../services/structural-zones.service';
+import { StructuralZoneBadge } from './common/StructuralZoneBadge';
 import { DatabaseService } from '../services/database';
 import { UserService } from '../services/database/user.service';
+import { GeocodingService } from '../services/geocoding.service';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -56,6 +59,20 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
     const [showDropdown, setShowDropdown] = useState(false);
     const [aiSnowZone, setAiSnowZone] = useState<{ zone: number; label: string } | null>(null);
     const [plzLookupLoading, setPlzLookupLoading] = useState(false);
+    const cityManuallyEdited = useRef(false);
+
+    // Auto-fill city from postal code via Google Geocoding
+    useEffect(() => {
+        const plz = (customer.postalCode || '').trim();
+        if (!plz || cityManuallyEdited.current) return;
+
+        const country = GeocodingService.detectCountryFromPLZ(plz);
+        GeocodingService.lookupCity(plz, country, 'customerForm').then(result => {
+            if (result?.city && !cityManuallyEdited.current) {
+                setCustomer(prev => ({ ...prev, city: result.city }));
+            }
+        });
+    }, [customer.postalCode]);
 
     // Load previous customers and users on mount
     useEffect(() => {
@@ -108,6 +125,10 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         // Reset AI snow zone when postal code changes
         if (name === 'postalCode') {
             setAiSnowZone(null);
+            cityManuallyEdited.current = false;
+        }
+        if (name === 'city') {
+            cityManuallyEdited.current = true;
         }
     };
 
@@ -163,9 +184,9 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         e.preventDefault();
         // Basic validation
         const newErrors: Record<string, string> = {};
-        if (!customer.lastName) newErrors.lastName = 'Nazwisko jest wymagane';
-        if (!customer.postalCode) newErrors.postalCode = 'Kod pocztowy jest wymagany';
-        if (!customer.city) newErrors.city = 'Miasto jest wymagane';
+        if (!customer.lastName) newErrors.lastName = 'Nachname ist erforderlich';
+        if (!customer.postalCode) newErrors.postalCode = 'PLZ ist erforderlich';
+        if (!customer.city) newErrors.city = 'Ort ist erforderlich';
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
@@ -192,8 +213,8 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-bold text-slate-900">Wyszukaj istniejącego klienta</h3>
-                                <p className="text-sm text-accent-dark">Lub wprowadź nowe dane poniżej</p>
+                                <h3 className="font-bold text-slate-900">Bestehenden Kunden suchen</h3>
+                                <p className="text-sm text-accent-dark">Oder neue Daten unten eingeben</p>
                             </div>
                         </div>
                         <button
@@ -220,7 +241,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             className="px-4 py-2 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:border-accent hover:text-accent font-medium text-sm transition-all flex items-center gap-2"
                         >
                             <span className="text-xl">⚡️</span>
-                            Szybka Wycena (Bez danych)
+                            Schnellangebot (ohne Daten)
                         </button>
                     </div>
                     <div className="relative customer-search-container">
@@ -229,7 +250,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             value={searchQuery}
                             onChange={handleSearchChange}
                             onFocus={() => setShowDropdown(true)}
-                            placeholder="Wpisz imię, nazwisko, miasto lub kod pocztowy..."
+                            placeholder="Name, Nachname, Ort oder PLZ eingeben..."
                             className="w-full p-3 pl-10 border-2 border-accent/60 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white shadow-sm transition-all"
                         />
                         <svg className="w-5 h-5 text-accent absolute left-3 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -260,7 +281,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                             {item.customer.firstName} {item.customer.lastName}
                                         </div>
                                         <div className="text-sm text-slate-600 mt-1">
-                                            {item.customer.postalCode} {item.customer.city} • <span className="text-accent font-medium">{item.offerCount} {item.offerCount === 1 ? 'oferta' : 'ofert'}</span>
+                                            {item.customer.postalCode} {item.customer.city} • <span className="text-accent font-medium">{item.offerCount} {item.offerCount === 1 ? 'Angebot' : 'Angebote'}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -272,7 +293,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 <svg className="w-5 h-5 inline mr-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Nie znaleziono klientów pasujących do "{searchQuery}"
+                                Keine Kunden gefunden für "{searchQuery}"
                             </div>
                         )}
                     </div>
@@ -284,13 +305,13 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <span className="text-2xl">👤</span>
-                        <h3 className="text-xl font-bold text-slate-800">Dane Osobowe</h3>
+                        <h3 className="text-xl font-bold text-slate-800">Persönliche Daten</h3>
                     </div>
 
                     <div className="space-y-5">
                         {/* Salutation */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-3">Zwrot grzecznościowy</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-3">Anrede</label>
                             <div className="flex gap-4">
                                 {['Herr', 'Frau', 'Firma'].map(opt => (
                                     <label key={opt} className={`flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-3 rounded-xl border-2 transition-all ${customer.salutation === opt ? 'border-accent bg-accent/5 text-accent font-bold' : 'border-slate-200 hover:border-accent/30'}`}>
@@ -311,7 +332,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         {/* Name fields */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Imię</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Vorname</label>
                                 <input
                                     type="text"
                                     name="firstName"
@@ -323,7 +344,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Nazwisko / Nazwa Firmy <span className="text-red-500">*</span>
+                                    Nachname / Firmenname <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -343,14 +364,14 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <span className="text-2xl">📍</span>
-                        <h3 className="text-xl font-bold text-slate-800">Adres</h3>
+                        <h3 className="text-xl font-bold text-slate-800">Adresse</h3>
                     </div>
 
                     <div className="space-y-5">
                         {/* Street and House Number */}
                         <div className="grid grid-cols-3 gap-5">
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Ulica</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Straße</label>
                                 <input
                                     type="text"
                                     name="street"
@@ -361,7 +382,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Nr domu</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Hausnr.</label>
                                 <input
                                     type="text"
                                     name="houseNumber"
@@ -392,7 +413,8 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             </div>
                             <div className="col-span-2">
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Miasto (Ort) <span className="text-red-500">*</span>
+                                    Ort <span className="text-red-500">*</span>
+                                    {customer.city && !cityManuallyEdited.current && customer.postalCode && <span className="ml-1.5 text-xs text-emerald-500 font-normal">✓ auto</span>}
                                 </label>
                                 <input
                                     type="text"
@@ -406,35 +428,13 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             </div>
                         </div>
 
-                        {/* Snow Zone Info */}
+                        {/* Structural Zones — DIN EN 1991 */}
                         {customer.postalCode && customer.postalCode.length === 5 && (
                             <div className="space-y-3">
-                                {/* Static zone detection */}
-                                {snowZone && (
-                                    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl border-2 border-blue-200 flex items-start gap-3">
-                                        <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-blue-900">
-                                                {aiSnowZone
-                                                    ? `✅ Schneelastzone ${aiSnowZone.zone} (AI-geprüft, DIN EN 1991-1-3/NA)`
-                                                    : `Schneelastzone: ${snowZone.id} (Schätzung)`
-                                                }
-                                            </p>
-                                            <p className="text-sm text-blue-700 mt-1">
-                                                {aiSnowZone
-                                                    ? aiSnowZone.label
-                                                    : `Obciążenie: ${snowZone.value} kN/m² — Grobe Einschätzung anhand PLZ`
-                                                }
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Wind + Snow Zone Badges */}
+                                <StructuralZoneBadge zones={StructuralZonesService.getZones(customer.postalCode)} />
 
-                                {/* AI Lookup Button */}
+                                {/* AI Lookup Button (fine-tune snow zone) */}
                                 {!aiSnowZone && (
                                     <button
                                         type="button"
@@ -445,15 +445,28 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                                     body: {
                                                         messages: [{
                                                             role: 'user',
-                                                            content: `Für die deutsche Postleitzahl ${customer.postalCode}: Welche Schneelastzone nach DIN EN 1991-1-3/NA gilt dort? Antworte NUR mit einer einzelnen Zahl: 1, 2 oder 3. Keine weiteren Erklärungen.`
+                                                            content: `Du bist ein Statik-Experte. Für die deutsche Postleitzahl ${customer.postalCode}: Welche Schneelastzone gilt nach DIN EN 1991-1-3/NA? Berücksichtige die Geländehöhe des Ortes. Antworte EXAKT im Format: ZONE:X LAST:Y (z.B. ZONE:2 LAST:0.85 oder ZONE:1a LAST:0.65). Mögliche Zonen: 1, 1a, 2, 2a, 3. Keine weiteren Erklärungen.`
                                                         }]
                                                     }
                                                 });
                                                 if (error) throw error;
                                                 const content = data?.content || '';
-                                                const match = content.match(/[123]/);
-                                                if (match) {
-                                                    const detectedZone = parseInt(match[0]);
+                                                const zoneMatch = content.match(/ZONE:\s*(1a|2a|[123])/i);
+                                                const lastMatch = content.match(/LAST:\s*([0-9]+[.,][0-9]+)/i);
+                                                const simpleFallback = content.match(/[123]/);
+
+                                                if (zoneMatch) {
+                                                    const zoneCode = zoneMatch[1].toLowerCase();
+                                                    const loadValue = lastMatch ? parseFloat(lastMatch[1].replace(',', '.')) :
+                                                        (zoneCode === '1' ? 0.65 : zoneCode === '1a' ? 0.81 : zoneCode === '2' ? 0.85 : zoneCode === '2a' ? 1.06 : 1.10);
+                                                    const zoneNum = zoneCode === '1' || zoneCode === '1a' ? 1 : zoneCode === '2' || zoneCode === '2a' ? 2 : 3;
+                                                    setAiSnowZone({
+                                                        zone: zoneNum,
+                                                        label: `PLZ ${customer.postalCode} → Zone ${zoneCode.toUpperCase()} — Schneelast: ${loadValue.toFixed(2).replace('.', ',')} kN/m²`
+                                                    });
+                                                    toast.success(`Schneelastzone ${zoneCode.toUpperCase()} für PLZ ${customer.postalCode} erkannt (${loadValue.toFixed(2)} kN/m²)`);
+                                                } else if (simpleFallback) {
+                                                    const detectedZone = parseInt(simpleFallback[0]);
                                                     setAiSnowZone({
                                                         zone: detectedZone,
                                                         label: `PLZ ${customer.postalCode} → Zone ${detectedZone} (${detectedZone === 1 ? '0,65 kN/m²' : detectedZone === 2 ? '0,85 kN/m²' : '1,10 kN/m²'})`
@@ -478,7 +491,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                         {plzLookupLoading ? (
                                             <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></span> Schneelastzone wird geprüft (AI)...</>
                                         ) : (
-                                            <>🔍 Schneelastzone per AI prüfen (DIN EN 1991-1-3/NA)</>
+                                            <>🔍 Schneelastzone per AI verfeinern</>
                                         )}
                                     </button>
                                 )}
@@ -526,43 +539,43 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <span className="text-2xl">🤝</span>
-                        <h3 className="text-xl font-bold text-slate-800">Przypisania</h3>
+                        <h3 className="text-xl font-bold text-slate-800">Zuweisungen</h3>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Opiekun / Przedstawiciel</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Betreuer / Vertreter</label>
                             <select
                                 name="representative_id"
                                 value={customer.representative_id || ''}
                                 onChange={handleChange}
                                 className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-white"
                             >
-                                <option value="">-- Wybierz opiekuna --</option>
+                                <option value="">-- Betreuer wählen --</option>
                                 {users.map(u => (
                                     <option key={u.id} value={u.id}>
                                         {u.firstName} {u.lastName} ({u.role})
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-xs text-slate-500 mt-1">Osoba odpowiedzialna za kontakt z klientem.</p>
+                            <p className="text-xs text-slate-500 mt-1">Zuständige Person für den Kundenkontakt.</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Osoba Podpisująca Umowę</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Vertragsunterzeichner</label>
                             <select
                                 name="contract_signer_id"
                                 value={customer.contract_signer_id || ''}
                                 onChange={handleChange}
                                 className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-white"
                             >
-                                <option value="">-- Wybierz osobę --</option>
+                                <option value="">-- Person wählen --</option>
                                 {users.map(u => (
                                     <option key={u.id} value={u.id}>
                                         {u.firstName} {u.lastName} ({u.role})
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-xs text-slate-500 mt-1">Osoba z firmy, która podpisze umowę.</p>
+                            <p className="text-xs text-slate-500 mt-1">Person, die den Vertrag unterzeichnet.</p>
                         </div>
                     </div>
                 </section>
@@ -573,7 +586,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         type="submit"
                         className="px-8 py-4 bg-accent text-white rounded-xl font-bold text-lg hover:bg-orange-600 transition-all shadow-lg shadow-accent/30 hover:shadow-xl hover:scale-[1.02] flex items-center gap-3"
                     >
-                        <span>{submitLabel || 'Dalej: Konfiguracja Produktu'}</span>
+                        <span>{submitLabel || 'Weiter: Produktkonfiguration'}</span>
                         {submitLabel ? (
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

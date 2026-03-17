@@ -221,6 +221,26 @@ export function createGuideMaterial(): THREE.MeshStandardMaterial {
     });
 }
 
+/** Black EPDM rubber seal strip (between glass panels and rafter caps) */
+export function createRubberSealMaterial(): THREE.MeshStandardMaterial {
+    return new THREE.MeshStandardMaterial({
+        color: '#111111',
+        roughness: 0.95,
+        metalness: 0,
+        envMapIntensity: 0.1,
+    });
+}
+
+/** Track rail material (brushed aluminum, slightly darker than structure) */
+export function createTrackRailMaterial(): THREE.MeshStandardMaterial {
+    return new THREE.MeshStandardMaterial({
+        color: '#555555',
+        roughness: 0.35,
+        metalness: 0.8,
+        envMapIntensity: 0.7,
+    });
+}
+
 // ─── Decor / Furniture ───────────────────────────────────────
 /** Natural wood (table tops, fence, planters) */
 export function createWoodMaterial(): THREE.MeshStandardMaterial {

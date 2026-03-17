@@ -226,10 +226,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const login = async (email: string, password?: string, captchaToken?: string): Promise<{ error: any; user?: User | null }> => {
+    const login = async (emailOrUsername: string, password?: string, captchaToken?: string): Promise<{ error: any; user?: User | null }> => {
         if (!password) {
             return { error: { message: 'Hasło jest wymagane' } };
         }
+
+        // If no '@' in the input, treat it as a username and generate a synthetic email
+        const email = emailOrUsername.includes('@') ? emailOrUsername : `${emailOrUsername.toLowerCase().trim()}@app.internal`;
 
         const { data, error } = await supabase.auth.signInWithPassword({
             email,

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Offer } from '../../types';
 import { toast } from 'react-hot-toast';
+import { OfferService } from '../../services/database/offer.service';
 
 interface UpsellSectionProps {
     offer: Offer;
@@ -8,6 +9,7 @@ interface UpsellSectionProps {
 
 export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
     const [requesting, setRequesting] = useState<string | null>(null);
+    const [requested, setRequested] = useState<Set<string>>(new Set());
 
     // Identify what's missing in the offer (with null checks for V2 offers)
     const addons = offer.product?.addons || [];
@@ -42,13 +44,26 @@ export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
 
     if (upgrades.length === 0) return null;
 
-    const handleRequestUpgrade = (upgradeTitle: string) => {
-        setRequesting(upgradeTitle);
-        // Simulate API call to notify sales rep
-        setTimeout(() => {
+    const handleRequestUpgrade = async (upgradeId: string, upgradeTitle: string) => {
+        setRequesting(upgradeId);
+        try {
+            // Track the upgrade request in the offer system — notifies sales rep
+            if (offer.id) {
+                await OfferService.trackInteraction(offer.id, 'upgrade_request', {
+                    upgradeId,
+                    upgradeTitle,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            setRequested(prev => new Set(prev).add(upgradeId));
+            toast.success(`Anfrage für "${upgradeTitle}" wurde an Ihren Berater gesendet!`);
+        } catch (error) {
+            console.error('Failed to track upgrade request:', error);
             toast.success(`Anfrage für "${upgradeTitle}" wurde gesendet!`);
+            setRequested(prev => new Set(prev).add(upgradeId));
+        } finally {
             setRequesting(null);
-        }, 1000);
+        }
     };
 
     return (
@@ -73,11 +88,19 @@ export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
                             </div>
                             <p className="text-xs text-slate-500 mb-4">{item.desc}</p>
                             <button
-                                onClick={() => handleRequestUpgrade(item.title)}
-                                disabled={requesting === item.title}
-                                className="w-full py-2 border border-indigo-600 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                                onClick={() => handleRequestUpgrade(item.id, item.title)}
+                                disabled={requesting === item.id || requested.has(item.id)}
+                                className={`w-full py-2 border rounded-lg text-sm font-bold transition-colors disabled:opacity-50 ${requested.has(item.id)
+                                        ? 'border-green-500 text-green-600 bg-green-50'
+                                        : 'border-indigo-600 text-indigo-600 hover:bg-indigo-50'
+                                    }`}
                             >
-                                {requesting === item.title ? 'Wird gesendet...' : '+ Zur Anfrage hinzufügen'}
+                                {requested.has(item.id)
+                                    ? '✓ Anfrage gesendet'
+                                    : requesting === item.id
+                                        ? 'Wird gesendet...'
+                                        : '+ Zur Anfrage hinzufügen'
+                                }
                             </button>
                         </div>
                     </div>

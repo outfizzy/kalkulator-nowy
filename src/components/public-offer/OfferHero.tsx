@@ -44,7 +44,9 @@ export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, off
                             {getModelDisplayName(product.modelId)} Edition
                         </h1>
                         <p className="text-lg md:text-xl text-slate-200">
-                            {product.width}mm x {product.projection}mm | {product.roofType === 'glass' ? 'Sicherheitsglas' : 'Polycarbonat'}
+                            {product.width > 0 && product.projection > 0
+                                ? `${product.width}mm x ${product.projection}mm | ${product.roofType === 'glass' ? 'Sicherheitsglas' : product.roofType === 'manual' ? 'Individuell' : 'Polycarbonat'}`
+                                : 'Individuelles Angebot'}
                         </p>
                     </div>
 
