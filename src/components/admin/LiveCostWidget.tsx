@@ -18,8 +18,9 @@ interface SalesRepRow {
     name: string;
     userId: string;
     role: string;
-    hourlyRate: number;
-    dailyCost: number; // 8h × hourlyRate
+    monthlySalary: number;
+    dailyCost: number; // monthlySalary / workdays
+    currency: string;
 }
 
 // Gauge component – simplified circular progress
@@ -168,36 +169,49 @@ export const LiveCostWidget: React.FC = () => {
             }, 0);
             setMonthlyInstallerCost(monthTotal);
 
-            // Sales reps with hourly rates
+            // Sales reps with base salaries
             const { data: repsData } = await supabase
                 .from('profiles')
-                .select('id, first_name, last_name, role, hourly_rate')
+                .select('id, first_name, last_name, role, base_salary, base_salary_currency')
                 .in('role', ['sales_rep', 'manager']);
+
+            // Count total workdays in current month
+            const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+            const monthEndDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+            let totalWorkdaysInMonth = 0;
+            const dc = new Date(monthStartDate);
+            while (dc <= monthEndDate) {
+                const dow = dc.getDay();
+                if (dow !== 0 && dow !== 6) totalWorkdaysInMonth++;
+                dc.setDate(dc.getDate() + 1);
+            }
+
+            // Count elapsed workdays this month
+            const todayDate = new Date();
+            let elapsedWorkdays = 0;
+            const d = new Date(monthStartDate);
+            while (d <= todayDate) {
+                const dow = d.getDay();
+                if (dow !== 0 && dow !== 6) elapsedWorkdays++;
+                d.setDate(d.getDate() + 1);
+            }
 
             if (repsData) {
                 const reps: SalesRepRow[] = repsData.map((r: any) => {
-                    const rate = Number(r.hourly_rate) || 0;
+                    const salary = Number(r.base_salary) || 0;
                     return {
                         name: `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Bez nazwy',
                         userId: r.id,
                         role: r.role,
-                        hourlyRate: rate,
-                        dailyCost: rate * 8, // 8h/day
+                        monthlySalary: salary,
+                        dailyCost: totalWorkdaysInMonth > 0 ? salary / totalWorkdaysInMonth : 0,
+                        currency: r.base_salary_currency || 'EUR',
                     };
                 });
                 setSalesReps(reps);
 
-                // Monthly sales rep cost: workdays so far this month × 8h × rate
-                const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-                const todayDate = new Date();
-                let workdays = 0;
-                const d = new Date(monthStartDate);
-                while (d <= todayDate) {
-                    const dow = d.getDay();
-                    if (dow !== 0 && dow !== 6) workdays++;
-                    d.setDate(d.getDate() + 1);
-                }
-                const totalRepMonthly = reps.reduce((s, r) => s + r.hourlyRate * 8 * workdays, 0);
+                // Monthly cost so far = sum of (salary / total_workdays * elapsed_workdays)
+                const totalRepMonthly = reps.reduce((s, r) => s + (r.dailyCost * elapsedWorkdays), 0);
                 setMonthlySalesRepCost(totalRepMonthly);
             }
         } catch (err) {
@@ -212,10 +226,10 @@ export const LiveCostWidget: React.FC = () => {
     const activeCount = teamRows.filter(r => r.status === 'active').length;
     const todayInstallerTotal = teamRows.reduce((s, r) => s + r.estimatedCost, 0);
 
-    // Sales reps today cost based on elapsed work hours (8-16)
+    // Sales reps today cost based on elapsed work hours (8-16) prorated from daily
     const nowHour = now.getHours() + now.getMinutes() / 60;
     const elapsedWorkHours = Math.max(0, Math.min(nowHour - 8, 8));
-    const todaySalesRepTotal = nowHour >= 8 ? salesReps.reduce((s, r) => s + r.hourlyRate * elapsedWorkHours, 0) : 0;
+    const todaySalesRepTotal = nowHour >= 8 ? salesReps.reduce((s, r) => s + (r.dailyCost * elapsedWorkHours / 8), 0) : 0;
 
     const todayGrandTotal = todayInstallerTotal + todaySalesRepTotal;
     const monthlyGrandTotal = monthlyInstallerCost + monthlySalesRepCost;
@@ -388,12 +402,12 @@ export const LiveCostWidget: React.FC = () => {
                                         </div>
                                         <div className="text-right">
                                             <p className="font-bold text-sm text-blue-700">
-                                                {(rep.hourlyRate * elapsedWorkHours).toFixed(0)} €
+                                                {(rep.dailyCost * elapsedWorkHours / 8).toFixed(0)} €
                                             </p>
-                                            {rep.hourlyRate > 0 ? (
-                                                <p className="text-[10px] text-slate-400">{rep.hourlyRate.toFixed(0)} €/h × 8h = {rep.dailyCost.toFixed(0)} €/d</p>
+                                            {rep.monthlySalary > 0 ? (
+                                                <p className="text-[10px] text-slate-400">{rep.monthlySalary.toFixed(0)} €/mies. → {rep.dailyCost.toFixed(0)} €/d</p>
                                             ) : (
-                                                <p className="text-[10px] text-amber-500">brak stawki</p>
+                                                <p className="text-[10px] text-amber-500">brak podstawy</p>
                                             )}
                                         </div>
                                     </div>
