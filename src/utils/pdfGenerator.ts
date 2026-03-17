@@ -48,7 +48,7 @@ function translateForPDF(key: string, category: string): string {
         // Roof types
         'poly': 'Polycarbonat', 'polycarbonate': 'Polycarbonat', 'glass': 'Glas VSG 8mm',
         'clear': 'Klar', 'klar': 'Klar', 'opal': 'Opal', 'matt': 'Matt',
-        'stopsol': 'Stopsol (Sonnenschutz)', 'ir-gold': 'IR Gold (Hitzeschutz)',
+        'stopsol': 'UV Reflex (Sonnenschutz)', 'ir-gold': 'IR Gold (Hitzeschutz)',
         // Installation types
         'wall': 'Wandmontage', 'wall-mounted': 'Wandmontage',
         'freestanding': 'Freistehend', 'wedge': 'Keilform',
@@ -68,7 +68,7 @@ function getGlassTypeLabel(config: string): string {
     const c = (config || '').toLowerCase();
     if (c.includes('isolierglas') || c.includes('iso')) return 'Wärmedämm-Isolierglas';
     if (c.includes('matt') || c.includes('satiniert')) return 'VSG Sicherheitsglas satiniert (Sichtschutz)';
-    if (c.includes('stopsol')) return 'Stopsol Sonnenschutzglas';
+    if (c.includes('stopsol')) return 'UV Reflex Sonnenschutzglas';
     if (c.includes('klar')) return 'VSG Sicherheitsglas klar';
     if (c.includes('vsg')) return 'VSG Sicherheitsglas';
     return '';
@@ -78,7 +78,7 @@ function getRoofCoverLabel(config: string): string {
     const c = (config || '').toLowerCase();
     if (c.includes('glass') || c.includes('glas')) {
         if (c.includes('matt') || c.includes('satiniert')) return 'VSG Sicherheitsglas 8 mm satiniert';
-        if (c.includes('stopsol')) return 'Stopsol Sonnenschutzglas 8 mm';
+        if (c.includes('stopsol')) return 'UV Reflex Sonnenschutzglas 8 mm';
         return 'VSG Sicherheitsglas 8 mm klar';
     }
     if (c.includes('poly')) {
@@ -204,7 +204,7 @@ function professionalItemDescription(name: string, config?: string): string {
     const simpleMap: Record<string, string> = {
         'Surcharge Matt': 'Aufpreis Mattglas-Verglasung',
         'Surcharge Iso': 'Aufpreis Wärmedämm-Isolierverglasung',
-        'Surcharge Stopsol': 'Aufpreis Stopsol Sonnenschutzglas',
+        'Surcharge Stopsol': 'Aufpreis UV Reflex Sonnenschutzglas',
     };
     if (simpleMap[name]) return simpleMap[name];
 

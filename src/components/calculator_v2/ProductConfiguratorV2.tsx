@@ -70,7 +70,7 @@ const ROOF_MODELS: RoofModel[] = [
 const GLASS_VARIANTS = [
     { id: 'klar', name: 'Klar (VSG)', description: 'Klares Sicherheitsglas', icon: '🟢' },
     { id: 'matt', name: 'Matt (VSG)', description: 'Satiniert, Sichtschutz', icon: '⚪' },
-    { id: 'stopsol', name: 'Stopsol', description: 'Sonnenschutzglas', icon: '🔶' },
+    { id: 'stopsol', name: 'UV Reflex', description: 'Sonnenschutzglas', icon: '🔶' },
 ];
 
 // Polycarbonate variant options (per Excel: klar/opal share price, IR Gold is surcharge)
