@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from '../../contexts/TranslationContext';
 import { DatabaseService } from '../../services/database';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
-import { InstallerSessionService, type WorkSession, type CrewMember } from '../../services/database/installer-session.service';
+import { InstallerSessionService, type WorkSession, type CrewMember, type InstallerVehicle } from '../../services/database/installer-session.service';
 import { InstallerWorkerService } from '../../services/database/installer-worker.service';
 import { SupportService } from '../../services/database/support.service';
 import { TasksList } from '../tasks/TasksList';
@@ -49,6 +49,13 @@ export const InstallerDashboard: React.FC = () => {
     const [installerNotes, setInstallerNotes] = useState<Record<string, string>>({});
     const [savingNote, setSavingNote] = useState<string | null>(null);
     const [togglingTask, setTogglingTask] = useState<string | null>(null);
+
+    // Vehicles
+    const [teamVehicles, setTeamVehicles] = useState<InstallerVehicle[]>([]);
+    const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
+
+    // Installation photos
+    const [installationPhotos, setInstallationPhotos] = useState<Record<string, string[]>>({});
 
     // Load data
     useEffect(() => {
@@ -125,9 +132,16 @@ export const InstallerDashboard: React.FC = () => {
                 const today = new Date().toISOString().split('T')[0];
 
                 const todayInsts = installations.filter(inst => {
-                    const isToday = inst.scheduledDate?.split('T')[0] === today;
-                    if (!team) return isToday;
-                    return isToday && inst.teamId === team.id;
+                    if (!inst.scheduledDate) return false;
+                    const startDate = inst.scheduledDate.split('T')[0];
+                    const duration = inst.expectedDuration || 1;
+                    // Check if today falls within the installation's multi-day span
+                    const startMs = new Date(startDate).getTime();
+                    const todayMs = new Date(today).getTime();
+                    const endMs = startMs + (duration - 1) * 86400000;
+                    const isTodayInRange = todayMs >= startMs && todayMs <= endMs;
+                    if (!team) return isTodayInRange;
+                    return isTodayInRange && inst.teamId === team.id;
                 });
                 setTodayInstallations(todayInsts);
                 if (todayInsts.length === 1 && !selectedInstallationId) {
@@ -144,6 +158,33 @@ export const InstallerDashboard: React.FC = () => {
                     return d >= now && d <= weekEnd && inst.teamId === team.id;
                 }).sort((a, b) => (a.scheduledDate || '').localeCompare(b.scheduledDate || ''));
                 setWeekInstallations(weekInsts);
+
+                // Load team vehicles
+                if (team) {
+                    try {
+                        const vehicles = await InstallerSessionService.getTeamVehicles(team.id);
+                        setTeamVehicles(vehicles);
+                        const defaultV = vehicles.find(v => v.isDefault);
+                        if (defaultV) setSelectedVehicleId(defaultV.id);
+                        else if (vehicles.length === 1) setSelectedVehicleId(vehicles[0].id);
+                    } catch { /* ignore */ }
+                }
+
+                // Load photos for today's installations
+                try {
+                    const photoMap: Record<string, string[]> = {};
+                    for (const inst of todayInsts) {
+                        const { data: files } = await supabase.storage
+                            .from('fuel-logs')
+                            .list(`installation-photos/${inst.id}`, { limit: 20 });
+                        if (files && files.length > 0) {
+                            photoMap[inst.id] = files.map(f =>
+                                supabase.storage.from('fuel-logs').getPublicUrl(`installation-photos/${inst.id}/${f.name}`).data.publicUrl
+                            );
+                        }
+                    }
+                    setInstallationPhotos(photoMap);
+                } catch { /* ignore */ }
 
                 // Load last fuel info
                 try {
@@ -325,6 +366,12 @@ export const InstallerDashboard: React.FC = () => {
                 .eq('id', photoTargetInstId);
 
             toast.success('📸 Zdjęcie dodane!');
+
+            // Update gallery instantly
+            setInstallationPhotos(prev => ({
+                ...prev,
+                [photoTargetInstId]: [...(prev[photoTargetInstId] || []), publicUrl]
+            }));
         } catch (err) {
             console.error('Photo upload error:', err);
             toast.error('Błąd wysyłania zdjęcia');
@@ -446,6 +493,27 @@ export const InstallerDashboard: React.FC = () => {
                             </span>
                             <span className="text-[10px] text-slate-400">• {lastFuelInfo.liters.toFixed(0)} L</span>
                         </Link>
+                    )}
+                    {/* Vehicle Selector */}
+                    {teamVehicles.length > 0 && (
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className="text-sm">🚗</span>
+                            <select
+                                value={selectedVehicleId}
+                                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 font-medium"
+                            >
+                                <option value="">Wybierz pojazd...</option>
+                                {teamVehicles.map(v => (
+                                    <option key={v.id} value={v.id}>
+                                        {v.licensePlate} {v.vehicleName ? `(${v.vehicleName})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedVehicleId && (
+                                <span className="text-xs text-emerald-600 font-medium">✅</span>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -733,6 +801,12 @@ export const InstallerDashboard: React.FC = () => {
                                                 {inst.client.firstName} {inst.client.lastName}
                                                 {inst.contractNumber && <span className="text-xs text-slate-400 ml-2">{inst.contractNumber}</span>}
                                             </h3>
+                                            {/* Multi-day badge */}
+                                            {inst.expectedDuration && inst.expectedDuration > 1 && (
+                                                <div className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full mt-1">
+                                                    📅 Dzień {Math.round((new Date(new Date().toISOString().split('T')[0]).getTime() - new Date(inst.scheduledDate!.split('T')[0]).getTime()) / 86400000) + 1}/{inst.expectedDuration}
+                                                </div>
+                                            )}
                                             <p className="text-sm text-slate-500">{inst.client.address}</p>
                                             <p className="text-sm text-slate-500">{inst.client.postalCode} {inst.client.city}</p>
                                             <p className="text-xs text-slate-400 mt-1">{inst.productSummary}</p>
@@ -826,6 +900,32 @@ export const InstallerDashboard: React.FC = () => {
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {/* Photo Gallery */}
+                                            {installationPhotos[inst.id] && installationPhotos[inst.id].length > 0 && (
+                                                <div className="mt-3">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                                                        📸 Zdjęcia ({installationPhotos[inst.id].length})
+                                                    </h4>
+                                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                                        {installationPhotos[inst.id].map((url, idx) => (
+                                                            <a
+                                                                key={idx}
+                                                                href={url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex-shrink-0"
+                                                            >
+                                                                <img
+                                                                    src={url}
+                                                                    alt={`Zdjęcie ${idx + 1}`}
+                                                                    className="w-16 h-16 object-cover rounded-lg border border-slate-200 hover:border-blue-400 transition-colors"
+                                                                />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-col gap-2 ml-3">
                                             <button
