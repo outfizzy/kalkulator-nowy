@@ -205,7 +205,7 @@ export const LiveCostWidget: React.FC = () => {
                         role: r.role,
                         monthlySalary: salary,
                         dailyCost: totalWorkdaysInMonth > 0 ? salary / totalWorkdaysInMonth : 0,
-                        currency: r.base_salary_currency || 'EUR',
+                        currency: r.base_salary_currency || 'PLN',
                     };
                 });
                 setSalesReps(reps);
@@ -402,10 +402,10 @@ export const LiveCostWidget: React.FC = () => {
                                         </div>
                                         <div className="text-right">
                                             <p className="font-bold text-sm text-blue-700">
-                                                {(rep.dailyCost * elapsedWorkHours / 8).toFixed(0)} €
+                                                {(rep.dailyCost * elapsedWorkHours / 8).toFixed(0)} {rep.currency === 'EUR' ? '€' : 'zł'}
                                             </p>
                                             {rep.monthlySalary > 0 ? (
-                                                <p className="text-[10px] text-slate-400">{rep.monthlySalary.toFixed(0)} €/mies. → {rep.dailyCost.toFixed(0)} €/d</p>
+                                                <p className="text-[10px] text-slate-400">{rep.monthlySalary.toFixed(0)} {rep.currency === 'EUR' ? '€' : 'zł'}/mies. → {rep.dailyCost.toFixed(0)} {rep.currency === 'EUR' ? '€' : 'zł'}/d</p>
                                             ) : (
                                                 <p className="text-[10px] text-amber-500">brak podstawy</p>
                                             )}
