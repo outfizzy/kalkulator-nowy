@@ -579,6 +579,35 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                         </div>
                                     </div>
 
+                                    {/* ---- INSTALLATION DAYS SELECTOR ---- */}
+                                    {!readOnly && (
+                                        <div className="flex items-center gap-3 bg-indigo-50/50 rounded-xl border border-indigo-200 px-4 py-3">
+                                            <span className="text-base">📅</span>
+                                            <label className="text-sm font-bold text-indigo-800">Dni montażu:</label>
+                                            <select
+                                                value={installation.expectedDuration || 1}
+                                                onChange={async (e) => {
+                                                    const days = parseInt(e.target.value);
+                                                    try {
+                                                        await InstallationService.updateInstallation(installation.id, { expectedDuration: days });
+                                                        toast.success(`Ustawiono ${days} ${days === 1 ? 'dzień' : 'dni'} montażu`);
+                                                        if (onSaved) onSaved();
+                                                    } catch { toast.error('Błąd zapisu'); }
+                                                }}
+                                                className="px-3 py-1.5 border border-indigo-200 rounded-lg text-sm font-bold text-indigo-700 bg-white focus:ring-2 focus:ring-indigo-400 outline-none"
+                                            >
+                                                {[1,2,3,4,5,6,7].map(d => (
+                                                    <option key={d} value={d}>{d} {d === 1 ? 'dzień' : 'dni'}</option>
+                                                ))}
+                                            </select>
+                                            {(installation.expectedDuration || 1) > 1 && (
+                                                <span className="text-xs text-indigo-500">
+                                                    → widoczny w kalendarzu na {installation.expectedDuration} dni
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* ---- INLINE COST EDITING CARD ---- */}
                                     <div className="bg-purple-50/50 rounded-xl border border-purple-200 overflow-hidden">
                                         <div className="px-4 py-2.5 bg-purple-100/50 border-b border-purple-200 flex items-center justify-between">

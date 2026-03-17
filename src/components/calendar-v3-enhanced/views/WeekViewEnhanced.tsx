@@ -58,9 +58,17 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
         data: { date: dateStr, teamId }
     });
 
-    const dayInstallations = installations.filter(
-        i => i.teamId === teamId && i.scheduledDate && isSameDay(new Date(i.scheduledDate), date)
-    );
+    const dayInstallations = installations.filter(i => {
+        if (i.teamId !== teamId || !i.scheduledDate) return false;
+        const start = new Date(i.scheduledDate);
+        const duration = i.expectedDuration || 1;
+        if (duration <= 1) return isSameDay(start, date);
+        // Multi-day: check if date falls within [start, start + duration - 1]
+        for (let d = 0; d < duration; d++) {
+            if (isSameDay(addDays(start, d), date)) return true;
+        }
+        return false;
+    });
 
     const isWeekendDay = isWeekend(date);
 
@@ -253,7 +261,16 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
         const counts: Record<string, number> = {};
         weekDays.forEach(day => {
             const ds = format(day, 'yyyy-MM-dd');
-            counts[ds] = installations.filter(i => i.scheduledDate && isSameDay(new Date(i.scheduledDate), day)).length;
+            counts[ds] = installations.filter(i => {
+                if (!i.scheduledDate) return false;
+                const start = new Date(i.scheduledDate);
+                const duration = i.expectedDuration || 1;
+                if (duration <= 1) return isSameDay(start, day);
+                for (let d = 0; d < duration; d++) {
+                    if (isSameDay(addDays(start, d), day)) return true;
+                }
+                return false;
+            }).length;
         });
         return counts;
     }, [installations, weekDays]);

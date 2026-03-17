@@ -94,7 +94,7 @@ export const LiveCostWidget: React.FC = () => {
     const [monthlySalesRepCost, setMonthlySalesRepCost] = useState(0);
     const [loading, setLoading] = useState(true);
     const [now, setNow] = useState(new Date());
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(true);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {

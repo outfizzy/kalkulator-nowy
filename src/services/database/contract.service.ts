@@ -895,6 +895,20 @@ export const ContractService = {
                 consumablesCost = Number(inst.consumables_cost) || 0;
                 additionalCosts = Number(inst.additional_costs) || 0;
 
+                // Also sum hotel costs from work sessions (installer endDay flow)
+                const { data: wsSessions } = await supabase
+                    .from('work_sessions')
+                    .select('hotel_cost')
+                    .eq('installation_id', inst.id);
+                if (wsSessions) {
+                    const wsHotel = wsSessions.reduce((s: number, ws: any) => s + (Number(ws.hotel_cost) || 0), 0);
+                    if (wsHotel > 0 && hotelCost === 0) {
+                        hotelCost = wsHotel; // Use session hotel if installation-level is empty
+                    } else if (wsHotel > 0) {
+                        hotelCost = Math.max(hotelCost, wsHotel); // Take the higher value to avoid double-counting
+                    }
+                }
+
                 // Work logs — hours
                 const { data: workLogs } = await supabase
                     .from('installation_work_logs')
@@ -915,23 +929,13 @@ export const ContractService = {
                     laborCost = Math.round(laborHours * HOURLY_RATE * 100) / 100;
                 }
 
-                // Fuel cost — if team exists, use travel distance
-                if (inst.team_id) {
-                    const { data: team } = await supabase
-                        .from('installation_teams')
-                        .select('fuel_consumption')
-                        .eq('id', inst.team_id)
-                        .single();
+                // Fuel cost — flat 0.5 €/km × roundtrip (Gubin ↔ client)
+                const instCosts = contractData?.pricing?.installationCosts;
+                const travelDistance = instCosts?.travelDistance || 0;
+                const COST_PER_KM = 0.50; // EUR per km
 
-                    // Estimate distance from pricing if available
-                    const instCosts = contractData?.pricing?.installationCosts;
-                    const travelDistance = instCosts?.travelDistance || 0;
-                    const fuelConsumption = team?.fuel_consumption || 12; // L/100km
-                    const FUEL_PRICE = 1.70; // EUR per liter (DE average)
-
-                    if (travelDistance > 0) {
-                        fuelCost = Math.round(((travelDistance * 2) * fuelConsumption / 100) * FUEL_PRICE * 100) / 100;
-                    }
+                if (travelDistance > 0) {
+                    fuelCost = Math.round(travelDistance * 2 * COST_PER_KM * 100) / 100;
                 }
             }
         }
