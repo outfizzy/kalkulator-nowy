@@ -620,7 +620,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
         const instDays = pricing.installationCosts.installationDays;
         allPositions.push({
             label: 'Fachgerechte Montage & Lieferung',
-            description: `Durch zertifiziertes Montageteam inkl. Kleinmaterial${instDays ? ` · Montagezeit: ${instDays} Tag${instDays > 1 ? 'e' : ''}` : ''}`,
+            description: 'Durch zertifiziertes Montageteam inkl. Kleinmaterial',
         });
     }
 

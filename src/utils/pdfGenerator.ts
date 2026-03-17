@@ -620,7 +620,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
         // Add breakdown details if available
         if (inst.installationDays) {
-            instDesc.push(`Montagezeit: ${inst.installationDays} Tag(e)`);
+            // Days info kept internal — not shown to customer
         }
         if (inst.travelCosts && inst.travelCosts > 0) {
             instDesc.push(`Inkl. Anfahrtskosten`);

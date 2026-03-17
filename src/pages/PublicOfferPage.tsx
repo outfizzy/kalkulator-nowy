@@ -411,9 +411,6 @@ export const PublicOfferPage: React.FC = () => {
                                                 <span className="text-slate-500 text-sm flex items-center gap-1">
                                                     <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5" /></svg>
                                                     Fachmontage & Logistik
-                                                    {offer.pricing.installationCosts.installationDays && (
-                                                        <span className="text-[10px] text-slate-400 ml-0.5">({offer.pricing.installationCosts.installationDays} Tag{(offer.pricing.installationCosts as any).installationDays > 1 ? 'e' : ''})</span>
-                                                    )}
                                                 </span>
                                                 <span className="font-semibold text-base">{offer.pricing.installationCosts.totalInstallation.toFixed(2)} €</span>
                                             </div>
