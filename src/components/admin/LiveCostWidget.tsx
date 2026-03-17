@@ -169,14 +169,48 @@ export const LiveCostWidget: React.FC = () => {
             }, 0);
             setMonthlyInstallerCost(monthTotal);
 
-            // Sales reps with base salaries
-            const { data: repsData, error: repsError } = await supabase
-                .from('profiles')
-                .select('id, first_name, last_name, role, base_salary, base_salary_currency, status')
-                .in('role', ['sales_rep', 'manager', 'admin'])
-                .eq('status', 'active');
+            // Sales reps — get from installation teams (members with role=sales_rep in profiles)
+            const allTeams = teams; // already loaded above
             
-            console.log('[LiveCostWidget] Sales reps query:', { repsData, repsError, count: repsData?.length });
+            // Collect all user-type member IDs from all teams
+            const allMembers: { id: string; firstName: string; lastName: string; hourlyRate: number; teamName: string }[] = [];
+            for (const team of allTeams) {
+                const teamMembers = typeof team.members === 'string' ? JSON.parse(team.members) : (team.members || []);
+                for (const m of teamMembers) {
+                    if (m.type !== 'virtual' && m.id) {
+                        allMembers.push({
+                            id: m.id,
+                            firstName: m.firstName || '',
+                            lastName: m.lastName || '',
+                            hourlyRate: m.hourlyRate || 0,
+                            teamName: team.name,
+                        });
+                    }
+                }
+            }
+
+            // Check which members are sales_rep in profiles
+            const memberIds = [...new Set(allMembers.map(m => m.id))];
+            let salesRepIds: string[] = [];
+            if (memberIds.length > 0) {
+                const { data: profilesData } = await supabase
+                    .from('profiles')
+                    .select('id, role')
+                    .in('id', memberIds)
+                    .in('role', ['sales_rep', 'manager']);
+                salesRepIds = (profilesData || []).map((p: any) => p.id);
+            }
+
+            // Build sales rep rows from team data
+            const salesRepMembers = allMembers.filter(m => salesRepIds.includes(m.id));
+            // Deduplicate by userId (take highest hourlyRate if in multiple teams)
+            const repMap = new Map<string, typeof salesRepMembers[0]>();
+            for (const m of salesRepMembers) {
+                const existing = repMap.get(m.id);
+                if (!existing || m.hourlyRate > existing.hourlyRate) {
+                    repMap.set(m.id, m);
+                }
+            }
 
             // Count total workdays in current month
             const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -199,24 +233,23 @@ export const LiveCostWidget: React.FC = () => {
                 d.setDate(d.getDate() + 1);
             }
 
-            if (repsData) {
-                const reps: SalesRepRow[] = repsData.map((r: any) => {
-                    const salary = Number(r.base_salary) || 0;
-                    return {
-                        name: `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Bez nazwy',
-                        userId: r.id,
-                        role: r.role,
-                        monthlySalary: salary,
-                        dailyCost: totalWorkdaysInMonth > 0 ? salary / totalWorkdaysInMonth : 0,
-                        currency: r.base_salary_currency || 'PLN',
-                    };
-                });
-                setSalesReps(reps);
+            const reps: SalesRepRow[] = Array.from(repMap.values()).map(m => {
+                const dailyCost = m.hourlyRate * 8; // 8h workday
+                const monthlySalary = dailyCost * totalWorkdaysInMonth;
+                return {
+                    name: `${m.firstName} ${m.lastName}`.trim() || 'Bez nazwy',
+                    userId: m.id,
+                    role: 'sales_rep',
+                    monthlySalary,
+                    dailyCost,
+                    currency: 'PLN',
+                };
+            });
+            setSalesReps(reps);
 
-                // Monthly cost so far = sum of (salary / total_workdays * elapsed_workdays)
-                const totalRepMonthly = reps.reduce((s, r) => s + (r.dailyCost * elapsedWorkdays), 0);
-                setMonthlySalesRepCost(totalRepMonthly);
-            }
+            // Monthly cost so far = sum of dailyCost × elapsed workdays
+            const totalRepMonthly = reps.reduce((s, r) => s + (r.dailyCost * elapsedWorkdays), 0);
+            setMonthlySalesRepCost(totalRepMonthly);
         } catch (err) {
             console.error('LiveCostWidget error:', err);
         } finally {
