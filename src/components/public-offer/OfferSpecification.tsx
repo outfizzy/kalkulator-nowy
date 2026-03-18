@@ -578,7 +578,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
         : `inkl. ${(product as any).variant ? getGermanInfo((product as any).variant).label : 'Polycarbonat Stegplatten 16 mm'}`;
     allPositions.push({
         label: `${displayName} Terrassenüberdachung`,
-        description: `${product.width} × ${product.projection} mm — ${(product as any).construction === 'freestanding' ? 'Freistehend' : 'Wandmontage'} — ${product.customColor ? `RAL ${product.customColorRAL || 'Sonderfarbe'}` : (product.color || 'RAL 7016')}\n${coverInfo} · Pulverbeschichtung · Integrierte Entwässerung`,
+        description: `${product.width} × ${product.projection} mm — ${(product as any).construction === 'freestanding' ? 'Freistehend' : 'Wandmontage'} — ${product.customColor ? `RAL ${product.customColorRAL || 'Sonderfarbe'}` : (product.color || 'RAL 7016')} · ${coverInfo} · Pulverbeschichtung · Integrierte Entwässerung`,
     });
 
     // 3. V2 Items from calculator
@@ -593,7 +593,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
         allPositions.push({
             label,
             description: info.description,
-            config: parsed.dimensions || (!parsed.dimensions ? item.config : undefined),
+            config: parsed.dimensions || undefined,
         });
     }
 
@@ -622,7 +622,6 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
 
     // 7. Installation & Delivery as a position
     if (pricing?.installationCosts?.totalInstallation > 0) {
-        const instDays = pricing.installationCosts.installationDays;
         allPositions.push({
             label: 'Fachgerechte Montage & Lieferung',
             description: 'Durch zertifiziertes Montageteam inkl. Kleinmaterial',
