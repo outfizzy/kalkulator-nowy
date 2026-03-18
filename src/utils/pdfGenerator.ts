@@ -90,10 +90,15 @@ function getRoofCoverLabel(config: string): string {
 }
 
 function getPlacementLabel(config: string): string {
-    const c = (config || '').toLowerCase();
-    if (c.includes('front:') || c.includes('front')) return 'Frontseite';
-    if (c.includes('links:') || c.includes('links') || c.includes('left')) return 'Linke Seite';
-    if (c.includes('rechts:') || c.includes('rechts') || c.includes('right')) return 'Rechte Seite';
+    const c = (config || '').toLowerCase().trim();
+    // Check prefix format: "Links: ...", "Rechts: ...", "Front: ..."
+    if (c.startsWith('links:') || c.startsWith('links ')) return 'Linke Seite';
+    if (c.startsWith('rechts:') || c.startsWith('rechts ')) return 'Rechte Seite';
+    if (c.startsWith('front:') || c.startsWith('front ')) return 'Frontseite';
+    // Fallback: check for standalone placement keywords (legacy data)
+    if (c === 'links' || c === 'left') return 'Linke Seite';
+    if (c === 'rechts' || c === 'right') return 'Rechte Seite';
+    if (c === 'front') return 'Frontseite';
     return '';
 }
 

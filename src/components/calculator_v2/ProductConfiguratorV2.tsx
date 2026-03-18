@@ -1486,7 +1486,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             : POLY_VARIANTS.find(v => v.id === polyVariant)?.name || polyVariant;
         const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${zone}, ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}` +
             (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
-            (construction === 'freestanding' && includeFoundations ? ' + Fundamenty' : '') +
+            (construction === 'freestanding' && includeFoundations ? ' + Fundamente' : '') +
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
             (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}× (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
             (extraPosts > 0 ? ` | Zusatzpfosten: ${extraPosts}× ${extraPostHeight}mm (+${formatCurrency(extraPostTotalPrice)})` : '') +
@@ -4103,7 +4103,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     const handleInfo = SCHIEBETUR_HANDLES.find(h => h.id === schiebetuerHandle);
                                                                     const openingInfo = SCHIEBETUR_OPENING.find(o => o.id === schiebetuerOpening);
                                                                     const panelInfo = getSchiebetuerPanelCount(wallWidth);
-                                                                    displayName = schiebaturProduct ? `Drzwi przesuwne – ${schiebaturProduct.name}` : wallProduct;
+                                                                    displayName = schiebaturProduct ? `Schiebetür – ${schiebaturProduct.name}` : wallProduct;
                                                                     configStr = `${displayName} | ${panelInfo.count} | ${openingInfo?.name || ''} | ${handleInfo?.name || ''} (${schiebetuerHandle})`;
                                                                 } else {
                                                                     configStr = isWedge && accessoriesNames.length > 0
@@ -4133,7 +4133,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 // For front: add all segments at once with placement info
                                                                 const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Links' : 'Rechts';
                                                                 const finalPrice = totalWithAccessories * segmentMultiplier;
-                                                                const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× odcinek)` : '';
+                                                                const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× Segment)` : '';
                                                                 configStr = `${placementLabel}: ${configStr}${qtyNote}`;
                                                                 addToBasket(displayName, finalPrice, configStr, techDims, 'wall');
 

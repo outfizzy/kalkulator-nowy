@@ -409,14 +409,19 @@ function isRedundantItem(itemName: string, modelId: string, roofType: string, co
     return false;
 }
 
-const LOCATION_LABELS: Record<string, string> = { 'left': 'Links', 'right': 'Rechts', 'front': 'Vorne', 'linke': 'Links', 'rechte': 'Rechts' };
+const LOCATION_LABELS: Record<string, string> = { 'links': 'Links', 'rechts': 'Rechts', 'front': 'Frontseite' };
 
 function parseItemConfig(config?: string): { location?: string; dimensions?: string; rawConfig?: string } {
     if (!config) return {};
-    const configLower = config.toLowerCase();
+    const configLower = config.toLowerCase().trim();
     let location: string | undefined;
+    // Check prefix format: "Links: ...", "Rechts: ...", "Front: ..."
+    // Must use prefix matching to avoid 'Front Wall' matching 'front' placement
     for (const [key, label] of Object.entries(LOCATION_LABELS)) {
-        if (configLower.includes(key)) { location = label; break; }
+        if (configLower.startsWith(key + ':') || configLower.startsWith(key + ' ')) {
+            location = label;
+            break;
+        }
     }
     const dimMatch = config.match(/(\d{3,5})\s*[xX×]\s*(\d{3,5})/);
     let dimensions: string | undefined;
