@@ -376,33 +376,43 @@ export const PublicOfferPage: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-2.5 mb-6">
-                                        {/* Discount visualization — strikethrough original price */}
-                                        {offer.pricing.discountValue && offer.pricing.discountValue > 0 ? (
+                                        {/* Discount visualization — strikethrough original GROSS price for bigger visual impact */}
+                                        {offer.pricing.discountValue && offer.pricing.discountValue > 0 ? (() => {
+                                            const discountGross = offer.pricing.discountValue * 1.19;
+                                            const originalGross = offer.pricing.sellingPriceGross + discountGross;
+                                            return (
                                             <>
                                                 <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-500 text-sm">Listenpreis (netto)</span>
-                                                    <span className="font-semibold text-base text-slate-400 line-through">{(offer.pricing.sellingPriceNet + offer.pricing.discountValue).toFixed(2)} €</span>
+                                                    <span className="text-slate-500 text-sm">Regulärer Preis</span>
+                                                    <span className="font-semibold text-base text-slate-400 line-through">{originalGross.toFixed(2)} €</span>
                                                 </div>
                                                 <div className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2 border border-green-100">
                                                     <span className="text-green-700 text-sm font-bold flex items-center gap-1.5">
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
                                                         {offer.pricing.discountPercentage
                                                             ? `−${offer.pricing.discountPercentage}% Sonderrabatt`
-                                                            : `−${offer.pricing.discountValue.toFixed(2)} € Sonderrabatt`
+                                                            : `Sie sparen`
                                                         }
                                                     </span>
-                                                    <span className="font-bold text-green-700 text-sm">−{offer.pricing.discountValue.toFixed(2)} €</span>
+                                                    <span className="font-bold text-green-700 text-sm">−{discountGross.toFixed(2)} €</span>
                                                 </div>
                                                 <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-700 text-sm font-semibold">Ihr Preis (netto)</span>
-                                                    <span className="font-bold text-lg text-slate-800">{offer.pricing.sellingPriceNet.toFixed(2)} €</span>
+                                                    <span className="text-slate-400 text-xs">davon MwSt. (19%)</span>
+                                                    <span className="text-xs text-slate-400">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
                                                 </div>
                                             </>
-                                        ) : (
-                                            <div className="flex justify-between items-baseline">
-                                                <span className="text-slate-500 text-sm">Nettopreis</span>
-                                                <span className="font-semibold text-base">{offer.pricing.sellingPriceNet.toFixed(2)} €</span>
-                                            </div>
+                                            );
+                                        })() : (
+                                            <>
+                                                <div className="flex justify-between items-baseline">
+                                                    <span className="text-slate-500 text-sm">Nettopreis</span>
+                                                    <span className="font-semibold text-base">{offer.pricing.sellingPriceNet.toFixed(2)} €</span>
+                                                </div>
+                                                <div className="flex justify-between items-baseline">
+                                                    <span className="text-slate-500 text-sm">MwSt. (19%)</span>
+                                                    <span className="font-semibold text-slate-600">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
+                                                </div>
+                                            </>
                                         )}
 
                                         {/* Installation as a visible position */}
@@ -416,13 +426,9 @@ export const PublicOfferPage: React.FC = () => {
                                             </div>
                                         )}
 
-                                        <div className="flex justify-between items-baseline pb-4 border-b border-slate-100">
-                                            <span className="text-slate-500 text-sm">MwSt. (19%)</span>
-                                            <span className="font-semibold text-slate-600">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
-                                        </div>
-                                        <div className="flex justify-between items-baseline pt-2">
+                                        <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
                                             <span className="text-lg font-bold text-slate-800">Gesamtpreis</span>
-                                            <span className="text-3xl font-extrabold text-blue-600">{offer.pricing.sellingPriceGross.toFixed(2)} €</span>
+                                            <span className="text-3xl font-extrabold text-emerald-600">{offer.pricing.sellingPriceGross.toFixed(2)} €</span>
                                         </div>
                                     </div>
                                 </div>
