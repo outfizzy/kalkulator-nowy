@@ -3449,11 +3449,23 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                                                     <h5 className="text-sm font-bold text-slate-700 mb-3">📍 Platzierung</h5>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {([
-                                                            { id: 'left' as const, label: 'Links', icon: '◀', desc: 'Seitenwand links' },
-                                                            { id: 'right' as const, label: 'Rechts', icon: '▶', desc: 'Seitenwand rechts' },
-                                                            { id: 'front' as const, label: 'Front', icon: '⬛', desc: 'Frontwand' },
-                                                        ]).map(p => (
+                                                        {(() => {
+                                                            // Keilfenster and Seitenwand: only Links/Rechts
+                                                            // Frontwand, Schiebetür, Panorama: all three
+                                                            const isSideOnly = wallProduct.includes('Side Wall') || wallProduct.includes('Wedge');
+                                                            const allPlacements = [
+                                                                { id: 'left' as const, label: 'Links', icon: '◀', desc: 'Linke Seite' },
+                                                                { id: 'right' as const, label: 'Rechts', icon: '▶', desc: 'Rechte Seite' },
+                                                                { id: 'front' as const, label: 'Front', icon: '⬛', desc: 'Frontseite' },
+                                                            ];
+                                                            const placements = isSideOnly
+                                                                ? allPlacements.filter(p => p.id !== 'front')
+                                                                : allPlacements;
+                                                            // Auto-reset to 'left' if front was selected but product is side-only
+                                                            if (isSideOnly && wallPlacement === 'front') {
+                                                                setTimeout(() => setWallPlacement('left'), 0);
+                                                            }
+                                                            return placements.map(p => (
                                                             <button
                                                                 key={p.id}
                                                                 onClick={() => setWallPlacement(p.id)}
@@ -3465,7 +3477,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 <div className="font-bold text-sm text-slate-800">{p.label}</div>
                                                                 <div className="text-[10px] text-slate-400 mt-0.5">{p.desc}</div>
                                                             </button>
-                                                        ))}
+                                                        ));
+                                                        })()}
                                                     </div>
                                                     {/* Dimension badge */}
                                                     {dachrechnerResults && (() => {
@@ -4269,8 +4282,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                             onClick={() => awningPrice && addToBasket(
                                                                 awningType === 'aufdach' ? 'Aufdachmarkise' : awningType === 'unterdach' ? 'Unterdachmarkise' : 'ZIP Screen',
                                                                 awningPrice,
-                                                                awningType === 'aufdach' ? 'Markiza na dachu' : awningType === 'unterdach' ? 'Markiza pod dachem' : 'Ekran ZIP pionowy',
-                                                                `${awningWidth}x${awningProjection}`,
+                                                                awningType === 'aufdach' ? 'Aufdachmarkise mit Somfy-Motor' : awningType === 'unterdach' ? 'Unterdachmarkise mit Somfy-Motor' : 'ZIP-Senkrechtmarkise mit Somfy-Motor',
+                                                                `${awningWidth} × ${awningProjection} mm`,
                                                                 'accessory'
                                                             )}
                                                             disabled={awningPrice === null}
