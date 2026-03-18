@@ -429,6 +429,21 @@ function parseItemConfig(config?: string): { location?: string; dimensions?: str
     return { location, dimensions, rawConfig: config };
 }
 
+/** Normalize dimension strings from basket, e.g. "2300×2100" → "2300 × 2100 mm" */
+function formatDimensionString(dim: string): string {
+    if (!dim) return '';
+    // Already formatted nicely
+    if (dim.includes('×') && dim.includes('mm')) return dim;
+    // Try to parse "WxH" or "W×H" patterns
+    const match = dim.match(/(\d{3,5})\s*[xX×]\s*(\d{3,5})/);
+    if (match) return `${parseInt(match[1])} × ${parseInt(match[2])} mm`;
+    // Try to parse "NxM" for awnings etc.
+    const simpleMatch = dim.match(/(\d+)\s*[xX×]\s*(\d+)/);
+    if (simpleMatch) return `${simpleMatch[1]} × ${simpleMatch[2]} mm`;
+    // Fallback: return as-is if it looks like dimensions
+    return dim;
+}
+
 // ═══════ SECTION HEADER — clean, minimal ═══════
 const SectionHeader = ({ title, iconKey }: { title: string; iconKey: string }) => {
     const Icon = ICON_MAP[iconKey] || IconPackage;
@@ -563,7 +578,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
     }
 
     // === CALCULATOR OFFER ===
-    const v2Items: Array<{ name: string; config?: string; price?: number }> = (product as any).items || [];
+    const v2Items: Array<{ name: string; config?: string; dimensions?: string; price?: number }> = (product as any).items || [];
     const filteredItems = v2Items.filter(item => !isRedundantItem(item.name, product.modelId, product.roofType, product.color));
 
     const displayName = getModelDisplayName(product.modelId);
@@ -590,10 +605,11 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
             const isWallType = info.category === 'walls' || item.name.toLowerCase().includes('wall') || item.name.toLowerCase().includes('wand') || item.name.toLowerCase().includes('schiebe');
             if (isWallType) label = `${info.label} — ${parsed.location}`;
         }
+        // Dimensions: prefer parsed from config, fallback to item.dimensions
+        const dimStr = parsed.dimensions || (item.dimensions ? formatDimensionString(item.dimensions) : undefined);
         allPositions.push({
             label,
-            description: info.description,
-            config: parsed.dimensions || undefined,
+            description: info.description + (dimStr ? `, ${dimStr}` : ''),
         });
     }
 

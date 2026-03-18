@@ -1676,7 +1676,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                 // Include model image URL for interactive offer
                 imageUrl: selectedModelConfig?.image_url || `/images/models/${selectedModel.toLowerCase().replace(/\s+/g, '-').replace(/\+/g, '-plus')}.jpg`,
                 // Main items from V2 basket (empty in manual mode)
-                items: isManualMode ? [] : basket.map(b => ({ name: b.name, config: b.config, price: b.price })),
+                items: isManualMode ? [] : basket.map(b => ({ name: b.name, config: b.config, dimensions: b.dimensions, price: b.price })),
                 // Custom items — primary content in manual mode, supplementary in standard mode
                 customItems: customItems.map(item => ({
                     id: item.id,
@@ -1711,6 +1711,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
             // 4. Build pricing object
             const manualInstallation = isManualMode ? (parseFloat(manualInstallationCost) || 0) : 0;
+            const installationTotal = isManualMode ? manualInstallation : montagePrice;
             const pricing = {
                 basePrice: basketTotal, // Base sum of basket components
                 addonsPrice: 0,
@@ -1722,11 +1723,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                 sellingPriceNet: finalPrice,
                 sellingPriceGross: finalPrice * 1.19, // 19% VAT
                 totalCost: finalPrice * 1.19,
-                installationCosts: manualInstallation > 0 ? {
-                    totalInstallation: manualInstallation,
-                    installationBase: manualInstallation,
+                installationCosts: installationTotal > 0 ? {
+                    totalInstallation: installationTotal,
+                    installationBase: installationTotal,
                     transportCost: 0
-                } : (isManualMode ? undefined : undefined)
+                } : undefined
             };
 
             // 5. Create Offer
