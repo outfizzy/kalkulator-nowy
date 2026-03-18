@@ -396,24 +396,18 @@ export const PublicOfferPage: React.FC = () => {
                                                     </span>
                                                     <span className="font-bold text-green-700 text-sm">−{discountGross.toFixed(2)} €</span>
                                                 </div>
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-400 text-xs">davon MwSt. (19%)</span>
-                                                    <span className="text-xs text-slate-400">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
-                                                </div>
                                             </>
                                             );
-                                        })() : (
-                                            <>
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-500 text-sm">Nettopreis</span>
-                                                    <span className="font-semibold text-base">{offer.pricing.sellingPriceNet.toFixed(2)} €</span>
-                                                </div>
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-500 text-sm">MwSt. (19%)</span>
-                                                    <span className="font-semibold text-slate-600">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
-                                                </div>
-                                            </>
-                                        )}
+                                        })() : null}
+
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-slate-500 text-sm">Nettopreis</span>
+                                            <span className="font-semibold text-base">{offer.pricing.sellingPriceNet.toFixed(2)} €</span>
+                                        </div>
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-slate-400 text-sm">MwSt. (19%)</span>
+                                            <span className="font-semibold text-slate-500">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
+                                        </div>
 
                                         {/* Installation as a visible position */}
                                         {offer.pricing.installationCosts?.totalInstallation > 0 && (
@@ -427,7 +421,7 @@ export const PublicOfferPage: React.FC = () => {
                                         )}
 
                                         <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
-                                            <span className="text-lg font-bold text-slate-800">Gesamtpreis</span>
+                                            <span className="text-lg font-bold text-slate-800">Gesamtpreis (brutto)</span>
                                             <span className="text-3xl font-extrabold text-emerald-600">{offer.pricing.sellingPriceGross.toFixed(2)} €</span>
                                         </div>
                                     </div>
