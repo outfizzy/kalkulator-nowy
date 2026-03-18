@@ -2194,6 +2194,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                                 <div className="flex flex-wrap gap-3">
                                     <button
+                                        onClick={() => setShowSendEmailModal(true)}
                                         className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                                     >
                                         ✉️ E-Mail senden
@@ -2226,6 +2227,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
                                 </button>
                                 <button
+                                    onClick={() => setShowSendEmailModal(true)}
                                     disabled={(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
                                     className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
                                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
