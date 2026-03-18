@@ -515,7 +515,7 @@ export const ConfiguratorWizardPage: React.FC = () => {
 
     // ========== WIZARD ==========
     return (
-        <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 15%, #ffffff 85%, #fef3c7 100%)' }}>
+        <div translate="no" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 15%, #ffffff 85%, #fef3c7 100%)' }}>
             {/* Header */}
             <header style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #fed7aa', position: 'sticky', top: 0, zIndex: 40 }}>
                 <div style={{ maxWidth: 1100, margin: '0 auto', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
