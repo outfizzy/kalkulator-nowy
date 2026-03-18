@@ -47,38 +47,57 @@ export const MODEL_GALLERY: Record<string, string[]> = {
     'Trendline': [
         '/images/models/trendline.jpg',
         '/images/models/trendline-2.webp',
+        '/images/models/trendline-3.webp',
+        '/images/models/trendline-4.webp',
     ],
     'Trendline+': [
         '/images/models/trendline.jpg',
         '/images/models/trendline-2.webp',
+        '/images/models/trendline-3.webp',
+        '/images/models/trendline-4.webp',
     ],
     'Topline': [
         '/images/models/topline.jpg',
+        '/images/models/topline-2.webp',
+        '/images/models/topline-3.webp',
+        '/images/models/topline-4.webp',
     ],
     'Topline XL': [
         '/images/models/topline.jpg',
+        '/images/models/topline-2.webp',
+        '/images/models/topline-4.webp',
     ],
     'Designline': [
         '/images/models/designline.jpg',
         '/images/models/designline-2.webp',
-        '/images/models/designline-senkrechtmarkise.webp',
+        '/images/models/designline-3.webp',
     ],
     'Skyline': [
         '/images/models/skyline.jpg',
         '/images/models/skyline-2.jpg',
         '/images/models/skyline-3.jpg',
+        '/images/models/skyline-4.jpg',
+        '/images/models/skyline-5.jpg',
+        '/images/models/skyline-render.jpg',
     ],
     'Orangeline': [
         '/images/models/orangeline.jpg',
+        '/images/models/orangeline-2.webp',
     ],
     'Orangeline+': [
         '/images/models/orangeline.jpg',
+        '/images/models/orangeline-2.webp',
     ],
     'Ultraline': [
         '/images/models/ultraline.jpg',
+        '/images/models/ultraline-2.jpg',
+        '/images/models/ultraline-3.jpg',
+        '/images/models/ultraline-4.webp',
     ],
     'Carport': [
-        '/images/models/carport.jpg',
+        '/images/models/carport-2.jpg',
+        '/images/models/carport-3.jpg',
+        '/images/models/carport-4.jpg',
     ],
     'Pergola': [
         '/images/models/pergola.jpg',
