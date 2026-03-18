@@ -375,56 +375,76 @@ export const PublicOfferPage: React.FC = () => {
                                         )}
                                     </div>
 
-                                    <div className="space-y-2.5 mb-6">
-                                        {/* Discount visualization — strikethrough original GROSS price for bigger visual impact */}
-                                        {offer.pricing.discountValue && offer.pricing.discountValue > 0 ? (() => {
-                                            const discountGross = offer.pricing.discountValue * 1.19;
-                                            const originalGross = offer.pricing.sellingPriceGross + discountGross;
-                                            return (
-                                            <>
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-500 text-sm">Regulärer Preis</span>
-                                                    <span className="font-semibold text-base text-slate-400 line-through">{originalGross.toFixed(2)} €</span>
-                                                </div>
-                                                <div className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2 border border-green-100">
-                                                    <span className="text-green-700 text-sm font-bold flex items-center gap-1.5">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
-                                                        {offer.pricing.discountPercentage
-                                                            ? `−${offer.pricing.discountPercentage}% Sonderrabatt`
-                                                            : `Sie sparen`
-                                                        }
-                                                    </span>
-                                                    <span className="font-bold text-green-700 text-sm">−{discountGross.toFixed(2)} €</span>
-                                                </div>
-                                            </>
-                                            );
-                                        })() : null}
+                                    {(() => {
+                                        const installNet = offer.pricing.installationCosts?.totalInstallation || 0;
+                                        const installGross = installNet * 1.19;
+                                        const productNet = offer.pricing.sellingPriceNet;
+                                        const productGross = offer.pricing.sellingPriceGross;
+                                        const totalNet = productNet + installNet;
+                                        const totalGross = productGross + installGross;
+                                        const totalVat = totalGross - totalNet;
+                                        const hasDiscount = offer.pricing.discountValue && offer.pricing.discountValue > 0;
+                                        const discountGross = hasDiscount ? offer.pricing.discountValue * 1.19 : 0;
+                                        const originalGross = hasDiscount ? productGross + discountGross : 0;
 
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-slate-500 text-sm">Nettopreis</span>
-                                            <span className="font-semibold text-base">{offer.pricing.sellingPriceNet.toFixed(2)} €</span>
-                                        </div>
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-slate-400 text-sm">MwSt. (19%)</span>
-                                            <span className="font-semibold text-slate-500">{(offer.pricing.sellingPriceGross - offer.pricing.sellingPriceNet).toFixed(2)} €</span>
-                                        </div>
-
-                                        {/* Installation as a visible position */}
-                                        {offer.pricing.installationCosts?.totalInstallation > 0 && (
+                                        return (
+                                        <div className="space-y-2 mb-6">
+                                            {/* Product price */}
                                             <div className="flex justify-between items-baseline">
-                                                <span className="text-slate-500 text-sm flex items-center gap-1">
-                                                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5" /></svg>
-                                                    Fachmontage & Logistik
-                                                </span>
-                                                <span className="font-semibold text-base">{offer.pricing.installationCosts.totalInstallation.toFixed(2)} €</span>
+                                                <span className="text-slate-500 text-sm">Terrassenüberdachung</span>
+                                                <span className="font-semibold text-sm text-slate-700">{productNet.toFixed(2)} €</span>
                                             </div>
-                                        )}
 
-                                        <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
-                                            <span className="text-lg font-bold text-slate-800">Gesamtpreis (brutto)</span>
-                                            <span className="text-3xl font-extrabold text-emerald-600">{offer.pricing.sellingPriceGross.toFixed(2)} €</span>
+                                            {/* Installation */}
+                                            {installNet > 0 && (
+                                                <div className="flex justify-between items-baseline">
+                                                    <span className="text-slate-500 text-sm flex items-center gap-1">
+                                                        Fachgerechte Montage & Lieferung
+                                                    </span>
+                                                    <span className="font-semibold text-sm text-slate-700">{installNet.toFixed(2)} €</span>
+                                                </div>
+                                            )}
+
+                                            {/* Netto subtotal */}
+                                            <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
+                                                <span className="text-slate-600 text-sm font-semibold">Summe netto</span>
+                                                <span className="font-bold text-base text-slate-800">{totalNet.toFixed(2)} €</span>
+                                            </div>
+
+                                            {/* VAT */}
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-slate-400 text-sm">zzgl. MwSt. (19%)</span>
+                                                <span className="text-sm text-slate-500">{totalVat.toFixed(2)} €</span>
+                                            </div>
+
+                                            {/* Discount badge */}
+                                            {hasDiscount && (
+                                                <>
+                                                    <div className="flex justify-between items-baseline pt-1">
+                                                        <span className="text-slate-400 text-sm">Regulärer Bruttopreis</span>
+                                                        <span className="text-sm text-slate-400 line-through">{(originalGross + installGross).toFixed(2)} €</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2 border border-green-100">
+                                                        <span className="text-green-700 text-sm font-bold flex items-center gap-1.5">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
+                                                            {offer.pricing.discountPercentage
+                                                                ? `−${offer.pricing.discountPercentage}% Sonderrabatt`
+                                                                : `Sie sparen`
+                                                            }
+                                                        </span>
+                                                        <span className="font-bold text-green-700 text-sm">−{discountGross.toFixed(2)} €</span>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Grand total brutto */}
+                                            <div className="flex justify-between items-center pt-3 border-t-2 border-slate-200">
+                                                <span className="text-lg font-bold text-slate-800">Gesamtpreis brutto</span>
+                                                <span className="text-3xl font-extrabold text-emerald-600">{totalGross.toFixed(2)} €</span>
+                                            </div>
                                         </div>
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* CTAs */}
