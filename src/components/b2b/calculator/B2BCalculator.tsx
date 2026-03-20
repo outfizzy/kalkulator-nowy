@@ -1665,7 +1665,7 @@ export const B2BCalculator: React.FC = () => {
         return (
             <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
                 <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Header */}
+                    {/* Header with ref + date */}
                     <div className="flex items-center justify-between">
                         <button
                             onClick={() => setView('config')}
@@ -1673,7 +1673,12 @@ export const B2BCalculator: React.FC = () => {
                         >
                             ← Wróć do konfiguracji
                         </button>
-                        <h1 className="text-2xl font-black text-slate-900">Podsumowanie oferty</h1>
+                        <div className="text-right">
+                            <h1 className="text-2xl font-black text-slate-900">Podsumowanie oferty</h1>
+                            <p className="text-xs text-slate-400 mt-1">
+                                {new Date().toLocaleDateString('de-DE')} • Ref: ANG-{new Date().toISOString().slice(2,10).replace(/-/g,'')}-{Math.random().toString(36).substring(2,5).toUpperCase()}
+                            </p>
+                        </div>
                     </div>
 
                     {/* Technical Specs */}
@@ -1798,7 +1803,7 @@ export const B2BCalculator: React.FC = () => {
                                 {customItems.map((item) => (
                                     <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
                                         <td className="py-3 font-medium text-blue-700">📝 {item.name}</td>
-                                        <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
+                                        <td className="py-3 text-slate-600 text-xs">Dodane ręcznie</td>
                                         <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
                                         <td className="py-3 text-center">
                                             <button
@@ -1813,7 +1818,7 @@ export const B2BCalculator: React.FC = () => {
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 border-slate-200">
-                                    <td colSpan={2} className="py-3 font-bold">Zwischensumme</td>
+                                    <td colSpan={2} className="py-3 font-bold">Suma pozycji</td>
                                     <td className="py-3 text-right font-bold">{formatCurrency(subtotal)}</td>
                                     <td></td>
                                 </tr>
@@ -1822,20 +1827,20 @@ export const B2BCalculator: React.FC = () => {
 
                         {/* Add Custom Item */}
                         <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Position hinzufügen</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Dodaj pozycję ręcznie</p>
                             <div className="flex gap-2">
                                 <input
                                     type="text"
                                     value={newItemName}
                                     onChange={e => setNewItemName(e.target.value)}
-                                    placeholder="Beschreibung..."
+                                    placeholder="Nazwa / opis..."
                                     className="flex-1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
                                 />
                                 <input
                                     type="number"
                                     value={newItemPrice}
                                     onChange={e => setNewItemPrice(e.target.value)}
-                                    placeholder="Preis €"
+                                    placeholder="Cena €"
                                     className="w-32 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
                                 />
                                 <button
@@ -1947,10 +1952,16 @@ export const B2BCalculator: React.FC = () => {
                                     <span className="text-3xl font-black text-slate-900">{formatCurrency(finalPrice)}</span>
                                 </div>
                                 {margin > 0 && (
-                                    <div className="flex justify-between text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-100">
-                                        <span className="font-semibold">💰 Twój zysk z tej oferty:</span>
-                                        <span className="font-black">{formatCurrency(marginValue - discountValue)}</span>
-                                    </div>
+                                    <>
+                                        <div className="flex justify-between text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-100">
+                                            <span className="font-semibold">💰 Twój zysk z tej oferty:</span>
+                                            <span className="font-black">{formatCurrency(marginValue - discountValue)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                            <span>Cena brutto klienta (inkl. 19% MwSt.):</span>
+                                            <span className="font-bold text-slate-700">{formatCurrency(finalPrice * 1.19)}</span>
+                                        </div>
+                                    </>
                                 )}
                             </div>
 
@@ -2078,26 +2089,43 @@ export const B2BCalculator: React.FC = () => {
                         </div>
 
                     ) : (
-                        <div className="flex gap-4">
+                        <div className="space-y-3">
+                            {/* Customer data warning */}
+                            {(!customerState || (!customerState.firstName && !customerState.name)) && (
+                                <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+                                    <span className="text-lg">⚠️</span>
+                                    <span>Dane klienta nie uzupełnione — PDF będzie bez danych odbiorcy.</span>
+                                    <button onClick={() => setView('customer')} className="ml-auto text-xs font-bold text-amber-800 underline hover:text-amber-900">Uzupełnij</button>
+                                </div>
+                            )}
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => saveB2BOffer(true)}
+                                    disabled={savingOffer || basket.length === 0}
+                                    className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || basket.length === 0
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    {savingOffer ? 'Zapisywanie...' : '💾 Zapisz (Szkic)'}
+                                </button>
+                                <button
+                                    onClick={handleSaveAndOrder}
+                                    disabled={savingOffer || basket.length === 0}
+                                    className={`flex-[1.5] py-4 rounded-xl font-bold text-lg transition-all shadow-xl shadow-green-900/10 ${savingOffer || basket.length === 0
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-green-600 text-white hover:bg-green-500'
+                                        }`}
+                                >
+                                    <span>🛒 Zapisz i Zamów</span>
+                                </button>
+                            </div>
+                            {/* PDF before save */}
                             <button
-                                onClick={() => saveB2BOffer(true)}
-                                disabled={savingOffer || basket.length === 0}
-                                className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || basket.length === 0
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    : 'bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-50'
-                                    }`}
+                                onClick={handleGenerateClientPDF}
+                                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-200 hover:shadow-xl hover:from-emerald-700 hover:to-green-700 transition-all flex items-center justify-center gap-2"
                             >
-                                {savingOffer ? 'Zapisywanie...' : '💾 Zapisz (Szkic)'}
-                            </button>
-                            <button
-                                onClick={handleSaveAndOrder}
-                                disabled={savingOffer || basket.length === 0}
-                                className={`flex-[1.5] py-4 rounded-xl font-bold text-lg transition-all shadow-xl shadow-green-900/10 ${savingOffer || basket.length === 0
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    : 'bg-green-600 text-white hover:bg-green-500'
-                                    }`}
-                            >
-                                <span>🛒 Zapisz i Zamów</span>
+                                📄 Podgląd PDF dla klienta (z Twoją marżą {margin}%)
                             </button>
                         </div>
                     )}
