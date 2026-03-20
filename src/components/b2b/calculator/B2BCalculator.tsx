@@ -1554,22 +1554,22 @@ export const B2BCalculator: React.FC = () => {
     // === GENERATE CLIENT PDF ===
     const handleGenerateClientPDF = async () => {
         try {
-            const partner = await B2BService.getCurrentPartner();
+            const partner = await B2BService.getOrCreateCurrentPartner();
             if (!partner) {
                 toast.error('Nie znaleziono partnera B2B');
                 return;
             }
 
             const modelConfig = ROOF_MODELS.find(m => m.id === model);
-            const modelLabel = modelConfig?.label || model;
+            const modelLabel = modelConfig?.name || model;
 
             const pdfConfig: B2BPDFConfig = {
                 partnerCompany: partner.company_name || 'Partner',
-                partnerAddress: partner.address || '',
-                partnerPhone: partner.phone || '',
-                partnerEmail: partner.email || '',
+                partnerAddress: partner.address ? `${partner.address.street || ''}, ${partner.address.zip || ''} ${partner.address.city || ''}`.replace(/^[, ]+|[, ]+$/g, '') : '',
+                partnerPhone: partner.contact_phone || '',
+                partnerEmail: partner.contact_email || '',
                 partnerTaxId: partner.tax_id || '',
-                partnerLogo: null,
+                partnerLogo: partner.logo_url || null,
                 customerName: customerState
                     ? `${customerState.firstName || ''} ${customerState.lastName || customerState.name || ''}`.trim() || 'Kunde'
                     : 'Kunde',
