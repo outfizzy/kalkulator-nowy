@@ -8,7 +8,7 @@ import { WallVisualizer } from '../../calculator_v2/WallVisualizer';
 import { DatabaseService } from '../../../services/database';
 import { useAuth } from '../../../contexts/AuthContext';
 import type { Customer, Lead, Offer } from '../../../types';
-import { generateOfferPDF } from '../../../utils/pdfGenerator';
+import { generateOfferPDF, generateB2BClientPDF, type B2BPDFConfig } from '../../../utils/pdfGenerator';
 import { B2BCustomerForm } from './B2BCustomerForm';
 import { B2BService } from '../../../services/database/b2b.service';
 import { calculateDachrechner, type DachrechnerResults, type RoofModelId } from '../../../services/dachrechner.service';
@@ -1416,10 +1416,74 @@ export const B2BCalculator: React.FC = () => {
     const finalPrice = priceAfterMargin - discountValue;
 
     // === SAVE OFFER HANDLER ===
-    // === SAVE OFFER HANDLER ===
     const handleSaveOffer = async () => {
         // For B2B mode: use saveB2BOffer directly (allows saving without customer data)
         await saveB2BOffer();
+    };
+
+    // === GENERATE CLIENT PDF ===
+    const handleGenerateClientPDF = async () => {
+        try {
+            const partner = await B2BService.getCurrentPartner();
+            if (!partner) {
+                toast.error('Nie znaleziono partnera B2B');
+                return;
+            }
+
+            const modelConfig = ROOF_MODELS.find(m => m.id === model);
+            const modelLabel = modelConfig?.label || model;
+
+            const pdfConfig: B2BPDFConfig = {
+                partnerCompany: partner.company_name || 'Partner',
+                partnerAddress: partner.address || '',
+                partnerPhone: partner.phone || '',
+                partnerEmail: partner.email || '',
+                partnerTaxId: partner.tax_id || '',
+                partnerLogo: null,
+                customerName: customerState
+                    ? `${customerState.firstName || ''} ${customerState.lastName || customerState.name || ''}`.trim() || 'Kunde'
+                    : 'Kunde',
+                customerCompany: customerState?.companyName || '',
+                customerAddress: customerState
+                    ? `${customerState.street || ''} ${customerState.houseNumber || ''}`.trim()
+                    : '',
+                customerCity: customerState
+                    ? `${customerState.postalCode || ''} ${customerState.city || ''}`.trim()
+                    : '',
+                customerPhone: customerState?.phone || '',
+                customerEmail: customerState?.email || '',
+                model: modelLabel,
+                width,
+                projection,
+                cover: cover === 'Poly'
+                    ? `Poly (${polyVariant})`
+                    : `Glass (${glassVariant})`,
+                construction,
+                postsCount: structuralMetadata?.posts_count || Math.max(2, Math.ceil(width / 3500) + 1),
+                basket: basket.map(item => ({
+                    name: item.name,
+                    config: item.config,
+                    price: item.price
+                })),
+                customItems: customItems.map(ci => ({
+                    name: ci.name,
+                    price: ci.price
+                })),
+                purchasePrice,
+                marginPercent: margin,
+                discountPercent: discount,
+                customerPrice: finalPrice,
+                partnerProfit: marginValue - discountValue,
+                areaM2,
+                structuralNote: structureNote || undefined
+            };
+
+            generateB2BClientPDF(pdfConfig);
+            toast.success('PDF wygenerowany!');
+        } catch (error) {
+            console.error('Error generating client PDF:', error);
+            toast.error('Błąd generowania PDF');
+        }
     };
 
     // === FINAL SUMMARY VIEW ===
@@ -1855,6 +1919,12 @@ export const B2BCalculator: React.FC = () => {
                                     className={`px-4 py-3 border rounded-xl font-bold ${savedOffer ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
                                 >
                                     📄 Drukuj / PDF
+                                </button>
+                                <button
+                                    onClick={handleGenerateClientPDF}
+                                    className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-200 hover:shadow-xl hover:from-emerald-700 hover:to-green-700 transition-all flex items-center gap-2"
+                                >
+                                    📄 PDF dla klienta (z marżą)
                                 </button>
                                 <button
                                     onClick={() => navigate('/dashboard')}

@@ -853,3 +853,385 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     return doc;
 }
+
+// === B2B PARTNER CLIENT PDF ===
+// Generates a customer-facing PDF with partner's company branding and margin-applied prices
+
+export interface B2BPDFConfig {
+    partnerCompany: string;
+    partnerAddress?: string;
+    partnerPhone?: string;
+    partnerEmail?: string;
+    partnerTaxId?: string;
+    partnerLogo?: string | null;
+    customerName?: string;
+    customerCompany?: string;
+    customerAddress?: string;
+    customerCity?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    model: string;
+    width: number;
+    projection: number;
+    cover: string;
+    construction: string;
+    postsCount?: number;
+    basket: Array<{ name: string; config?: string; price: number }>;
+    customItems?: Array<{ name: string; price: number }>;
+    purchasePrice: number;
+    marginPercent: number;
+    discountPercent: number;
+    customerPrice: number;
+    partnerProfit: number;
+    areaM2: number;
+    structuralNote?: string;
+}
+
+export function generateB2BClientPDF(config: B2BPDFConfig) {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    doc.setFont('helvetica', 'normal');
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    const drawHeader = () => {
+        doc.setFillColor(...THEME.primary);
+        doc.rect(0, 0, pageWidth, 35, 'F');
+
+        // Partner company name (instead of Polendach24 logo)
+        doc.setFont(FONTS.bold, 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(...THEME.white);
+        const companyName = config.partnerCompany || 'Angebot';
+        doc.text(companyName, MARGIN, 22);
+
+        doc.setFont(FONTS.normal, 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(200, 200, 200);
+        if (config.partnerPhone) doc.text(config.partnerPhone, pageWidth - MARGIN, 15, { align: 'right' });
+        if (config.partnerEmail) doc.text(config.partnerEmail, pageWidth - MARGIN, 20, { align: 'right' });
+        if (config.partnerTaxId) doc.text(`USt-ID: ${config.partnerTaxId}`, pageWidth - MARGIN, 25, { align: 'right' });
+
+        doc.setFillColor(...THEME.secondary);
+        doc.rect(0, 35, pageWidth, 1.5, 'F');
+    };
+
+    const drawFooter = (pageNo: number, pageCount: number) => {
+        const y = pageHeight - 16;
+        doc.setDrawColor(...THEME.line);
+        doc.setLineWidth(0.2);
+        doc.line(MARGIN, y, pageWidth - MARGIN, y);
+
+        doc.setFontSize(7);
+        doc.setTextColor(...THEME.textLight);
+        doc.setFont(FONTS.normal, 'normal');
+        doc.text(config.partnerCompany, MARGIN, y + 5);
+        if (config.partnerAddress) doc.text(config.partnerAddress, MARGIN, y + 9);
+        doc.text(`Seite ${pageNo} / ${pageCount}`, pageWidth - MARGIN, y + 9, { align: 'right' });
+    };
+
+    const ensureSpace = (neededMm: number, currentY: number): number => {
+        if (currentY + neededMm > pageHeight - 20) {
+            doc.addPage();
+            drawHeader();
+            return 50;
+        }
+        return currentY;
+    };
+
+    // --- PAGE 1 ---
+    drawHeader();
+    let y = 50;
+
+    // Date
+    const today = new Date().toLocaleDateString('de-DE');
+    const validUntil = new Date();
+    validUntil.setDate(validUntil.getDate() + 30);
+    const validUntilStr = validUntil.toLocaleDateString('de-DE');
+
+    // Offer badge (Right)
+    doc.setFillColor(...THEME.surface);
+    doc.roundedRect(pageWidth - MARGIN - 60, y, 60, 22, 1, 1, 'F');
+    doc.setDrawColor(...THEME.line);
+    doc.rect(pageWidth - MARGIN - 60, y, 60, 22, 'S');
+
+    doc.setFontSize(7);
+    doc.setTextColor(...THEME.textLight);
+    doc.text('DATUM', pageWidth - MARGIN - 55, y + 6);
+
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...THEME.primary);
+    doc.text(today, pageWidth - MARGIN - 55, y + 13);
+
+    doc.setFontSize(7);
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text(`Gueltig bis: ${validUntilStr}`, pageWidth - MARGIN - 55, y + 19);
+
+    // Customer address (Left)
+    if (config.partnerAddress) {
+        doc.setFontSize(7);
+        doc.setTextColor(...THEME.textLight);
+        doc.text(`${config.partnerCompany} - ${config.partnerAddress}`, MARGIN, y - 2);
+    }
+
+    y += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(...THEME.text);
+
+    if (config.customerCompany) {
+        doc.setFont(FONTS.bold, 'bold');
+        doc.text(config.customerCompany, MARGIN, y);
+        y += 5;
+    }
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text(config.customerName || 'Kunde', MARGIN, y);
+    y += 5;
+    if (config.customerAddress) { doc.text(config.customerAddress, MARGIN, y); y += 5; }
+    if (config.customerCity) { doc.text(config.customerCity, MARGIN, y); y += 5; }
+
+    // Hero Title
+    y = 88;
+    const modelName = config.model;
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(...THEME.primary);
+    doc.text(modelName, MARGIN, y);
+
+    doc.setFontSize(11);
+    doc.setTextColor(...THEME.secondary);
+    doc.text('Ihr individuelles Angebot', MARGIN + doc.getTextWidth(modelName) + 4, y);
+
+    y += 8;
+    doc.setFontSize(10);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.setTextColor(...THEME.text);
+
+    let greeting = 'Sehr geehrte Damen und Herren,';
+    if (config.customerName && config.customerName !== 'Kunde') {
+        greeting = `Sehr geehrte/r ${config.customerName},`;
+    }
+    doc.text(greeting, MARGIN, y);
+    y += 6;
+
+    const introText = 'vielen Dank fuer Ihr Interesse. Gerne unterbreiten wir Ihnen folgendes Angebot fuer Ihre individuelle Terrassenueberdachung aus hochwertigem Aluminium.';
+    const introLines = doc.splitTextToSize(introText, pageWidth - MARGIN * 2);
+    doc.text(introLines, MARGIN, y);
+    y += (introLines.length * 5) + 10;
+
+    // Configuration Box
+    const boxHeight = 52;
+    y = ensureSpace(boxHeight + 10, y);
+
+    doc.setFillColor(...THEME.primary);
+    doc.roundedRect(MARGIN, y, pageWidth - (MARGIN * 2), boxHeight, 1, 1, 'F');
+
+    doc.setTextColor(...THEME.secondary);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(9);
+    doc.text('IHRE KONFIGURATION', MARGIN + 8, y + 8);
+
+    const specsY = y + 16;
+    const colW = (pageWidth - MARGIN * 2) / 3;
+
+    doc.setTextColor(...THEME.white);
+    doc.setFontSize(10);
+    doc.setFont(FONTS.normal, 'normal');
+
+    // Col 1 - Dimensions
+    doc.text('Dimensionen:', MARGIN + 8, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${config.width} x ${config.projection} mm`, MARGIN + 8, specsY + 5);
+
+    // Col 2 - Cover
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Dacheindeckung:', MARGIN + 8 + colW, specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(translateForPDF(config.cover, 'roofTypes'), MARGIN + 8 + colW, specsY + 5);
+
+    // Col 3 - Construction
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Montage:', MARGIN + 8 + (colW * 2), specsY);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(config.construction === 'wall' ? 'Wandmontage' : 'Freistehend', MARGIN + 8 + (colW * 2), specsY + 5);
+
+    // Row 2
+    const specsY2 = specsY + 14;
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Flaeche:', MARGIN + 8, specsY2);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${config.areaM2.toFixed(2)} m2`, MARGIN + 8, specsY2 + 5);
+
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Pfosten:', MARGIN + 8 + colW, specsY2);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(`${config.postsCount || '-'}`, MARGIN + 8 + colW, specsY2 + 5);
+
+    y += boxHeight + 10;
+
+    // Pricing Table
+    const bodyRows: any[] = [];
+    let pos = 1;
+
+    // Main product
+    const mainDesc = `${modelName} Aluminiumkonstruktion\nPremium Pulverbeschichtung, Verstaerkte Profile, Integrierte Entwaesserung.`;
+    const mainPrice = config.basket.find(b => b.name.toLowerCase().includes(config.model.toLowerCase().split(' ')[0]))?.price || config.basket[0]?.price || 0;
+
+    // Apply margin ratio to each item
+    const marginMultiplier = config.marginPercent > 0 ? (1 + config.marginPercent / 100) : 1;
+    const discountMultiplier = config.discountPercent > 0 ? (1 - config.discountPercent / 100) : 1;
+
+    config.basket.forEach((item) => {
+        const customerItemPrice = item.price * marginMultiplier * discountMultiplier;
+        bodyRows.push([
+            { content: String(pos++), styles: { halign: 'center' } },
+            professionalItemDescription(item.name, item.config),
+            formatCurrency(customerItemPrice)
+        ]);
+    });
+
+    // Custom items
+    if (config.customItems && config.customItems.length > 0) {
+        config.customItems.forEach(ci => {
+            const customerItemPrice = ci.price * marginMultiplier * discountMultiplier;
+            bodyRows.push([
+                { content: String(pos++), styles: { halign: 'center' } },
+                ci.name || 'Zusaetzliche Position',
+                formatCurrency(customerItemPrice)
+            ]);
+        });
+    }
+
+    autoTable(doc, {
+        startY: y,
+        head: [['Pos.', 'Beschreibung', 'Betrag']],
+        body: bodyRows,
+        theme: 'grid',
+        styles: {
+            font: FONTS.normal,
+            fontSize: 9,
+            cellPadding: 6,
+            lineWidth: 0.1,
+            lineColor: THEME.line,
+            textColor: THEME.text,
+            overflow: 'linebreak'
+        },
+        headStyles: {
+            fillColor: THEME.surface,
+            textColor: THEME.primary,
+            fontStyle: 'bold',
+            lineWidth: 0.1,
+            lineColor: THEME.line
+        },
+        columnStyles: {
+            0: { cellWidth: 12 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+        },
+        alternateRowStyles: {
+            fillColor: THEME.white
+        },
+        margin: { left: MARGIN, right: MARGIN, top: 50, bottom: 25 },
+        rowPageBreak: 'avoid',
+        showHead: 'everyPage',
+        didDrawPage: function () { drawHeader(); }
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Totals Block
+    const totalBlockHeight = 60;
+    y = ensureSpace(totalBlockHeight, y);
+
+    const totalBoxWidth = 85;
+    const totalBoxX = pageWidth - MARGIN - totalBoxWidth;
+    let ty = y;
+
+    const totalNet = config.customerPrice;
+    const totalVat = totalNet * 0.19;
+    const totalGross = totalNet + totalVat;
+
+    // Netto
+    doc.setFontSize(9);
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Summe netto:', totalBoxX, ty + 5);
+    doc.setTextColor(...THEME.text);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text(formatCurrency(totalNet), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    ty += 6;
+
+    // MwSt
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('zzgl. 19% MwSt.:', totalBoxX, ty + 5);
+    doc.text(formatCurrency(totalVat), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    ty += 7;
+
+    // Divider
+    doc.setDrawColor(...THEME.primary);
+    doc.setLineWidth(0.4);
+    doc.line(totalBoxX, ty, pageWidth - MARGIN, ty);
+    ty += 3;
+
+    // Grand Total
+    doc.setFillColor(...THEME.primary);
+    doc.roundedRect(totalBoxX, ty, totalBoxWidth, 14, 1, 1, 'F');
+    doc.setTextColor(...THEME.white);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.setFontSize(12);
+    doc.text('GESAMT BRUTTO:', totalBoxX + 4, ty + 9);
+    doc.text(formatCurrency(totalGross), pageWidth - MARGIN - 4, ty + 9, { align: 'right' });
+
+    // Contact info (left side)
+    const cardY = y;
+    doc.setDrawColor(...THEME.line);
+    doc.setLineWidth(0.1);
+    doc.rect(MARGIN, cardY, 80, 35);
+
+    doc.setFillColor(...THEME.primary);
+    doc.rect(MARGIN, cardY, 80, 8, 'F');
+    doc.setTextColor(...THEME.white);
+    doc.setFontSize(8);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text('IHR ANSPRECHPARTNER', MARGIN + 4, cardY + 5);
+
+    doc.setFontSize(10);
+    doc.setTextColor(...THEME.primary);
+    doc.text(config.partnerCompany, MARGIN + 4, cardY + 16);
+
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    if (config.partnerPhone) doc.text(config.partnerPhone, MARGIN + 4, cardY + 22);
+    if (config.partnerEmail) doc.text(config.partnerEmail, MARGIN + 4, cardY + 27);
+
+    // Closing
+    y = Math.max(ty + 25, cardY + 45);
+    y = ensureSpace(30, y);
+
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.textLight);
+    doc.text(`Dieses Angebot ist gueltig bis ${validUntilStr}. Alle Preise in EUR zzgl. 19% MwSt.`, pageWidth / 2, y, { align: 'center' });
+
+    y += 12;
+    doc.setDrawColor(...THEME.textLight);
+    doc.setLineWidth(0.1);
+    doc.line(MARGIN, y + 10, MARGIN + 60, y + 10);
+    doc.line(pageWidth - MARGIN - 60, y + 10, pageWidth - MARGIN, y + 10);
+
+    doc.setFontSize(7);
+    doc.text(config.partnerCompany, MARGIN, y + 14);
+    doc.text('Ort, Datum, Unterschrift Kunde', pageWidth - MARGIN - 60, y + 14);
+
+    // Footer Loop
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        drawFooter(i, pageCount);
+    }
+
+    // Save
+    doc.save(`Angebot_${config.customerName?.replace(/\s+/g, '_') || 'Kunde'}_${today.replace(/\./g, '-')}.pdf`);
+}
