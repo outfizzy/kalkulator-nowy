@@ -885,6 +885,17 @@ export interface B2BPDFConfig {
     partnerProfit: number;
     areaM2: number;
     structuralNote?: string;
+    technicalSpecs?: {
+        angleDeg?: number;
+        gutterH3?: number;
+        wallH1?: number;
+        rafterSpacing?: number;
+        postWidth?: number;
+        depthWithGutter?: number;
+        windowWidth?: number;
+        slopePerMeter?: number;
+        materialDesc?: string;
+    };
 }
 
 export function generateB2BClientPDF(config: B2BPDFConfig) {
@@ -1069,6 +1080,58 @@ export function generateB2BClientPDF(config: B2BPDFConfig) {
     doc.text(`${config.postsCount || '-'}`, MARGIN + 8 + colW, specsY2 + 5);
 
     y += boxHeight + 10;
+
+    // Technical Specs Section (if data available)
+    if (config.technicalSpecs) {
+        const ts = config.technicalSpecs;
+        const specLines: string[] = [];
+
+        if (ts.angleDeg != null) specLines.push(`Neigung: ${ts.angleDeg.toFixed(1)}°`);
+        if (ts.slopePerMeter != null) specLines.push(`Gefaelle: ${Math.round(ts.slopePerMeter)} mm/m`);
+        if (ts.wallH1 != null) specLines.push(`H1 Wandhoehe: ${Math.round(ts.wallH1)} mm`);
+        if (ts.gutterH3 != null) specLines.push(`H3 Rinnenhoehe: ${Math.round(ts.gutterH3)} mm`);
+        if (ts.depthWithGutter != null) specLines.push(`Tiefe m. Rinne: ${Math.round(ts.depthWithGutter)} mm`);
+        if (ts.rafterSpacing != null) specLines.push(`Sparrenabstand: ${Math.round(ts.rafterSpacing)} mm`);
+        if (ts.postWidth != null) specLines.push(`Pfostenbreite: ${ts.postWidth} mm`);
+        if (ts.windowWidth != null) specLines.push(`Fensterbreite F2: ${Math.round(ts.windowWidth)} mm`);
+
+        if (specLines.length > 0) {
+            const techHeight = 28;
+            y = ensureSpace(techHeight, y);
+
+            doc.setFillColor(245, 247, 250);
+            doc.roundedRect(MARGIN, y, pageWidth - MARGIN * 2, techHeight, 1, 1, 'F');
+            doc.setDrawColor(...THEME.line);
+            doc.rect(MARGIN, y, pageWidth - MARGIN * 2, techHeight, 'S');
+
+            doc.setTextColor(...THEME.secondary);
+            doc.setFont(FONTS.bold, 'bold');
+            doc.setFontSize(7);
+            doc.text('TECHNISCHE DATEN', MARGIN + 6, y + 6);
+
+            doc.setTextColor(...THEME.text);
+            doc.setFont(FONTS.normal, 'normal');
+            doc.setFontSize(7.5);
+
+            // Layout specs in 4 columns, 2 rows
+            const specColW = (pageWidth - MARGIN * 2 - 12) / 4;
+            const tx = MARGIN + 6;
+            specLines.forEach((line, i) => {
+                const col = i % 4;
+                const row = Math.floor(i / 4);
+                doc.text(line, tx + col * specColW, y + 12 + row * 6);
+            });
+
+            if (ts.materialDesc) {
+                const matY = y + 12 + (Math.ceil(specLines.length / 4)) * 6;
+                doc.setFontSize(7);
+                doc.setTextColor(...THEME.textLight);
+                doc.text(ts.materialDesc, tx, matY);
+            }
+
+            y += techHeight + 6;
+        }
+    }
 
     // Pricing Table
     const bodyRows: any[] = [];

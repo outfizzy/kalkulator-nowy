@@ -1475,7 +1475,18 @@ export const B2BCalculator: React.FC = () => {
                 customerPrice: finalPrice,
                 partnerProfit: marginValue - discountValue,
                 areaM2,
-                structuralNote: structureNote || undefined
+                structuralNote: structureNote || undefined,
+                technicalSpecs: dachResults ? {
+                    angleDeg: dachResults.angleAlpha ?? undefined,
+                    slopePerMeter: dachResults.inclinationMmM ?? undefined,
+                    wallH1: dachResults.h1 ?? undefined,
+                    gutterH3: dachResults.h3 ?? undefined,
+                    depthWithGutter: dachResults.depthD2 ?? undefined,
+                    rafterSpacing: dachResults.sparrenMitte ?? undefined,
+                    postWidth: dachResults.postWidth ?? undefined,
+                    windowWidth: dachResults.fensterF2 ?? undefined,
+                    materialDesc: `Aluminium Konstruktion, Pulverbeschichtet ${color}, ${cover === 'Poly' ? 'Polycarbonat ' + polyVariant : 'Glas ' + glassVariant}`
+                } : undefined
             };
 
             generateB2BClientPDF(pdfConfig);
