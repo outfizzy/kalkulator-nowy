@@ -896,6 +896,7 @@ export interface B2BPDFConfig {
         slopePerMeter?: number;
         materialDesc?: string;
     };
+    modelDetailSpecs?: Array<{ label: string; value: string }>;
 }
 
 export function generateB2BClientPDF(config: B2BPDFConfig) {
@@ -1131,6 +1132,56 @@ export function generateB2BClientPDF(config: B2BPDFConfig) {
 
             y += techHeight + 6;
         }
+    }
+
+    // === PRODUKTSPEZIFIKATION (detailed model specs) ===
+    if (config.modelDetailSpecs && config.modelDetailSpecs.length > 0) {
+        const specs = config.modelDetailSpecs;
+        const rowH = 5.5;
+        const specTableH = 8 + specs.length * rowH + 4;
+        y = ensureSpace(specTableH, y);
+
+        // Header
+        doc.setFillColor(15, 23, 42); // dark navy
+        doc.roundedRect(MARGIN, y, pageWidth - MARGIN * 2, 8, 1, 1, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.setFontSize(7);
+        doc.text('PRODUKTSPEZIFIKATION  |  ' + config.model.toUpperCase(), MARGIN + 6, y + 5.5);
+        y += 10;
+
+        // Spec rows in 2-column layout
+        const colW = (pageWidth - MARGIN * 2) / 2;
+        doc.setFontSize(7.5);
+
+        specs.forEach((spec, i) => {
+            const col = i % 2;
+            const row = Math.floor(i / 2);
+            const rx = MARGIN + col * colW;
+            const ry = y + row * rowH;
+
+            // Alternate row bg
+            if (col === 0 && row % 2 === 0) {
+                doc.setFillColor(248, 250, 252);
+                doc.rect(MARGIN, ry - 1.5, pageWidth - MARGIN * 2, rowH, 'F');
+            }
+
+            doc.setFont(FONTS.normal, 'normal');
+            doc.setTextColor(100, 116, 139); // slate-500
+            doc.text(spec.label + ':', rx + 4, ry + 2);
+
+            doc.setFont(FONTS.bold, 'bold');
+            doc.setTextColor(30, 41, 59); // slate-800
+            doc.text(spec.value, rx + 52, ry + 2);
+        });
+
+        const totalSpecRows = Math.ceil(specs.length / 2);
+        y += totalSpecRows * rowH + 6;
+
+        // Separator
+        doc.setDrawColor(...THEME.line);
+        doc.line(MARGIN, y, pageWidth - MARGIN, y);
+        y += 4;
     }
 
     // Pricing Table
