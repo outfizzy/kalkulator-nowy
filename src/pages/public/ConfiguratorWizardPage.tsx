@@ -556,7 +556,15 @@ export const ConfiguratorWizardPage: React.FC = () => {
                         </React.Fragment>
                     ))}
                 </div>
-                <style>{`@media(min-width:640px){.step-label{display:inline!important}}`}</style>
+                <style>{`
+                    @media(min-width:640px){.step-label{display:inline!important}}
+                    @media(max-width:639px){
+                        .wiz-grid-2col{grid-template-columns:1fr!important}
+                        .wiz-grid-3col{grid-template-columns:1fr 1fr!important}
+                        .wiz-grid-plz{grid-template-columns:1fr!important}
+                        .wiz-h2{font-size:clamp(22px,5vw,32px)!important}
+                    }
+                `}</style>
             </div>
 
             {/* Step Content */}
@@ -624,11 +632,11 @@ export const ConfiguratorWizardPage: React.FC = () => {
 const StepPersonalData: React.FC<{ data: CustomerData; onChange: (f: keyof CustomerData, v: string) => void }> = ({ data, onChange }) => (
     <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <h2 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Willkommen bei Ihrem Konfigurator</h2>
+            <h2 className="wiz-h2" style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Willkommen bei Ihrem Konfigurator</h2>
             <p style={{ color: '#64748b', fontSize: 16 }}>Füllen Sie Ihre Daten aus und wir erstellen Ihnen ein individuelles Angebot.</p>
         </div>
         <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', padding: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                 <WField label="Vorname *" value={data.firstName} onChange={v => onChange('firstName', v)} placeholder="Max" />
                 <WField label="Nachname *" value={data.lastName} onChange={v => onChange('lastName', v)} placeholder="Mustermann" />
             </div>
@@ -638,7 +646,7 @@ const StepPersonalData: React.FC<{ data: CustomerData; onChange: (f: keyof Custo
             <div style={{ height: 1, background: '#e2e8f0', margin: '20px 0' }} />
             <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>📍 Montageadresse</h3>
             <WField label="Straße & Hausnummer" value={data.street} onChange={v => onChange('street', v)} placeholder="Musterstraße 1" />
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16 }}>
+            <div className="wiz-grid-plz" style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16 }}>
                 <WField label="PLZ" value={data.postalCode} onChange={v => onChange('postalCode', v)} placeholder="12345" />
                 <WField label="Ort" value={data.city} onChange={v => onChange('city', v)} placeholder="Musterstadt" />
             </div>
@@ -699,7 +707,7 @@ const StepModelSelection: React.FC<{ state: WizardState; setState: React.Dispatc
     return (
         <div>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <h2 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Wählen Sie Ihr Modell</h2>
+                <h2 className="wiz-h2" style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Wählen Sie Ihr Modell</h2>
                 <p style={{ color: '#64748b', fontSize: 16 }}>Entdecken Sie unsere Überdachungen und Konstruktionen.</p>
             </div>
 
@@ -794,7 +802,7 @@ const StepStandaloneProducts: React.FC<{ state: WizardState; setState: React.Dis
     return (
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <h2 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Welche Komponenten benötigen Sie?</h2>
+                <h2 className="wiz-h2" style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Welche Komponenten benötigen Sie?</h2>
                 <p style={{ color: '#64748b', fontSize: 16 }}>Wählen Sie alle gewünschten Einzelkomponenten aus.</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
@@ -823,7 +831,7 @@ const StepStandaloneDimensions: React.FC<{ state: WizardState; setState: React.D
             <p style={{ color: '#64748b', fontSize: 16 }}>Geben Sie die ungefähren Abmessungen an — wir beraten Sie gerne im Detail.</p>
         </div>
         <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', padding: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                 <div>
                     <label style={{ color: '#64748b', fontSize: 14, fontWeight: 600, display: 'block', marginBottom: 8 }}>Breite (mm)</label>
                     <input type="number" value={state.standaloneWidth} onChange={e => setState(s => ({ ...s, standaloneWidth: Number(e.target.value) }))} min={500} max={10000} step={100}
@@ -858,7 +866,7 @@ const StepRoofAndColor: React.FC<{ state: WizardState; setState: React.Dispatch<
     return (
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <h2 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Dacheindeckung & Farbe</h2>
+                <h2 className="wiz-h2" style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Dacheindeckung & Farbe</h2>
                 <p style={{ color: '#64748b', fontSize: 16 }}>Wählen Sie das Material für Ihr Dach und die gewünschte Farbe für Ihre {state.modelDisplayName || 'Überdachung'}.</p>
             </div>
 
@@ -866,7 +874,7 @@ const StepRoofAndColor: React.FC<{ state: WizardState; setState: React.Dispatch<
             {hasRoofChoice ? (
                 <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', padding: 24, marginBottom: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 16 }}>🏠 Dacheindeckung wählen *</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: selectedMdl!.hasPoly ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
+                    <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: selectedMdl!.hasPoly ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
                         {selectedMdl!.hasGlass && (
                             <button onClick={() => setState(s => ({ ...s, roofCovering: 'glass', roofVariant: '' }))} style={{ padding: 20, borderRadius: 14, border: state.roofCovering === 'glass' ? '2px solid #f97316' : '2px solid #e2e8f0', background: state.roofCovering === 'glass' ? '#fff7ed' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, textAlign: 'left' }}>
                                 <img src="/images/models/roof-glass.jpg" alt="Glas" style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover' }}
@@ -948,7 +956,7 @@ const StepRoofAndColor: React.FC<{ state: WizardState; setState: React.Dispatch<
 const StepDimensions: React.FC<{ state: WizardState; setState: React.Dispatch<React.SetStateAction<WizardState>> }> = ({ state, setState }) => (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <h2 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Maße & Montageart</h2>
+            <h2 className="wiz-h2" style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Maße & Montageart</h2>
             <p style={{ color: '#64748b', fontSize: 16 }}>Geben Sie die gewünschten Abmessungen Ihrer {state.modelDisplayName} an.</p>
         </div>
 
@@ -958,7 +966,7 @@ const StepDimensions: React.FC<{ state: WizardState; setState: React.Dispatch<Re
                 const selModel = WIZARD_MODELS.find(m => m.id === state.model);
                 const mD = selModel?.maxDepth || 5000;
                 return (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                    <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                         <div>
                             <label style={{ color: '#64748b', fontSize: 14, fontWeight: 600, display: 'block', marginBottom: 8 }}>Breite (mm)</label>
                             <input type="number" value={state.width} onChange={e => setState(s => ({ ...s, width: Number(e.target.value) }))} min={1500} max={15000} step={100}
@@ -989,7 +997,7 @@ const StepDimensions: React.FC<{ state: WizardState; setState: React.Dispatch<Re
 
         <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', padding: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 20 }}>🔩 Wie soll montiert werden? *</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <div className="wiz-grid-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {MOUNTING_OPTIONS.map(opt => (
                     <button key={opt.id} onClick={() => setState(s => ({ ...s, mountingType: opt.id as any }))}
                         style={{
@@ -1009,7 +1017,7 @@ const StepDimensions: React.FC<{ state: WizardState; setState: React.Dispatch<Re
         {/* Konstruktionsart: Wandmontage vs Freistehend */}
         <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', padding: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.06)', marginTop: 20 }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 20 }}>🏠 Konstruktionsart *</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {[
                     { id: 'wand', label: 'Wandmontage', icon: '🏠', desc: 'An der Hauswand befestigt — stabiler Halt, kein hinterer Pfosten', recommended: true },
                     { id: 'frei', label: 'Freistehend', icon: '⛺', desc: 'Frei aufgestellt — Pfosten vorne und hinten, flexibler Standort' },
@@ -1056,7 +1064,7 @@ const StepAccessories: React.FC<{
     return (
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <h2 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Individuelle Ausstattung</h2>
+                <h2 className="wiz-h2" style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Individuelle Ausstattung</h2>
                 <p style={{ color: '#64748b', fontSize: 16 }}>Wählen Sie für jede Seite den gewünschten Abschluss.</p>
             </div>
 
@@ -1091,7 +1099,7 @@ const StepAccessories: React.FC<{
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>🪄 Senkrechtmarkise / ZIP Screen</h3>
                 <p style={{ color: '#64748b', fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Vertikaler Sonnenschutz mit seitlicher Schienenführung — ideal gegen Blendung, Hitze und Wind.</p>
                 <p style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Seiten auswählen:</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                <div className="wiz-grid-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     {(['left', 'right', 'front'] as const).map(side => {
                         const isSelected = state.senkrechtmarkise.sides.includes(side);
                         const label = side === 'left' ? '← Linke Seite' : side === 'right' ? 'Rechte Seite →' : '↓ Vorderseite';
@@ -1113,7 +1121,7 @@ const StepAccessories: React.FC<{
                     <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>☀️ Markise (Sonnenschutz)</h3>
                     <p style={{ color: '#64748b', fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Horizontaler Sonnenschutz auf dem Dach montiert — schützt vor direkter Sonneneinstrahlung und Hitzestau.</p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         {(['aufdach', 'unterdach'] as const).map(type => {
                             const isNone = !state.markise.type || (state.markise.sides.length === 0 && state.markise.type !== type);
                             const isActive = state.markise.type === type && state.markise.sides.length > 0;
@@ -1146,7 +1154,7 @@ const StepAccessories: React.FC<{
             {/* Extras */}
             <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', padding: 24, marginBottom: 16 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>✨ Komfort-Extras</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="wiz-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <button onClick={() => setState(s => ({ ...s, heater: !s.heater }))}
                         style={{ padding: 20, borderRadius: 14, border: state.heater ? '2px solid #f97316' : '2px solid #e2e8f0', background: state.heater ? '#fff7ed' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, textAlign: 'left' }}>
                         <div style={{ fontSize: 32 }}>🔥</div>

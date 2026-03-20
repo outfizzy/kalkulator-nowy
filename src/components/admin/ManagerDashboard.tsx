@@ -1,8 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { DatabaseService } from '../../services/database';
+import type { WalletTransaction } from '../../types';
 
 
 export const ManagerDashboard: React.FC = () => {
+    // Wallet mini-stats (no balance for manager)
+    const [recentTransactions, setRecentTransactions] = useState<WalletTransaction[]>([]);
+    const [walletLoading, setWalletLoading] = useState(true);
+
+    useEffect(() => {
+        loadWalletData();
+    }, []);
+
+    const loadWalletData = async () => {
+        try {
+            const txs = await DatabaseService.getWalletTransactions();
+            setRecentTransactions(txs.slice(0, 5));
+        } catch (err) {
+            console.error('Error loading wallet:', err);
+        } finally {
+            setWalletLoading(false);
+        }
+    };
+
+    const formatCurrency = (amount: number, currency: 'EUR' | 'PLN' = 'EUR') => {
+        return new Intl.NumberFormat('pl-PL', { style: 'currency', currency }).format(amount);
+    };
 
     const quickActions = [
         {
@@ -128,6 +152,68 @@ export const ManagerDashboard: React.FC = () => {
                 </div>
                 <div className="text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
                     {new Date().toLocaleDateString('pl-PL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+            </div>
+
+            {/* Wallet Widget for Manager — no balance, just recent activity */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800">Portfel — ostatnie transakcje</h2>
+                            <p className="text-xs text-slate-400">5 najnowszych wpisów</p>
+                        </div>
+                    </div>
+                    <Link
+                        to="/admin/wallet"
+                        className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                    >
+                        Zobacz wszystkie &rarr;
+                    </Link>
+                </div>
+                <div>
+                    {walletLoading ? (
+                        <div className="p-8 text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
+                        </div>
+                    ) : recentTransactions.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400">
+                            <p>Brak transakcji</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-slate-50">
+                            {recentTransactions.map(tx => (
+                                <div key={tx.id} className="px-6 py-3.5 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                                    <div className={`p-2 rounded-lg flex-shrink-0 ${tx.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                        {tx.type === 'income' ? (
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-slate-800 truncate">{tx.description || tx.category}</p>
+                                        <p className="text-xs text-slate-400">
+                                            {new Date(tx.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                                            {tx.processedByName && <span> · {tx.processedByName}</span>}
+                                        </p>
+                                    </div>
+                                    <span className={`text-sm font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                        {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

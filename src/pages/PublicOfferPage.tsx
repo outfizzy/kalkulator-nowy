@@ -73,6 +73,8 @@ export const PublicOfferPage: React.FC = () => {
                 // Track interaction
                 if (data?.id) {
                     OfferService.trackInteraction(data.id, 'offer_view').catch(err => console.error('Failed to track view', err));
+                    // Notify sales rep (RPC handles 24h dedup)
+                    OfferService.notifyOfferAction(token, 'offer_viewed').catch(err => console.error('Failed to notify view', err));
                 }
                 // Fetch sibling offers for multi-offer comparison
                 OfferService.getSiblingOffers(token).then(siblings => {
@@ -361,7 +363,7 @@ export const PublicOfferPage: React.FC = () => {
                             {/* ═══════ PRICE & ACTION CARD (Zusammenfassung) ═══════ */}
                             <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
                                 {/* Price header */}
-                                <div className="p-6 pb-0">
+                                <div className="p-4 md:p-6 pb-0">
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Zusammenfassung</h3>
 
                                     {/* Mini product summary */}
@@ -391,14 +393,14 @@ export const PublicOfferPage: React.FC = () => {
                                         <div className="space-y-2 mb-6">
                                             {/* Product price */}
                                             <div className="flex justify-between items-baseline">
-                                                <span className="text-slate-500 text-sm">Terrassenüberdachung</span>
+                                                <span className="text-slate-500 text-xs sm:text-sm">Terrassenüberdachung</span>
                                                 <span className="font-semibold text-sm text-slate-700">{productNet.toFixed(2)} €</span>
                                             </div>
 
                                             {/* Installation */}
                                             {installNet > 0 && (
                                                 <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-500 text-sm flex items-center gap-1">
+                                                    <span className="text-slate-500 text-xs sm:text-sm flex items-center gap-1">
                                                         Fachgerechte Montage & Lieferung
                                                     </span>
                                                     <span className="font-semibold text-sm text-slate-700">{installNet.toFixed(2)} €</span>
@@ -439,8 +441,8 @@ export const PublicOfferPage: React.FC = () => {
 
                                             {/* Grand total brutto */}
                                             <div className="flex justify-between items-center pt-3 border-t-2 border-slate-200">
-                                                <span className="text-lg font-bold text-slate-800">Gesamtpreis brutto</span>
-                                                <span className="text-3xl font-extrabold text-emerald-600">{totalGross.toFixed(2)} €</span>
+                                                <span className="text-base md:text-lg font-bold text-slate-800">Gesamtpreis brutto</span>
+                                                <span className="text-xl md:text-3xl font-extrabold text-emerald-600 break-all">{totalGross.toFixed(2)} €</span>
                                             </div>
                                         </div>
                                         );
@@ -448,7 +450,7 @@ export const PublicOfferPage: React.FC = () => {
                                 </div>
 
                                 {/* CTAs */}
-                                <div className="px-6 pb-6 space-y-3">
+                                <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-3">
                                     <button
                                         onClick={handleAcceptOffer}
                                         disabled={accepting}
@@ -547,27 +549,32 @@ export const PublicOfferPage: React.FC = () => {
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 lg:hidden z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.12)]">
                 <div className="flex items-center gap-3 p-3 max-w-md mx-auto">
                     <div className="flex-shrink-0">
-                        <p className="text-[10px] text-slate-400 leading-none">Gesamtpreis</p>
-                        <p className="text-lg font-extrabold text-slate-800 leading-tight">{offer.pricing.sellingPriceGross.toFixed(0)} €</p>
+                        {(() => {
+                            const installNet = offer.pricing.installationCosts?.totalInstallation || 0;
+                            const installGross = installNet * 1.19;
+                            const totalNet = offer.pricing.sellingPriceNet + installNet;
+                            const totalGross = offer.pricing.sellingPriceGross + installGross;
+                            return (
+                                <>
+                                    <p className="text-[9px] text-slate-400 leading-none">netto <span className="font-semibold text-slate-500">{totalNet.toFixed(0)} €</span></p>
+                                    <p className="text-base font-extrabold text-slate-800 leading-tight">{totalGross.toFixed(0)} € <span className="text-[9px] font-normal text-slate-400">brutto</span></p>
+                                </>
+                            );
+                        })()}
                     </div>
+                    <a
+                        href={`tel:${creatorPhoneHref}`}
+                        className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 shrink-0 hover:bg-slate-50"
+                        title="Anrufen"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    </a>
                     <button
                         onClick={handleScheduleMeasurement}
-                        className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 shrink-0 hover:bg-slate-50"
-                        title="Aufmaß vereinbaren"
+                        className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0l2-2M5 21l-2-2m7-9h4" /></svg>
-                    </button>
-                    <button
-                        onClick={handleAcceptOffer}
-                        disabled={accepting}
-                        className="flex-1 py-3.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
-                    >
-                        {accepting ? 'Bestätigen...' : (
-                            <>
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                                Annehmen
-                            </>
-                        )}
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        Aufmaß vereinbaren
                     </button>
                 </div>
             </div>

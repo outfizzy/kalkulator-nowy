@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { EmailTemplateService } from '../../services/database/email-template.service';
 import type { EmailTemplate } from '../../services/database/email-template.service';
 import { EmailFooterService } from '../../services/database/email-footer.service';
@@ -7,10 +7,12 @@ import { TemplateEditorModal } from '../../components/mail/TemplateEditorModal';
 import { FooterEditorModal } from '../../components/mail/FooterEditorModal';
 import { EmailPreviewModal } from '../../components/mail/EmailPreviewModal';
 import { getSystemTemplates, wrapInBrandTemplate, textToEmailHtml } from '../../utils/emailBrandKit';
+import { getCampaignTemplates } from '../../components/campaigns/CampaignTemplates';
+import { generateLeadSalesEmailHtml } from '../../components/leads/leadSalesEmailTemplate';
 import { toast } from 'react-hot-toast';
 
 export const EmailTemplatesPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'system' | 'templates' | 'footers'>('system');
+    const [activeTab, setActiveTab] = useState<'gallery' | 'system' | 'templates' | 'footers'>('gallery');
 
     // Templates State
     const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -117,13 +119,100 @@ export const EmailTemplatesPage: React.FC = () => {
         setIsFooterEditorOpen(true);
     };
 
-    const CATEGORY_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-        offer: { label: 'Oferta', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-        sales: { label: 'Sprzedaż', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-        fair: { label: 'Targi', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
-        service: { label: 'Serwis', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
-        installation: { label: 'Montaż', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
+    const CATEGORY_LABELS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+        offer: { label: 'Oferta', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', icon: '📄' },
+        sales: { label: 'Sprzedaż', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '💰' },
+        fair: { label: 'Targi', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: '🎪' },
+        service: { label: 'Serwis', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', icon: '🔧' },
+        installation: { label: 'Montaż', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200', icon: '🏗️' },
+        campaign: { label: 'Kampania', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: '📧' },
+        lead: { label: 'Lead', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200', icon: '🎯' },
     };
+
+    // Build unified gallery items
+    const allTemplates = useMemo(() => {
+        const items: { id: string; name: string; description: string; trigger: string; category: string; source: string; getPreview: () => string }[] = [];
+
+        // 1. System templates from emailBrandKit
+        systemTemplates.forEach(t => {
+            const triggers: Record<string, string> = {
+                system_offer: '⚙️ Automatycznie — przy wysyłce oferty PDF do klienta',
+                system_fair_catalog: '⚙️ Automatycznie — follow-up po targach z katalogiem',
+                system_welcome: '⚙️ Automatycznie — po pierwszym kontakcie klienta',
+                system_send_offer: '⚙️ Automatycznie — email z wycenąi ofertą',
+                system_followup: '⚙️ Automatycznie — follow-up po braku odpowiedzi',
+                system_service_ack: '⚙️ Automatycznie — potwierdzenie zgłoszenia serwisowego',
+                system_installation_confirm: '⚙️ Automatycznie — potwierdzenie terminu montażu',
+                system_installation_complete: '⚙️ Automatycznie — po zakończeniu montażu + prośba o opinię',
+                system_service_form_link: '⚙️ Automatycznie — link do formularza serwisowego',
+                system_feedback_request: '⚙️ Automatycznie — prośba o feedback po montażu',
+            };
+            items.push({
+                id: t.id,
+                name: t.name,
+                description: t.description,
+                trigger: triggers[t.id] || '⚙️ Systemowy',
+                category: t.category,
+                source: 'System',
+                getPreview: () => t.previewHtml(),
+            });
+        });
+
+        // 2. Campaign templates
+        const campaignTemplates = getCampaignTemplates();
+        const campaignTriggers: Record<string, string> = {
+            letzte_referenz: '📧 Ręcznie — kampania "Ostatnia realizacja w pobliżu" (wysyłka do klientów w promieniu od realizacji)',
+            sonderaktion: '📧 Ręcznie — kampania promocyjna z rabatem i deadline\'em',
+            neuer_katalog: '📧 Ręcznie — kampania z nowym katalogiem produktów',
+        };
+        campaignTemplates.forEach(t => {
+            items.push({
+                id: `campaign_${t.id}`,
+                name: `[Kampania] ${t.name}`,
+                description: t.description,
+                trigger: campaignTriggers[t.id] || '📧 Ręcznie — kampania mailowa',
+                category: 'campaign',
+                source: 'Kampania',
+                getPreview: () => t.previewHtml({
+                    projectTitle: 'Premium Terrassenüberdachung SkyStyle',
+                    projectLocation: 'Berlin-Charlottenburg',
+                    projectModel: 'SkyStyle 6000',
+                    projectDimensions: '6000 × 4000 mm',
+                    projectColor: 'RAL 7016 Anthrazitgrau',
+                    projectDescription: 'Hochwertige Aluminium-Terrassenüberdachung mit VSG-Verglasung und integrierter LED-Beleuchtung.',
+                    heroImage: 'https://polendach24.de/wp-content/uploads/2025/06/trendstyle-1024x682.webp',
+                    galleryImages: [],
+                    ctaUrl: 'https://polendach24.de',
+                    ctaText: 'Jetzt Beratung anfragen',
+                    promoTitle: 'Frühlings-Aktion 2026',
+                    promoSubtitle: 'Nur für kurze Zeit',
+                    promoDiscount: '15% Rabatt',
+                    promoDeadline: '31.03.2026',
+                    promoDescription: 'Sichern Sie sich jetzt Ihre Premium-Terrassenüberdachung zum Sonderpreis.',
+                    promoProducts: 'Terrassenüberdachungen, Carports, Pergolen',
+                }),
+            });
+        });
+
+        // 3. Schneelast Lead Welcome Email
+        items.push({
+            id: 'lead_schneelast',
+            name: 'Schneelastzone – Projektbestätigung',
+            description: 'Powitalny email dla leada — potwierdza strefę śnieżną, prezentuje konfigurację i zespół doradców. Zachęca do skonfigurowania dachu online.',
+            trigger: '🎯 Automatycznie — po zapisaniu leada z Schneelastzone (formularz na stronie)',
+            category: 'lead',
+            source: 'Lead',
+            getPreview: () => generateLeadSalesEmailHtml({
+                customerName: 'Max Mustermann',
+                postalCode: '03044',
+                snowZone: '2',
+                snowLoad: '0.85',
+                configuratorUrl: 'https://polendach24.app/konfigurator?ref=demo',
+            }),
+        });
+
+        return items;
+    }, [systemTemplates]);
 
     return (
         <div className="space-y-6">
@@ -132,7 +221,13 @@ export const EmailTemplatesPage: React.FC = () => {
                     <h1 className="text-2xl font-bold text-slate-800">Komunikacja E-mail</h1>
                     <p className="text-slate-500">Zarządzaj szablonami wiadomości, identyfikacją marki i stopkami firmowymi.</p>
                 </div>
-                <div className="flex bg-slate-100 p-1 rounded-lg">
+                <div className="flex bg-slate-100 p-1 rounded-lg flex-wrap gap-0.5">
+                    <button
+                        onClick={() => setActiveTab('gallery')}
+                        className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'gallery' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        📋 Galeria
+                    </button>
                     <button
                         onClick={() => setActiveTab('system')}
                         className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'system' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -179,6 +274,84 @@ export const EmailTemplatesPage: React.FC = () => {
                         </svg>
                         Nowa Stopka
                     </button>
+                </div>
+            )}
+
+            {/* ═══════ GALLERY TAB ═══════ */}
+            {activeTab === 'gallery' && (
+                <div className="space-y-4">
+                    {/* Header Banner */}
+                    <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                                <span className="text-2xl">📋</span>
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold">Galeria Wszystkich Szablonów E-mail</h2>
+                                <p className="text-blue-200 text-sm mt-1">
+                                    Podgląd {allTemplates.length} szablonów z całego systemu — z przykładowymi danymi. Kliknij "Podgląd" aby zobaczyć co otrzymuje klient.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Templates Grid */}
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {allTemplates.map((tmpl, idx) => {
+                            const cat = CATEGORY_LABELS[tmpl.category] || CATEGORY_LABELS.sales;
+                            return (
+                                <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden group">
+                                    {/* Category stripe */}
+                                    <div className={`h-1.5 ${tmpl.category === 'campaign' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : tmpl.category === 'lead' ? 'bg-gradient-to-r from-cyan-500 to-blue-500' : tmpl.category === 'installation' ? 'bg-gradient-to-r from-violet-500 to-purple-500' : tmpl.category === 'service' ? 'bg-gradient-to-r from-rose-500 to-pink-500' : 'bg-gradient-to-r from-slate-700 via-blue-600 to-slate-700'}`} />
+
+                                    <div className="p-5">
+                                        {/* Badges row */}
+                                        <div className="flex items-start justify-between mb-3">
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${cat.bg} ${cat.color}`}>
+                                                {cat.icon} {cat.label}
+                                            </span>
+                                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-medium">
+                                                {tmpl.source}
+                                            </span>
+                                        </div>
+
+                                        {/* Number badge */}
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 flex-shrink-0">
+                                                {idx + 1}
+                                            </div>
+                                            <h3 className="font-bold text-slate-800 text-sm leading-tight">{tmpl.name}</h3>
+                                        </div>
+                                        <p className="text-xs text-slate-500 leading-relaxed mb-3">{tmpl.description}</p>
+
+                                        {/* Trigger info */}
+                                        <div className="bg-slate-50 rounded-lg px-3 py-2 mb-4 border border-slate-100">
+                                            <p className="text-[11px] text-slate-600 leading-relaxed">
+                                                <span className="font-bold text-slate-700">Wyzwalacz: </span>
+                                                {tmpl.trigger}
+                                            </p>
+                                        </div>
+
+                                        {/* Preview button */}
+                                        <button
+                                            onClick={() => {
+                                                setPreviewTitle(tmpl.name);
+                                                setPreviewHtml(tmpl.getPreview());
+                                                setIsPreviewOpen(true);
+                                            }}
+                                            className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2 border border-blue-200 hover:border-blue-300"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Podgląd z przykładowymi danymi
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

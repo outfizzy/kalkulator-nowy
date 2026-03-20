@@ -30,6 +30,7 @@ export interface B2BPartner {
     prepayment_required: boolean;
     prepayment_percent: number;
     status: 'active' | 'suspended' | 'inactive';
+    logo_url: string | null;
     created_at: string;
     updated_at: string;
     // Joined fields
@@ -54,6 +55,7 @@ export interface B2BPartnerUser {
         id: string;
         full_name: string;
         email: string;
+        phone: string | null;
     };
 }
 
@@ -380,7 +382,7 @@ export const B2BService = {
             .from('b2b_partner_users')
             .select(`
                 *,
-                user:profiles!user_id(id, full_name, email)
+                user:profiles!user_id(id, full_name, email, phone)
             `)
             .eq('partner_id', partnerId);
 
@@ -494,7 +496,7 @@ export const B2BService = {
                         name: profile?.full_name || ''
                     },
                     address: {},
-                    margin_percent: 0,
+                    margin_percent: 15,
                     payment_terms_days: 14,
                     credit_limit: 0,
                     credit_used: 0,

@@ -22,7 +22,7 @@ function calcLogCost(log: FuelLog, prices: FuelPrice[]): number {
 }
 
 // ── Tab type ──
-type TabId = 'stats' | 'logs';
+type TabId = 'stats' | 'logs' | 'history';
 
 export const FuelLogManager: React.FC = () => {
     const [logs, setLogs] = useState<FuelLog[]>([]);
@@ -237,6 +237,7 @@ export const FuelLogManager: React.FC = () => {
                 {([
                     { id: 'stats' as TabId, label: '📊 Statystyki', icon: '' },
                     { id: 'logs' as TabId, label: '📋 Lista wpisów', icon: '' },
+                    { id: 'history' as TabId, label: '🕐 Historia tankowania', icon: '' },
                 ]).map(tab => (
                     <button
                         key={tab.id}
@@ -581,6 +582,177 @@ export const FuelLogManager: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            )}
+
+            {/* ━━━ TAB: HISTORY (TIMELINE) ━━━ */}
+            {activeTab === 'history' && (
+                <div className="space-y-4">
+                    {/* Month Selector */}
+                    <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 w-fit">
+                        <button
+                            onClick={() => setSelectedMonth(prev => subMonths(prev, 1))}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                            <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <span className="text-lg font-bold text-slate-800 min-w-[160px] text-center capitalize">
+                            {format(selectedMonth, 'LLLL yyyy', { locale: pl })}
+                        </span>
+                        <button
+                            onClick={() => setSelectedMonth(prev => addMonths(prev, 1))}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                            <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                        <button
+                            onClick={() => setSelectedMonth(new Date())}
+                            className="ml-2 px-3 py-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
+                        >
+                            Dziś
+                        </button>
+                    </div>
+
+                    {/* Timeline view */}
+                    {(() => {
+                        // Group by date
+                        const grouped = new Map<string, FuelLog[]>();
+                        const sorted = [...monthLogs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                        for (const log of sorted) {
+                            const dateKey = log.logDate.slice(0, 10);
+                            if (!grouped.has(dateKey)) grouped.set(dateKey, []);
+                            grouped.get(dateKey)!.push(log);
+                        }
+
+                        if (grouped.size === 0) {
+                            return (
+                                <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                                    <div className="text-4xl mb-3">⛽</div>
+                                    <div className="text-slate-400 font-medium">Brak tankowań w tym miesiącu</div>
+                                </div>
+                            );
+                        }
+
+                        return Array.from(grouped.entries()).map(([dateKey, dayLogs]) => (
+                            <div key={dateKey} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                {/* Day header */}
+                                <div className="bg-gradient-to-r from-slate-50 to-white px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center font-black text-sm">
+                                            {dateKey.slice(8)}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-slate-800">
+                                                {format(new Date(dateKey), 'EEEE', { locale: pl })}
+                                            </div>
+                                            <div className="text-xs text-slate-400">
+                                                {format(new Date(dateKey), 'dd MMMM yyyy', { locale: pl })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-xs text-slate-400 font-bold uppercase">Łącznie</div>
+                                        <div className="font-bold text-slate-700 text-sm">
+                                            {dayLogs.reduce((sum, l) => sum + l.liters, 0).toFixed(1)} L
+                                            <span className="text-slate-400 mx-1">·</span>
+                                            {dayLogs.length} tank.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Entries for this day */}
+                                <div className="divide-y divide-slate-50">
+                                    {dayLogs.map((log) => {
+                                        const time = format(new Date(log.createdAt), 'HH:mm');
+                                        const cost = calcLogCost(log, fuelPrices);
+                                        return (
+                                            <div key={log.id} className="px-5 py-3 hover:bg-slate-50/50 transition-colors">
+                                                <div className="flex items-center gap-4">
+                                                    {/* Time */}
+                                                    <div className="flex flex-col items-center min-w-[50px]">
+                                                        <div className="text-lg font-black text-slate-800 font-mono">{time}</div>
+                                                    </div>
+
+                                                    {/* Dot connector */}
+                                                    <div className="flex flex-col items-center">
+                                                        <div className={`w-3 h-3 rounded-full border-2 ${
+                                                            log.type === 'sales_rep'
+                                                                ? 'bg-blue-500 border-blue-300'
+                                                                : 'bg-purple-500 border-purple-300'
+                                                        }`} />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-bold text-slate-800">
+                                                                {log.userName || 'Nieznany'}
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                log.type === 'sales_rep'
+                                                                    ? 'bg-blue-50 text-blue-600'
+                                                                    : 'bg-purple-50 text-purple-600'
+                                                            }`}>
+                                                                {log.type === 'sales_rep' ? 'Sprzedawca' : 'Montażysta'}
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                log.fuelingType === 'internal'
+                                                                    ? 'bg-green-50 text-green-600'
+                                                                    : 'bg-amber-50 text-amber-600'
+                                                            }`}>
+                                                                {log.fuelingType === 'internal' ? '💳 Wew.' : '🧾 Zew.'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                                                            {log.vehiclePlate && (
+                                                                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold">
+                                                                    🚗 {log.vehiclePlate}
+                                                                </span>
+                                                            )}
+                                                            {log.stationName && (
+                                                                <span>📍 {log.stationName}</span>
+                                                            )}
+                                                            {log.odometerReading && (
+                                                                <span className="font-mono">{log.odometerReading} km</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Amounts */}
+                                                    <div className="text-right flex-shrink-0">
+                                                        <div className="font-bold text-slate-800">{log.liters} L</div>
+                                                        {cost > 0 && (
+                                                            <div className="text-sm font-medium text-emerald-600">
+                                                                {formatCost(cost, log.currency)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Photos */}
+                                                    <div className="flex gap-1 flex-shrink-0">
+                                                        {log.odometerPhotoUrl && (
+                                                            <a href={log.odometerPhotoUrl} target="_blank" rel="noopener noreferrer"
+                                                               className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center text-xs hover:bg-blue-100 transition-colors"
+                                                               title="Zdjęcie licznika">
+                                                                📷
+                                                            </a>
+                                                        )}
+                                                        {log.receiptPhotoUrl && (
+                                                            <a href={log.receiptPhotoUrl} target="_blank" rel="noopener noreferrer"
+                                                               className="w-7 h-7 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-xs hover:bg-amber-100 transition-colors"
+                                                               title="Zdjęcie paragonu">
+                                                                🧾
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ));
+                    })()}
                 </div>
             )}
         </div>

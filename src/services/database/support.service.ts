@@ -208,8 +208,8 @@ export const SupportService = {
     },
 
     async getFuelStats(month: number, year: number): Promise<{
-        byUser: { userId: string; userName: string; totalLiters: number; totalCost: number; internalCount: number; externalCount: number; entries: number }[];
-        totals: { totalLiters: number; totalCost: number; totalEntries: number };
+        byUser: { userId: string; userName: string; totalLiters: number; totalCost: number; totalCostPLN: number; totalCostEUR: number; internalCount: number; externalCount: number; entries: number }[];
+        totals: { totalLiters: number; totalCost: number; totalCostPLN: number; totalCostEUR: number; totalEntries: number };
     }> {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endMonth = month === 12 ? 1 : month + 1;
@@ -229,7 +229,7 @@ export const SupportService = {
 
         const { data, error } = logsResult;
         if (error) throw error;
-        if (!data || data.length === 0) return { byUser: [], totals: { totalLiters: 0, totalCost: 0, totalEntries: 0 } };
+        if (!data || data.length === 0) return { byUser: [], totals: { totalLiters: 0, totalCost: 0, totalCostPLN: 0, totalCostEUR: 0, totalEntries: 0 } };
 
         // Fetch profiles
         const userIds = Array.from(new Set(data.map(r => r.user_id).filter(Boolean)));
@@ -240,12 +240,12 @@ export const SupportService = {
         }
 
         // Aggregate by user — use historical prices for internal fueling
-        const userStats = new Map<string, { totalLiters: number; totalCost: number; internalCount: number; externalCount: number; entries: number }>();
-        let totalLiters = 0, totalCost = 0;
+        const userStats = new Map<string, { totalLiters: number; totalCost: number; totalCostPLN: number; totalCostEUR: number; internalCount: number; externalCount: number; entries: number }>();
+        let totalLiters = 0, totalCost = 0, totalCostPLN = 0, totalCostEUR = 0;
 
         for (const row of data) {
             const uid = row.user_id;
-            const existing = userStats.get(uid) || { totalLiters: 0, totalCost: 0, internalCount: 0, externalCount: 0, entries: 0 };
+            const existing = userStats.get(uid) || { totalLiters: 0, totalCost: 0, totalCostPLN: 0, totalCostEUR: 0, internalCount: 0, externalCount: 0, entries: 0 };
             const liters = Number(row.liters) || 0;
             existing.totalLiters += liters;
 
@@ -259,6 +259,16 @@ export const SupportService = {
                 if (pricePerLiter) {
                     logCost = liters * pricePerLiter;
                 }
+            }
+
+            // Internal fueling is always PLN, external uses its stored currency
+            const logCurrency = row.fueling_type === 'internal' ? 'PLN' : (row.currency || 'PLN');
+            if (logCurrency === 'PLN') {
+                existing.totalCostPLN += logCost;
+                totalCostPLN += logCost;
+            } else {
+                existing.totalCostEUR += logCost;
+                totalCostEUR += logCost;
             }
 
             existing.totalCost += logCost;
@@ -275,6 +285,6 @@ export const SupportService = {
             ...stats,
         })).sort((a, b) => b.totalCost - a.totalCost);
 
-        return { byUser, totals: { totalLiters, totalCost, totalEntries: data.length } };
+        return { byUser, totals: { totalLiters, totalCost, totalCostPLN, totalCostEUR, totalEntries: data.length } };
     },
 };

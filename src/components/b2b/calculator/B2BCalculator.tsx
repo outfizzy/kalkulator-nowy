@@ -11,6 +11,7 @@ import type { Customer, Lead, Offer } from '../../../types';
 import { generateOfferPDF } from '../../../utils/pdfGenerator';
 import { B2BCustomerForm } from './B2BCustomerForm';
 import { B2BService } from '../../../services/database/b2b.service';
+import { calculateDachrechner, type DachrechnerResults, type RoofModelId } from '../../../services/dachrechner.service';
 
 // ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
@@ -27,6 +28,14 @@ interface RoofModel {
     hasGlass: boolean;
     hasFreestanding: boolean;
     image_url?: string;
+    specs?: {
+        profileMm: string;
+        angleType: string;
+        postMm: number;
+        maxWidth?: number;
+        maxDepth?: number;
+        dachrechnerKey: string;
+    };
 }
 
 interface Accessory {
@@ -49,16 +58,26 @@ interface BasketItem {
 
 // ======= PRODUCT CATALOG =======
 const ROOF_MODELS: RoofModel[] = [
-    { id: 'Orangeline', name: 'Orangestyle', description: 'Ekonomiczny profil 50mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline.jpg' },
-    { id: 'Orangeline+', name: 'Orangestyle+', description: 'Ekonomiczny Plus 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline-plus.jpg' },
-    { id: 'Trendline', name: 'Trendstyle', description: 'Klasyczny profil 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg' },
-    { id: 'Trendline+', name: 'Trendstyle+', description: 'Klasyczny Plus 70mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-plus.jpg' },
-    { id: 'Topline', name: 'Topstyle', description: 'Premium profil 80mm • od 2500mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg' },
-    { id: 'Topline XL', name: 'Topstyle XL', description: 'Extra duża konstrukcja XL', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/topline-xl.jpg' },
-    { id: 'Designline', name: 'Designstyle', description: 'Elegancki design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
-    { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa 100mm • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
-    { id: 'Skyline', name: 'Skystyle', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
-    { id: 'Carport', name: 'Carport', description: 'Wiata garażowa z blachą', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
+    { id: 'Orangeline', name: 'Orangestyle', description: 'Ekonomiczne zadaszenie tarasu • profil aluminiowy 50mm • montaż ścienny • poliwęglan lub szkło', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline.jpg',
+      specs: { profileMm: '50mm', angleType: '8° stały', postMm: 110, maxWidth: 7000, maxDepth: 5000, dachrechnerKey: 'orangeline' } },
+    { id: 'Orangeline+', name: 'Orangestyle+', description: 'Wersja wzmocniona • profil 60mm • większa stabilność • poliwęglan lub szkło', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline-2.webp',
+      specs: { profileMm: '60mm', angleType: '8° stały', postMm: 110, maxWidth: 7000, maxDepth: 5500, dachrechnerKey: 'orangeline+' } },
+    { id: 'Trendline', name: 'Trendstyle', description: 'Klasyczne zadaszenie • profil 60mm • regulowany kąt • możliwość wolnostojąca', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg',
+      specs: { profileMm: '60mm', angleType: 'zmienny', postMm: 110, maxWidth: 7000, maxDepth: 5000, dachrechnerKey: 'trendline' } },
+    { id: 'Trendline+', name: 'Trendstyle+', description: 'Klasyka wzmocniona • profil 70mm • większa nośność • wolnostojące', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-2.webp',
+      specs: { profileMm: '70mm', angleType: 'zmienny', postMm: 110, maxWidth: 7000, maxDepth: 5500, dachrechnerKey: 'trendline+' } },
+    { id: 'Topline', name: 'Topstyle', description: 'Premium zadaszenie • profil 80mm • większe wymiary • słupki 149mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg',
+      specs: { profileMm: '80mm', angleType: 'zmienny', postMm: 149, maxWidth: 10000, maxDepth: 6000, dachrechnerKey: 'topline' } },
+    { id: 'Topline XL', name: 'Topstyle XL', description: 'Extra duże konstrukcje • profil 100mm • do 14m szer. • słupki 196mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/toplinexl.webp',
+      specs: { profileMm: '100mm', angleType: 'zmienny', postMm: 196, maxWidth: 14000, maxDepth: 6000, dachrechnerKey: 'topline_xl' } },
+    { id: 'Designline', name: 'Designstyle', description: 'Eleganckie zadaszenie szklane • profil 93mm • nowoczesny design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg',
+      specs: { profileMm: '93mm', angleType: 'zmienny', postMm: 196, maxWidth: 10000, maxDepth: 6000, dachrechnerKey: 'designline' } },
+    { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa • profil 100mm z naddachem • szklany dach • montaż ścienny', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg',
+      specs: { profileMm: '100mm', angleType: 'z naddachem', postMm: 196, maxWidth: 14000, maxDepth: 6000, dachrechnerKey: 'ultraline_classic' } },
+    { id: 'Skyline', name: 'Skystyle', description: 'Pergola z ruchomymi lamelami aluminiowymi • ochrona słoneczna • płaski dach', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline-render.jpg',
+      specs: { profileMm: 'lamele alu', angleType: 'płaski 0°', postMm: 160, maxWidth: 7000, maxDepth: 5000, dachrechnerKey: 'skyline' } },
+    { id: 'Carport', name: 'Carport', description: 'Wiata garażowa aluminiowa • konstrukcja płaska • wolnostojąca • poliwęglan', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport-3.jpg',
+      specs: { profileMm: 'profil płaski', angleType: 'płaski 0°', postMm: 160, maxWidth: 10000, maxDepth: 6000, dachrechnerKey: 'carport' } },
 ];
 
 // Glass variant options
@@ -276,7 +295,7 @@ export const B2BCalculator: React.FC = () => {
     ];
 
     // === VIEW STATE ===
-    const [view, setView] = useState<ViewState>('start');
+    const [view, setView] = useState<ViewState>('config');
     const [customerState, setCustomerState] = useState<Customer | null>(null);
 
     // === ROOF CONFIG ===
@@ -305,6 +324,7 @@ export const B2BCalculator: React.FC = () => {
     const [wallPriceLoading, setWallPriceLoading] = useState(false);
     const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama'>('fixed');
     const [structuralMetadata, setStructuralMetadata] = useState<{ posts_count: number } | null>(null);
+    const [wallPlacement, setWallPlacement] = useState<'lewa' | 'prawa' | 'przód'>('lewa');
 
     // === ACCESSORIES ===
     const [accessories, setAccessories] = useState<Accessory[]>([]);
@@ -316,15 +336,22 @@ export const B2BCalculator: React.FC = () => {
     const [awningWidth, setAwningWidth] = useState<number>(3000);
     const [awningProjection, setAwningProjection] = useState(3000);
     const [awningMotorCount, setAwningMotorCount] = useState<1 | 2>(1);
+    const [zipPlacement, setZipPlacement] = useState<'przód' | 'bok lewy' | 'bok prawy'>('przód');
 
     // Keilfenster Options
     const [wedgeGlassType, setWedgeGlassType] = useState('clear');
+    const [wedgeSide, setWedgeSide] = useState<'gutter' | 'wall'>('gutter');
     const [wedgeAccessories, setWedgeAccessories] = useState<Record<string, boolean>>({
         uProfil: false,
         schraubenSet: false,
         kippFenster: false,
         abdeckungEL891: false
     });
+
+    // === DACHRECHNER STATE ===
+    const [h3Input, setH3Input] = useState<number>(2200);
+    const [h1Input, setH1Input] = useState<number>(2500);
+    const [dachResults, setDachResults] = useState<DachrechnerResults | null>(null);
 
     // === WPC FLOORING ===
     const [wpcArea, setWpcArea] = useState<number>(0);
@@ -337,6 +364,27 @@ export const B2BCalculator: React.FC = () => {
     const [aluWallHeight, setAluWallHeight] = useState<number>(2200);
     const [aluWallPrice, setAluWallPrice] = useState<number | null>(null);
     const [aluWallPriceLoading, setAluWallPriceLoading] = useState(false);
+
+    // === DACHRECHNER AUTO-FILL ===
+    useEffect(() => {
+        const currentModel = ROOF_MODELS.find(m => m.id === model);
+        if (!currentModel?.specs?.dachrechnerKey) return;
+
+        try {
+            const dKey = currentModel.specs.dachrechnerKey as RoofModelId;
+            const results = calculateDachrechner(dKey, {
+                h3: h3Input,
+                depth: projection,
+                h1: h1Input,
+                width: width,
+                postCount: structuralMetadata?.posts_count || 2,
+            });
+            setDachResults(results);
+        } catch (err) {
+            console.warn('Dachrechner calculation error:', err);
+            setDachResults(null);
+        }
+    }, [model, width, projection, h3Input, h1Input, structuralMetadata?.posts_count]);
 
     // === PRICE STATE ===
     const [awningPrice, setAwningPrice] = useState<number | null>(null);
@@ -1270,7 +1318,12 @@ export const B2BCalculator: React.FC = () => {
                 status: customerState ? 'saved' : 'draft' as const,
                 items: items,
                 customer_contact: customerContact,
-                notes: null,
+                notes: margin > 0 || discount > 0 ? JSON.stringify({
+                    partner_margin_percent: margin,
+                    customer_discount_percent: discount,
+                    customer_price: finalPrice,
+                    partner_profit: marginValue - discountValue
+                }) : null,
                 valid_until: null
             };
 
@@ -1412,38 +1465,60 @@ export const B2BCalculator: React.FC = () => {
                             onClick={() => setView('config')}
                             className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
                         >
-                            ← Zurück zur Konfiguration
+                            ← Wróć do konfiguracji
                         </button>
-                        <h1 className="text-2xl font-black text-slate-900">Angebotszusammenfassung</h1>
+                        <h1 className="text-2xl font-black text-slate-900">Podsumowanie oferty</h1>
                     </div>
 
                     {/* Technical Specs */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            📐 Technische Daten
-                        </h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                                📐 Dane techniczne
+                            </h2>
+                            <button
+                                onClick={() => {
+                                    const specDE = [
+                                        `Modell: ${modelDisplayName(model)}`,
+                                        `Breite: ${(width / 1000).toFixed(2)} m`,
+                                        `Tiefe: ${(projection / 1000).toFixed(2)} m`,
+                                        `Fläche: ${areaM2.toFixed(2)} m²`,
+                                        `Pfosten: ${structuralMetadata?.posts_count || '-'}`,
+                                        `Eindeckung: ${cover}`,
+                                        `Montage: ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}`,
+                                        '',
+                                        `Preis (netto): ${formatCurrency(finalPrice)}`,
+                                    ].join('\n');
+                                    navigator.clipboard.writeText(specDE);
+                                    toast.success('Specyfikacja DE skopiowana!');
+                                }}
+                                className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg flex items-center gap-1.5 transition-colors"
+                            >
+                                🇩🇪 Kopiuj spec. DE
+                            </button>
+                        </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                <p className="text-slate-500 text-xs uppercase">Breite</p>
+                                <p className="text-slate-500 text-xs uppercase">Szerokość</p>
                                 <p className="font-bold text-lg">{(width / 1000).toFixed(2)} m</p>
                             </div>
                             <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                <p className="text-slate-500 text-xs uppercase">Tiefe</p>
+                                <p className="text-slate-500 text-xs uppercase">Głębokość</p>
                                 <p className="font-bold text-lg">{(projection / 1000).toFixed(2)} m</p>
                             </div>
                             <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-200">
-                                <p className="text-indigo-600 text-xs uppercase font-bold">Fläche</p>
+                                <p className="text-indigo-600 text-xs uppercase font-bold">Powierzchnia</p>
                                 <p className="font-black text-xl text-indigo-700">{areaM2.toFixed(2)} m²</p>
                             </div>
                             <div className="bg-amber-50 p-3 rounded-lg text-center border border-amber-200">
-                                <p className="text-amber-600 text-xs uppercase font-bold">Pfosten</p>
+                                <p className="text-amber-600 text-xs uppercase font-bold">Słupki</p>
                                 <p className="font-black text-xl text-amber-700">{structuralMetadata?.posts_count || '-'}</p>
                             </div>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                            <div><span className="text-slate-500">Modell:</span> <strong>{modelDisplayName(model)}</strong></div>
-                            <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
-                            <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
+                            <div><span className="text-slate-500">Model:</span> <strong>{modelDisplayName(model)}</strong></div>
+                            <div><span className="text-slate-500">Pokrycie:</span> <strong>{cover}</strong></div>
+                            <div><span className="text-slate-500">Montaż:</span> <strong>{construction === 'wall' ? 'Ścienny' : 'Wolnostojący'}</strong></div>
                         </div>
                     </div>
 
@@ -1451,19 +1526,19 @@ export const B2BCalculator: React.FC = () => {
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
                         <div className="flex justify-between items-start">
                             <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                👤 Kundendaten
+                                👤 Dane klienta
                             </h2>
                             <button
                                 onClick={() => setView('customer')}
                                 className="text-xs text-indigo-600 font-bold hover:underline"
                             >
-                                Bearbeiten
+                                Edytuj
                             </button>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                                <span className="text-slate-500 block">Name:</span>
+                                <span className="text-slate-500 block">Imię i nazwisko:</span>
                                 <strong className="text-slate-800">
                                     {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : '-'}
                                 </strong>
@@ -1477,7 +1552,7 @@ export const B2BCalculator: React.FC = () => {
                                 <strong className="text-slate-800">{customerState?.phone || '-'}</strong>
                             </div>
                             <div>
-                                <span className="text-slate-500 block">Adresse:</span>
+                                <span className="text-slate-500 block">Adres:</span>
                                 <strong className="text-slate-800">
                                     {[customerState?.street, customerState?.postalCode, customerState?.city].filter(Boolean).join(', ') || '-'}
                                 </strong>
@@ -1487,13 +1562,13 @@ export const B2BCalculator: React.FC = () => {
 
                     {/* Items Table */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">🛒 Positionen</h2>
+                        <h2 className="font-bold text-slate-800 mb-4">🛒 Pozycje</h2>
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-slate-100">
                                     <th className="text-left py-2 text-slate-500">Produkt</th>
-                                    <th className="text-left py-2 text-slate-500">Konfiguration</th>
-                                    <th className="text-right py-2 text-slate-500">Preis</th>
+                                    <th className="text-left py-2 text-slate-500">Konfiguracja</th>
+                                    <th className="text-right py-2 text-slate-500">Cena</th>
                                     <th className="w-10"></th>
                                 </tr>
                             </thead>
@@ -1562,23 +1637,20 @@ export const B2BCalculator: React.FC = () => {
                                     disabled={!newItemName.trim()}
                                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50"
                                 >
-                                    + Hinzufügen
+                                    + Dodaj
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     {/* Purchase Price (Review for Partner) */}
-                    <div className="bg-slate-900 rounded-2xl shadow-lg p-6 text-white mb-6">
+                    <div className="bg-slate-900 rounded-2xl shadow-lg p-6 text-white">
                         <div className="flex justify-between items-center">
                             <div>
                                 <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Twoja Cena Zakupu (Netto)</p>
                                 <p className="text-4xl font-black">{formatCurrency(purchasePrice)}</p>
-                                <p className="text-slate-400 text-sm mt-1">
-                                    Cena zawiera wszystkie narzuty
-                                </p>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right space-y-2">
                                 <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold uppercase border border-green-500/30">
                                     B2B Partner
                                 </span>
@@ -1586,41 +1658,125 @@ export const B2BCalculator: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Margin & Offer Calculation (Secondary) */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
-                            <span>📝</span> Kalkulacja Oferty dla Klienta (Opcjonalne)
-                        </h2>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Twoja Marża (%)</label>
-                                <input
-                                    type="number"
-                                    value={margin}
-                                    onChange={e => setMargin(parseFloat(e.target.value) || 0)}
-                                    min={0}
-                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                />
-                                <p className="text-xs text-slate-400 mt-1">Zysk: {formatCurrency(marginValue)}</p>
+                    {/* Partner Margin Calculator */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                <span className="text-white">💰</span>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rabat dla Klienta (%)</label>
-                                <input
-                                    type="number"
-                                    value={discount}
-                                    onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                                    min={0}
-                                    max={100}
-                                    className="w-full p-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-lg font-bold"
-                                />
-                                <p className="text-xs text-slate-400 mt-1">Upust: {formatCurrency(discountValue)}</p>
+                                <h3 className="font-bold text-slate-800">Kalkulator marży</h3>
+                                <p className="text-xs text-slate-500">Dodaj swoją marżę i wygeneruj cenę dla klienta</p>
                             </div>
                         </div>
 
-                        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex justify-between items-center">
-                            <span className="text-indigo-900 font-medium">Sugerowana cena końcowa (dla Klienta):</span>
-                            <span className="text-2xl font-bold text-indigo-700">{formatCurrency(finalPrice)}</span>
+                        {/* Margin Slider + Input */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                                <label className="text-sm font-semibold text-slate-600 whitespace-nowrap w-24">Twoja marża:</label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={margin}
+                                    onChange={e => setMargin(Number(e.target.value))}
+                                    className="flex-1 h-2 appearance-none rounded-full cursor-pointer"
+                                    style={{
+                                        background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${margin}%, #e2e8f0 ${margin}%, #e2e8f0 100%)`
+                                    }}
+                                />
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="200"
+                                        value={margin}
+                                        onChange={e => setMargin(Math.max(0, Number(e.target.value)))}
+                                        className="w-16 text-center p-2 rounded-lg border border-slate-200 text-sm font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    />
+                                    <span className="text-sm font-bold text-slate-500">%</span>
+                                </div>
+                            </div>
+
+                            {/* Quick presets */}
+                            <div className="flex gap-2 flex-wrap">
+                                {[10, 15, 20, 25, 30, 40, 50].map(pct => (
+                                    <button
+                                        key={pct}
+                                        onClick={() => setMargin(pct)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                            margin === pct
+                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {pct}%
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Price breakdown */}
+                            <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-indigo-50 border border-slate-200/60 space-y-3">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">Twoja cena zakupu</span>
+                                    <span className="font-semibold text-slate-700">{formatCurrency(purchasePrice)}</span>
+                                </div>
+                                {margin > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-indigo-500">+ Twoja marża ({margin}%)</span>
+                                        <span className="font-semibold text-indigo-600">+ {formatCurrency(marginValue)}</span>
+                                    </div>
+                                )}
+                                {discount > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-red-500">- Rabat dla klienta ({discount}%)</span>
+                                        <span className="font-semibold text-red-600">- {formatCurrency(discountValue)}</span>
+                                    </div>
+                                )}
+                                <div className="border-t border-slate-200 pt-3 flex justify-between items-end">
+                                    <div>
+                                        <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Cena dla klienta (netto)</span>
+                                    </div>
+                                    <span className="text-3xl font-black text-slate-900">{formatCurrency(finalPrice)}</span>
+                                </div>
+                                {margin > 0 && (
+                                    <div className="flex justify-between text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-100">
+                                        <span className="font-semibold">💰 Twój zysk z tej oferty:</span>
+                                        <span className="font-black">{formatCurrency(marginValue - discountValue)}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Optional: Customer discount */}
+                            {margin > 0 && (
+                                <div className="flex items-center gap-4 pt-2">
+                                    <label className="text-sm font-semibold text-slate-500 whitespace-nowrap w-24">Rabat klient:</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="50"
+                                        step="1"
+                                        value={discount}
+                                        onChange={e => setDiscount(Number(e.target.value))}
+                                        className="flex-1 h-2 appearance-none rounded-full cursor-pointer"
+                                        style={{
+                                            background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${discount * 2}%, #e2e8f0 ${discount * 2}%, #e2e8f0 100%)`
+                                        }}
+                                    />
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="50"
+                                            value={discount}
+                                            onChange={e => setDiscount(Math.max(0, Math.min(50, Number(e.target.value))))}
+                                            className="w-16 text-center p-2 rounded-lg border border-slate-200 text-sm font-bold focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none"
+                                        />
+                                        <span className="text-sm font-bold text-slate-500">%</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1630,7 +1786,7 @@ export const B2BCalculator: React.FC = () => {
                             <div className="flex items-center gap-3 text-green-700">
                                 <span className="text-2xl">✅</span>
                                 <div>
-                                    <p className="font-bold">Angebot erfolgreich gespeichert!</p>
+                                    <p className="font-bold">Oferta zapisana pomyślnie!</p>
                                     <p className="text-xs text-green-600">ID: {savedOfferId}</p>
                                 </div>
                             </div>
@@ -1639,7 +1795,7 @@ export const B2BCalculator: React.FC = () => {
                             {publicLink && (
                                 <div className="bg-white p-4 rounded-xl border border-green-100 space-y-2">
                                     <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                        🔗 Link zur interaktiven Angebotsseite
+                                        🔗 Link do interaktywnej oferty
                                     </p>
                                     <div className="flex gap-2">
                                         <input
@@ -1818,27 +1974,11 @@ export const B2BCalculator: React.FC = () => {
                             </table>
                         </div>
 
-                        {/* Price Summary with Purchase Price */}
-                        <div className="grid grid-cols-2 gap-4 mb-8">
-                            {/* Partner Purchase Price (Koszt) */}
-                            <div className="bg-slate-100 rounded-xl p-5 border border-slate-200">
-                                <h4 className="text-sm text-slate-500 mb-1">💰 Cena Zakupu Towaru (Twój koszt)</h4>
-                                <p className="text-2xl font-black text-slate-800">{formatCurrency(purchasePrice)}</p>
-                                <p className="text-xs text-slate-500 mt-1">Cena końcowa</p>
-                            </div>
-
-                            {/* Final Price for Customer */}
-                            <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
-                                <h4 className="text-sm text-blue-600 mb-1">🏷️ Cena dla Klienta (Twoja sprzedaż)</h4>
-                                <p className="text-2xl font-black text-blue-700">{formatCurrency(finalPrice)}</p>
-                                <p className="text-xs text-blue-500 mt-1">Z marżą +{margin}%</p>
-                            </div>
-                        </div>
-
-                        {/* Your Profit */}
-                        <div className="bg-green-50 rounded-xl p-5 mb-8 border border-green-200 text-center">
-                            <h4 className="text-sm text-green-600 mb-1">📈 Twój Zysk na Ofercie</h4>
-                            <p className="text-3xl font-black text-green-700">{formatCurrency(finalPrice - purchasePrice)}</p>
+                        {/* Partner Price — single clear price card */}
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 mb-8 border border-blue-200 text-center">
+                            <h4 className="text-sm text-blue-600 mb-2 font-semibold uppercase tracking-wider">💰 Twoja cena partnera</h4>
+                            <p className="text-4xl font-black text-blue-800">{formatCurrency(purchasePrice)}</p>
+                            <p className="text-xs text-blue-500 mt-2">Cena netto • {basket.length} {basket.length === 1 ? 'pozycja' : basket.length < 5 ? 'pozycje' : 'pozycji'}</p>
                         </div>
 
                         {/* Actions */}
@@ -2023,31 +2163,63 @@ export const B2BCalculator: React.FC = () => {
                         {/* STEP 0: MODEL */}
                         {activeStep === 0 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
                                     <span className="text-2xl">🏠</span> Wybierz Model
                                 </h2>
+                                <p className="text-sm text-slate-400 mb-6">Kliknij w model, aby go wybrać — zdjęcie pomoże Ci go rozpoznać</p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {ROOF_MODELS.map(m => (
                                         <button
                                             key={m.id}
                                             onClick={() => setModel(m.id)}
-                                            className={`relative p-5 rounded-xl border-2 text-left transition-all hover:shadow-md ${model === m.id
-                                                ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
-                                                : 'border-slate-100 hover:border-indigo-200 bg-white'
+                                            className={`relative rounded-xl border-2 text-left transition-all hover:shadow-lg overflow-hidden group ${model === m.id
+                                                ? 'border-indigo-600 ring-2 ring-indigo-200 shadow-md'
+                                                : 'border-slate-100 hover:border-indigo-300 bg-white'
                                                 }`}
                                         >
-                                            <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
-                                            <p className="text-xs text-slate-500 mt-1 mb-3">{m.description}</p>
-                                            <div className="flex gap-1 flex-wrap">
-                                                {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
-                                                {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
-                                                {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Wolnostojące</span>}
-                                            </div>
-                                            {model === m.id && (
-                                                <div className="absolute top-3 right-3 text-indigo-600">
-                                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                            {/* Product Image */}
+                                            <div className="relative w-full h-40 bg-slate-100 overflow-hidden">
+                                                <img
+                                                    src={m.image_url}
+                                                    alt={m.name}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    onError={(e) => { (e.target as HTMLImageElement).src = '/images/models/trendline.jpg'; }}
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                                                <div className="absolute bottom-3 left-3 right-3">
+                                                    <h3 className="text-lg font-bold text-white drop-shadow-lg">{m.name}</h3>
                                                 </div>
-                                            )}
+                                                {model === m.id && (
+                                                    <div className="absolute top-3 right-3 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+                                                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Info below image */}
+                                            <div className="p-4">
+                                                <p className="text-xs text-slate-500 mb-2">{m.description}</p>
+                                                {m.specs && (
+                                                    <div className="grid grid-cols-3 gap-1 mb-2 text-[10px]">
+                                                        <div className="bg-slate-50 px-1.5 py-1 rounded text-center">
+                                                            <div className="text-slate-400">Profil</div>
+                                                            <div className="font-bold text-slate-700">{m.specs.profileMm}</div>
+                                                        </div>
+                                                        <div className="bg-slate-50 px-1.5 py-1 rounded text-center">
+                                                            <div className="text-slate-400">Kąt</div>
+                                                            <div className="font-bold text-slate-700">{m.specs.angleType}</div>
+                                                        </div>
+                                                        <div className="bg-slate-50 px-1.5 py-1 rounded text-center">
+                                                            <div className="text-slate-400">Słupek</div>
+                                                            <div className="font-bold text-slate-700">{m.specs.postMm}mm</div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="flex gap-1.5 flex-wrap">
+                                                    {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poliwęglan</span>}
+                                                    {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Szkło</span>}
+                                                    {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Wolnostojące</span>}
+                                                </div>
+                                            </div>
                                         </button>
                                     ))}
                                 </div>
@@ -2057,9 +2229,73 @@ export const B2BCalculator: React.FC = () => {
                         {/* STEP 1: DIMENSIONS */}
                         {activeStep === 1 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                                     <span className="text-2xl">📏</span> Wymiary i Konstrukcja
                                 </h2>
+
+                                {/* H3 / H1 inputs for Dachrechner */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                        <label className="flex justify-between mb-2">
+                                            <span className="text-sm font-bold text-amber-800">H3 — Wysokość rynny (mm)</span>
+                                            <span className="text-amber-600 font-bold">{h3Input} mm</span>
+                                        </label>
+                                        <input
+                                            type="range" min="1800" max="3200" step="50"
+                                            value={h3Input} onChange={e => setH3Input(Number(e.target.value))}
+                                            className="w-full accent-amber-500 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <p className="text-[10px] text-amber-600 mt-1">Dolna krawędź rynny — typowo 2100-2400mm</p>
+                                    </div>
+                                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                        <label className="flex justify-between mb-2">
+                                            <span className="text-sm font-bold text-amber-800">H1 — Wysokość ściany (mm)</span>
+                                            <span className="text-amber-600 font-bold">{h1Input} mm</span>
+                                        </label>
+                                        <input
+                                            type="range" min="2000" max="3500" step="50"
+                                            value={h1Input} onChange={e => setH1Input(Number(e.target.value))}
+                                            className="w-full accent-amber-500 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <p className="text-[10px] text-amber-600 mt-1">Dolna krawędź profilu ściennego — wyższe niż H3</p>
+                                    </div>
+                                </div>
+
+                                {/* Dachrechner Results Banner */}
+                                {dachResults && (
+                                    <div className="mb-6 p-3 bg-indigo-50 rounded-xl border border-indigo-200">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-lg">📐</span>
+                                            <span className="text-sm font-bold text-indigo-800">Wymiary Dachrechner (auto)</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                            {dachResults.angleAlpha !== null && (
+                                                <div className="bg-white p-2 rounded-lg text-center">
+                                                    <div className="text-slate-400">Kąt α</div>
+                                                    <div className="font-bold text-indigo-700">{dachResults.angleAlpha.toFixed(1)}°</div>
+                                                </div>
+                                            )}
+                                            {dachResults.fensterF2 !== null && (
+                                                <div className="bg-white p-2 rounded-lg text-center">
+                                                    <div className="text-slate-400">F2 (szer. okna)</div>
+                                                    <div className="font-bold text-indigo-700">{Math.round(dachResults.fensterF2)} mm</div>
+                                                </div>
+                                            )}
+                                            {dachResults.fensterF1 !== null && (
+                                                <div className="bg-white p-2 rounded-lg text-center">
+                                                    <div className="text-slate-400">F1 (wys. rynna)</div>
+                                                    <div className="font-bold text-indigo-700">{Math.round(dachResults.fensterF1)} mm</div>
+                                                </div>
+                                            )}
+                                            {dachResults.innerWidth !== null && (
+                                                <div className="bg-white p-2 rounded-lg text-center">
+                                                    <div className="text-slate-400">Szer. wewnętrzna</div>
+                                                    <div className="font-bold text-indigo-700">{Math.round(dachResults.innerWidth)} mm</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                                     {/* Width */}
@@ -2589,12 +2825,107 @@ export const B2BCalculator: React.FC = () => {
                                                     </div>
                                                 </div>
 
+                                                {/* Placement Selector */}
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-4">
+                                                    <h5 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                                        📍 Umiejscowienie
+                                                    </h5>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {(['lewa', 'prawa', 'przód'] as const).map(p => (
+                                                            <button
+                                                                key={p}
+                                                                onClick={() => {
+                                                                    setWallPlacement(p);
+                                                                    // Auto-fill dimensions from Dachrechner
+                                                                    if (dachResults) {
+                                                                        if (p === 'przód' && dachResults.innerWidth) {
+                                                                            setWallWidth(Math.round(dachResults.innerWidth));
+                                                                        } else if ((p === 'lewa' || p === 'prawa') && dachResults.fensterF2) {
+                                                                            setWallWidth(Math.round(dachResults.fensterF2));
+                                                                        }
+                                                                        if (dachResults.fensterF1) {
+                                                                            setWallHeight(Math.round(dachResults.fensterF1));
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className={`py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all ${
+                                                                    wallPlacement === p
+                                                                        ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm'
+                                                                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                                                                }`}
+                                                            >
+                                                                {p === 'lewa' ? '◀️ Bok lewy' : p === 'prawa' ? '▶️ Bok prawy' : '⬛ Przód'}
+                                                                {dachResults && (
+                                                                    <div className="text-[10px] mt-1 font-normal text-slate-400">
+                                                                        {p === 'przód'
+                                                                            ? dachResults.innerWidth ? `szer: ${Math.round(dachResults.innerWidth)}mm` : ''
+                                                                            : dachResults.fensterF2 ? `szer: ${Math.round(dachResults.fensterF2)}mm` : ''}
+                                                                    </div>
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
                                                 {/* Dimensions Card */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <h5 className="text-sm font-bold text-slate-700">Wymiary zabudowy</h5>
-                                                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Wybierz wymiar w mm</span>
+                                                        {dachResults && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (!dachResults) return;
+                                                                    const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
+                                                                    const isSide = wallProduct.includes('Side');
+                                                                    if (isWedge && dachResults.fensterF2) {
+                                                                        setWallWidth(Math.round(dachResults.fensterF2));
+                                                                    } else if (isSide && dachResults.fensterF2) {
+                                                                        setWallWidth(Math.round(dachResults.fensterF2));
+                                                                        if (dachResults.fensterF1) setWallHeight(Math.round(dachResults.fensterF1));
+                                                                    } else if (dachResults.innerWidth) {
+                                                                        setWallWidth(Math.round(dachResults.innerWidth));
+                                                                        if (dachResults.fensterF1) setWallHeight(Math.round(dachResults.fensterF1));
+                                                                    }
+                                                                }}
+                                                                className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 font-medium flex items-center gap-1"
+                                                            >
+                                                                📐 Użyj z Dachrechner
+                                                            </button>
+                                                        )}
                                                     </div>
+
+                                                    {/* Keilfenster Side Selection */}
+                                                    {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && dachResults && (
+                                                        <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                                            <label className="text-xs font-bold text-orange-800 mb-2 block">📐 Strona Keilfenster</label>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setWedgeSide('gutter');
+                                                                        if (dachResults.fensterF2) setWallWidth(Math.round(dachResults.fensterF2));
+                                                                    }}
+                                                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-all ${wedgeSide === 'gutter'
+                                                                        ? 'border-orange-500 bg-orange-100 text-orange-800'
+                                                                        : 'border-slate-200 bg-white text-slate-600 hover:border-orange-300'}`}
+                                                                >
+                                                                    🔽 Strona rynny (L)
+                                                                    {dachResults.keilhoeheK1 && <div className="text-[10px] mt-1">Klin: {Math.round(dachResults.keilhoeheK1)}mm</div>}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setWedgeSide('wall');
+                                                                        if (dachResults.fensterF2) setWallWidth(Math.round(dachResults.fensterF2));
+                                                                    }}
+                                                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-all ${wedgeSide === 'wall'
+                                                                        ? 'border-orange-500 bg-orange-100 text-orange-800'
+                                                                        : 'border-slate-200 bg-white text-slate-600 hover:border-orange-300'}`}
+                                                                >
+                                                                    🔼 Strona ściany (R)
+                                                                    {dachResults.keilhoeheK2 && <div className="text-[10px] mt-1">Klin: {Math.round(dachResults.keilhoeheK2)}mm</div>}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
 
                                                     <div className={`grid ${(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
                                                         <div>
@@ -2693,11 +3024,14 @@ export const B2BCalculator: React.FC = () => {
 
                                                                 const totalWithAccessories = wallPrice + accessoriesTotal;
                                                                 const wallDisplayName = WALL_PRODUCTS.find(p => p.id === wallProduct)?.name || wallProduct;
+                                                                const placementLabel = wallProduct.includes('Side') || wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')
+                                                                    ? ` (${wallPlacement === 'lewa' ? 'strona lewa' : wallPlacement === 'prawa' ? 'strona prawa' : 'przód'})`
+                                                                    : wallProduct.includes('Front') ? ' (przód)' : '';
                                                                 const configStr = isWedge && accessoriesNames.length > 0
-                                                                    ? `${wallDisplayName} + ${accessoriesNames.join(', ')}`
-                                                                    : wallDisplayName;
+                                                                    ? `${wallDisplayName}${placementLabel} + ${accessoriesNames.join(', ')}`
+                                                                    : `${wallDisplayName}${placementLabel}`;
 
-                                                                addToBasket(wallDisplayName, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
+                                                                addToBasket(`${wallDisplayName}${placementLabel}`, totalWithAccessories, configStr, `${wallWidth}x${wallHeight}`, 'wall');
 
                                                                 // Reset accessories after adding
                                                                 if (isWedge) {
@@ -2762,6 +3096,67 @@ export const B2BCalculator: React.FC = () => {
                                                         </button>
                                                     ))}
                                                 </div>
+
+                                                {/* Placement selector for ZIP */}
+                                                {awningType === 'zip' && (
+                                                    <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                                        <label className="text-xs font-bold text-slate-600 mb-2 block">📍 Umiejscowienie ZIP Screen</label>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {(['przód', 'bok lewy', 'bok prawy'] as const).map(p => (
+                                                                <button
+                                                                    key={p}
+                                                                    onClick={() => {
+                                                                        setZipPlacement(p);
+                                                                        // Auto-fill width from Dachrechner
+                                                                        if (dachResults) {
+                                                                            if (p === 'przód' && dachResults.innerWidth) {
+                                                                                setAwningWidth(Math.round(dachResults.innerWidth));
+                                                                            } else if ((p === 'bok lewy' || p === 'bok prawy') && dachResults.fensterF2) {
+                                                                                setAwningWidth(Math.round(dachResults.fensterF2));
+                                                                            }
+                                                                            if (dachResults.fensterF1) {
+                                                                                setAwningProjection(Math.round(dachResults.fensterF1));
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className={`py-2 px-3 rounded-lg text-xs font-medium border transition-all ${
+                                                                        zipPlacement === p
+                                                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-800'
+                                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300'
+                                                                    }`}
+                                                                >
+                                                                    {p === 'przód' ? '⬛ Przód' : p === 'bok lewy' ? '◀️ Bok lewy' : '▶️ Bok prawy'}
+                                                                    {dachResults && (
+                                                                        <div className="text-[10px] mt-0.5 text-slate-400">
+                                                                            {p === 'przód'
+                                                                                ? dachResults.innerWidth ? `${Math.round(dachResults.innerWidth)}mm` : ''
+                                                                                : dachResults.fensterF2 ? `${Math.round(dachResults.fensterF2)}mm` : ''}
+                                                                        </div>
+                                                                    )}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Auto-fill from roof dims for awnings */}
+                                                {awningType !== 'zip' && (
+                                                    <div className="mb-4 p-3 bg-orange-50 rounded-xl border border-orange-200">
+                                                        <label className="text-xs font-bold text-orange-700 mb-2 block">📐 Wymiary z dachu</label>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setAwningWidth(width);
+                                                                    setAwningProjection(projection);
+                                                                }}
+                                                                className="flex-1 py-2 px-3 bg-white rounded-lg text-xs font-medium border border-orange-300 text-orange-700 hover:bg-orange-100 transition-all"
+                                                            >
+                                                                🏠 Szerokość × Głębokość dachu
+                                                                <div className="text-[10px] mt-0.5 text-orange-500">{width} × {projection} mm</div>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* Dimensions and Price calculation area */}
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
@@ -2842,9 +3237,9 @@ export const B2BCalculator: React.FC = () => {
                                                         </div>
                                                         <button
                                                             onClick={() => awningPrice && addToBasket(
-                                                                awningType === 'aufdach' ? 'Aufdachmarkise' : awningType === 'unterdach' ? 'Unterdachmarkise' : 'ZIP Screen',
+                                                                awningType === 'aufdach' ? 'Aufdachmarkise' : awningType === 'unterdach' ? 'Unterdachmarkise' : `ZIP Screen (${zipPlacement})`,
                                                                 awningPrice,
-                                                                awningType === 'aufdach' ? 'Markiza na dachu' : awningType === 'unterdach' ? 'Markiza pod dachem' : 'Ekran ZIP pionowy',
+                                                                awningType === 'aufdach' ? 'Markiza na dachu' : awningType === 'unterdach' ? 'Markiza pod dachem' : `Ekran ZIP — ${zipPlacement}`,
                                                                 `${awningWidth}x${awningProjection}`,
                                                                 'accessory'
                                                             )}

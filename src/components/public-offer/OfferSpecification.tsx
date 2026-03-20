@@ -667,9 +667,9 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
 
             {/* ═══ POSITIONS LIST ═══ */}
             <div className="px-6 py-5 md:px-8 md:py-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Leistungsumfang</h3>
-                    <span className="text-[11px] text-slate-400">Alle Positionen im Angebotspreis enthalten</span>
+                    <span className="text-[11px] text-slate-400 whitespace-nowrap">Alle Positionen im Angebotspreis enthalten</span>
                 </div>
 
                 <div className="border border-slate-100 rounded-xl overflow-hidden">

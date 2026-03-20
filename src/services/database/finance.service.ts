@@ -81,6 +81,19 @@ export const FinanceService = {
 
         if (error) throw error;
 
+        // Batch fetch profile names for all processed_by IDs
+        const profileIds = [...new Set(data.map(r => r.processed_by).filter(Boolean))];
+        let profileMap: Record<string, string> = {};
+        if (profileIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', profileIds);
+            if (profiles) {
+                profileMap = Object.fromEntries(profiles.map(p => [p.id, p.full_name]));
+            }
+        }
+
         return data.map(row => ({
             id: row.id,
             type: row.type,
@@ -93,6 +106,7 @@ export const FinanceService = {
             customerName: row.customer_name,
             contractNumber: row.contract_number,
             processedBy: row.processed_by,
+            processedByName: profileMap[row.processed_by] || undefined,
             createdAt: new Date(row.created_at)
         }));
     },
@@ -120,6 +134,13 @@ export const FinanceService = {
 
         if (error) throw error;
 
+        // Get the current user's profile name
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+
         return {
             id: data.id,
             type: data.type,
@@ -132,6 +153,7 @@ export const FinanceService = {
             customerName: data.customer_name,
             contractNumber: data.contract_number,
             processedBy: data.processed_by,
+            processedByName: profile?.full_name || undefined,
             createdAt: new Date(data.created_at)
         };
     },

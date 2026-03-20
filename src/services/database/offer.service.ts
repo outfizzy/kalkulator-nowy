@@ -784,7 +784,7 @@ export const OfferService = {
      */
     async notifyOfferAction(
         token: string,
-        actionType: 'offer_accepted' | 'measurement_requested' | 'message_sent',
+        actionType: 'offer_accepted' | 'measurement_requested' | 'message_sent' | 'offer_viewed',
         actionData?: Record<string, any>
     ): Promise<boolean> {
         try {

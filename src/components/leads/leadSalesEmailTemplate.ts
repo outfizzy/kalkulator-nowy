@@ -271,48 +271,73 @@ export function generateLeadSalesEmailHtml(params: {
                             </td>
                         </tr>
 
-                        <!-- TEAM SECTION -->
+                        <!-- TEAM SECTION — 2×2 mobile-safe grid -->
                         <tr>
-                            <td class="content-padding" style="padding: 0 40px 70px 40px;">
-                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #f0f2f5; padding-top: 60px;">
+                            <td class="content-padding" style="padding: 0 40px 50px 40px;">
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #f0f2f5; padding-top: 40px;">
                                     <tr>
-                                        <td align="center" style="padding-bottom: 50px;">
-                                            <h3 style="margin: 0; font-size: 22px; color: #1c252e; font-weight: 700;">Ihre Projektberater</h3>
+                                        <td align="center" style="padding-bottom: 30px;">
+                                            <h3 style="margin: 0; font-size: 20px; color: #1c252e; font-weight: 700;">Ihre Projektberater</h3>
+                                            <p style="margin: 8px 0 0; font-size: 13px; color: #94a3b8;">Rufen Sie uns direkt an – wir beraten Sie persönlich & unverbindlich:</p>
                                         </td>
                                     </tr>
+                                    <!-- Row 1: Oliwia + Mike -->
                                     <tr>
                                         <td>
-                                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 8px;">
                                                 <tr>
-                                                    <td width="33%" class="mobile-stack mobile-center" valign="top" style="padding: 0 15px; border-right: 1px solid #f0f2f5;" align="center">
-                                                        <img src="https://dummyimage.com/180x180/f4f6f8/1c252e&text=OD" width="100" height="100" style="border-radius: 50%; margin-bottom: 20px; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: block;" alt="Oliwia Duź">
-                                                        <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1c252e;">Oliwia Duź</p>
-                                                        <p style="margin: 5px 0 15px 0; font-size: 11px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Projektberatung</p>
-                                                        <p style="margin: 0; font-size: 13px; line-height: 20px;">
-                                                            <a href="mailto:o.duz@polendach24.de" style="color: #4a5568; text-decoration: none; display: block; margin-bottom: 4px;">o.duz@polendach24.de</a>
-                                                            <a href="tel:+491626692445" style="color: #1c252e; text-decoration: none; font-weight: 700;">+49 162 6692445</a>
-                                                        </p>
+                                                    <td width="50%" align="center" valign="top" style="padding: 4px;">
+                                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 10px;">
+                                                            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #e67e22, #f59e0b); margin: 0 auto 8px; line-height: 44px; font-size: 16px; font-weight: 800; color: #fff;">OD</div>
+                                                            <p style="margin: 0 0 2px; font-size: 14px; font-weight: 700; color: #1c252e;">Oliwia Duz</p>
+                                                            <p style="margin: 0 0 8px; font-size: 10px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Vertrieb & Beratung</p>
+                                                            <a href="tel:+491626692445" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 0162 669 2445</a>
+                                                            <p style="margin: 6px 0 0; font-size: 11px;"><a href="mailto:o.duz@polendach24.de" style="color: #64748b; text-decoration: none;">o.duz@polendach24.de</a></p>
+                                                        </div>
                                                     </td>
-                                                    <td width="33%" class="mobile-stack mobile-center" valign="top" style="padding: 0 15px; border-right: 1px solid #f0f2f5;" align="center">
-                                                        <img src="https://dummyimage.com/180x180/f4f6f8/1c252e&text=ML" width="100" height="100" style="border-radius: 50%; margin-bottom: 20px; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: block;" alt="Mike Ledwin">
-                                                        <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1c252e;">Mike Ledwin</p>
-                                                        <p style="margin: 5px 0 15px 0; font-size: 11px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Projektberatung</p>
-                                                        <p style="margin: 0; font-size: 13px; line-height: 20px;">
-                                                            <a href="mailto:m.ledwin@polendach24.de" style="color: #4a5568; text-decoration: none; display: block; margin-bottom: 4px;">m.ledwin@polendach24.de</a>
-                                                            <a href="tel:+4915257487430" style="color: #1c252e; text-decoration: none; font-weight: 700;">+49 152 57487430</a>
-                                                        </p>
-                                                    </td>
-                                                    <td width="33%" class="mobile-stack mobile-stack-last mobile-center" valign="top" style="padding: 0 15px;" align="center">
-                                                        <img src="https://dummyimage.com/180x180/f4f6f8/1c252e&text=HK" width="100" height="100" style="border-radius: 50%; margin-bottom: 20px; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: block;" alt="Hubert Kościów">
-                                                        <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1c252e;">Hubert Kościów</p>
-                                                        <p style="margin: 5px 0 15px 0; font-size: 11px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Projektberatung</p>
-                                                        <p style="margin: 0; font-size: 13px; line-height: 20px;">
-                                                            <a href="mailto:h.kosciow@polendach24.de" style="color: #4a5568; text-decoration: none; display: block; margin-bottom: 4px;">h.kosciow@polendach24.de</a>
-                                                            <a href="tel:+4915223634823" style="color: #1c252e; text-decoration: none; font-weight: 700;">+49 152 23634823</a>
-                                                        </p>
+                                                    <td width="50%" align="center" valign="top" style="padding: 4px;">
+                                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 10px;">
+                                                            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #e67e22, #f59e0b); margin: 0 auto 8px; line-height: 44px; font-size: 16px; font-weight: 800; color: #fff;">ML</div>
+                                                            <p style="margin: 0 0 2px; font-size: 14px; font-weight: 700; color: #1c252e;">Mike Ledwin</p>
+                                                            <p style="margin: 0 0 8px; font-size: 10px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Vertrieb & Beratung</p>
+                                                            <a href="tel:+4915257487430" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 0152 5748 7430</a>
+                                                            <p style="margin: 6px 0 0; font-size: 11px;"><a href="mailto:m.ledwin@polendach24.de" style="color: #64748b; text-decoration: none;">m.ledwin@polendach24.de</a></p>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </table>
+                                        </td>
+                                    </tr>
+                                    <!-- Row 2: Hubert + Artur -->
+                                    <tr>
+                                        <td>
+                                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 12px;">
+                                                <tr>
+                                                    <td width="50%" align="center" valign="top" style="padding: 4px;">
+                                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 10px;">
+                                                            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #e67e22, #f59e0b); margin: 0 auto 8px; line-height: 44px; font-size: 16px; font-weight: 800; color: #fff;">HK</div>
+                                                            <p style="margin: 0 0 2px; font-size: 14px; font-weight: 700; color: #1c252e;">Hubert Kosciow</p>
+                                                            <p style="margin: 0 0 8px; font-size: 10px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Vertrieb & Beratung</p>
+                                                            <a href="tel:+48669558015" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 +48 669 558 015</a>
+                                                            <p style="margin: 6px 0 0; font-size: 11px;"><a href="mailto:h.kosciow@polendach24.de" style="color: #64748b; text-decoration: none;">h.kosciow@polendach24.de</a></p>
+                                                        </div>
+                                                    </td>
+                                                    <td width="50%" align="center" valign="top" style="padding: 4px;">
+                                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 10px;">
+                                                            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #e67e22, #f59e0b); margin: 0 auto 8px; line-height: 44px; font-size: 16px; font-weight: 800; color: #fff;">AN</div>
+                                                            <p style="margin: 0 0 2px; font-size: 14px; font-weight: 700; color: #1c252e;">Artur Nagorny</p>
+                                                            <p style="margin: 0 0 8px; font-size: 10px; color: #e67e22; text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Vertrieb & Beratung</p>
+                                                            <a href="tel:+4915258715652" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 0152 5871 5652</a>
+                                                            <p style="margin: 6px 0 0; font-size: 11px;"><a href="mailto:buero@polendach24.de" style="color: #64748b; text-decoration: none;">buero@polendach24.de</a></p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td align="center">
+                                            <p style="margin: 0; font-size: 12px; color: #94a3b8;">Oder schreiben Sie uns: <a href="mailto:buero@polendach24.de" style="color: #e67e22; text-decoration: none; font-weight: 700;">buero@polendach24.de</a></p>
                                         </td>
                                     </tr>
                                 </table>

@@ -153,6 +153,13 @@ export const WalletPage: React.FC = () => {
         });
     };
 
+    const formatTime = (date: Date) => {
+        return date.toLocaleTimeString('pl-PL', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     return (
         <div className="space-y-8 pb-12">
             {/* Header */}
@@ -366,6 +373,7 @@ export const WalletPage: React.FC = () => {
                                     <th className="px-6 py-4">Data</th>
                                     <th className="px-6 py-4">Typ / Kategoria</th>
                                     <th className="px-6 py-4">Opis / Klient</th>
+                                    <th className="px-6 py-4">Wprowadził</th>
                                     <th className="px-6 py-4 text-right">Kwota</th>
                                     <th className="px-6 py-4 text-right">Akcje</th>
                                 </tr>
@@ -373,13 +381,13 @@ export const WalletPage: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                                             Ładowanie transakcji...
                                         </td>
                                     </tr>
                                 ) : filteredTransactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                                             Brak transakcji w historii
                                         </td>
                                     </tr>
@@ -418,6 +426,12 @@ export const WalletPage: React.FC = () => {
                                                 ) : (
                                                     <p className="text-sm text-slate-600">{tx.description || '-'}</p>
                                                 )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div>
+                                                    <p className="text-sm font-medium text-slate-700">{tx.processedByName || '—'}</p>
+                                                    <p className="text-xs text-slate-400">{formatTime(tx.createdAt)}</p>
+                                                </div>
                                             </td>
                                             <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
                                                 }`}>
@@ -464,13 +478,14 @@ export const WalletPage: React.FC = () => {
                                     <th className="px-6 py-4">Oryginalna Data</th>
                                     <th className="px-6 py-4">Typ / Kategoria</th>
                                     <th className="px-6 py-4">Opis / Klient</th>
+                                    <th className="px-6 py-4">Wprowadził</th>
                                     <th className="px-6 py-4 text-right">Kwota</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-red-100 bg-red-50/30">
                                 {deletedTransactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                                             Brak usuniętych transakcji
                                         </td>
                                     </tr>
@@ -516,6 +531,9 @@ export const WalletPage: React.FC = () => {
                                                 ) : (
                                                     <p className="text-sm text-slate-600">{tx.description || '-'}</p>
                                                 )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm font-medium text-slate-700">{tx.processedByName || '—'}</p>
                                             </td>
                                             <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
                                                 }`}>

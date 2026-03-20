@@ -19,7 +19,7 @@ export const SalesRepFuelPage: React.FC = () => {
     const [fuelingType, setFuelingType] = useState<FuelingType>('internal');
     const [liters, setLiters] = useState<number | ''>('');
     const [netCost, setNetCost] = useState<number | ''>('');
-    const [currency, setCurrency] = useState<'EUR' | 'PLN'>('EUR');
+    const [currency, setCurrency] = useState<'EUR' | 'PLN'>('PLN');
     const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
     const [odometer, setOdometer] = useState<number | ''>('');
     const [stationName, setStationName] = useState('');
@@ -99,7 +99,7 @@ export const SalesRepFuelPage: React.FC = () => {
                 liters: Number(liters),
                 cost: fuelingType === 'external' ? Number(netCost) : undefined,
                 netCost: fuelingType === 'external' ? Number(netCost) : undefined,
-                currency: fuelingType === 'external' ? currency : 'EUR',
+                currency: fuelingType === 'external' ? currency : 'PLN',
                 logDate,
                 odometerReading: odometer ? Number(odometer) : undefined,
                 receiptPhotoUrl: receiptUrl,
@@ -108,7 +108,7 @@ export const SalesRepFuelPage: React.FC = () => {
             if (error) throw error;
 
             toast.success('⛽ Tankowanie zapisane!');
-            setLiters(''); setNetCost(''); setOdometer(''); setStationName(''); setCurrency('EUR');
+            setLiters(''); setNetCost(''); setOdometer(''); setStationName(''); setCurrency('PLN');
             setReceiptPhoto(null); setLogDate(new Date().toISOString().split('T')[0]);
             if (fileInputRef.current) fileInputRef.current.value = '';
             loadLogs();
@@ -126,7 +126,8 @@ export const SalesRepFuelPage: React.FC = () => {
     const now = new Date();
     const thisMonth = logs.filter(l => { const d = new Date(l.logDate); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
     const mLiters = thisMonth.reduce((s, l) => s + l.liters, 0);
-    const mCost = thisMonth.reduce((s, l) => s + (l.cost || l.netCost || 0), 0);
+    const mCostPLN = thisMonth.filter(l => (l.currency || 'PLN') === 'PLN').reduce((s, l) => s + (l.cost || l.netCost || 0), 0);
+    const mCostEUR = thisMonth.filter(l => (l.currency || 'PLN') === 'EUR').reduce((s, l) => s + (l.cost || l.netCost || 0), 0);
 
     return (
         <div style={{ padding: 'clamp(16px, 3vw, 24px)', maxWidth: 1200, margin: '0 auto' }}>
@@ -274,7 +275,12 @@ export const SalesRepFuelPage: React.FC = () => {
                             </div>
                             <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', borderRadius: 14, padding: '16px 20px', border: '1px solid #bbf7d0' }}>
                                 <p style={{ color: '#16a34a', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Koszt</p>
-                                <p style={{ fontSize: 24, fontWeight: 800, color: '#14532d', marginTop: 4 }}>{mCost.toFixed(2)} €</p>
+                                <p style={{ fontSize: 22, fontWeight: 800, color: '#14532d', marginTop: 4 }}>
+                                    {mCostPLN > 0 && <span>{mCostPLN.toFixed(2)} zł</span>}
+                                    {mCostPLN > 0 && mCostEUR > 0 && <span style={{ color: '#94a3b8', margin: '0 4px' }}>|</span>}
+                                    {mCostEUR > 0 && <span>{mCostEUR.toFixed(2)} €</span>}
+                                    {mCostPLN === 0 && mCostEUR === 0 && <span>0,00 zł</span>}
+                                </p>
                             </div>
                             <div style={{ background: 'linear-gradient(135deg, #faf5ff, #f3e8ff)', borderRadius: 14, padding: '16px 20px', border: '1px solid #e9d5ff' }}>
                                 <p style={{ color: '#7c3aed', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Wpisy</p>
@@ -354,7 +360,11 @@ export const SalesRepFuelPage: React.FC = () => {
                             </div>
                             <div style={{ background: 'linear-gradient(135deg, #16a34a, #059669)', borderRadius: 16, padding: '20px 24px', color: '#fff' }}>
                                 <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.7 }}>Łączny koszt</p>
-                                <p style={{ fontSize: 32, fontWeight: 800, marginTop: 6 }}>{stats.totals.totalCost.toFixed(2)} €</p>
+                                <div style={{ marginTop: 6 }}>
+                                    {stats.totals.totalCostPLN > 0 && <p style={{ fontSize: 28, fontWeight: 800 }}>{stats.totals.totalCostPLN.toFixed(2)} zł</p>}
+                                    {stats.totals.totalCostEUR > 0 && <p style={{ fontSize: stats.totals.totalCostPLN > 0 ? 20 : 28, fontWeight: 800, opacity: stats.totals.totalCostPLN > 0 ? 0.8 : 1 }}>{stats.totals.totalCostEUR.toFixed(2)} €</p>}
+                                    {stats.totals.totalCostPLN === 0 && stats.totals.totalCostEUR === 0 && <p style={{ fontSize: 28, fontWeight: 800 }}>0,00 zł</p>}
+                                </div>
                                 <p style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>netto</p>
                             </div>
                             <div style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', borderRadius: 16, padding: '20px 24px', color: '#fff' }}>
@@ -392,7 +402,8 @@ export const SalesRepFuelPage: React.FC = () => {
                                         </div>
                                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                             <p style={{ fontWeight: 800, color: '#1e293b', fontSize: 16 }}>{user.totalLiters.toFixed(1)} L</p>
-                                            <p style={{ fontWeight: 600, color: '#16a34a', fontSize: 13 }}>{user.totalCost.toFixed(2)} €</p>
+                                            {user.totalCostPLN > 0 && <p style={{ fontWeight: 600, color: '#16a34a', fontSize: 13 }}>{user.totalCostPLN.toFixed(2)} zł</p>}
+                                            {user.totalCostEUR > 0 && <p style={{ fontWeight: 600, color: '#0284c7', fontSize: 13 }}>{user.totalCostEUR.toFixed(2)} €</p>}
                                         </div>
                                     </div>
                                 );

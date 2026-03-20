@@ -871,6 +871,7 @@ export interface WalletTransaction {
     contractNumber?: string;
 
     processedBy: string; // User ID
+    processedByName?: string; // Full name from profiles join
     createdAt: Date;
     // Exchange rate tracking
     exchangeRate?: number;

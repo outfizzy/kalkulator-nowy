@@ -44,10 +44,10 @@ const BRAND = {
     ],
     usps: [
         { icon: '✔', label: 'Top-Qualität', desc: 'zu fairen Preisen' },
-        { icon: '✔', label: 'Komplett-Service', desc: 'inkl. Montage' },
+        { icon: '✔', label: 'Professionelle Montagen', desc: 'durch erfahrene Teams' },
         { icon: '✔', label: 'Persönliche Beratung', desc: 'vor Ort' },
         { icon: '✔', label: 'Über 1.000', desc: 'zufriedene Kunden' },
-        { icon: '✔', label: '10 Jahre Garantie', desc: 'auf Konstruktion' },
+        { icon: '✔', label: '5 Jahre Garantie', desc: 'auf Konstruktion' },
     ],
     reviews: [
         { name: 'Thomas M. – Berlin', text: '"Sehr schnelle und professionelle Abwicklung. Das Dach sieht fantastisch aus und die Qualität ist top. Klare Weiterempfehlung!"' },
@@ -159,13 +159,51 @@ function buildUSPs() {
                     ${items}
                 </table>
                 <div style="margin-top: 40px;">
-                    <p style="margin: 0 0 10px; font-size: 14px; color: #9ca3af;">Haben Sie noch Fragen? Rufen Sie uns an:</p>
-                    <a href="tel:+4935615019981" style="display: inline-block; color: #ffffff; font-weight: bold; text-decoration: none; font-size: 22px; background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 8px;">
-                        📞 ${BRAND.phone}
-                    </a>
-                    <p style="margin-top: 15px; font-size: 14px;">
-                        <a href="${BRAND.website}" style="color: ${BRAND.accentBlue}; text-decoration: none;">www.polendach24.de</a>
-                    </p>
+                    <p style="margin: 0 0 5px; font-size: 10px; text-transform: uppercase; letter-spacing: 3px; color: #94a3b8; font-weight: 700;">IHRE ANSPRECHPARTNER</p>
+                    <p style="margin: 0 0 15px; font-size: 13px; color: #cbd5e1;">Rufen Sie uns direkt an – persönlich & unverbindlich:</p>
+                    <!-- Row 1: Mike + Oliwia -->
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin: 0 auto 6px;">
+                        <tr>
+                            <td width="50%" align="center" style="padding: 3px;">
+                                <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 6px;">
+                                    <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #60a5fa); margin: 0 auto 6px; line-height: 36px; font-size: 13px; font-weight: 800; color: #fff;">ML</div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #f1f5f9;">Mike Ledwin</div>
+                                    <div style="font-size: 9px; color: #94a3b8; margin-bottom: 6px;">Vertrieb & Beratung</div>
+                                    <a href="tel:+4915257487430" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 0152 5748 7430</a>
+                                </div>
+                            </td>
+                            <td width="50%" align="center" style="padding: 3px;">
+                                <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 6px;">
+                                    <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #60a5fa); margin: 0 auto 6px; line-height: 36px; font-size: 13px; font-weight: 800; color: #fff;">OD</div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #f1f5f9;">Oliwia Duz</div>
+                                    <div style="font-size: 9px; color: #94a3b8; margin-bottom: 6px;">Vertrieb & Beratung</div>
+                                    <a href="tel:+491626692445" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 0162 669 2445</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    <!-- Row 2: Hubert + Artur -->
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin: 0 auto 12px;">
+                        <tr>
+                            <td width="50%" align="center" style="padding: 3px;">
+                                <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 6px;">
+                                    <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #60a5fa); margin: 0 auto 6px; line-height: 36px; font-size: 13px; font-weight: 800; color: #fff;">HK</div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #f1f5f9;">Hubert Kosciow</div>
+                                    <div style="font-size: 9px; color: #94a3b8; margin-bottom: 6px;">Vertrieb & Beratung</div>
+                                    <a href="tel:+48669558015" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 +48 669 558 015</a>
+                                </div>
+                            </td>
+                            <td width="50%" align="center" style="padding: 3px;">
+                                <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 6px;">
+                                    <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #60a5fa); margin: 0 auto 6px; line-height: 36px; font-size: 13px; font-weight: 800; color: #fff;">AN</div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #f1f5f9;">Artur Nagorny</div>
+                                    <div style="font-size: 9px; color: #94a3b8; margin-bottom: 6px;">Vertrieb & Beratung</div>
+                                    <a href="tel:+4915258715652" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">📞 0152 5871 5652</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    <p style="margin: 0; font-size: 11px; color: #64748b;">Oder: <a href="mailto:buero@polendach24.de" style="color: ${BRAND.accentBlue}; text-decoration: none; font-weight: 700;">buero@polendach24.de</a> | <a href="${BRAND.website}" style="color: ${BRAND.accentBlue}; text-decoration: none;">polendach24.de</a></p>
                 </div>
             </td>
         </tr>`;
@@ -228,6 +266,16 @@ export function wrapInBrandTemplate(
             ${showReviews ? buildReviews() : ''}
             ${showUSPs ? buildUSPs() : ''}
             ${buildFooter()}
+        </table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto;">
+            <tr>
+                <td style="text-align: center; padding: 15px 30px 25px;">
+                    <p style="font-size: 11px; color: #94a3b8; margin: 0; line-height: 1.6;">
+                        Sie erhalten diese E-Mail, weil Sie Kontakt mit Polendach24 hatten.<br>
+                        <a href="#UNSUBSCRIBE_URL#" style="color: #64748b; text-decoration: underline;">Sie möchten keine E-Mails mehr erhalten? Hier abmelden</a>
+                    </p>
+                </td>
+            </tr>
         </table>
     </center>
 </body>
@@ -394,7 +442,7 @@ export function getSystemTemplates(): SystemTemplate[] {
         {
             id: 'system_send_offer',
             name: 'Exklusives Angebot',
-            description: 'Angebots-E-Mail mit starkem Sales-Pitch. Betont Premium-Qualität, 10-Jahres-Garantie und zeitlich begrenzten Rabatt.',
+            description: 'Angebots-E-Mail mit starkem Sales-Pitch. Betont Premium-Qualität, 5-Jahres-Garantie und zeitlich begrenzten Rabatt.',
             category: 'sales',
             previewHtml: () => {
                 const body = `
@@ -408,7 +456,7 @@ export function getSystemTemplates(): SystemTemplate[] {
                         <h3 style="margin: 0 0 15px; font-size: 15px; color: #3b82f6; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; text-align: center;">Warum Polendach24?</h3>
                         <table border="0" cellpadding="0" cellspacing="0" width="100%">
                             <tr><td style="padding: 8px 0; font-size: 15px;">✔ <strong>Premium-Aluminium</strong> – korrosionsbeständig, wartungsfrei, langlebig</td></tr>
-                            <tr><td style="padding: 8px 0; font-size: 15px;">✔ <strong>10 Jahre Garantie</strong> auf Konstruktion und Verarbeitung</td></tr>
+                            <tr><td style="padding: 8px 0; font-size: 15px;">✔ <strong>5 Jahre Garantie</strong> auf Konstruktion und Verarbeitung</td></tr>
                             <tr><td style="padding: 8px 0; font-size: 15px;">✔ <strong>Komplettservice</strong> – Beratung, Lieferung & fachgerechte Montage</td></tr>
                             <tr><td style="padding: 8px 0; font-size: 15px;">✔ <strong>Made in EU</strong> – höchste Qualitätsstandards</td></tr>
                         </table>

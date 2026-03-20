@@ -8,6 +8,13 @@
   }
 }
 
+/* Hide reCAPTCHA Enterprise floating badge */
+.grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 @layer utilities {
   .bg-grid-pattern {
     background-image:

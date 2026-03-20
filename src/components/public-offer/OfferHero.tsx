@@ -17,7 +17,7 @@ export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, off
     return (
         <div className="mb-8">
             {/* Main Hero Image */}
-            <div className="relative h-[400px] w-full rounded-2xl overflow-hidden shadow-md">
+            <div className="relative h-[260px] md:h-[400px] w-full rounded-2xl overflow-hidden shadow-md">
                 <img
                     src={heroImage}
                     alt={getModelDisplayName(product.modelId)}
@@ -27,16 +27,16 @@ export const OfferHero: React.FC<OfferHeroProps> = ({ product, customerName, off
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/50 to-transparent"></div>
 
                 {/* Content */}
-                <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 text-white">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="absolute bottom-0 left-0 w-full p-5 md:p-12 text-white">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
                         <div>
                             <div className="inline-block px-3 py-1 bg-blue-600 text-xs font-bold uppercase tracking-wider rounded-full mb-3 shadow-lg shadow-blue-900/50">
                                 Exklusives Angebot für {customerName}
                             </div>
-                            <h1 className="text-4xl md:text-5xl font-bold mb-2 shadow-sm text-shadow">
+                            <h1 className="text-2xl md:text-5xl font-bold mb-1 md:mb-2 shadow-sm text-shadow">
                                 {getModelDisplayName(product.modelId)} Edition
                             </h1>
-                            <p className="text-lg md:text-xl text-slate-200">
+                            <p className="text-sm md:text-xl text-slate-200">
                                 {product.width > 0 && product.projection > 0
                                     ? `${product.width}mm x ${product.projection}mm | ${product.roofType === 'glass' ? 'Sicherheitsglas' : product.roofType === 'manual' ? 'Individuell' : 'Polycarbonat'}`
                                     : 'Individuelles Angebot'}

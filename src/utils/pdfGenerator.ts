@@ -4,7 +4,7 @@ import type { Offer } from '../types';
 import { getSalesProfile, getCurrentUser } from './storage';
 import { translate, formatCurrency } from './translations';
 import { LOGO_BASE64 } from './assets';
-import { ROBOTO_REGULAR_BASE64, ROBOTO_BOLD_BASE64 } from './pdfFonts';
+// import { ROBOTO_REGULAR_BASE64, ROBOTO_BOLD_BASE64 } from './pdfFonts'; // DISABLED: corrupted data
 
 // --- ULTRA PREMIUM DESIGN SYSTEM ---
 const THEME = {
@@ -18,8 +18,8 @@ const THEME = {
 };
 
 const FONTS = {
-    bold: 'Roboto',
-    normal: 'Roboto',
+    bold: 'helvetica',
+    normal: 'helvetica',
 };
 
 const MARGIN = 18;
@@ -246,12 +246,10 @@ export async function generateOfferPDFData(offer: Offer): Promise<string> {
 async function createDocument(offer: Offer): Promise<jsPDF> {
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // Register Roboto fonts for UTF-8 support (ä, ö, ü, ß, €)
-    doc.addFileToVFS('Roboto-Regular.ttf', ROBOTO_REGULAR_BASE64);
-    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-    doc.addFileToVFS('Roboto-Bold.ttf', ROBOTO_BOLD_BASE64);
-    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-    doc.setFont('Roboto', 'normal');
+    // NOTE: Custom Roboto fonts disabled — pdfFonts.ts contains corrupted data.
+    // jsPDF PubSub swallows parse errors without throwing, registering a broken font
+    // that crashes on text(). Using built-in helvetica which handles German chars fine.
+    doc.setFont('helvetica', 'normal');
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -644,7 +642,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
         body: bodyRows,
         theme: 'grid',
         styles: {
-            font: 'Roboto',
+            font: FONTS.normal,
             fontSize: 9,
             cellPadding: 6,
             lineWidth: 0.1,
@@ -680,7 +678,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     // 5. BOTTOM BLOCK: CONTACT CARD (Left) vs TOTALS (Right)
     // Need ~90mm for the bottom block (card + totals + trust badges + signatures)
-    const bottomBlockHeight = 90;
+    const bottomBlockHeight = 110;
     y = ensureSpace(bottomBlockHeight, y);
 
     const midPoint = pageWidth / 2;
@@ -723,69 +721,96 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     doc.setFontSize(7);
     doc.text('Fragen Sie mich nach Aktionen!', MARGIN + 4, cardY + 41);
 
-    // --- RIGHT: TOTALS BLOCK ---
+    // --- RIGHT: TOTALS BLOCK (matching interactive offer layout) ---
     const totalBoxWidth = 85;
     const totalBoxX = pageWidth - MARGIN - totalBoxWidth;
     let ty = y;
 
-    doc.setFontSize(10);
-    const net = offer.pricing?.sellingPriceNet || 0;
+    doc.setFontSize(9);
+    const productNet = offer.pricing?.sellingPriceNet || 0;
+    const installNet = offer.pricing?.installationCosts?.totalInstallation || 0;
+    const installGross = installNet * 1.19;
+    const productGross = offer.pricing?.sellingPriceGross || (productNet * 1.19);
+    const totalNet = productNet + installNet;
+    const totalVat = totalNet * 0.19;
+    const totalGross = productGross + installGross;
     const discount = offer.pricing?.discountValue || 0;
-    const preDiscount = net + discount;
-    const vat = net * 0.19;
-    // Use gross from DB if available, otherwise calculate
-    const gross = offer.pricing?.sellingPriceGross || (net + vat);
+    const discountGross = discount > 0 ? discount * 1.19 : 0;
 
-    if (discount > 0) {
-        // Strikethrough effect — Listenpreis with dimmed color
-        doc.setTextColor(180, 180, 180);
-        doc.text('Listenpreis (Netto):', totalBoxX, ty + 5);
-        doc.text(formatCurrency(preDiscount), pageWidth - MARGIN, ty + 5, { align: 'right' });
-        // Draw strikethrough line
-        const priceTextWidth = doc.getTextWidth(formatCurrency(preDiscount));
-        doc.setDrawColor(180, 180, 180);
-        doc.setLineWidth(0.3);
-        doc.line(pageWidth - MARGIN - priceTextWidth, ty + 4, pageWidth - MARGIN, ty + 4);
-        ty += 6;
-
-        // Sonderrabatt label — green color for positive association
-        const discountLabel = offer.pricing?.discountPercentage
-            ? `Sonderrabatt (−${offer.pricing.discountPercentage}%):`
-            : 'Sonderrabatt:';
-        doc.setTextColor(22, 163, 74); // green-600
-        doc.setFont(FONTS.bold, 'bold');
-        doc.text(discountLabel, totalBoxX, ty + 5);
-        doc.text(`− ${formatCurrency(discount)}`, pageWidth - MARGIN, ty + 5, { align: 'right' });
-        doc.setFont(FONTS.normal, 'normal');
-        ty += 8;
-
-        doc.setDrawColor(...THEME.line);
-        doc.setLineWidth(0.1);
-        doc.line(totalBoxX, ty, pageWidth - MARGIN, ty);
-        ty += 2;
-    }
-
-    doc.setTextColor(...THEME.text);
-    doc.setFont(FONTS.bold, 'bold');
-    doc.text('Endpreis Netto:', totalBoxX, ty + 5);
-    doc.text(formatCurrency(net), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    // Product netto
+    doc.setTextColor(...THEME.textLight);
+    doc.setFont(FONTS.normal, 'normal');
+    doc.text('Terrassenüberdachung:', totalBoxX, ty + 5);
+    doc.text(formatCurrency(productNet), pageWidth - MARGIN, ty + 5, { align: 'right' });
     ty += 6;
 
+    // Installation netto (if applicable)
+    if (installNet > 0) {
+        doc.text('Fachgerechte Montage & Lieferung:', totalBoxX, ty + 5);
+        doc.text(formatCurrency(installNet), pageWidth - MARGIN, ty + 5, { align: 'right' });
+        ty += 6;
+    }
+
+    // Divider
+    doc.setDrawColor(...THEME.line);
+    doc.setLineWidth(0.1);
+    doc.line(totalBoxX, ty + 1, pageWidth - MARGIN, ty + 1);
+    ty += 4;
+
+    // Summe netto
+    doc.setTextColor(...THEME.text);
+    doc.setFont(FONTS.bold, 'bold');
+    doc.text('Summe netto:', totalBoxX, ty + 5);
+    doc.text(formatCurrency(totalNet), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    ty += 6;
+
+    // MwSt
     doc.setFont(FONTS.normal, 'normal');
     doc.setTextColor(...THEME.textLight);
     doc.text('zzgl. 19% MwSt.:', totalBoxX, ty + 5);
-    doc.text(formatCurrency(vat), pageWidth - MARGIN, ty + 5, { align: 'right' });
-    ty += 10;
+    doc.text(formatCurrency(totalVat), pageWidth - MARGIN, ty + 5, { align: 'right' });
+    ty += 7;
 
-    // Grand Total Box
+    // Discount (if any)
+    if (discount > 0) {
+        // Original brutto strikethrough
+        doc.setTextColor(180, 180, 180);
+        doc.text('Regulärer Bruttopreis:', totalBoxX, ty + 5);
+        const originalGross = totalGross + discountGross;
+        doc.text(formatCurrency(originalGross), pageWidth - MARGIN, ty + 5, { align: 'right' });
+        const priceTextWidth = doc.getTextWidth(formatCurrency(originalGross));
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.line(pageWidth - MARGIN - priceTextWidth, ty + 4, pageWidth - MARGIN, ty + 4);
+        ty += 7;
+
+        // Sonderrabatt label — green
+        const discountLabel = offer.pricing?.discountPercentage
+            ? `Sonderrabatt (−${offer.pricing.discountPercentage}%):`
+            : 'Sonderrabatt:';
+        doc.setTextColor(22, 163, 74);
+        doc.setFont(FONTS.bold, 'bold');
+        doc.text(discountLabel, totalBoxX, ty + 5);
+        doc.text(`− ${formatCurrency(discountGross)}`, pageWidth - MARGIN, ty + 5, { align: 'right' });
+        doc.setFont(FONTS.normal, 'normal');
+        ty += 8;
+    }
+
+    // Divider before grand total
+    doc.setDrawColor(...THEME.primary);
+    doc.setLineWidth(0.4);
+    doc.line(totalBoxX, ty, pageWidth - MARGIN, ty);
+    ty += 3;
+
+    // Grand Total Box — BRUTTO
     doc.setFillColor(...THEME.primary);
     doc.roundedRect(totalBoxX, ty, totalBoxWidth, 14, 1, 1, 'F');
 
     doc.setTextColor(...THEME.white);
     doc.setFont(FONTS.bold, 'bold');
     doc.setFontSize(12);
-    doc.text('GESAMT BETRAG:', totalBoxX + 5, ty + 9);
-    doc.text(formatCurrency(gross), pageWidth - MARGIN - 5, ty + 9, { align: 'right' });
+    doc.text('GESAMTPREIS BRUTTO:', totalBoxX + 4, ty + 9);
+    doc.text(formatCurrency(totalGross), pageWidth - MARGIN - 4, ty + 9, { align: 'right' });
 
     // 6. CLOSING & SIGNATURES
     y = Math.max(ty + 25, cardY + 55);
@@ -804,7 +829,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // Validity notice
     doc.setFontSize(7);
     doc.setTextColor(...THEME.textLight);
-    doc.text(`Dieses Angebot ist gültig bis ${validUntilStr}. Preise in EUR, netto zzgl. 19% MwSt.`, pageWidth / 2, y, { align: 'center' });
+    doc.text(`Dieses Angebot ist gültig bis ${validUntilStr}. Alle Preise in EUR inkl. 19% MwSt.`, pageWidth / 2, y, { align: 'center' });
 
     y += 12;
 

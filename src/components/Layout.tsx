@@ -14,7 +14,7 @@ export const Layout: React.FC = () => {
     const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ sprzedaz: true });
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ crm: true });
     const toggleSection = (key: string) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
     // Poll unread email count every 3 minutes
@@ -81,127 +81,161 @@ export const Layout: React.FC = () => {
                     />
                 </div>
                 <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto custom-scrollbar">
-                    {/* SPRZEDAŻ - Always visible or granular? Let's use permissions */}
-                    {(hasPermission('dashboard') || hasPermission('crm_mail') || hasPermission('crm_tasks') || hasPermission('crm_leads') || hasPermission('crm_clients') || hasPermission('offers_create') || hasPermission('ai_assistant')) && (
+                    {/* ── CRM & SPRZEDAŻ ── */}
+                    {(hasPermission('dashboard') || hasPermission('crm_mail') || hasPermission('crm_tasks') || hasPermission('crm_leads') || hasPermission('crm_clients') || hasPermission('offers_create')) && (
                         <div className="space-y-1">
-                            <button onClick={() => toggleSection('sprzedaz')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sprzedaż</span>
-                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.sprzedaz ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            <button onClick={() => toggleSection('crm')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">CRM & Sprzedaż</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.crm ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
-                            {expandedSections.sprzedaz && (<>
-                                {hasPermission('dashboard') && <NavLink to="/dashboard" label="Dashboard" icon="dashboard" />}
-                                {hasPermission('crm_mail') && <NavLink to="/mail" label="Poczta" icon="mail" badge={unreadCount} />}
+                            {expandedSections.crm && (<>
+                                {hasPermission('dashboard') && <NavLink to="/dashboard" label="Panel główny" icon="dashboard" />}
+                                {hasPermission('crm_mail') && <NavLink to="/mail" label="Skrzynka e-mail" icon="mail" badge={unreadCount} />}
                                 {hasPermission('crm_tasks') && <NavLink to="/tasks" label="Zadania" icon="check-circle" />}
                                 {hasPermission('crm_leads') && <NavLink to="/leads" label="Leady" icon="users" />}
-                                <NavLink to="/admin/fairs" label="Targi / Hub" icon="calendar" />
-                                {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" />}
-                                {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" />}
-                                {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" />}
-                                {hasPermission('ai_assistant') && (
-                                    <NavLink to="/ai-assistant" label="Chat GPT" icon="chat" />
-                                )}
-                                {/* Visualizer? */}
-                                {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
-                                <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" />
+                                {hasPermission('crm_clients') && <NavLink to="/customers" label="Baza klientów" icon="users" />}
+                                {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa oferta" icon="plus" />}
+                                {hasPermission('offers_list') && <NavLink to="/offers" label="Lista ofert" icon="offers" />}
                             </>)}
                         </div>
                     )}
 
-                    {/* TELEFONIA */}
+                    {/* ── NARZĘDZIA SPRZEDAŻY ── */}
+                    {(hasPermission('ai_assistant') || hasPermission('visualizer')) && (
+                        <div className="space-y-1">
+                            <button onClick={() => toggleSection('narzedziaSales')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Narzędzia sprzedaży</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.narzedziaSales ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.narzedziaSales && (<>
+                                {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
+                                {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
+                                <NavLink to="/dachrechner" label="Kalkulator dachowy" icon="clipboard" />
+                                <NavLink to="/admin/aliplast-configurator" label="Konfigurator Aliplast" icon="clipboard" />
+                                <NavLink to="/admin/fairs" label="Targi i eventy" icon="calendar" />
+                            </>)}
+                        </div>
+                    )}
+
+                    {/* ── KOMUNIKACJA ── */}
                     <div className="space-y-1">
-                        <button onClick={() => toggleSection('telefonia')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
-                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">📞 Telefonia</span>
-                            <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.telefonia ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        <button onClick={() => toggleSection('komunikacja')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Komunikacja</span>
+                            <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.komunikacja ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                         </button>
-                        {expandedSections.telefonia && (<>
+                        {expandedSections.komunikacja && (<>
                             <NavLink to="/telephony/calls" label="Połączenia" icon="phone" />
-                            <NavLink to="/telephony/sms" label="SMS" icon="chat" />
+                            <NavLink to="/telephony/sms" label="Wiadomości SMS" icon="chat" />
                             <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" />
-                            <NavLink to="/telephony/whatsapp/campaigns" label="Kampanie WA" icon="mail" />
-                            <NavLink to="/telephony/voicemail" label="Poczta Głosowa" icon="bell" />
-                            {isAdmin() && <NavLink to="/telephony/numbers" label="Numery Tel." icon="settings" />}
+                            <NavLink to="/telephony/whatsapp/campaigns" label="Kampanie WhatsApp" icon="mail" />
+                            <NavLink to="/telephony/voicemail" label="Poczta głosowa" icon="bell" />
+                            {isAdmin() && <NavLink to="/telephony/numbers" label="Zarządzanie numerami" icon="settings" />}
                         </>)}
                     </div>
 
-                    {/* REALIZACJA */}
-                    {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module') || hasPermission('portfolio_map')) && (
+                    {/* ── REALIZACJA & LOGISTYKA ── */}
+                    {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
                         <div className="space-y-1">
                             <button onClick={() => toggleSection('realizacja')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Realizacja</span>
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Realizacja & Logistyka</span>
                                 <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.realizacja ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
                             {expandedSections.realizacja && (<>
-                                {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" />}
-                                {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" />}
+                                {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz montaży" icon="map" />}
+                                {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Protokoły pomiarowe" icon="clipboard" />}
                                 {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/advance-payments" label="💰 Zaliczki" icon="clipboard" />}
-                                {hasPermission('logistics') && <NavLink to="/procurement" label="Logistyka" icon="box" />}
-                                {hasPermission('deliveries') && <NavLink to="/deliveries" label="Dostawy" icon="calendar" />}
-                                {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa Realizacji" icon="map" />}
-                                {hasPermission('service_module') && <NavLink to="/service" label="Serwis" icon="tools" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/routing" label="🗺️ AI Routing" icon="map" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/profitability" label="💰 Rentowność" icon="clipboard" />}
-                                {(isAdmin() || currentUser?.role === 'manager' || currentUser?.role === 'sales_rep') && <NavLink to="/admin/teams-dashboard" label="👷 Dashboard Ekip" icon="users" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/installers" label="🔧 Zarządzanie Ekipami" icon="users" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="⛽ Dziennik Paliwa" icon="clipboard" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/failures" label="⚠️ Zgłoszenia Awarii" icon="tools" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/advance-payments" label="Rozliczenia zaliczek" icon="clipboard" />}
+                                {hasPermission('logistics') && <NavLink to="/procurement" label="Zamówienia materiałów" icon="box" />}
+                                {hasPermission('deliveries') && <NavLink to="/deliveries" label="Harmonogram dostaw" icon="calendar" />}
+                                {hasPermission('service_module') && <NavLink to="/service" label="Zgłoszenia serwisowe" icon="tools" />}
                             </>)}
                         </div>
                     )}
 
-                    {/* ADMINISTRACJA */}
-                    {(hasPermission('stats_dashboard') || hasPermission('team_management') || hasPermission('partner_management') || hasPermission('pricing_management') || hasPermission('inventory_lite') || hasPermission('system_logs') || hasPermission('system_notifications') || hasPermission('settings_general')) && (
+                    {/* ── MAPA & ANALITYKA ── */}
+                    {(hasPermission('portfolio_map') || isAdmin() || currentUser?.role === 'manager' || currentUser?.role === 'sales_rep') && (
                         <div className="space-y-1">
-                            <button onClick={() => toggleSection('administracja')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Administracja</span>
-                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.administracja ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            <button onClick={() => toggleSection('analityka')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mapa & Analityka</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.analityka ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
-                            {expandedSections.administracja && (<>
-                                {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki" icon="dashboard" />}
-                                {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" />}
-                                {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" />}
-                                {hasPermission('pricing_management') && <NavLink to="/admin/product-images" label="Zdjęcia Produktów" icon="offers" />}
-                                {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Magazyn (Lite)" icon="box" />}
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/wallet" label="Portfel" icon="clipboard" />}
-                                {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi Systemowe" icon="list" />}
-                                <NavLink to="/admin/error-reports" label="Raporty Błędów" icon="bell" />
-                                <NavLink to="/admin/email-templates" label="Szablony Wiadomości" icon="mail" />
-                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/marketing" label="📊 Marketing Intelligence" icon="dashboard" />}
-                                {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" />}
+                            {expandedSections.analityka && (<>
+                                {hasPermission('portfolio_map') && <NavLink to="/portfolio" label="Mapa realizacji" icon="map" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/routing" label="Planowanie tras" icon="map" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/profitability" label="Rentowność projektów" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager' || currentUser?.role === 'sales_rep') && <NavLink to="/admin/teams-dashboard" label="Przegląd ekip" icon="users" />}
                             </>)}
                         </div>
                     )}
 
-                    {/* FACEBOOK ADS MANAGER */}
+                    {/* ── MARKETING ── */}
                     {(isAdmin() || currentUser?.role === 'manager') && (
                         <div className="space-y-1">
-                            <button onClick={() => toggleSection('facebook')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
-                                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">📘 Facebook Ads</span>
-                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.facebook ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            <button onClick={() => toggleSection('marketing')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Marketing</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.marketing ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
-                            {expandedSections.facebook && (<>
-                                <NavLink to="/admin/facebook-ads" label="Menedżer Reklam" icon="dashboard" />
-                                <NavLink to="/admin/facebook-ads?tab=contacts" label="Kontakty FB" icon="users" />
-                                <NavLink to="/admin/facebook-ads?tab=ai" label="AI Asystent" icon="chat" />
+                            {expandedSections.marketing && (<>
+                                <NavLink to="/admin/marketing" label="Marketing Intelligence" icon="dashboard" />
+                                <NavLink to="/campaigns" label="Kampanie e-mail" icon="mail" />
+                                <NavLink to="/admin/email-templates" label="Szablony wiadomości" icon="mail" />
+                                <NavLink to="/admin/facebook-ads" label="Facebook Ads Manager" icon="dashboard" />
+                                <NavLink to="/admin/facebook-ads?tab=contacts" label="Kontakty z Facebooka" icon="users" />
                             </>)}
                         </div>
                     )}
 
-                    {/* PORTAL B2B */}
+                    {/* ── ZARZĄDZANIE ── */}
+                    {(hasPermission('team_management') || hasPermission('pricing_management') || hasPermission('inventory_lite') || isAdmin() || currentUser?.role === 'manager') && (
+                        <div className="space-y-1">
+                            <button onClick={() => toggleSection('zarzadzanie')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Zarządzanie</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.zarzadzanie ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.zarzadzanie && (<>
+                                {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół i uprawnienia" icon="users" />}
+                                {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki produktów" icon="clipboard" />}
+                                {hasPermission('pricing_management') && <NavLink to="/admin/product-images" label="Galeria produktów" icon="offers" />}
+                                {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Stan magazynowy" icon="box" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/wallet" label="Portfel prowizji" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/installers" label="Ekipy montażowe" icon="users" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="Dziennik paliwa" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/failures" label="Zgłoszenia usterek" icon="tools" />}
+                            </>)}
+                        </div>
+                    )}
+
+                    {/* ── SYSTEM ── */}
+                    {(hasPermission('stats_dashboard') || hasPermission('system_logs') || hasPermission('settings_general')) && (
+                        <div className="space-y-1">
+                            <button onClick={() => toggleSection('system')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">System</span>
+                                <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.system ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {expandedSections.system && (<>
+                                {hasPermission('stats_dashboard') && <NavLink to="/admin/stats" label="Statystyki i raporty" icon="dashboard" />}
+                                {hasPermission('system_logs') && <NavLink to="/admin/logs" label="Logi systemowe" icon="list" />}
+                                <NavLink to="/admin/error-reports" label="Raporty błędów" icon="bell" />
+                                {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia ogólne" icon="settings" />}
+                            </>)}
+                        </div>
+                    )}
+
+                    {/* ── PORTAL B2B ── */}
                     {hasPermission('partner_management') && (
                         <div className="space-y-1">
                             <button onClick={() => toggleSection('b2b')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
-                                <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">🏢 Portal B2B</span>
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Portal B2B</span>
                                 <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.b2b ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
                             {expandedSections.b2b && (<>
-                                <NavLink to="/admin/b2b/partners" label="Partnerzy B2B" icon="users" />
-                                <NavLink to="/admin/b2b/offers" label="Oferty B2B" icon="clipboard" />
+                                <NavLink to="/admin/b2b/partners" label="Partnerzy handlowi" icon="users" />
+                                <NavLink to="/admin/b2b/offers" label="Oferty partnerskie" icon="clipboard" />
                                 <NavLink to="/admin/b2b/orders" label="Zamówienia B2B" icon="box" />
-                                <NavLink to="/admin/b2b/promotions" label="Promocje" icon="offers" />
-                                <NavLink to="/admin/b2b/credit" label="Kredyt Kupiecki" icon="clipboard" />
-                                <NavLink to="/admin/b2b/analytics" label="Analityka" icon="dashboard" />
-                                <NavLink to="/admin/b2b/marketing" label="Materiały Marketingowe" icon="offers" />
+                                <NavLink to="/admin/b2b/promotions" label="Promocje i rabaty" icon="offers" />
+                                <NavLink to="/admin/b2b/credit" label="Kredyt kupiecki" icon="clipboard" />
+                                <NavLink to="/admin/b2b/analytics" label="Analityka partnerska" icon="dashboard" />
+                                <NavLink to="/admin/b2b/marketing" label="Materiały marketingowe" icon="offers" />
                             </>)}
                         </div>
                     )}
@@ -224,7 +258,7 @@ export const Layout: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        ⚙️ Moje Ustawienia
+                        Moje ustawienia
                     </Link>
                     <button
                         onClick={handleLogout}
@@ -282,6 +316,7 @@ export const Layout: React.FC = () => {
                                     {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" onClick={() => setMobileMenuOpen(false)} />}
                                     <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
+                                    <NavLink to="/admin/aliplast-configurator" label="Aliplast" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
                                 </div>
                             )}
 
@@ -325,6 +360,7 @@ export const Layout: React.FC = () => {
                                     {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół" icon="users" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
+                                    {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/campaigns" label="📧 Kampanie Mailowe" icon="mail" onClick={() => setMobileMenuOpen(false)} />}
                                 </div>
                             )}
 
@@ -354,7 +390,7 @@ export const Layout: React.FC = () => {
                                 onClick={() => setMobileMenuOpen(false)}
                                 className="w-full px-4 py-3 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-2"
                             >
-                                ⚙️ Moje Ustawienia
+                                Moje ustawienia
                             </Link>
                             <button
                                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}

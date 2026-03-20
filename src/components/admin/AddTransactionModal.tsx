@@ -83,6 +83,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
             return;
         }
 
+        // Description is always required
+        if (!description.trim()) {
+            toast.error('Podaj opis transakcji');
+            return;
+        }
+
         try {
             const transactionData = {
                 type,
@@ -327,13 +333,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                     )}
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Opis (opcjonalnie)</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Opis <span className="text-red-500">*</span></label>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             rows={3}
+                            required
                             className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
-                            placeholder="Dodatkowe informacje..."
+                            placeholder="Opisz cel transakcji..."
                         />
                     </div>
 

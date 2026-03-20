@@ -96,6 +96,8 @@ import { PartnerLayout } from './components/partner/PartnerLayout';
 import { ScrollToTop } from './components/ScrollToTop';
 import { FuelRegistryPublic } from './pages/FuelRegistryPublic';
 import { SalesRepFuelPage } from './pages/SalesRepFuelPage';
+import EmailCampaignsPage from './pages/EmailCampaignsPage';
+import UnsubscribePage from './pages/public/UnsubscribePage';
 
 // B2B Partner Portal
 import { B2BLayout } from './pages/b2b/B2BLayout';
@@ -108,6 +110,7 @@ import { B2BMaterialsPage } from './pages/b2b/B2BMaterialsPage';
 import { B2BInvoicesPage } from './pages/b2b/B2BInvoicesPage';
 import { B2BLoginPage } from './pages/b2b/B2BLoginPage';
 import { B2BCalculator } from './components/b2b/calculator/B2BCalculator';
+import { B2BProfilePage } from './pages/b2b/B2BProfilePage';
 
 // B2B Admin
 import { B2BPromotionsAdminPage } from './pages/admin/B2BPromotionsAdminPage';
@@ -119,6 +122,7 @@ import FacebookAdsPage from './pages/admin/FacebookAdsPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
+import { AliplastConfiguratorPage } from './pages/admin/AliplastConfiguratorPage';
 
 // Lazy load heavy components to avoid module evaluation crashes
 const ProductConfiguratorV2 = React.lazy(() => import('./components/calculator_v2/ProductConfiguratorV2').then(m => ({ default: m.ProductConfiguratorV2 })));
@@ -176,7 +180,7 @@ function App() {
           <ScrollToTop />
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<LoginPage />} />
             <Route path="/p/offer/:token" element={<PublicOfferPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -190,6 +194,7 @@ function App() {
             <Route path="/print/offer/:token" element={<OfferPrintView />} />
             <Route path="/fuel-registry" element={<FuelRegistryPublic />} />
             <Route path="/p/konfigurator/:token" element={<ConfiguratorWizardPage />} />
+            <Route path="/unsubscribe/:token" element={<UnsubscribePage />} />
 
             {/* Sales Rep / Admin Routes */}
             <Route element={
@@ -227,6 +232,7 @@ function App() {
               <Route path="/contracts/:id" element={<ContractDetails />} />
               <Route path="/advance-payments" element={<AdvancePaymentsList />} />
               <Route path="/dachrechner" element={<DachrechnerPage />} />
+              <Route path="/admin/aliplast-configurator" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AliplastConfiguratorPage /></ProtectedRoute>} />
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/fuel-prices" element={<FuelPriceManager />} />
@@ -284,6 +290,8 @@ function App() {
               <Route path="/telephony/whatsapp/campaigns" element={<WhatsAppCampaignPage />} />
               <Route path="/telephony/voicemail" element={<VoicemailPage />} />
               <Route path="/telephony/numbers" element={<ProtectedRoute allowedRoles={['admin']}><PhoneNumbersAdmin /></ProtectedRoute>} />
+              {/* Email campaigns */}
+              <Route path="/campaigns" element={<EmailCampaignsPage />} />
             </Route>
 
             {/* Partner Protected Routes - Redirect to B2B */}
@@ -307,6 +315,7 @@ function App() {
               <Route path="materials" element={<B2BMaterialsPage />} />
               <Route path="credit" element={<B2BCreditPage />} />
               <Route path="invoices" element={<B2BInvoicesPage />} />
+              <Route path="profile" element={<B2BProfilePage />} />
               <Route index element={<Navigate to="/b2b/dashboard" replace />} />
             </Route>
 

@@ -1114,24 +1114,33 @@ export const LeadDetailsPage: React.FC = () => {
                                                                     </h4>
                                                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 bg-white rounded-lg border border-slate-100 p-3">
                                                                         {cfg.mountingType && <div><span className="text-[10px] text-slate-400 uppercase block">Untergrund</span><span className="text-sm font-medium text-slate-800 capitalize">{cfg.mountingType === 'fundament' ? 'Betonfundament' : cfg.mountingType === 'pflaster' ? 'Pflaster / Platten' : cfg.mountingType === 'erde' ? 'Erde / Rasen' : cfg.mountingType}</span></div>}
-                                                                        {cfg.installType && <div><span className="text-[10px] text-slate-400 uppercase block">Installationsart</span><span className="text-sm font-medium text-slate-800 capitalize">{cfg.installType}</span></div>}
+                                                                        {cfg.installType && <div><span className="text-[10px] text-slate-400 uppercase block">Installationsart</span><span className="text-sm font-medium text-slate-800 capitalize">{cfg.installType === 'wand' ? 'Wandmontage' : cfg.installType === 'frei' ? 'Freistehend' : cfg.installType}</span></div>}
                                                                     </div>
                                                                 </div>
                                                             )}
 
                                                             {/* ── Roof Covering & Variant ── */}
-                                                            {(cfg.roofCovering || cfg.roofVariant) && (
+                                                            {(cfg.roofCovering || cfg.roofVariant) && (() => {
+                                                                const roofCoveringLabels: Record<string, string> = { glass: 'Glas', poly: 'Polycarbonat' };
+                                                                const roofVariantLabels: Record<string, string> = {
+                                                                    'klar-8': 'VSG Klar 8mm', 'matt-8': 'VSG Matt 8mm', 'sonnenschutz-8': 'Sonnenschutz UV Reflex 8mm',
+                                                                    'klar-10': 'VSG Klar 10mm', 'matt-10': 'VSG Matt 10mm', 'sonnenschutz-10': 'Sonnenschutz UV Reflex 10mm',
+                                                                    'opal': 'Opal (milchig)', 'klar': 'Klar (transparent)', 'ir-gold': 'IR Gold',
+                                                                    'poly_klar': 'Klar (transparent)', 'poly_opal': 'Opal (milchig)', 'poly_iq_relax': 'IQ Relax',
+                                                                };
+                                                                return (
                                                                 <div>
                                                                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                                                                         Dacheindeckung
                                                                     </h4>
                                                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 bg-white rounded-lg border border-slate-100 p-3">
-                                                                        {cfg.roofCovering && <div><span className="text-[10px] text-slate-400 uppercase block">Eindeckung</span><span className="text-sm font-medium text-slate-800">{cfg.roofCovering}</span></div>}
-                                                                        {cfg.roofVariant && <div><span className="text-[10px] text-slate-400 uppercase block">Variante</span><span className="text-sm font-medium text-slate-800">{cfg.roofVariant}</span></div>}
+                                                                        {cfg.roofCovering && <div><span className="text-[10px] text-slate-400 uppercase block">Eindeckung</span><span className="text-sm font-medium text-slate-800">{roofCoveringLabels[cfg.roofCovering] || cfg.roofCovering}</span></div>}
+                                                                        {cfg.roofVariant && <div><span className="text-[10px] text-slate-400 uppercase block">Variante</span><span className="text-sm font-medium text-slate-800">{roofVariantLabels[cfg.roofVariant] || cfg.roofVariant}</span></div>}
                                                                     </div>
                                                                 </div>
-                                                            )}
+                                                                );
+                                                            })()}
 
                                                             {/* ── Color ── */}
                                                             {cfg.color && (
@@ -1154,12 +1163,20 @@ export const LeadDetailsPage: React.FC = () => {
                                                                         Verglasung
                                                                     </h4>
                                                                     <div className="grid grid-cols-3 gap-2">
-                                                                        {Object.entries(cfg.glazingSides).filter(([, type]) => type && String(type).trim()).map(([side, type]) => (
+                                                                        {Object.entries(cfg.glazingSides).filter(([, type]) => type && String(type).trim()).map(([side, type]) => {
+                                                                            const glazingLabels: Record<string, string> = {
+                                                                                '': 'Keine', fest: 'Festwand Glass', panoramisch: 'Panoramaschiebewand',
+                                                                                rahmen: 'Schiebetüren mit Rahmen', sonnenschutz: 'Sonnenschutzpaneele',
+                                                                                sichtschutz: 'Sichtschutz Systeme', alu_wand: 'Festwand Aluminium',
+                                                                                lamellen: 'Lamellenelemente',
+                                                                            };
+                                                                            return (
                                                                             <div key={side} className="bg-white rounded-lg border border-slate-100 p-3 text-center">
                                                                                 <span className="text-[10px] text-slate-400 uppercase block">{side === 'left' ? 'Links' : side === 'right' ? 'Rechts' : 'Vorne'}</span>
-                                                                                <span className="text-sm font-medium text-slate-800">{String(type)}</span>
+                                                                                <span className="text-sm font-medium text-slate-800">{glazingLabels[String(type)] || String(type)}</span>
                                                                             </div>
-                                                                        ))}
+                                                                            );
+                                                                        })}
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -1216,7 +1233,14 @@ export const LeadDetailsPage: React.FC = () => {
                                                                     <div className="flex gap-2 flex-wrap">
                                                                         {cfg.heater && <span className="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold border border-orange-100 flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg> Heizstrahler</span>}
                                                                         {cfg.led && <span className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-100 flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> LED-Beleuchtung</span>}
-                                                                        {cfg.flooring && <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100 flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" /></svg> Boden: {cfg.flooring}</span>}
+                                                                        {cfg.flooring && (() => {
+                                                                            const flooringLabels: Record<string, string> = {
+                                                                                wpc: 'WPC Terrassendielen', holz: 'Holz / Drewno',
+                                                                                gres: 'Gres / Feinsteinzeug', pflaster: 'Kostka brukowa / Pflastersteine',
+                                                                                naturstein: 'Naturstein',
+                                                                            };
+                                                                            return <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100 flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" /></svg> Boden: {flooringLabels[cfg.flooring] || cfg.flooring}</span>;
+                                                                        })()}
                                                                     </div>
                                                                 </div>
                                                             )}

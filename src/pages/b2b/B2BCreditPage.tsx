@@ -119,11 +119,11 @@ export function B2BCreditPage() {
 
         // Validation
         if (!formData.requested_amount || parseFloat(formData.requested_amount) <= 0) {
-            toast.error('Bitte geben Sie den gewünschten Kreditrahmen ein');
+            toast.error('Proszę podać żądany limit kredytowy');
             return;
         }
         if (!formData.company_name || !formData.tax_id) {
-            toast.error('Firmenname und Steuernummer sind Pflichtfelder');
+            toast.error('Nazwa firmy i NIP są wymagane');
             return;
         }
 
@@ -152,12 +152,12 @@ export function B2BCreditPage() {
                 status: 'submitted'
             });
 
-            toast.success('Antrag erfolgreich eingereicht!');
+            toast.success('Wniosek złożony pomyślnie!');
             setShowForm(false);
             await loadData();
         } catch (err: any) {
             console.error('Error submitting application:', err);
-            toast.error(err.message || 'Fehler beim Einreichen des Antrags');
+            toast.error(err.message || 'Błąd podczas składania wniosku');
         }
         setSubmitting(false);
     }
@@ -218,7 +218,7 @@ export function B2BCreditPage() {
                         </div>
                     </div>
                     <div className="mt-4 text-sm text-green-700">
-                        {t('b2b.creditPage.paymentTerms')}: <b>{partner.payment_terms_days} Days</b>
+                        Termin płatności: <b>{partner.payment_terms_days} dni</b>
                     </div>
                 </div>
             )}
@@ -230,7 +230,7 @@ export function B2BCreditPage() {
                         <div>
                             <h3 className="font-semibold text-blue-800 mb-2">📋 {t('b2b.creditPage.activeApp')}</h3>
                             <p className="text-blue-700">
-                                Requesting <b>€{activeApplication.requested_amount.toLocaleString()}</b>
+                                Wnioskowana kwota: <b>€{activeApplication.requested_amount.toLocaleString()}</b>
                             </p>
                             <div className="mt-2">
                                 <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${STATUS_STYLES[activeApplication.status]?.color}`}>
@@ -239,16 +239,16 @@ export function B2BCreditPage() {
                             </div>
                         </div>
                         <div className="text-sm text-blue-600">
-                            Eingereicht: {format(new Date(activeApplication.created_at), 'dd.MM.yyyy')}
+                            Złożono: {format(new Date(activeApplication.created_at), 'dd.MM.yyyy')}
                         </div>
                     </div>
 
                     {activeApplication.status === 'approved' && (
                         <div className="mt-4 p-4 bg-green-100 rounded-xl">
-                            <h4 className="font-medium text-green-800">🎉 Genehmigt!</h4>
+                            <h4 className="font-medium text-green-800">🎉 Zatwierdzony!</h4>
                             <p className="text-green-700">
-                                Kreditrahmen: <b>€{activeApplication.approved_amount?.toLocaleString()}</b> •
-                                Zahlungsziel: <b>{activeApplication.approved_payment_days} Tage</b>
+                                Limit kredytowy: <b>€{activeApplication.approved_amount?.toLocaleString()}</b> •
+                                Termin płatności: <b>{activeApplication.approved_payment_days} dni</b>
                             </p>
                             {activeApplication.decision_notes && (
                                 <p className="text-sm text-green-600 mt-2">{activeApplication.decision_notes}</p>
@@ -258,7 +258,7 @@ export function B2BCreditPage() {
 
                     {activeApplication.status === 'rejected' && activeApplication.decision_notes && (
                         <div className="mt-4 p-4 bg-red-100 rounded-xl">
-                            <h4 className="font-medium text-red-800">Ablehnungsgrund:</h4>
+                            <h4 className="font-medium text-red-800">Powód odrzucenia:</h4>
                             <p className="text-red-700">{activeApplication.decision_notes}</p>
                         </div>
                     )}
@@ -282,7 +282,7 @@ export function B2BCreditPage() {
                                     type="number"
                                     value={formData.requested_amount}
                                     onChange={e => updateFormData('requested_amount', e.target.value)}
-                                    placeholder="z.B. 50000"
+                                    placeholder="np. 50000"
                                     className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-lg"
                                     required
                                 />
@@ -296,11 +296,11 @@ export function B2BCreditPage() {
                                     onChange={e => updateFormData('requested_payment_days', e.target.value)}
                                     className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 >
-                                    <option value="14">14 Tage</option>
-                                    <option value="30">30 Tage</option>
-                                    <option value="45">45 Tage</option>
-                                    <option value="60">60 Tage</option>
-                                    <option value="90">90 Tage</option>
+                                    <option value="14">14 dni</option>
+                                    <option value="30">30 dni</option>
+                                    <option value="45">45 dni</option>
+                                    <option value="60">60 dni</option>
+                                    <option value="90">90 dni</option>
                                 </select>
                             </div>
                         </div>
@@ -347,7 +347,7 @@ export function B2BCreditPage() {
                                     type="text"
                                     value={formData.industry}
                                     onChange={e => updateFormData('industry', e.target.value)}
-                                    placeholder="z.B. Bauwesen, Handel"
+                                    placeholder="np. Budownictwo, Handel"
                                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -395,7 +395,7 @@ export function B2BCreditPage() {
                                     type="number"
                                     value={formData.annual_revenue}
                                     onChange={e => updateFormData('annual_revenue', e.target.value)}
-                                    placeholder="z.B. 500000"
+                                    placeholder="np. 500000"
                                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -558,7 +558,7 @@ export function B2BCreditPage() {
             {applications.length > 0 && !showForm && (
                 <div className="bg-white rounded-2xl border shadow-sm">
                     <div className="p-4 border-b">
-                        <h3 className="font-semibold text-gray-800">📜 Antragshistorie</h3>
+                        <h3 className="font-semibold text-gray-800">📜 Historia wniosków</h3>
                     </div>
                     <div className="divide-y">
                         {applications.map(app => (
@@ -566,10 +566,10 @@ export function B2BCreditPage() {
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <div className="font-medium text-gray-900">
-                                            Antrag über €{app.requested_amount.toLocaleString()}
+                                            Wniosek na €{app.requested_amount.toLocaleString()}
                                         </div>
                                         <div className="text-sm text-gray-500">
-                                            {app.requested_payment_days} Tage Zahlungsziel
+                                            {app.requested_payment_days} dni terminu płatności
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -583,7 +583,7 @@ export function B2BCreditPage() {
                                 </div>
                                 {app.status === 'approved' && (
                                     <div className="mt-2 text-sm text-green-600">
-                                        ✅ Genehmigt: €{app.approved_amount?.toLocaleString()} • {app.approved_payment_days} Tage
+                                        ✅ Zatwierdzono: €{app.approved_amount?.toLocaleString()} • {app.approved_payment_days} dni
                                     </div>
                                 )}
                                 {app.status === 'rejected' && app.decision_notes && (

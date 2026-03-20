@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
+import { NotificationService } from '../../services/database/notification.service';
 import type { Note } from '../../types';
+import { MentionTextarea, parseMentions, renderMentionText } from './MentionTextarea';
 import { useAuth } from '../../contexts/AuthContext';
 
 export interface NoteItem {
@@ -82,6 +84,25 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId, extr
                 attachments: uploadedAttachments
             });
 
+            // Parse @mentions and send notifications
+            const mentions = parseMentions(newNoteContent);
+            if (mentions.length > 0 && currentUser) {
+                const senderName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Kolega';
+                const link = entityType === 'lead' ? `/leads/${entityId}` : `/customers/${entityId}`;
+                for (const mention of mentions) {
+                    if (mention.userId !== currentUser.id) {
+                        NotificationService.createNotification(
+                            mention.userId,
+                            'info',
+                            `📌 ${senderName} hat Sie erwähnt`,
+                            `${senderName} hat Sie in einer Notiz erwähnt.\n➜ Klicken Sie hier, um die Details zu sehen!`,
+                            link,
+                            { mentionedBy: currentUser.id, entityType, entityId }
+                        ).catch(err => console.error('Failed to notify mention:', err));
+                    }
+                }
+            }
+
             setNewNoteContent('');
             setAttachments([]);
             toast.success('Notatka dodana');
@@ -125,10 +146,10 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId, extr
     return (
         <div className="space-y-4">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <textarea
+                <MentionTextarea
                     value={newNoteContent}
-                    onChange={(e) => setNewNoteContent(e.target.value)}
-                    placeholder="Wpisz treść notatki..."
+                    onChange={setNewNoteContent}
+                    placeholder="Wpisz treść notatki... Użyj @ aby oznaczyć kolegę"
                     className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm focus:border-accent outline-none min-h-[80px]"
                 />
 
@@ -214,7 +235,7 @@ export const NotesList: React.FC<NotesListProps> = ({ entityType, entityId, extr
 
                         <div className={`text-sm whitespace-pre-wrap ml-8 ${item.type === 'client_message' ? 'text-purple-800' : 'text-slate-600'
                             }`}>
-                            {item.content}
+                            {renderMentionText(item.content)}
                         </div>
 
                         {item.attachments && item.attachments.length > 0 && (

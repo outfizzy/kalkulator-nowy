@@ -90,15 +90,15 @@ function getGreeting(): string {
 // ─── Quick Action Groups ────────────────────────────────────
 const actionGroups = [
     {
-        title: 'Sprzedaż',
+        title: 'CRM & Sprzedaż',
         items: [
             {
-                title: 'Nowa Oferta', path: '/new-offer', icon: (
+                title: 'Nowa oferta', path: '/new-offer', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 ), color: 'text-blue-600 bg-blue-50 border-blue-100 hover:bg-blue-100'
             },
             {
-                title: 'Baza Ofert', path: '/offers', icon: (
+                title: 'Lista ofert', path: '/offers', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                 ), color: 'text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100'
             },
@@ -108,67 +108,57 @@ const actionGroups = [
                 ), color: 'text-amber-600 bg-amber-50 border-amber-100 hover:bg-amber-100'
             },
             {
-                title: 'Klienci', path: '/customers', icon: (
+                title: 'Baza klientów', path: '/customers', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 ), color: 'text-teal-600 bg-teal-50 border-teal-100 hover:bg-teal-100'
             },
             {
-                title: 'Poczta', path: '/mail', icon: (
+                title: 'Skrzynka e-mail', path: '/mail', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                 ), color: 'text-purple-600 bg-purple-50 border-purple-100 hover:bg-purple-100'
             },
         ]
     },
     {
-        title: 'Realizacja',
+        title: 'Realizacja & Logistyka',
         items: [
             {
-                title: 'Pomiary', path: '/measurements', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
-                ), color: 'text-orange-600 bg-orange-50 border-orange-100 hover:bg-orange-100'
-            },
-            {
-                title: 'Montaże', path: '/installations', icon: (
+                title: 'Kalendarz montaży', path: '/installations', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 ), color: 'text-rose-600 bg-rose-50 border-rose-100 hover:bg-rose-100'
             },
             {
-                title: 'Dashboard Ekip', path: '/admin/teams-dashboard', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                ), color: 'text-indigo-600 bg-indigo-50 border-indigo-100 hover:bg-indigo-100'
+                title: 'Protokoły pomiarowe', path: '/reports/measurements', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                ), color: 'text-orange-600 bg-orange-50 border-orange-100 hover:bg-orange-100'
             },
             {
-                title: 'Logistyka', path: '/procurement', icon: (
+                title: 'Zamówienia materiałów', path: '/procurement', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                 ), color: 'text-cyan-600 bg-cyan-50 border-cyan-100 hover:bg-cyan-100'
             },
             {
-                title: 'Zgłoszenia Awarii', path: '/admin/failures', icon: (
+                title: 'Zgłoszenia serwisowe', path: '/service', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                ), color: 'text-indigo-600 bg-indigo-50 border-indigo-100 hover:bg-indigo-100'
+            },
+            {
+                title: 'Zgłoszenia usterek', path: '/admin/failures', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                 ), color: 'text-red-600 bg-red-50 border-red-100 hover:bg-red-100'
             },
         ]
     },
     {
-        title: 'Zarządzanie',
+        title: 'Narzędzia & Marketing',
         items: [
             {
-                title: 'Użytkownicy', path: '/admin/users', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                ), color: 'text-violet-600 bg-violet-50 border-violet-100 hover:bg-violet-100'
+                title: 'Kampanie e-mail', path: '/campaigns', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                ), color: 'text-orange-600 bg-orange-50 border-orange-100 hover:bg-orange-100'
             },
             {
-                title: 'Zarządzanie Ekipami', path: '/admin/installers', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                ), color: 'text-pink-600 bg-pink-50 border-pink-100 hover:bg-pink-100'
-            },
-            {
-                title: 'Partnerzy B2B', path: '/admin/b2b/partners', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                ), color: 'text-emerald-600 bg-emerald-50 border-emerald-100 hover:bg-emerald-100'
-            },
-            {
-                title: 'Targi', path: '/fairs', icon: (
+                title: 'Targi i eventy', path: '/admin/fairs', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>
                 ), color: 'text-indigo-600 bg-indigo-50 border-indigo-100 hover:bg-indigo-100'
             },
@@ -178,7 +168,37 @@ const actionGroups = [
                 ), color: 'text-sky-600 bg-sky-50 border-sky-100 hover:bg-sky-100'
             },
             {
-                title: 'Paliwo', path: '/admin/fuel-logs', icon: (
+                title: 'Kalkulator dachowy', path: '/dachrechner', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                ), color: 'text-emerald-600 bg-emerald-50 border-emerald-100 hover:bg-emerald-100'
+            },
+        ]
+    },
+    {
+        title: 'Zarządzanie',
+        items: [
+            {
+                title: 'Zespół i uprawnienia', path: '/admin/users', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                ), color: 'text-violet-600 bg-violet-50 border-violet-100 hover:bg-violet-100'
+            },
+            {
+                title: 'Ekipy montażowe', path: '/admin/installers', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                ), color: 'text-pink-600 bg-pink-50 border-pink-100 hover:bg-pink-100'
+            },
+            {
+                title: 'Przegląd ekip', path: '/admin/teams-dashboard', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                ), color: 'text-indigo-600 bg-indigo-50 border-indigo-100 hover:bg-indigo-100'
+            },
+            {
+                title: 'Partnerzy handlowi', path: '/admin/b2b/partners', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                ), color: 'text-emerald-600 bg-emerald-50 border-emerald-100 hover:bg-emerald-100'
+            },
+            {
+                title: 'Dziennik paliwa', path: '/admin/fuel-logs', icon: (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 ), color: 'text-yellow-600 bg-yellow-50 border-yellow-100 hover:bg-yellow-100'
             },
@@ -407,7 +427,7 @@ export const AdminDashboard: React.FC = () => {
                         </svg>
                     </div>
                     <div>
-                        <h3 className="text-base sm:text-lg font-bold text-slate-800">📞 Centrum Połączeń</h3>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-800">Centrum połączeń</h3>
                         <p className="text-xs text-slate-400">Połączenia przychodzące, wychodzące, nieodebrane i oddzwonienia</p>
                     </div>
                 </div>
@@ -419,7 +439,7 @@ export const AdminDashboard: React.FC = () => {
             {/* ═══ ZONE 5: Quick Actions — Grouped ═══ */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
                 <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">Szybki dostęp</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     {actionGroups.map((group, gi) => (
                         <div key={gi}>
                             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">{group.title}</h4>
