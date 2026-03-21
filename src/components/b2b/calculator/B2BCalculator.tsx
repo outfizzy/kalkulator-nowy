@@ -72,7 +72,7 @@ const ROOF_MODELS: RoofModel[] = [
       specs: { profileMm: '100mm', angleType: 'zmienny', postMm: 196, maxWidth: 14000, maxDepth: 6000, dachrechnerKey: 'topline_xl' } },
     { id: 'Designline', name: 'Designstyle', description: 'Eleganckie zadaszenie szklane • profil 93mm • nowoczesny design • tylko szkło', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg',
       specs: { profileMm: '93mm', angleType: 'zmienny', postMm: 196, maxWidth: 10000, maxDepth: 6000, dachrechnerKey: 'designline' } },
-    { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa • profil 100mm z naddachem • szklany dach • montaż ścienny', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg',
+    { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa • profil 100mm z naddachem • szklany dach • ścienny / wolnostojący', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/ultraline.jpg',
       specs: { profileMm: '100mm', angleType: 'z naddachem', postMm: 196, maxWidth: 14000, maxDepth: 6000, dachrechnerKey: 'ultraline_classic' } },
     { id: 'Skyline', name: 'Skystyle', description: 'Zadaszenie ze szklanym dachem • horyzontalna konstrukcja • płaski dach', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline-render.jpg',
       specs: { profileMm: 'lamele alu', angleType: 'płaski 0°', postMm: 160, maxWidth: 7000, maxDepth: 5000, dachrechnerKey: 'skyline' } },
@@ -183,7 +183,7 @@ const MODEL_DETAIL_SPECS: Record<string, Array<{ label: string; value: string }>
         { label: 'Max. Breite', value: '14.000 mm' },
         { label: 'Max. Tiefe', value: '6.000 mm' },
         { label: 'Dacheindeckung', value: 'Nur VSG Glas' },
-        { label: 'Montage', value: 'Wandmontage' },
+        { label: 'Montage', value: 'Wandmontage / Freistehend' },
         { label: 'Oberflaeche', value: 'Pulverbeschichtung RAL' },
     ],
     'Skyline': [
