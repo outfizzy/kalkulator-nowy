@@ -74,7 +74,7 @@ const ROOF_MODELS: RoofModel[] = [
       specs: { profileMm: '93mm', angleType: 'zmienny', postMm: 196, maxWidth: 10000, maxDepth: 6000, dachrechnerKey: 'designline' } },
     { id: 'Ultraline', name: 'Ultrastyle', description: 'Najwyższa klasa • profil 100mm z naddachem • szklany dach • montaż ścienny', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg',
       specs: { profileMm: '100mm', angleType: 'z naddachem', postMm: 196, maxWidth: 14000, maxDepth: 6000, dachrechnerKey: 'ultraline_classic' } },
-    { id: 'Skyline', name: 'Skystyle', description: 'Zadaszenie lamelowe • ruchome lamele aluminiowe • ochrona słoneczna • płaski dach', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline-render.jpg',
+    { id: 'Skyline', name: 'Skystyle', description: 'Zadaszenie ze szklanym dachem • horyzontalna konstrukcja • płaski dach', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline-render.jpg',
       specs: { profileMm: 'lamele alu', angleType: 'płaski 0°', postMm: 160, maxWidth: 7000, maxDepth: 5000, dachrechnerKey: 'skyline' } },
     { id: 'Carport', name: 'Carport', description: 'Wiata garażowa aluminiowa • konstrukcja płaska • wolnostojąca • poliwęglan', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport-3.jpg',
       specs: { profileMm: 'profil płaski', angleType: 'płaski 0°', postMm: 160, maxWidth: 10000, maxDepth: 6000, dachrechnerKey: 'carport' } },
