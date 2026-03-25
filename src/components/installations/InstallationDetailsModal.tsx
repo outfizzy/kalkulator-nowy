@@ -104,7 +104,38 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                 consumablesCost: installation.consumablesCost || 0,
                 additionalCosts: installation.additionalCosts || 0,
             });
-            setPhotos(installation.offerId ? getOfferPhotos(installation.offerId) : []);
+            // Load photos from multiple sources and merge
+            const loadAllPhotos = async () => {
+                const allPhotos: string[] = [];
+
+                // 1. LocalStorage photos (admin-uploaded via current browser)
+                if (installation.offerId) {
+                    getOfferPhotos(installation.offerId).forEach(p => allPhotos.push(p));
+                }
+
+                // 2. Supabase storage photos (uploaded by installer from mobile)
+                try {
+                    const { data: files } = await supabase.storage
+                        .from('fuel-logs')
+                        .list(`installation-photos/${installation.id}`, { limit: 50 });
+                    if (files && files.length > 0) {
+                        files.forEach(f => {
+                            const url = supabase.storage.from('fuel-logs').getPublicUrl(`installation-photos/${installation.id}/${f.name}`).data.publicUrl;
+                            if (!allPhotos.includes(url)) allPhotos.push(url);
+                        });
+                    }
+                } catch { /* non-blocking */ }
+
+                // 3. Acceptance protocol photos (installer acceptance flow)
+                if (installation.acceptance?.photos && Array.isArray(installation.acceptance.photos)) {
+                    (installation.acceptance.photos as string[]).forEach(p => {
+                        if (!allPhotos.includes(p)) allPhotos.push(p);
+                    });
+                }
+
+                setPhotos(allPhotos);
+            };
+            loadAllPhotos();
             setActiveTab('overview');
         }
     }, [isOpen, installation]);

@@ -7,8 +7,9 @@ import { InstallationTeamService } from '../../services/database/installation-te
 import { InstallerSessionService, type WorkSession, type CrewMember, type InstallerVehicle } from '../../services/database/installer-session.service';
 import { InstallerWorkerService } from '../../services/database/installer-worker.service';
 import { SupportService } from '../../services/database/support.service';
+import { InstallationService } from '../../services/database/installation.service';
 import { TasksList } from '../tasks/TasksList';
-import type { Installation, InstallationTeam } from '../../types';
+import type { Installation, InstallationTeam, OrderItem } from '../../types';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,6 +57,12 @@ export const InstallerDashboard: React.FC = () => {
 
     // Installation photos
     const [installationPhotos, setInstallationPhotos] = useState<Record<string, string[]>>({});
+
+    // Order items per installation
+    const [orderItemsMap, setOrderItemsMap] = useState<Record<string, OrderItem[]>>({});
+
+    // Contract data per installation (product, notes, etc.)
+    const [contractDataMap, setContractDataMap] = useState<Record<string, any>>({});
 
     // Load data
     useEffect(() => {
@@ -174,16 +181,54 @@ export const InstallerDashboard: React.FC = () => {
                 try {
                     const photoMap: Record<string, string[]> = {};
                     for (const inst of todayInsts) {
+                        const allPhotos: string[] = [];
+
+                        // 1. Photos from Supabase storage (uploaded by installer)
                         const { data: files } = await supabase.storage
                             .from('fuel-logs')
                             .list(`installation-photos/${inst.id}`, { limit: 20 });
                         if (files && files.length > 0) {
-                            photoMap[inst.id] = files.map(f =>
-                                supabase.storage.from('fuel-logs').getPublicUrl(`installation-photos/${inst.id}/${f.name}`).data.publicUrl
-                            );
+                            files.forEach(f => {
+                                allPhotos.push(
+                                    supabase.storage.from('fuel-logs').getPublicUrl(`installation-photos/${inst.id}/${f.name}`).data.publicUrl
+                                );
+                            });
                         }
+
+                        // 2. Photos from acceptance protocol
+                        if (inst.acceptance?.photos && Array.isArray(inst.acceptance.photos)) {
+                            inst.acceptance.photos.forEach((p: string) => {
+                                if (!allPhotos.includes(p)) allPhotos.push(p);
+                            });
+                        }
+
+                        if (allPhotos.length > 0) photoMap[inst.id] = allPhotos;
                     }
                     setInstallationPhotos(photoMap);
+                } catch { /* ignore */ }
+
+                // Load order items for today's installations
+                try {
+                    const oiMap: Record<string, OrderItem[]> = {};
+                    for (const inst of todayInsts) {
+                        const items = await InstallationService.getOrderItems(inst.id);
+                        if (items.length > 0) oiMap[inst.id] = items;
+                    }
+                    setOrderItemsMap(oiMap);
+                } catch { /* ignore */ }
+
+                // Load contract data for today's installations (product details, notes)
+                try {
+                    const cdMap: Record<string, any> = {};
+                    const oIds = todayInsts.map(i => i.offerId).filter(Boolean);
+                    if (oIds.length > 0) {
+                        const { data: contracts } = await supabase
+                            .from('contracts')
+                            .select('offer_id, contract_data')
+                            .in('offer_id', oIds);
+                        contracts?.forEach((c: any) => { cdMap[c.offer_id] = c.contract_data; });
+                    }
+                    setContractDataMap(cdMap);
                 } catch { /* ignore */ }
 
                 // Load last fuel info
@@ -809,6 +854,11 @@ export const InstallerDashboard: React.FC = () => {
                                             )}
                                             <p className="text-sm text-slate-500">{inst.client.address}</p>
                                             <p className="text-sm text-slate-500">{inst.client.postalCode} {inst.client.city}</p>
+                                            {inst.client.phone && (
+                                                <a href={`tel:${inst.client.phone}`} className="inline-flex items-center gap-1.5 mt-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-2.5 py-1 font-medium hover:bg-blue-100 transition-colors">
+                                                    📞 {inst.client.phone}
+                                                </a>
+                                            )}
                                             <p className="text-xs text-slate-400 mt-1">{inst.productSummary}</p>
 
                                             {(inst.paymentMethod === 'cash' || inst.contractData?.paymentMethod === 'cash') && (
@@ -842,6 +892,57 @@ export const InstallerDashboard: React.FC = () => {
                                                 <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700">
                                                     ⚠️ {inst.notes || inst.contractData?.notes}
                                                 </div>
+                                            )}
+
+                                            {/* Order Items — what needs to be installed */}
+                                            {orderItemsMap[inst.id] && orderItemsMap[inst.id].length > 0 && (
+                                                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                    <h4 className="text-xs font-bold text-blue-700 uppercase mb-2 flex items-center gap-1">
+                                                        📦 Elementy do montażu ({orderItemsMap[inst.id].filter(oi => oi.status === 'delivered').length}/{orderItemsMap[inst.id].length} dostarczone)
+                                                    </h4>
+                                                    <div className="space-y-1">
+                                                        {orderItemsMap[inst.id].map((oi) => (
+                                                            <div key={oi.id} className="flex items-center gap-2 px-1 py-1">
+                                                                <span className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 text-xs ${
+                                                                    oi.status === 'delivered' ? 'bg-green-500 border-green-500 text-white' :
+                                                                    oi.status === 'ordered' ? 'bg-amber-100 border-amber-300 text-amber-600' :
+                                                                    'border-slate-300 bg-white text-slate-400'
+                                                                }`}>
+                                                                    {oi.status === 'delivered' ? '✓' : oi.status === 'ordered' ? '⏳' : '—'}
+                                                                </span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className={`text-sm ${oi.status === 'delivered' ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
+                                                                        {oi.name} {oi.quantity > 1 ? `×${oi.quantity}` : ''}
+                                                                    </p>
+                                                                    {oi.notes && <p className="text-[10px] text-slate-400 truncate">{oi.notes}</p>}
+                                                                </div>
+                                                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                                                    oi.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                                                    oi.status === 'ordered' ? 'bg-amber-100 text-amber-700' :
+                                                                    'bg-slate-100 text-slate-500'
+                                                                }`}>
+                                                                    {oi.status === 'delivered' ? 'Dostarczono' : oi.status === 'ordered' ? 'Zamówiono' : 'Oczekuje'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Contract notes / remarks */}
+                                            {inst.offerId && contractDataMap[inst.offerId] && (
+                                                <>
+                                                    {contractDataMap[inst.offerId]?.notes && (
+                                                        <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg p-2 text-xs text-purple-700">
+                                                            📋 <strong>Uwagi z umowy:</strong> {contractDataMap[inst.offerId].notes}
+                                                        </div>
+                                                    )}
+                                                    {contractDataMap[inst.offerId]?.product?.customItems && contractDataMap[inst.offerId].product.customItems.length > 0 && !orderItemsMap[inst.id]?.length && (
+                                                        <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs text-indigo-700">
+                                                            <strong>Elementy:</strong> {contractDataMap[inst.offerId].product.customItems.map((ci: any) => ci.name).join(', ')}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
 
                                             {/* Measurement Tasks (Zadania do domierzenia) */}
