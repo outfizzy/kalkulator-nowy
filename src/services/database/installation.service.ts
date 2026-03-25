@@ -795,7 +795,7 @@ export const InstallationService = {
         }
 
         // Merge installation_data
-        if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance || updates.measurementTasks) {
+        if (updates.client || updates.productSummary || updates.teamId || updates.notes || updates.acceptance || updates.measurementTasks || (updates as any).completionReport) {
             const installationData = {
                 ...currentData,
                 ...(updates.client && { client: updates.client }),
@@ -803,7 +803,8 @@ export const InstallationService = {
                 ...(updates.teamId !== undefined && { teamId: updates.teamId }),
                 ...(updates.notes && { notes: updates.notes }),
                 ...(updates.acceptance && { acceptance: updates.acceptance }),
-                ...(updates.measurementTasks !== undefined && { measurementTasks: updates.measurementTasks })
+                ...(updates.measurementTasks !== undefined && { measurementTasks: updates.measurementTasks }),
+                ...((updates as any).completionReport && { completionReport: (updates as any).completionReport })
             };
 
             // Redundant assignment for clarity: updates.teamId handles logic above
@@ -1219,7 +1220,8 @@ export const InstallationService = {
         const installationData = {
             client: installation.client,
             productSummary: installation.productSummary,
-            notes: description || 'Dokończenie montażu'
+            notes: description || 'Dokończenie montażu',
+            contractNumber: installation.contractNumber
         };
 
         await supabase

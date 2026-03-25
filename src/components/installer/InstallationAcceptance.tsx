@@ -5,7 +5,10 @@ import SignatureCanvas from 'react-signature-canvas';
 import { DatabaseService } from '../../services/database';
 import { InstallationService } from '../../services/database/installation.service';
 import { StorageService } from '../../services/database/storage.service';
+import { supabase } from '../../lib/supabase';
 import type { Installation } from '../../types';
+
+type InstallerChoice = 'complete' | 'service' | 'followup';
 
 type ChecklistKey = 'structureIntegrity' | 'materialQuality' | 'functionalityTest' | 'cleaningCompleted' | 'clientInstructed' | 'warrantyProvided';
 
@@ -43,6 +46,8 @@ export const InstallationAcceptance: React.FC = () => {
         clientInstructed: false,
         warrantyProvided: false,
     });
+    const [installerChoice, setInstallerChoice] = useState<InstallerChoice>('complete');
+    const [serviceDescription, setServiceDescription] = useState('');
 
     useEffect(() => {
         loadInstallation();
@@ -86,6 +91,25 @@ export const InstallationAcceptance: React.FC = () => {
                 }
             } else {
                 setClientName(`${inst.client.firstName} ${inst.client.lastName}`);
+
+                // Merge dashboard photos from Supabase storage into acceptance gallery
+                try {
+                    const { data: files } = await supabase.storage
+                        .from('fuel-logs')
+                        .list(`installation-photos/${inst.id}`, { limit: 30 });
+                    if (files && files.length > 0) {
+                        const dashboardPhotos = files.map(f =>
+                            supabase.storage.from('fuel-logs').getPublicUrl(`installation-photos/${inst.id}/${f.name}`).data.publicUrl
+                        );
+                        setPhotos(prev => {
+                            const merged = [...prev];
+                            dashboardPhotos.forEach(url => {
+                                if (!merged.includes(url)) merged.push(url);
+                            });
+                            return merged;
+                        });
+                    }
+                } catch { /* non-blocking */ }
             }
         } catch (error) {
             console.error(error);
@@ -188,23 +212,44 @@ export const InstallationAcceptance: React.FC = () => {
                 ? installation.acceptance?.signature
                 : signatureRef.current?.toDataURL();
 
-            await DatabaseService.updateInstallationAcceptance(installationId, {
+            // Build notes with installer choice
+            const choiceLabels: Record<InstallerChoice, string> = {
+                complete: '✅ Montaż zakończony',
+                service: '🔧 Zgłoszenie serwisowe',
+                followup: '🔄 Wymaga dokończenia'
+            };
+            const choiceNote = !isEditMode ? `\n[OCENA MONTAŻYSTY: ${choiceLabels[installerChoice]}]${serviceDescription ? `\nOpis: ${serviceDescription}` : ''}` : '';
+
+            // Save acceptance — status goes to 'verification' (NOT 'completed')
+            // Admin/manager will make the final decision
+            const acceptanceData = {
                 acceptedAt: isEditMode ? (installation.acceptance?.acceptedAt || new Date().toISOString()) : new Date().toISOString(),
                 clientName: clientName.trim(),
                 signature: signatureData,
-                notes: notes.trim() || undefined,
+                notes: (notes.trim() + choiceNote).trim() || undefined,
                 photos: photos,
-            });
+            };
 
-            // Save checklist in completionReport
+            // Use direct update instead of updateInstallationAcceptance to avoid auto-completing
+            await supabase
+                .from('installations')
+                .update({
+                    acceptance: acceptanceData,
+                    status: isEditMode ? installation.status : 'verification'
+                })
+                .eq('id', installationId);
+
+            // Save checklist + installer choice in completionReport
             await InstallationService.updateInstallation(installationId, {
                 completionReport: {
                     checklist,
                     completedAt: new Date().toISOString(),
+                    installerChoice,
+                    serviceDescription: serviceDescription || undefined
                 },
             } as any);
 
-            toast.success(isEditMode ? 'Protokół zaktualizowany' : 'Protokół odbioru zapisany');
+            toast.success(isEditMode ? 'Protokół zaktualizowany' : 'Protokół odbioru zapisany — oczekuje na decyzję biura');
             navigate('/installer');
         } catch (error) {
             console.error(error);
@@ -513,11 +558,88 @@ export const InstallationAcceptance: React.FC = () => {
                         </label>
                     </div>
 
+                    {/* Installer Choice — 3 options */}
+                    {!isEditMode && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                Co dalej z montażem?
+                            </h3>
+                            <div className="space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setInstallerChoice('complete'); setServiceDescription(''); }}
+                                    className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                                        installerChoice === 'complete'
+                                            ? 'border-emerald-500 bg-emerald-50'
+                                            : 'border-slate-200 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <span className="text-2xl">✅</span>
+                                    <div>
+                                        <p className={`font-bold text-sm ${installerChoice === 'complete' ? 'text-emerald-700' : 'text-slate-700'}`}>Montaż zakończony</p>
+                                        <p className="text-xs text-slate-400">Wszystko zamontowane, gotowe do zamknięcia</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallerChoice('service')}
+                                    className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                                        installerChoice === 'service'
+                                            ? 'border-amber-500 bg-amber-50'
+                                            : 'border-slate-200 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <span className="text-2xl">🔧</span>
+                                    <div>
+                                        <p className={`font-bold text-sm ${installerChoice === 'service' ? 'text-amber-700' : 'text-slate-700'}`}>Wymaga serwisu</p>
+                                        <p className="text-xs text-slate-400">Usterka, poprawka, lub problem do naprawienia</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallerChoice('followup')}
+                                    className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                                        installerChoice === 'followup'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-slate-200 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <span className="text-2xl">🔄</span>
+                                    <div>
+                                        <p className={`font-bold text-sm ${installerChoice === 'followup' ? 'text-blue-700' : 'text-slate-700'}`}>Wymaga dokończenia</p>
+                                        <p className="text-xs text-slate-400">Nie wszystko zamontowane, brakuje materiałów / domierzenie</p>
+                                    </div>
+                                </button>
+                            </div>
+
+                            {/* Description for service/followup */}
+                            {(installerChoice === 'service' || installerChoice === 'followup') && (
+                                <div className="mt-3">
+                                    <textarea
+                                        value={serviceDescription}
+                                        onChange={(e) => setServiceDescription(e.target.value)}
+                                        placeholder={installerChoice === 'service' ? 'Opisz problem / usterkę...' : 'Co zostało do zrobienia? Jakie materiały brakują?'}
+                                        className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none resize-none text-sm"
+                                        rows={3}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Submit */}
                     <button
                         type="submit"
-                        disabled={saving || uploading}
-                        className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                        disabled={saving || uploading || ((installerChoice !== 'complete') && !serviceDescription.trim() && !isEditMode)}
+                        className={`w-full font-bold py-4 px-6 rounded-2xl transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 ${
+                            isEditMode ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white' :
+                            installerChoice === 'complete' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white' :
+                            installerChoice === 'service' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white' :
+                            'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white'
+                        }`}
                     >
                         {saving ? (
                             <>
@@ -529,10 +651,19 @@ export const InstallationAcceptance: React.FC = () => {
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
-                                {isEditMode ? 'Zapisz zmiany' : 'Zatwierdź protokół odbioru'}
+                                {isEditMode ? 'Zapisz zmiany' : 
+                                 installerChoice === 'complete' ? 'Zatwierdź — Montaż zakończony' :
+                                 installerChoice === 'service' ? 'Zatwierdź — Do serwisu' :
+                                 'Zatwierdź — Do dokończenia'}
                             </>
                         )}
                     </button>
+
+                    {!isEditMode && (
+                        <p className="text-center text-xs text-slate-400">
+                            Decyzję końcową podejmie biuro na podstawie Twojej oceny
+                        </p>
+                    )}
 
                     {isEditMode && (
                         <p className="text-center text-xs text-slate-400">
