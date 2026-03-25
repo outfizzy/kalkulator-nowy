@@ -1067,6 +1067,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                 </div>
                                 <div className="p-4">
                                     {formData.acceptance ? (
+                                        <div className="space-y-2">
                                         <div className="bg-green-100 text-green-800 p-3 rounded-lg border border-green-200 text-sm space-y-1">
                                             <p className="font-bold">✅ Montaż odebrany</p>
                                             <p>Przez: {formData.acceptance.clientName}</p>
@@ -1075,7 +1076,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                         </div>
                                         {/* Show installer recommendation if status is verification */}
                                         {formData.status === 'verification' && (installation as any).completionReport?.installerChoice && (
-                                            <div className={`mt-2 p-3 rounded-lg border text-sm ${
+                                            <div className={`p-3 rounded-lg border text-sm ${
                                                 (installation as any).completionReport.installerChoice === 'complete' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
                                                 (installation as any).completionReport.installerChoice === 'service' ? 'bg-amber-50 border-amber-200 text-amber-700' :
                                                 'bg-blue-50 border-blue-200 text-blue-700'
@@ -1089,9 +1090,9 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                 )}
                                             </div>
                                         )}
-                                        {/* Show completion buttons also for verification status (installer already submitted but admin decides) */}
+                                        {/* Show completion buttons also for verification status */}
                                         {formData.status === 'verification' && (
-                                            <div className="mt-3 space-y-3">
+                                            <div className="space-y-3">
                                                 <p className="text-sm text-purple-700 font-medium">⚡ Podejmij decyzję:</p>
                                                 <div className="space-y-2">
                                                     <button onClick={handleForceComplete} disabled={saving}
@@ -1136,7 +1137,8 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                     </button>
                                                 </div>
                                             </div>
-                                        )
+                                        )}
+                                        </div>
                                     ) : (
                                         <div className="space-y-3">
                                             <p className="text-sm text-slate-600">Wybierz sposób zakończenia montażu:</p>
