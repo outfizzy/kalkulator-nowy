@@ -1062,7 +1062,7 @@ export const InstallationService = {
             !activeSourceIds.has(t.id) && !t.installation_id
         );
 
-        // 5. Follow-Up Installations: completed/verified with pending order items
+        // 5. Follow-Up Installations: completed/verified with pending order items + manual follow-ups
         let followUps: Installation[] = [];
         try {
             const completedInstallations = pendingInst.filter(i =>
@@ -1091,13 +1091,24 @@ export const InstallationService = {
                         .filter(i => pendingByInstallation.has(i.id))
                         .map(i => ({
                             ...i,
-                            // Add followup metadata to notes for sidebar display
                             followUpItems: pendingByInstallation.get(i.id) || [],
                             sourceType: 'followup' as any,
                             sourceId: i.id
                         }));
                 }
             }
+
+            // 5b. Also include manually-created follow-up installations (from "Dokończenie" completion action)
+            const manualFollowUps = pendingInst.filter(i =>
+                i.sourceType === 'followup' && (i.status === 'pending' || i.status === 'scheduled')
+            );
+            // Avoid duplicates (an installation already in followUps from order items)
+            const existingFollowUpIds = new Set(followUps.map(f => f.id));
+            manualFollowUps.forEach(fu => {
+                if (!existingFollowUpIds.has(fu.id)) {
+                    followUps.push(fu);
+                }
+            });
         } catch (e) {
             console.error('Error fetching follow-ups:', e);
         }
@@ -1111,7 +1122,119 @@ export const InstallationService = {
     },
 
     async getAllInstallations(): Promise<Installation[]> {
-        return this.getInstallations(); // Alias for consistency if needed, or if logic diverges later.
+        return this.getInstallations();
+    },
+
+    /**
+     * Complete an installation and create a new Service Ticket so it appears in the Serwis backlog tab.
+     */
+    async completeAndCreateServiceTicket(
+        installationId: string,
+        description: string
+    ): Promise<void> {
+        // 1. Fetch installation data
+        const allInst = await this.getInstallations();
+        const installation = allInst.find(i => i.id === installationId);
+        if (!installation) throw new Error('Installation not found');
+
+        // 2. Mark installation as completed
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase
+            .from('installations')
+            .update({
+                status: 'completed',
+                acceptance: {
+                    acceptedAt: new Date().toISOString(),
+                    clientName: `${installation.client?.firstName} ${installation.client?.lastName}`,
+                    notes: `Zakończono z przekierowaniem do Serwisu: ${user?.email || 'Admin'}`
+                }
+            })
+            .eq('id', installationId);
+
+        // 3. Resolve client ID from contract
+        let clientId: string | null = null;
+        let contractId: string | null = null;
+        if (installation.offerId) {
+            const { data: contract } = await supabase
+                .from('contracts')
+                .select('id, client_id, customer_id')
+                .eq('offer_id', installation.offerId)
+                .single();
+            if (contract) {
+                contractId = contract.id;
+                clientId = contract.client_id || contract.customer_id || null;
+            }
+        }
+        // Fallback: try installation's customerId
+        if (!clientId && installation.customerId) {
+            clientId = installation.customerId;
+        }
+
+        // 4. Create a service ticket
+        const ticketNumber = `SRV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        await supabase
+            .from('service_tickets')
+            .insert({
+                ticket_number: ticketNumber,
+                client_id: clientId,
+                contract_id: contractId,
+                installation_id: installationId,
+                type: 'repair',
+                status: 'new',
+                priority: 'medium',
+                description: description || 'Serwis po montażu',
+                photos: []
+            });
+    },
+
+    /**
+     * Complete an installation and create a new follow-up Installation so it appears in the Dokończ. backlog tab.
+     */
+    async completeAndCreateFollowUp(
+        installationId: string,
+        description: string
+    ): Promise<void> {
+        // 1. Fetch installation data
+        const allInst = await this.getInstallations();
+        const installation = allInst.find(i => i.id === installationId);
+        if (!installation) throw new Error('Installation not found');
+
+        // 2. Mark installation as completed
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        await supabase
+            .from('installations')
+            .update({
+                status: 'completed',
+                acceptance: {
+                    acceptedAt: new Date().toISOString(),
+                    clientName: `${installation.client?.firstName} ${installation.client?.lastName}`,
+                    notes: `Zakończono z przekierowaniem do Dokończenia: ${user.email || 'Admin'}`
+                }
+            })
+            .eq('id', installationId);
+
+        // 3. Create a new follow-up installation
+        const installationData = {
+            client: installation.client,
+            productSummary: installation.productSummary,
+            notes: description || 'Dokończenie montażu'
+        };
+
+        await supabase
+            .from('installations')
+            .insert({
+                offer_id: installation.offerId || null,
+                customer_id: installation.customerId || null,
+                user_id: user.id,
+                status: 'pending',
+                installation_data: installationData,
+                source_type: 'followup',
+                source_id: installationId,
+                title: description || 'Dokończenie montażu',
+                expected_duration: 1
+            });
     },
 
     async getCustomerInstallations(customerId: string): Promise<Installation[]> {

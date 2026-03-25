@@ -1044,12 +1044,55 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            <p className="text-sm text-slate-600">Potwierdź odbiór prac przez klienta. Status zmieni się na "Zakończony".</p>
+                                            <p className="text-sm text-slate-600">Wybierz sposób zakończenia montażu:</p>
                                             {(!readOnly || formData.status !== 'completed') && (
-                                                <button onClick={handleForceComplete} disabled={saving}
-                                                    className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm">
-                                                    {saving ? '⏳ Zapisywanie...' : '✅ Wymuś Zakończenie (Biuro)'}
-                                                </button>
+                                                <div className="space-y-2">
+                                                    {/* Option 1: Complete normally */}
+                                                    <button onClick={handleForceComplete} disabled={saving}
+                                                        className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm">
+                                                        {saving ? '⏳ Zapisywanie...' : '✅ Zakończ montaż'}
+                                                    </button>
+                                                    {/* Option 2: Complete + Service Ticket */}
+                                                    <button
+                                                        disabled={saving}
+                                                        onClick={async () => {
+                                                            const desc = window.prompt('Opisz problem serwisowy:');
+                                                            if (desc === null) return; // cancelled
+                                                            if (!desc.trim()) { toast.error('Opis jest wymagany'); return; }
+                                                            setSaving(true);
+                                                            try {
+                                                                await InstallationService.completeAndCreateServiceTicket(installation.id, desc.trim());
+                                                                toast.success('Montaż zakończony — utworzono zgłoszenie serwisowe');
+                                                                onUpdate();
+                                                                onClose();
+                                                            } catch (e) { toast.error('Błąd tworzenia serwisu'); console.error(e); }
+                                                            finally { setSaving(false); }
+                                                        }}
+                                                        className="w-full py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
+                                                    >
+                                                        🔧 Serwis
+                                                    </button>
+                                                    {/* Option 3: Complete + Follow-up */}
+                                                    <button
+                                                        disabled={saving}
+                                                        onClick={async () => {
+                                                            const desc = window.prompt('Co pozostało do dokończenia?');
+                                                            if (desc === null) return;
+                                                            if (!desc.trim()) { toast.error('Opis jest wymagany'); return; }
+                                                            setSaving(true);
+                                                            try {
+                                                                await InstallationService.completeAndCreateFollowUp(installation.id, desc.trim());
+                                                                toast.success('Montaż zakończony — utworzono dokończenie');
+                                                                onUpdate();
+                                                                onClose();
+                                                            } catch (e) { toast.error('Błąd tworzenia dokończenia'); console.error(e); }
+                                                            finally { setSaving(false); }
+                                                        }}
+                                                        className="w-full py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 text-sm"
+                                                    >
+                                                        🔄 Dokończenie
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     )}
