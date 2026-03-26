@@ -35,6 +35,7 @@ import type { Measurement } from '../../types';
 import { ConfiguratorService } from '../../services/database/configurator.service';
 import { LeadAutoAssignService } from '../../services/database/lead-auto-assign.service';
 import { OfferService } from '../../services/database/offer.service';
+import { supabase } from '../../lib/supabase';
 
 interface LeadsKanbanProps {
     leads: Lead[];
@@ -298,7 +299,13 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 })()}
             </div>
 
-            {/* Formularz Status Badge */}
+            {/* Formularz Completion Badge — visible on ALL statuses */}
+            {formCompleted && lead.status !== 'formularz' && (
+                <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span>📋✅</span>
+                    <span>Formularz wypełniony</span>
+                </div>
+            )}
             {lead.status === 'formularz' && (
                 <div className={`mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold ${formCompleted
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
@@ -646,62 +653,86 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         return cols;
     }, [leads]);
 
-    // Track which formularz leads have completed configurations
+    // Track which leads have completed configurator forms (check ALL leads, not just formularz)
     const [completedFormLeadIds, setCompletedFormLeadIds] = useState<Set<string>>(new Set());
     useEffect(() => {
-        const formularzLeads = leads.filter(l => l.status === 'formularz');
-        if (formularzLeads.length === 0) { setCompletedFormLeadIds(new Set()); return; }
+        if (leads.length === 0) { setCompletedFormLeadIds(new Set()); return; }
 
         const checkForms = async () => {
-            const completed = new Set<string>();
-            for (const lead of formularzLeads) {
-                try {
-                    const cfgs = await ConfiguratorService.getByLeadId(lead.id);
-                    if (cfgs.some(c => c.status === 'completed')) {
-                        completed.add(lead.id);
-                    }
-                } catch { /* ignore */ }
-            }
+            // BATCH: single query for all leads instead of N+1
+            const leadIds = leads.map(l => l.id);
+            const { data } = await supabase
+                .from('lead_configurations')
+                .select('lead_id')
+                .in('lead_id', leadIds)
+                .eq('status', 'completed');
+
+            const completed = new Set<string>(
+                (data || []).map((r: any) => r.lead_id).filter(Boolean)
+            );
             setCompletedFormLeadIds(completed);
         };
         checkForms();
     }, [leads]);
 
     // Track offer view status + customer interactions for offer_sent/negotiation leads
-    const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({}); 
+    const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({});
     useEffect(() => {
         const relevantLeads = leads.filter(l => ['offer_sent', 'negotiation'].includes(l.status));
         if (relevantLeads.length === 0) { setOfferViewMap({}); return; }
 
         const fetchOfferViews = async () => {
             const viewMap: Record<string, OfferCardInfo> = {};
+
+            // BATCH: fetch all offers for all relevant leads in one query
+            const leadIds = relevantLeads.map(l => l.id);
+            const { data: allOffers } = await supabase
+                .from('offers')
+                .select('id, lead_id, view_count, last_viewed_at')
+                .in('lead_id', leadIds)
+                .order('created_at', { ascending: false });
+
+            // BATCH: fetch all interactions for all relevant leads in one query
+            const { data: allInteractions } = await supabase
+                .from('lead_interactions')
+                .select('lead_id, event_type, event_data')
+                .in('lead_id', leadIds);
+
+            // Group by lead
+            const offersByLead = new Map<string, any[]>();
+            (allOffers || []).forEach((o: any) => {
+                const list = offersByLead.get(o.lead_id) || [];
+                list.push(o);
+                offersByLead.set(o.lead_id, list);
+            });
+
+            const interactionsByLead = new Map<string, any[]>();
+            (allInteractions || []).forEach((i: any) => {
+                const list = interactionsByLead.get(i.lead_id) || [];
+                list.push(i);
+                interactionsByLead.set(i.lead_id, list);
+            });
+
             for (const lead of relevantLeads) {
-                try {
-                    // Fetch offers for view count
-                    const offers = await OfferService.getLeadOffers(lead.id);
-                    const latest = offers.length > 0 ? offers[0] : null;
+                const offers = offersByLead.get(lead.id) || [];
+                const latest = offers[0] || null;
+                const interactions = interactionsByLead.get(lead.id) || [];
 
-                    // Fetch interactions
-                    const interactions = await OfferService.getLeadInteractions(lead.id);
+                const measurementRequested = interactions.some((i: any) => i.event_type === 'measurement_request');
+                const offerAccepted = interactions.some((i: any) => i.event_type === 'offer_accept');
+                const messageSent = interactions.some((i: any) => i.event_type === 'message_sent');
+                const lastMessage = interactions.find((i: any) => i.event_type === 'message_sent');
 
-                    const measurementRequested = interactions.some(i => i.eventType === 'measurement_request');
-                    const offerAccepted = interactions.some(i => i.eventType === 'offer_accept');
-                    const messageSent = interactions.some(i => i.eventType === 'message_sent');
-                    const lastMessage = interactions.find(i => i.eventType === 'message_sent');
-
-                    viewMap[lead.id] = {
-                        viewed: latest ? (latest.viewCount || 0) > 0 : false,
-                        viewCount: latest?.viewCount || 0,
-                        lastViewedAt: latest?.lastViewedAt,
-                        measurementRequested,
-                        offerAccepted,
-                        messageSent,
-                        messageText: lastMessage?.eventData?.message || lastMessage?.eventData?.text || undefined,
-                        interactionCount: interactions.length + ((latest?.viewCount || 0) > 0 ? 1 : 0)
-                    };
-                } catch {
-                    viewMap[lead.id] = { viewed: false, viewCount: 0, interactionCount: 0 };
-                }
+                viewMap[lead.id] = {
+                    viewed: latest ? (latest.view_count || 0) > 0 : false,
+                    viewCount: latest?.view_count || 0,
+                    lastViewedAt: latest?.last_viewed_at,
+                    measurementRequested,
+                    offerAccepted,
+                    messageSent,
+                    messageText: lastMessage?.event_data?.message || lastMessage?.event_data?.text || undefined,
+                    interactionCount: interactions.length + ((latest?.view_count || 0) > 0 ? 1 : 0)
+                };
             }
             setOfferViewMap(viewMap);
         };
