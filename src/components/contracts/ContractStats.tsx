@@ -34,66 +34,179 @@ const REP_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4
 const formatCurrency = (val: number) =>
     new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val);
 
+/**
+ * Extract the net value from a contract, handling all possible sources:
+ * - Manual contracts: pricing.finalPriceNet
+ * - Offer-based contracts: pricing.sellingPriceNet (or finalPriceNet as override)
+ * - Also considers installationCosts.totalNet for installation price
+ */
+const getContractNetValue = (c: Contract): number => {
+    const finalNet = Number(c.pricing?.finalPriceNet || 0);
+    const sellingNet = Number(c.pricing?.sellingPriceNet || 0);
+    // Use the higher of finalPriceNet and sellingPriceNet as the source of truth
+    // finalPriceNet is the override for signed contracts, sellingPriceNet is the original
+    const baseNet = Math.max(finalNet, sellingNet);
+    // Add installation price if present
+    const installNet = Number(c.pricing?.installationCosts?.totalNet || 0);
+    return baseNet + installNet;
+};
+
+/**
+ * Get the relevant date for a contract (prefers signedAt for signed/completed, falls back to createdAt)
+ */
+const getContractDate = (c: Contract): Date => {
+    if (c.signedAt) return new Date(c.signedAt);
+    return new Date(c.createdAt);
+};
+
+/** Date preset helper */
+type DatePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear' | 'lastYear' | 'all' | 'custom';
+
+const getPresetRange = (preset: DatePreset): { from: string; to: string } => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+
+    switch (preset) {
+        case 'thisMonth':
+            return { from: `${y}-${String(m + 1).padStart(2, '0')}-01`, to: formatDateISO(now) };
+        case 'lastMonth': {
+            const lm = m === 0 ? 11 : m - 1;
+            const ly = m === 0 ? y - 1 : y;
+            const lastDay = new Date(ly, lm + 1, 0).getDate();
+            return { from: `${ly}-${String(lm + 1).padStart(2, '0')}-01`, to: `${ly}-${String(lm + 1).padStart(2, '0')}-${lastDay}` };
+        }
+        case 'thisQuarter': {
+            const qStart = Math.floor(m / 3) * 3;
+            return { from: `${y}-${String(qStart + 1).padStart(2, '0')}-01`, to: formatDateISO(now) };
+        }
+        case 'thisYear':
+            return { from: `${y}-01-01`, to: formatDateISO(now) };
+        case 'lastYear':
+            return { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` };
+        case 'all':
+            return { from: '', to: '' };
+        default:
+            return { from: '', to: '' };
+    }
+};
+
+const formatDateISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCommission = false }) => {
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [activeView, setActiveView] = useState<'overview' | 'reps' | 'months'>('overview');
+    const [activePreset, setActivePreset] = useState<DatePreset>('thisYear');
 
-    // Available years
-    const years = useMemo(() => {
-        const ys = new Set<number>();
-        contracts.forEach(c => {
-            const d = new Date(c.createdAt);
-            if (!isNaN(d.getTime())) ys.add(d.getFullYear());
+    // Date range state
+    const initialRange = getPresetRange('thisYear');
+    const [dateFrom, setDateFrom] = useState(initialRange.from);
+    const [dateTo, setDateTo] = useState(initialRange.to);
+
+    // Apply preset
+    const applyPreset = (preset: DatePreset) => {
+        setActivePreset(preset);
+        if (preset === 'custom') return;
+        const range = getPresetRange(preset);
+        setDateFrom(range.from);
+        setDateTo(range.to);
+    };
+
+    // Filtered contracts by date range (excluding cancelled from stats)
+    const filteredContracts = useMemo(() => {
+        return contracts.filter(c => {
+            // Exclude cancelled contracts from statistics
+            if (c.status === 'cancelled') return false;
+
+            const d = getContractDate(c);
+            if (isNaN(d.getTime())) return false;
+
+            if (dateFrom) {
+                const from = new Date(dateFrom);
+                from.setHours(0, 0, 0, 0);
+                if (d < from) return false;
+            }
+            if (dateTo) {
+                const to = new Date(dateTo);
+                to.setHours(23, 59, 59, 999);
+                if (d > to) return false;
+            }
+            return true;
         });
-        if (ys.size === 0) ys.add(new Date().getFullYear());
-        return Array.from(ys).sort((a, b) => b - a);
-    }, [contracts]);
+    }, [contracts, dateFrom, dateTo]);
 
-    // Filtered by year
-    const yearContracts = useMemo(() =>
-        contracts.filter(c => new Date(c.createdAt).getFullYear() === selectedYear),
-        [contracts, selectedYear]
-    );
+    // All contracts in range (including cancelled, for status counts)
+    const allInRange = useMemo(() => {
+        return contracts.filter(c => {
+            const d = getContractDate(c);
+            if (isNaN(d.getTime())) return false;
+            if (dateFrom) {
+                const from = new Date(dateFrom);
+                from.setHours(0, 0, 0, 0);
+                if (d < from) return false;
+            }
+            if (dateTo) {
+                const to = new Date(dateTo);
+                to.setHours(23, 59, 59, 999);
+                if (d > to) return false;
+            }
+            return true;
+        });
+    }, [contracts, dateFrom, dateTo]);
 
     // Per-rep stats
     const repStats = useMemo(() => {
         const repMap = new Map<string, RepStats>();
-        yearContracts.forEach(c => {
+        filteredContracts.forEach(c => {
             const repId = c.salesRepId || 'unknown';
             const repName = c.salesRep ? `${c.salesRep.firstName} ${c.salesRep.lastName}` : 'Brak przypisania';
             if (!repMap.has(repId)) repMap.set(repId, { repId, repName, count: 0, totalValueNet: 0, totalCommission: 0, totalProfit: 0 });
             const r = repMap.get(repId)!;
             r.count += 1;
-            r.totalValueNet += Math.max(Number(c.pricing?.sellingPriceNet || 0), Number(c.pricing?.finalPriceNet || 0));
+            r.totalValueNet += getContractNetValue(c);
             r.totalCommission += Number(c.commission || 0);
             r.totalProfit += Number(c.pricing?.marginValue || 0);
         });
         return Array.from(repMap.values()).sort((a, b) => b.totalValueNet - a.totalValueNet);
-    }, [yearContracts]);
+    }, [filteredContracts]);
 
-    // Monthly breakdown
+    // Determine year range for monthly breakdown
+    const yearRange = useMemo(() => {
+        if (filteredContracts.length === 0) return { startYear: new Date().getFullYear(), endYear: new Date().getFullYear() };
+        const dates = filteredContracts.map(c => getContractDate(c));
+        const minYear = Math.min(...dates.map(d => d.getFullYear()));
+        const maxYear = Math.max(...dates.map(d => d.getFullYear()));
+        return { startYear: minYear, endYear: maxYear };
+    }, [filteredContracts]);
+
+    // Monthly breakdown across all years in range
     const monthData = useMemo(() => {
         const months: MonthData[] = [];
-        for (let m = 0; m < 12; m++) {
-            const key = `${selectedYear}-${String(m + 1).padStart(2, '0')}`;
-            months.push({
-                key,
-                label: `${MONTH_LABELS_PL[m]} ${selectedYear}`,
-                count: 0,
-                totalNet: 0,
-                totalProfit: 0,
-                totalCommission: 0,
-                byRep: {},
-                byStatus: {}
-            });
+        for (let y = yearRange.startYear; y <= yearRange.endYear; y++) {
+            const startM = (dateFrom && y === yearRange.startYear) ? new Date(dateFrom).getMonth() : 0;
+            const endM = (dateTo && y === yearRange.endYear) ? new Date(dateTo).getMonth() : 11;
+            for (let m = startM; m <= endM; m++) {
+                const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+                months.push({
+                    key,
+                    label: `${MONTH_LABELS_PL[m]} ${y}`,
+                    count: 0,
+                    totalNet: 0,
+                    totalProfit: 0,
+                    totalCommission: 0,
+                    byRep: {},
+                    byStatus: {}
+                });
+            }
         }
 
-        yearContracts.forEach(c => {
-            const d = new Date(c.createdAt);
-            const monthIdx = d.getMonth();
-            const md = months[monthIdx];
+        filteredContracts.forEach(c => {
+            const d = getContractDate(c);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const md = months.find(m => m.key === key);
+            if (!md) return;
+
             md.count += 1;
-            const net = Math.max(Number(c.pricing?.sellingPriceNet || 0), Number(c.pricing?.finalPriceNet || 0));
+            const net = getContractNetValue(c);
             const profit = Number(c.pricing?.marginValue || 0);
             const commission = Number(c.commission || 0);
             md.totalNet += net;
@@ -114,17 +227,18 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
         });
 
         return months;
-    }, [yearContracts, selectedYear]);
+    }, [filteredContracts, yearRange, dateFrom, dateTo]);
 
     // Totals
     const totals = useMemo(() => ({
-        count: yearContracts.length,
-        totalNet: yearContracts.reduce((s, c) => s + Math.max(Number(c.pricing?.sellingPriceNet || 0), Number(c.pricing?.finalPriceNet || 0)), 0),
-        totalProfit: yearContracts.reduce((s, c) => s + Number(c.pricing?.marginValue || 0), 0),
-        totalCommission: yearContracts.reduce((s, c) => s + Number(c.commission || 0), 0),
-        signed: yearContracts.filter(c => c.status === 'signed' || c.status === 'completed').length,
-        cancelled: yearContracts.filter(c => c.status === 'cancelled').length,
-    }), [yearContracts]);
+        count: filteredContracts.length,
+        totalNet: filteredContracts.reduce((s, c) => s + getContractNetValue(c), 0),
+        totalProfit: filteredContracts.reduce((s, c) => s + Number(c.pricing?.marginValue || 0), 0),
+        totalCommission: filteredContracts.reduce((s, c) => s + Number(c.commission || 0), 0),
+        signed: allInRange.filter(c => c.status === 'signed' || c.status === 'completed').length,
+        cancelled: allInRange.filter(c => c.status === 'cancelled').length,
+        allCount: allInRange.length,
+    }), [filteredContracts, allInRange]);
 
     const maxMonthNet = Math.max(...monthData.map(m => m.totalNet), 1);
 
@@ -134,21 +248,32 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
         return map;
     }, [repStats]);
 
+    // Date range label
+    const dateLabel = useMemo(() => {
+        const labels: Record<DatePreset, string> = {
+            thisMonth: 'Bieżący miesiąc',
+            lastMonth: 'Poprzedni miesiąc',
+            thisQuarter: 'Bieżący kwartał',
+            thisYear: 'Bieżący rok',
+            lastYear: 'Poprzedni rok',
+            all: 'Cały okres',
+            custom: 'Własny zakres'
+        };
+        return labels[activePreset];
+    }, [activePreset]);
+
     return (
         <div className="mb-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-            {/* Header with year selector + view toggle */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <h3 className="text-lg font-bold text-slate-800">Statystyki Umów</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                    {/* Year selector */}
-                    <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
-                        {years.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+            {/* Header with date range + view toggle */}
+            <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <h3 className="text-lg font-bold text-slate-800">Statystyki Umów</h3>
+                        <span className="text-xs text-slate-400 font-medium">{dateLabel}</span>
+                    </div>
                     {/* View toggle */}
                     <div className="flex bg-slate-100 rounded-lg p-0.5">
                         {([['overview', 'Przegląd'], ['reps', 'Przedstawiciele'], ['months', 'Miesiące']] as const).map(([id, label]) => (
@@ -158,39 +283,84 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                         ))}
                     </div>
                 </div>
+
+                {/* Date range controls */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Preset buttons */}
+                    {([
+                        ['thisMonth', 'Ten miesiąc'],
+                        ['lastMonth', 'Poprzedni'],
+                        ['thisQuarter', 'Kwartał'],
+                        ['thisYear', `${new Date().getFullYear()}`],
+                        ['lastYear', `${new Date().getFullYear() - 1}`],
+                        ['all', 'Wszystko']
+                    ] as [DatePreset, string][]).map(([id, label]) => (
+                        <button
+                            key={id}
+                            onClick={() => applyPreset(id)}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${activePreset === id
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+
+                    {/* Custom date picker separator */}
+                    <div className="w-px h-6 bg-slate-200 mx-1" />
+
+                    {/* Custom date inputs */}
+                    <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={e => { setDateFrom(e.target.value); setActivePreset('custom'); }}
+                            className="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium bg-white focus:ring-2 focus:ring-indigo-500 outline-none w-[130px]"
+                        />
+                        <span className="text-xs text-slate-400 font-medium">—</span>
+                        <input
+                            type="date"
+                            value={dateTo}
+                            onChange={e => { setDateTo(e.target.value); setActivePreset('custom'); }}
+                            className="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium bg-white focus:ring-2 focus:ring-indigo-500 outline-none w-[130px]"
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Umowy</p>
                     <p className="text-2xl font-bold text-slate-800">{totals.count}</p>
                     <p className="text-xs text-green-600 mt-1 font-medium">{totals.signed} podpisanych</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Wartość Netto</p>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Obrót Netto</p>
                     <p className="text-2xl font-bold text-slate-800">{formatCurrency(totals.totalNet)}</p>
-                    <p className="text-xs text-slate-400 mt-1">Razem {selectedYear}</p>
+                    <p className="text-xs text-slate-400 mt-1">{totals.count > 0 ? `Śr. ${formatCurrency(totals.totalNet / totals.count)}` : '-'}</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Zysk</p>
                     <p className="text-2xl font-bold text-green-600">{formatCurrency(totals.totalProfit)}</p>
-                    <p className="text-xs text-slate-400 mt-1">Marża potencjalna</p>
+                    <p className="text-xs text-slate-400 mt-1">{totals.totalNet > 0 ? `${((totals.totalProfit / totals.totalNet) * 100).toFixed(1)}% marży` : '-'}</p>
                 </div>
                 {showCommission && (
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Prowizje</p>
                         <p className="text-2xl font-bold text-indigo-600">{formatCurrency(totals.totalCommission)}</p>
-                        <p className="text-xs text-slate-400 mt-1">Razem {selectedYear}</p>
+                        <p className="text-xs text-slate-400 mt-1">{totals.totalNet > 0 ? `${((totals.totalCommission / totals.totalNet) * 100).toFixed(1)}% obrotu` : '-'}</p>
                     </div>
                 )}
-                {!showCommission && (
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Anulowane</p>
-                        <p className="text-2xl font-bold text-red-500">{totals.cancelled}</p>
-                        <p className="text-xs text-slate-400 mt-1">Utracone umowy</p>
-                    </div>
-                )}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Anulowane</p>
+                    <p className="text-2xl font-bold text-red-500">{totals.cancelled}</p>
+                    <p className="text-xs text-slate-400 mt-1">{totals.allCount > 0 ? `${((totals.cancelled / totals.allCount) * 100).toFixed(0)}% wszystkich` : '-'}</p>
+                </div>
             </div>
 
             {/* VIEW: OVERVIEW — Monthly bar chart */}
@@ -198,17 +368,19 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                     <h4 className="text-sm font-bold text-slate-700 mb-4">Obrót miesięczny (Netto)</h4>
                     <div className="flex items-end gap-1.5" style={{ height: 200 }}>
-                        {monthData.map((m, idx) => {
+                        {monthData.map((m) => {
                             const pct = maxMonthNet > 0 ? (m.totalNet / maxMonthNet) * 100 : 0;
                             const now = new Date();
-                            const isCurrent = idx === now.getMonth() && selectedYear === now.getFullYear();
+                            const [mYear, mMonth] = m.key.split('-').map(Number);
+                            const isCurrent = (mMonth - 1) === now.getMonth() && mYear === now.getFullYear();
                             return (
-                                <div key={m.key} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                                <div key={m.key} className="flex-1 flex flex-col items-center justify-end h-full group relative" style={{ minWidth: 20 }}>
                                     {/* Tooltip */}
                                     <div className="absolute bottom-full mb-2 hidden group-hover:block z-10 bg-slate-800 text-white text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap">
                                         <p className="font-bold">{m.label}</p>
                                         <p>{m.count} umów · {formatCurrency(m.totalNet)}</p>
                                         <p className="text-green-400">Zysk: {formatCurrency(m.totalProfit)}</p>
+                                        {showCommission && <p className="text-indigo-300">Prowizje: {formatCurrency(m.totalCommission)}</p>}
                                     </div>
                                     {/* Bar */}
                                     <div
@@ -217,7 +389,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                                     />
                                     {/* Label */}
                                     <p className={`text-[10px] mt-1.5 font-bold ${isCurrent ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                        {MONTH_LABELS_PL[idx]}
+                                        {m.label.split(' ')[0]}
                                     </p>
                                     {m.count > 0 && (
                                         <p className="text-[9px] text-slate-400">{m.count}</p>
@@ -230,7 +402,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                     {/* Status breakdown mini-legend */}
                     <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
                         {Object.entries(STATUS_LABELS).map(([key, label]) => {
-                            const cnt = yearContracts.filter(c => c.status === key).length;
+                            const cnt = allInRange.filter(c => c.status === key).length;
                             if (cnt === 0) return null;
                             return (
                                 <div key={key} className="flex items-center gap-1.5">
@@ -251,7 +423,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                             <tr>
                                 <th className="px-4 py-3 rounded-l-lg">Przedstawiciel</th>
                                 <th className="px-4 py-3 text-right">Umowy</th>
-                                <th className="px-4 py-3 text-right">Wartość Netto</th>
+                                <th className="px-4 py-3 text-right">Obrót Netto</th>
                                 <th className="px-4 py-3 text-right">Zysk</th>
                                 {showCommission && <th className="px-4 py-3 text-right">Prowizja</th>}
                                 <th className="px-4 py-3 text-right rounded-r-lg">Śr. Wartość</th>
@@ -285,7 +457,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                     </table>
 
                     {/* Per-rep monthly mini-bars */}
-                    {repStats.length > 0 && (
+                    {repStats.length > 0 && monthData.length > 0 && (
                         <div className="p-4 border-t border-slate-100">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Rozkład miesięczny wg przedstawiciela</h4>
                             <div className="space-y-3">
@@ -309,7 +481,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                                                                 opacity: cnt > 0 ? 0.8 : 0.15,
                                                                 minHeight: cnt > 0 ? 6 : 1
                                                             }}
-                                                            title={`${MONTH_LABELS_PL[idx]}: ${cnt} umów`}
+                                                            title={`${monthData[idx]?.label || ''}: ${cnt} umów`}
                                                         />
                                                     </div>
                                                 ))}
@@ -332,17 +504,17 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                             <tr>
                                 <th className="px-4 py-3 rounded-l-lg">Miesiąc</th>
                                 <th className="px-4 py-3 text-right">Umowy</th>
-                                <th className="px-4 py-3 text-right">Wartość Netto</th>
+                                <th className="px-4 py-3 text-right">Obrót Netto</th>
                                 <th className="px-4 py-3 text-right">Zysk</th>
                                 {showCommission && <th className="px-4 py-3 text-right">Prowizje</th>}
                                 <th className="px-4 py-3 rounded-r-lg">Statusy</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {monthData.map((m, idx) => {
+                            {monthData.map((m) => {
                                 if (m.count === 0) return (
                                     <tr key={m.key} className="text-slate-300">
-                                        <td className="px-4 py-2.5 text-xs">{MONTH_LABELS_PL[idx]} {selectedYear}</td>
+                                        <td className="px-4 py-2.5 text-xs">{m.label}</td>
                                         <td className="px-4 py-2.5 text-right text-xs">0</td>
                                         <td className="px-4 py-2.5 text-right text-xs">-</td>
                                         <td className="px-4 py-2.5 text-right text-xs">-</td>
@@ -352,7 +524,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                                 );
                                 return (
                                     <tr key={m.key} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-slate-800">{MONTH_LABELS_PL[idx]} {selectedYear}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-800">{m.label}</td>
                                         <td className="px-4 py-3 text-right font-bold text-slate-700">{m.count}</td>
                                         <td className="px-4 py-3 text-right font-medium text-slate-700">{formatCurrency(m.totalNet)}</td>
                                         <td className="px-4 py-3 text-right text-green-600 font-medium">{formatCurrency(m.totalProfit)}</td>
@@ -372,7 +544,7 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                         </tbody>
                         <tfoot className="bg-slate-50 font-bold text-slate-800">
                             <tr>
-                                <td className="px-4 py-3 rounded-l-lg">RAZEM {selectedYear}</td>
+                                <td className="px-4 py-3 rounded-l-lg">RAZEM</td>
                                 <td className="px-4 py-3 text-right">{totals.count}</td>
                                 <td className="px-4 py-3 text-right">{formatCurrency(totals.totalNet)}</td>
                                 <td className="px-4 py-3 text-right text-green-700">{formatCurrency(totals.totalProfit)}</td>
@@ -383,15 +555,15 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                     </table>
 
                     {/* Monthly per-rep matrix */}
-                    {repStats.length > 1 && (
+                    {repStats.length > 1 && monthData.length > 0 && (
                         <div className="p-4 border-t border-slate-100">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Wartość netto wg przedstawiciela i miesiąca</h4>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Obrót netto wg przedstawiciela i miesiąca</h4>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
                                         <tr>
                                             <th className="px-2 py-1.5 text-left text-slate-400 font-medium">Rep</th>
-                                            {MONTH_LABELS_PL.map(l => <th key={l} className="px-2 py-1.5 text-right text-slate-400 font-medium">{l}</th>)}
+                                            {monthData.map(m => <th key={m.key} className="px-2 py-1.5 text-right text-slate-400 font-medium">{m.label.split(' ')[0]}</th>)}
                                             <th className="px-2 py-1.5 text-right text-slate-600 font-bold">Razem</th>
                                         </tr>
                                     </thead>
