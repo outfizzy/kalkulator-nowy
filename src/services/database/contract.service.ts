@@ -255,6 +255,11 @@ export const ContractService = {
             updates.sales_rep_id = contract.salesRepId;
         }
 
+        // Handle createdAt update (contract date edit)
+        if (contract.createdAt) {
+            updates.created_at = new Date(contract.createdAt).toISOString();
+        }
+
         // Handle advance payment updates (direct columns)
         if (contract.advanceAmount !== undefined) {
             updates.advance_amount = contract.advanceAmount;
