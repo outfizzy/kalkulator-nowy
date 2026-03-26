@@ -301,11 +301,11 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                             )}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                            {installation.offerId && (
-                                <a href={`/offers/edit/${installation.offerId}`} target="_blank" rel="noopener noreferrer"
+                            {contractDetails?.id && (
+                                <a href={`/contracts/${contractDetails.id}`} target="_blank" rel="noopener noreferrer"
                                     className="text-xs bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                    Oferta
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    Umowa
                                 </a>
                             )}
                             <button onClick={onClose} className="text-white/60 hover:text-white p-1 transition-colors">
@@ -485,7 +485,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                         <div className="px-4 py-2.5 bg-blue-100/50 border-b border-blue-200 flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-base">📅</span>
-                                                <h3 className="font-bold text-blue-800 text-sm">Planowanie</h3>
+                                                <h3 className="font-bold text-blue-800 text-sm">Zarządzanie</h3>
                                             </div>
                                             {formData.status === 'scheduled' && (
                                                 <button onClick={() => { handleChange('status', 'confirmed'); toast.success('Zmieniono na Potwierdzony'); }}
@@ -507,6 +507,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                         <option value="scheduled">Zaplanowany</option>
                                                         <option value="confirmed">Potwierdzony</option>
                                                         <option value="completed">Zakończony</option>
+                                                        <option value="verification">Do weryfikacji</option>
                                                         <option value="issue">Problem</option>
                                                         <option value="cancelled">Anulowany</option>
                                                     </select>
