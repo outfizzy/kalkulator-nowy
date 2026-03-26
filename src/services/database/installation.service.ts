@@ -1060,7 +1060,7 @@ export const InstallationService = {
             .in('status', ['new', 'open']);
 
         const backlogTickets = (tickets || []).filter((t: any) =>
-            !activeSourceIds.has(t.id) && !t.installation_id
+            !activeSourceIds.has(t.id)
         );
 
         // 5. Follow-Up Installations: completed/verified with pending order items + manual follow-ups
