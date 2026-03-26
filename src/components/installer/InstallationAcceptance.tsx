@@ -214,9 +214,9 @@ export const InstallationAcceptance: React.FC = () => {
 
             // Build notes with installer choice
             const choiceLabels: Record<InstallerChoice, string> = {
-                complete: '✅ Montaż zakończony',
-                service: '🔧 Zgłoszenie serwisowe',
-                followup: '🔄 Wymaga dokończenia'
+                complete: 'Montaż zakończony',
+                service: 'Zgłoszenie serwisowe',
+                followup: 'Wymaga dokończenia'
             };
             const choiceNote = !isEditMode ? `\n[OCENA MONTAŻYSTY: ${choiceLabels[installerChoice]}]${serviceDescription ? `\nOpis: ${serviceDescription}` : ''}` : '';
 
@@ -359,7 +359,7 @@ export const InstallationAcceptance: React.FC = () => {
 
                             {isEditMode && (
                                 <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2">
-                                    <span className="text-emerald-600 text-lg">✅</span>
+                                    <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     <div>
                                         <p className="text-sm font-medium text-emerald-700">Protokół odebrany</p>
                                         <p className="text-xs text-emerald-500">Możesz edytować notatki i dodawać zdjęcia</p>
@@ -577,7 +577,7 @@ export const InstallationAcceptance: React.FC = () => {
                                             : 'border-slate-200 hover:border-slate-300'
                                     }`}
                                 >
-                                    <span className="text-2xl">✅</span>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${installerChoice === 'complete' ? 'bg-emerald-100' : 'bg-slate-100'}`}><svg className={`w-5 h-5 ${installerChoice === 'complete' ? 'text-emerald-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
                                     <div>
                                         <p className={`font-bold text-sm ${installerChoice === 'complete' ? 'text-emerald-700' : 'text-slate-700'}`}>Montaż zakończony</p>
                                         <p className="text-xs text-slate-400">Wszystko zamontowane, gotowe do zamknięcia</p>
@@ -592,7 +592,7 @@ export const InstallationAcceptance: React.FC = () => {
                                             : 'border-slate-200 hover:border-slate-300'
                                     }`}
                                 >
-                                    <span className="text-2xl">🔧</span>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${installerChoice === 'service' ? 'bg-amber-100' : 'bg-slate-100'}`}><svg className={`w-5 h-5 ${installerChoice === 'service' ? 'text-amber-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></div>
                                     <div>
                                         <p className={`font-bold text-sm ${installerChoice === 'service' ? 'text-amber-700' : 'text-slate-700'}`}>Wymaga serwisu</p>
                                         <p className="text-xs text-slate-400">Usterka, poprawka, lub problem do naprawienia</p>
@@ -607,7 +607,7 @@ export const InstallationAcceptance: React.FC = () => {
                                             : 'border-slate-200 hover:border-slate-300'
                                     }`}
                                 >
-                                    <span className="text-2xl">🔄</span>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${installerChoice === 'followup' ? 'bg-blue-100' : 'bg-slate-100'}`}><svg className={`w-5 h-5 ${installerChoice === 'followup' ? 'text-blue-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg></div>
                                     <div>
                                         <p className={`font-bold text-sm ${installerChoice === 'followup' ? 'text-blue-700' : 'text-slate-700'}`}>Wymaga dokończenia</p>
                                         <p className="text-xs text-slate-400">Nie wszystko zamontowane, brakuje materiałów / domierzenie</p>

@@ -1081,10 +1081,10 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                 (installation as any).completionReport.installerChoice === 'service' ? 'bg-amber-50 border-amber-200 text-amber-700' :
                                                 'bg-blue-50 border-blue-200 text-blue-700'
                                             }`}>
-                                                <p className="font-bold mb-1">📝 Ocena montażysty:</p>
-                                                <p>{(installation as any).completionReport.installerChoice === 'complete' ? '✅ Montaż zakończony' :
-                                                    (installation as any).completionReport.installerChoice === 'service' ? '🔧 Wymaga serwisu' :
-                                                    '🔄 Wymaga dokończenia'}</p>
+                                                <p className="font-bold mb-1 flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> Ocena montażysty:</p>
+                                                <p>{(installation as any).completionReport.installerChoice === 'complete' ? 'Montaż zakończony' :
+                                                    (installation as any).completionReport.installerChoice === 'service' ? 'Wymaga serwisu' :
+                                                    'Wymaga dokończenia'}</p>
                                                 {(installation as any).completionReport.serviceDescription && (
                                                     <p className="mt-1 italic">"{(installation as any).completionReport.serviceDescription}"</p>
                                                 )}
@@ -1093,11 +1093,11 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                         {/* Show completion buttons also for verification status */}
                                         {formData.status === 'verification' && (
                                             <div className="space-y-3">
-                                                <p className="text-sm text-purple-700 font-medium">⚡ Podejmij decyzję:</p>
+                                                <p className="text-sm text-purple-700 font-medium flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Podejmij decyzję:</p>
                                                 <div className="space-y-2">
                                                     <button onClick={handleForceComplete} disabled={saving}
                                                         className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm">
-                                                        {saving ? '⏳ Zapisywanie...' : '✅ Zakończ montaż'}
+                                                        {saving ? 'Zapisywanie...' : 'Zakończ montaż'}
                                                     </button>
                                                     <button
                                                         disabled={saving}
@@ -1115,7 +1115,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                         }}
                                                         className="w-full py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
                                                     >
-                                                        🔧 Serwis
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Serwis
                                                     </button>
                                                     <button
                                                         disabled={saving}
@@ -1133,7 +1133,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                         }}
                                                         className="w-full py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 text-sm"
                                                     >
-                                                        🔄 Dokończenie
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Dokończenie
                                                     </button>
                                                 </div>
                                             </div>
@@ -1147,7 +1147,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                     {/* Option 1: Complete normally */}
                                                     <button onClick={handleForceComplete} disabled={saving}
                                                         className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm">
-                                                        {saving ? '⏳ Zapisywanie...' : '✅ Zakończ montaż'}
+                                                        {saving ? 'Zapisywanie...' : 'Zakończ montaż'}
                                                     </button>
                                                     {/* Option 2: Complete + Service Ticket */}
                                                     <button
@@ -1167,7 +1167,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                         }}
                                                         className="w-full py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
                                                     >
-                                                        🔧 Serwis
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Serwis
                                                     </button>
                                                     {/* Option 3: Complete + Follow-up */}
                                                     <button
@@ -1187,7 +1187,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                         }}
                                                         className="w-full py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 text-sm"
                                                     >
-                                                        🔄 Dokończenie
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Dokończenie
                                                     </button>
                                                 </div>
                                             )}
