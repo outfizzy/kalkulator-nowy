@@ -52,10 +52,11 @@ const getContractNetValue = (c: Contract): number => {
 };
 
 /**
- * Get the relevant date for a contract (prefers signedAt for signed/completed, falls back to createdAt)
+ * Get the relevant date for a contract.
+ * Uses createdAt as primary (this is the "Data umowy" that users edit in the UI).
+ * SignedAt is an auto-set event timestamp and should not override the user's chosen date.
  */
 const getContractDate = (c: Contract): Date => {
-    if (c.signedAt) return new Date(c.signedAt);
     return new Date(c.createdAt);
 };
 

@@ -277,7 +277,7 @@ export const ContractDetails: React.FC = () => {
                         )}
                     </div>
                     <p className="text-slate-500 ml-9 mt-1 text-sm">
-                        Utworzono:{' '}
+                        Data umowy:{' '}
                         {isEditing && isAdmin() ? (
                             <input
                                 type="date"
@@ -289,6 +289,21 @@ export const ContractDetails: React.FC = () => {
                             new Date(contract.createdAt).toLocaleDateString()
                         )}
                     </p>
+                    {contract.signedAt && (
+                        <p className="text-slate-500 ml-9 mt-1 text-sm">
+                            Data podpisania:{' '}
+                            {isEditing && isAdmin() ? (
+                                <input
+                                    type="date"
+                                    value={new Date(contract.signedAt).toISOString().split('T')[0]}
+                                    onChange={e => setContract({ ...contract, signedAt: new Date(e.target.value) })}
+                                    className="border-b-2 border-green-400 bg-transparent focus:outline-none focus:border-green-600 text-slate-700 font-medium"
+                                />
+                            ) : (
+                                new Date(contract.signedAt).toLocaleDateString()
+                            )}
+                        </p>
+                    )}
                 </div>
                 <div className="flex gap-2 flex-wrap flex-shrink-0">
                     {isEditing ? (
