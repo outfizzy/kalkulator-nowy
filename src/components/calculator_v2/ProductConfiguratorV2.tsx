@@ -1169,23 +1169,18 @@ export const ProductConfiguratorV2: React.FC = () => {
                         minDepth: limits.minDepth
                     });
 
-                    // Auto-constrain dimensions to valid range
+                    // Auto-constrain dimensions: only clamp UPPER bounds
+                    // Lower bounds are NOT clamped — the matrix lookup (gte) naturally snaps to nearest available size
                     let needsRerun = false;
 
-                    // Check WIDTH limits (allow up to 2x for combined constructions)
-                    if (width < limits.minWidth) {
-                        setWidth(limits.minWidth);
-                        needsRerun = true;
-                    } else if (width > limits.maxWidth * 2) {
+                    // Check WIDTH upper limit (allow up to 2x for combined constructions)
+                    if (width > limits.maxWidth * 2) {
                         setWidth(limits.maxWidth * 2);
                         needsRerun = true;
                     }
 
-                    // Check PROJECTION/DEPTH limits
-                    if (projection < limits.minDepth) {
-                        setProjection(limits.minDepth);
-                        needsRerun = true;
-                    } else if (projection > limits.maxDepth) {
+                    // Check PROJECTION/DEPTH upper limit
+                    if (projection > limits.maxDepth) {
                         setProjection(limits.maxDepth);
                         needsRerun = true;
                     }
@@ -2850,12 +2845,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             <span className="text-indigo-600 font-black text-xl">{width} mm</span>
                                         </label>
                                         <input
-                                            type="range" min="2000" max="14000" step="100"
+                                            type="range" min="1500" max="14000" step="100"
                                             value={width} onChange={e => setWidth(Number(e.target.value))}
                                             className="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mb-4"
                                         />
-                                        <div className="flex justify-between gap-2">
-                                            {[3000, 4000, 5000, 6000, 7000].map(w => (
+                                        <div className="flex justify-between gap-2 flex-wrap">
+                                            {[2000, 2500, 3000, 4000, 5000, 6000, 7000].map(w => (
                                                 <button key={w} onClick={() => setWidth(w)} className="px-2 py-1 text-xs bg-white border border-slate-200 rounded hover:border-indigo-300 transition-colors shadow-sm text-slate-600">{w}</button>
                                             ))}
                                         </div>
@@ -2868,12 +2863,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             <span className="text-indigo-600 font-black text-xl">{projection} mm</span>
                                         </label>
                                         <input
-                                            type="range" min={dimensionLimits?.minDepth || 1500} max={dimensionLimits?.maxDepth || 6000} step="100"
+                                            type="range" min="1500" max={dimensionLimits?.maxDepth || 6000} step="100"
                                             value={projection} onChange={e => setProjection(Number(e.target.value))}
                                             className="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mb-4"
                                         />
-                                        <div className="flex justify-between gap-2">
-                                            {[2500, 3000, 3500, 4000].filter(p => !dimensionLimits || p <= dimensionLimits.maxDepth).map(p => (
+                                        <div className="flex justify-between gap-2 flex-wrap">
+                                            {[1500, 2000, 2500, 3000, 3500, 4000].filter(p => !dimensionLimits || p <= dimensionLimits.maxDepth).map(p => (
                                                 <button key={p} onClick={() => setProjection(p)} className="px-2 py-1 text-xs bg-white border border-slate-200 rounded hover:border-indigo-300 transition-colors shadow-sm text-slate-600">{p}</button>
                                             ))}
                                         </div>
