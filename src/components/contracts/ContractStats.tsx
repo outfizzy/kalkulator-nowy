@@ -333,34 +333,109 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Umowy</p>
-                    <p className="text-2xl font-bold text-slate-800">{totals.count}</p>
-                    <p className="text-xs text-green-600 mt-1 font-medium">{totals.signed} podpisanych</p>
+            {/* KPI Cards — Premium Design */}
+            <div className={`grid grid-cols-2 ${showCommission ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3`}>
+                {/* Contracts Count */}
+                <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-blue-600 rounded-l-xl" />
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Umowy</p>
+                            <p className="text-3xl font-black text-slate-800 leading-none">{totals.count}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-bold">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4" /></svg>
+                                    {totals.signed}
+                                </span>
+                                <span className="text-[10px] text-slate-400">podpisanych</span>
+                            </div>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Obrót Netto</p>
-                    <p className="text-2xl font-bold text-slate-800">{formatCurrency(totals.totalNet)}</p>
-                    <p className="text-xs text-slate-400 mt-1">{totals.count > 0 ? `Śr. ${formatCurrency(totals.totalNet / totals.count)}` : '-'}</p>
+
+                {/* Net Turnover */}
+                <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-emerald-500 to-teal-600 rounded-l-xl" />
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Obrót Netto</p>
+                            <p className="text-2xl font-black text-slate-800 leading-none">{formatCurrency(totals.totalNet)}</p>
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                                {totals.count > 0 ? `Średnia: ${formatCurrency(totals.totalNet / totals.count)}` : '–'}
+                            </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Zysk</p>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(totals.totalProfit)}</p>
-                    <p className="text-xs text-slate-400 mt-1">{totals.totalNet > 0 ? `${((totals.totalProfit / totals.totalNet) * 100).toFixed(1)}% marży` : '-'}</p>
+
+                {/* Profit */}
+                <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-green-500 to-green-600 rounded-l-xl" />
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Zysk</p>
+                            <p className="text-2xl font-black text-green-600 leading-none">{formatCurrency(totals.totalProfit)}</p>
+                            <div className="flex items-center gap-1.5 mt-2">
+                                <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${totals.totalNet > 0 ? Math.min((totals.totalProfit / totals.totalNet) * 100, 100) : 0}%` }} />
+                                </div>
+                                <span className="text-[10px] text-green-600 font-bold">
+                                    {totals.totalNet > 0 ? `${((totals.totalProfit / totals.totalNet) * 100).toFixed(1)}%` : '–'}
+                                </span>
+                                <span className="text-[10px] text-slate-400">marży</span>
+                            </div>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                        </div>
+                    </div>
                 </div>
+
+                {/* Commission */}
                 {showCommission && (
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Prowizje</p>
-                        <p className="text-2xl font-bold text-indigo-600">{formatCurrency(totals.totalCommission)}</p>
-                        <p className="text-xs text-slate-400 mt-1">{totals.totalNet > 0 ? `${((totals.totalCommission / totals.totalNet) * 100).toFixed(1)}% obrotu` : '-'}</p>
+                    <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-violet-600 rounded-l-xl" />
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Prowizje</p>
+                                <p className="text-2xl font-black text-indigo-600 leading-none">{formatCurrency(totals.totalCommission)}</p>
+                                <div className="flex items-center gap-1.5 mt-2">
+                                    <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: `${totals.totalNet > 0 ? Math.min((totals.totalCommission / totals.totalNet) * 100 * 5, 100) : 0}%` }} />
+                                    </div>
+                                    <span className="text-[10px] text-indigo-600 font-bold">
+                                        {totals.totalNet > 0 ? `${((totals.totalCommission / totals.totalNet) * 100).toFixed(1)}%` : '–'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">obrotu</span>
+                                </div>
+                            </div>
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                            </div>
+                        </div>
                     </div>
                 )}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Anulowane</p>
-                    <p className="text-2xl font-bold text-red-500">{totals.cancelled}</p>
-                    <p className="text-xs text-slate-400 mt-1">{totals.allCount > 0 ? `${((totals.cancelled / totals.allCount) * 100).toFixed(0)}% wszystkich` : '-'}</p>
+
+                {/* Cancelled */}
+                <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-rose-400 to-red-500 rounded-l-xl" />
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Anulowane</p>
+                            <p className="text-3xl font-black text-rose-500 leading-none">{totals.cancelled}</p>
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                                {totals.allCount > 0 ? `${((totals.cancelled / totals.allCount) * 100).toFixed(0)}% wszystkich` : '–'}
+                            </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-red-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                        </div>
+                    </div>
                 </div>
             </div>
 
