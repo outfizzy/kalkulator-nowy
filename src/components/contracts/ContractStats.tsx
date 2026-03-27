@@ -554,38 +554,92 @@ export const ContractStats: React.FC<ContractStatsProps> = ({ contracts, showCom
                         </tfoot>
                     </table>
 
-                    {/* Monthly per-rep matrix */}
-                    {repStats.length > 1 && monthData.length > 0 && (
+                    {/* Monthly per-rep matrix: Count + Net + Commission */}
+                    {repStats.length > 0 && monthData.length > 0 && (
                         <div className="p-4 border-t border-slate-100">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Obrót netto wg przedstawiciela i miesiąca</h4>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                                Umowy i prowizje wg przedstawiciela i miesiąca
+                            </h4>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
-                                        <tr>
-                                            <th className="px-2 py-1.5 text-left text-slate-400 font-medium">Rep</th>
-                                            {monthData.map(m => <th key={m.key} className="px-2 py-1.5 text-right text-slate-400 font-medium">{m.label.split(' ')[0]}</th>)}
-                                            <th className="px-2 py-1.5 text-right text-slate-600 font-bold">Razem</th>
+                                        <tr className="border-b border-slate-200">
+                                            <th className="px-3 py-2 text-left text-slate-500 font-bold">Przedstawiciel</th>
+                                            {monthData.map(m => (
+                                                <th key={m.key} className="px-3 py-2 text-center text-slate-500 font-bold border-l border-slate-100">
+                                                    {m.label}
+                                                </th>
+                                            ))}
+                                            <th className="px-3 py-2 text-center text-slate-700 font-bold border-l border-slate-200 bg-slate-50">Razem</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50">
+                                    <tbody className="divide-y divide-slate-100">
                                         {repStats.map(rep => (
-                                            <tr key={rep.repId} className="hover:bg-slate-50">
-                                                <td className="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap flex items-center gap-1.5">
-                                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: repColorMap[rep.repId] }} />
-                                                    {rep.repName}
+                                            <tr key={rep.repId} className="hover:bg-indigo-50/30 transition-colors">
+                                                <td className="px-3 py-3 font-medium text-slate-800 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: repColorMap[rep.repId] }} />
+                                                        {rep.repName}
+                                                    </div>
                                                 </td>
                                                 {monthData.map((m) => {
                                                     const rd = m.byRep[rep.repId];
+                                                    if (!rd || rd.count === 0) return (
+                                                        <td key={m.key} className="px-3 py-3 text-center text-slate-200 border-l border-slate-50">—</td>
+                                                    );
                                                     return (
-                                                        <td key={m.key} className={`px-2 py-1.5 text-right ${rd ? 'text-slate-700 font-medium' : 'text-slate-200'}`}>
-                                                            {rd ? formatCurrency(rd.totalNet) : '-'}
+                                                        <td key={m.key} className="px-3 py-3 border-l border-slate-50">
+                                                            <div className="text-center">
+                                                                <div className="font-bold text-slate-800">{rd.count} <span className="text-slate-400 font-normal">um.</span></div>
+                                                                <div className="text-[10px] text-slate-500 mt-0.5">{formatCurrency(rd.totalNet)}</div>
+                                                                {showCommission && (
+                                                                    <div className="text-[10px] text-indigo-600 font-bold mt-0.5">
+                                                                        {formatCurrency(rd.totalCommission)} prow.
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     );
                                                 })}
-                                                <td className="px-2 py-1.5 text-right font-bold text-slate-800">{formatCurrency(rep.totalValueNet)}</td>
+                                                <td className="px-3 py-3 border-l border-slate-200 bg-slate-50">
+                                                    <div className="text-center">
+                                                        <div className="font-bold text-slate-800">{rep.count} <span className="text-slate-400 font-normal">um.</span></div>
+                                                        <div className="text-[10px] text-slate-600 font-medium mt-0.5">{formatCurrency(rep.totalValueNet)}</div>
+                                                        {showCommission && (
+                                                            <div className="text-[10px] text-indigo-700 font-bold mt-0.5">
+                                                                {formatCurrency(rep.totalCommission)} prow.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
+                                    <tfoot>
+                                        <tr className="bg-slate-50 border-t-2 border-slate-200">
+                                            <td className="px-3 py-2.5 font-bold text-slate-700">RAZEM</td>
+                                            {monthData.map(m => (
+                                                <td key={m.key} className="px-3 py-2.5 border-l border-slate-100">
+                                                    <div className="text-center">
+                                                        <div className="font-bold text-slate-700">{m.count}</div>
+                                                        <div className="text-[10px] text-slate-500">{formatCurrency(m.totalNet)}</div>
+                                                        {showCommission && (
+                                                            <div className="text-[10px] text-indigo-600 font-bold">{formatCurrency(m.totalCommission)}</div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            ))}
+                                            <td className="px-3 py-2.5 border-l border-slate-200 bg-slate-100">
+                                                <div className="text-center">
+                                                    <div className="font-bold text-slate-800">{totals.count}</div>
+                                                    <div className="text-[10px] text-slate-700 font-bold">{formatCurrency(totals.totalNet)}</div>
+                                                    {showCommission && (
+                                                        <div className="text-[10px] text-indigo-700 font-bold">{formatCurrency(totals.totalCommission)}</div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
