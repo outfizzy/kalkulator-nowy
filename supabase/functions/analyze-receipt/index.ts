@@ -18,10 +18,10 @@ Deno.serve(async (req) => {
             );
         }
 
-        const apiKey = Deno.env.get('OPENAI_API_KEY');
-        if (!apiKey) {
+        const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+        if (!anthropicKey) {
             return new Response(
-                JSON.stringify({ error: 'Missing OPENAI_API_KEY' }),
+                JSON.stringify({ error: 'Missing ANTHROPIC_API_KEY' }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
@@ -50,57 +50,63 @@ CRITICAL RULES:
 6. For fuel amount, look for volume indicators (L, l, litr, Liter).
 7. Return ONLY the JSON object, nothing else.`;
 
-        console.log(`[analyze-receipt] Processing receipt image analysis...`);
+        console.log(`[analyze-receipt] Processing receipt image with Claude Vision...`);
 
-        const imageUrl = image.startsWith('data:')
-            ? image
-            : `data:${mimeType || 'image/jpeg'};base64,${image}`;
+        const mediaType = mimeType || 'image/jpeg';
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+                'x-api-key': anthropicKey,
+                'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 500,
+                system: systemPrompt,
                 messages: [
-                    { role: 'system', content: systemPrompt },
                     {
                         role: 'user',
                         content: [
                             {
-                                type: 'text',
-                                text: 'Analyze this fuel receipt/invoice and extract the fuel amount, cost, currency, and station name.'
+                                type: 'image',
+                                source: {
+                                    type: 'base64',
+                                    media_type: mediaType,
+                                    data: image,
+                                },
                             },
                             {
-                                type: 'image_url',
-                                image_url: {
-                                    url: imageUrl,
-                                    detail: 'high'
-                                }
-                            }
-                        ]
-                    }
+                                type: 'text',
+                                text: 'Analyze this fuel receipt/invoice and extract: liters, cost, currency, station name. Return only JSON.',
+                            },
+                        ],
+                    },
                 ],
-                temperature: 0.1,
-                max_tokens: 500
-            })
+            }),
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('[analyze-receipt] OpenAI API Error:', response.status, errorText);
+            console.error('[analyze-receipt] Claude API Error:', response.status, errorText);
             return new Response(
-                JSON.stringify({ error: `OpenAI API Error (${response.status})`, details: errorText }),
+                JSON.stringify({ error: `Claude API Error (${response.status})`, details: errorText }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
         const data = await response.json();
-        const content = data.choices[0]?.message?.content?.trim();
+        const content = data.content?.[0]?.text?.trim();
 
-        console.log(`[analyze-receipt] Raw AI response:`, content);
+        console.log(`[analyze-receipt] Raw Claude response:`, content);
+
+        if (!content) {
+            return new Response(
+                JSON.stringify({ error: 'Empty response from Claude' }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
 
         let result;
         try {
