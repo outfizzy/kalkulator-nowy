@@ -118,12 +118,12 @@ export const ContractDetails: React.FC = () => {
     };
 
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     const uploadAttachment = async (file: File, type: 'document' | 'image') => {
         if (!contract) return;
-        setIsUploading(true);
-        const toastId = toast.loading('Wgrywanie pliku...');
 
         try {
             const path = `contracts/${contract.id}`;
@@ -145,12 +145,41 @@ export const ContractDetails: React.FC = () => {
 
             setContract(updatedContract);
             await DatabaseService.updateContract(updatedContract.id, updatedContract);
-            toast.success('Plik wgrany pomyślnie', { id: toastId });
+            return true;
         } catch (error) {
             console.error('Upload error:', error);
-            toast.error('Błąd wgrywania pliku', { id: toastId });
-        } finally {
-            setIsUploading(false);
+            return false;
+        }
+    };
+
+    /** Batch upload: handles multiple files with progress counter */
+    const uploadMultipleFiles = async (files: File[], type: 'document' | 'image' | 'auto') => {
+        if (!contract || files.length === 0) return;
+        setIsUploading(true);
+        setUploadProgress({ current: 0, total: files.length });
+        const toastId = toast.loading(`Wgrywanie 0/${files.length}...`);
+
+        let successCount = 0;
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileType = type === 'auto'
+                ? (file.type.startsWith('image/') ? 'image' : 'document')
+                : type;
+
+            setUploadProgress({ current: i + 1, total: files.length });
+            toast.loading(`Wgrywanie ${i + 1}/${files.length}...`, { id: toastId });
+
+            const ok = await uploadAttachment(file, fileType);
+            if (ok) successCount++;
+        }
+
+        setUploadProgress({ current: 0, total: 0 });
+        setIsUploading(false);
+
+        if (successCount === files.length) {
+            toast.success(`Wgrano ${successCount} ${successCount === 1 ? 'plik' : 'plików'}`, { id: toastId });
+        } else {
+            toast.error(`Wgrano ${successCount}/${files.length} plików`, { id: toastId });
         }
     };
 
@@ -162,21 +191,50 @@ export const ContractDetails: React.FC = () => {
             return;
         }
         const renamedFile = new File([file], `UMOWA-PODPISANA-${contract?.contractNumber.replace(/\//g, '-')}.pdf`, { type: file.type });
-        uploadAttachment(renamedFile, 'document');
+        uploadMultipleFiles([renamedFile], 'document');
     };
 
     const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
-        Array.from(e.target.files).forEach(file => {
-            if (!file.type.startsWith('image/')) return;
-            uploadAttachment(file, 'image');
-        });
+        const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+        uploadMultipleFiles(files, 'image');
     };
 
     const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
+        const files = Array.from(e.target.files);
+        uploadMultipleFiles(files, 'auto');
+    };
+
+    /** Camera capture — opens native camera on mobile */
+    const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
         const file = e.target.files[0];
-        uploadAttachment(file, 'document');
+        if (!file.type.startsWith('image/')) return;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const renamed = new File([file], `Foto-${timestamp}.${file.name.split('.').pop()}`, { type: file.type });
+        uploadMultipleFiles([renamed], 'image');
+    };
+
+    /** Document scan via camera — captures image and labels as scanned document */
+    const handleScanCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        const files = Array.from(e.target.files);
+        const renamedFiles = files.map((file, i) => {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const ext = file.name.split('.').pop();
+            return new File([file], `SKAN-${contract?.contractNumber?.replace(/\//g, '-') || 'DOC'}-${timestamp}${files.length > 1 ? `-${i + 1}` : ''}.${ext}`, { type: file.type });
+        });
+        uploadMultipleFiles(renamedFiles, 'image');
+    };
+
+    /** Drag & Drop handlers */
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); };
+    const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false); };
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragOver(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) uploadMultipleFiles(files, 'auto');
     };
 
     const handlePlanInstallation = async () => {
@@ -1025,49 +1083,140 @@ export const ContractDetails: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Dokumenty & Zdjęcia */}
+                    {/* Dokumenty & Zdjęcia — Professional Upload Center */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-xs uppercase tracking-wider">
-                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            Dokumenty & Zdjęcia
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
+                            <span className="flex items-center gap-2 text-xs uppercase tracking-wider">
+                                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                Dokumenty & Zdjęcia
+                            </span>
+                            {(allDocuments.length > 0 || allImages.length > 0) && (
+                                <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
+                                    {allDocuments.length + allImages.length} {(allDocuments.length + allImages.length) === 1 ? 'plik' : 'plików'}
+                                </span>
+                            )}
                         </h3>
 
-                        {/* Upload buttons */}
-                        <div className="flex flex-wrap gap-2 mb-4">
-                            <label className="cursor-pointer px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors">
-                                <input type="file" accept="application/pdf" onChange={handleSignedContractUpload} className="hidden" />
-                                📄 Podpisana Umowa
-                            </label>
-                            <label className={`cursor-pointer px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors ${isUploading ? 'opacity-50' : ''}`}>
-                                <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} disabled={isUploading} className="hidden" />
-                                📸 Zdjęcia
-                            </label>
-                            <label className={`cursor-pointer px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors ${isUploading ? 'opacity-50' : ''}`}>
-                                <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={handleDocumentUpload} disabled={isUploading} className="hidden" />
-                                📎 Plik
-                            </label>
+                        {/* Drag & Drop Zone + Upload Progress */}
+                        <div
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            className={`relative border-2 border-dashed rounded-xl p-4 mb-4 transition-all duration-200 ${
+                                isDragOver
+                                    ? 'border-indigo-400 bg-indigo-50/50 scale-[1.01]'
+                                    : isUploading
+                                        ? 'border-amber-300 bg-amber-50/30'
+                                        : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
+                            }`}
+                        >
+                            {/* Upload progress overlay */}
+                            {isUploading && uploadProgress.total > 0 && (
+                                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center z-10">
+                                    <div className="w-10 h-10 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-2" />
+                                    <p className="text-sm font-bold text-indigo-600">{uploadProgress.current}/{uploadProgress.total}</p>
+                                    <p className="text-[10px] text-slate-400">Wgrywanie plików...</p>
+                                </div>
+                            )}
+
+                            {/* Drag overlay */}
+                            {isDragOver && (
+                                <div className="absolute inset-0 bg-indigo-50/90 backdrop-blur-sm rounded-xl flex items-center justify-center z-10">
+                                    <div className="text-center">
+                                        <svg className="w-10 h-10 text-indigo-500 mx-auto mb-2 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                                        <p className="text-sm font-bold text-indigo-600">Upuść pliki tutaj</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Action Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                {/* 1. Signed Contract PDF */}
+                                <label className={`cursor-pointer flex flex-col items-center gap-1.5 p-3 rounded-xl border border-transparent hover:border-purple-200 hover:bg-purple-50 transition-all group ${isUploading ? 'pointer-events-none opacity-40' : ''}`}>
+                                    <input type="file" accept="application/pdf" onChange={handleSignedContractUpload} className="hidden" disabled={isUploading} />
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-600 text-center leading-tight">Podpisana<br/>Umowa</span>
+                                </label>
+
+                                {/* 2. Photos (multiple) */}
+                                <label className={`cursor-pointer flex flex-col items-center gap-1.5 p-3 rounded-xl border border-transparent hover:border-blue-200 hover:bg-blue-50 transition-all group ${isUploading ? 'pointer-events-none opacity-40' : ''}`}>
+                                    <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} disabled={isUploading} className="hidden" />
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-600 text-center leading-tight">Zdjęcia<br/><span className="text-slate-400 font-normal">wiele</span></span>
+                                </label>
+
+                                {/* 3. Camera Capture (mobile) */}
+                                <label className={`cursor-pointer flex flex-col items-center gap-1.5 p-3 rounded-xl border border-transparent hover:border-emerald-200 hover:bg-emerald-50 transition-all group ${isUploading ? 'pointer-events-none opacity-40' : ''}`}>
+                                    <input type="file" accept="image/*" capture="environment" onChange={handleCameraCapture} disabled={isUploading} className="hidden" />
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-600 text-center leading-tight">Aparat<br/><span className="text-slate-400 font-normal">foto</span></span>
+                                </label>
+
+                                {/* 4. Scan Document */}
+                                <label className={`cursor-pointer flex flex-col items-center gap-1.5 p-3 rounded-xl border border-transparent hover:border-amber-200 hover:bg-amber-50 transition-all group ${isUploading ? 'pointer-events-none opacity-40' : ''}`}>
+                                    <input type="file" accept="image/*" capture="environment" multiple onChange={handleScanCapture} disabled={isUploading} className="hidden" />
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h6" /></svg>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-600 text-center leading-tight">Skanuj<br/><span className="text-slate-400 font-normal">dokument</span></span>
+                                </label>
+
+                                {/* 5. Any Files (multiple) */}
+                                <label className={`cursor-pointer flex flex-col items-center gap-1.5 p-3 rounded-xl border border-transparent hover:border-slate-300 hover:bg-slate-100 transition-all group ${isUploading ? 'pointer-events-none opacity-40' : ''}`}>
+                                    <input type="file" multiple onChange={handleDocumentUpload} disabled={isUploading} className="hidden" />
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-500 to-slate-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-600 text-center leading-tight">Pliki<br/><span className="text-slate-400 font-normal">wiele</span></span>
+                                </label>
+                            </div>
+
+                            {/* Drop hint */}
+                            {!isUploading && !isDragOver && allDocuments.length === 0 && allImages.length === 0 && (
+                                <p className="text-center text-[10px] text-slate-400 mt-2">lub przeciągnij i upuść pliki tutaj</p>
+                            )}
                         </div>
 
-                        {/* Photos */}
+                        {/* Photos Gallery */}
                         {allImages.length > 0 && (
-                            <div className="grid grid-cols-4 gap-2 mb-4">
-                                {allImages.map((photo, idx) => (
-                                    <div key={photo.id} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group cursor-pointer" onClick={() => setLightboxIndex(idx)}>
-                                        <img src={photo.url} alt={photo.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            <>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">📸 Zdjęcia ({allImages.length})</p>
+                                <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mb-4">
+                                    {allImages.map((photo, idx) => (
+                                        <div key={photo.id} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group cursor-pointer" onClick={() => setLightboxIndex(idx)}>
+                                            <img src={photo.url} alt={photo.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" loading="lazy" />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+                                            </div>
+                                            {/* Scan badge */}
+                                            {photo.name.startsWith('SKAN-') && (
+                                                <div className="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm">SKAN</div>
+                                            )}
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            </>
                         )}
 
-                        {/* Documents */}
-                        <div className="space-y-2">
+                        {/* Documents List */}
+                        {allDocuments.length > 0 && (
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">📄 Dokumenty ({allDocuments.length})</p>
+                        )}
+                        <div className="space-y-1.5">
                             {allDocuments.map(doc => (
-                                <div key={doc.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg hover:border-blue-300 transition-colors">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${doc.name.toLowerCase().includes('podpisan') ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                                <div key={doc.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-2.5 overflow-hidden">
+                                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                                            doc.name.toLowerCase().includes('podpisan') ? 'bg-green-100 text-green-600' :
+                                            doc.name.startsWith('SKAN-') ? 'bg-amber-100 text-amber-600' :
+                                            'bg-slate-100 text-slate-500'
+                                        }`}>
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                         </div>
                                         <div className="truncate">
@@ -1075,13 +1224,13 @@ export const ContractDetails: React.FC = () => {
                                             <div className="text-[10px] text-slate-400">{new Date(doc.createdAt).toLocaleDateString()}</div>
                                         </div>
                                     </div>
-                                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors flex-shrink-0">
+                                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                     </a>
                                 </div>
                             ))}
                             {allDocuments.length === 0 && allImages.length === 0 && (
-                                <div className="text-center text-xs text-slate-400 py-4 italic">Brak załączników</div>
+                                <div className="text-center text-xs text-slate-400 py-2 italic">Brak załączników — użyj przycisków powyżej lub przeciągnij pliki</div>
                             )}
                         </div>
                     </div>
