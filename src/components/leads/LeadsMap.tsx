@@ -12,9 +12,11 @@ const GUBIN_COORDS = { lat: 51.9533, lng: 14.7233 };
 
 const STATUS_COLORS: Record<LeadStatus, string> = {
     new: '#3B82F6',
+    formularz: '#14B8A6',
     fair: '#EC4899',
     contacted: '#F59E0B',
     measurement_scheduled: '#06B6D4',
+    measurement_completed: '#A855F7',
     offer_sent: '#6366F1',
     negotiation: '#8B5CF6',
     won: '#10B981',
@@ -23,9 +25,11 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
     new: 'Nowy',
+    formularz: 'Formularz',
     fair: 'Targi',
     contacted: 'Skontaktowano',
     measurement_scheduled: 'Umówiony na pomiar',
+    measurement_completed: 'Pomiar odbył się',
     offer_sent: 'Oferta Wysłana',
     negotiation: 'Negocjacje',
     won: 'Wygrany',
@@ -151,8 +155,8 @@ export const LeadsMap: React.FC<LeadsMapProps> = ({ leads }) => {
 
     // Resolve coordinates offline (no API calls)
     useEffect(() => {
-        const newLeads = leads.filter(l => l.status === 'new' || l.status === 'fair');
-        const resolved = newLeads
+        const newClientLeads = leads.filter(l => ['new', 'fair', 'formularz'].includes(l.status));
+        const resolved = newClientLeads
             .map(l => resolveCoordinates(l))
             .filter((r): r is GeocodedLead => r !== null);
         setGeocodedLeads(resolved);
@@ -245,21 +249,21 @@ export const LeadsMap: React.FC<LeadsMapProps> = ({ leads }) => {
         return acc;
     }, {} as Record<string, number>);
 
-    const newLeadsCount = leads.filter(l => l.status === 'new' || l.status === 'fair').length;
+    const newClientsCount = leads.filter(l => ['new', 'fair', 'formularz'].includes(l.status)).length;
 
     return (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-blue-600" />
-                    <h3 className="font-bold text-slate-800">Mapa Nowych Leadów</h3>
+                    <h3 className="font-bold text-slate-800">Mapa Nowych Klientów</h3>
                     <span className="text-sm text-slate-500">
-                        ({geocodedLeads.length} z {newLeadsCount} nowych na mapie)
+                        ({geocodedLeads.length} z {newClientsCount} na mapie)
                     </span>
                 </div>
-                {geocodedLeads.length < newLeadsCount && (
+                {geocodedLeads.length < newClientsCount && (
                     <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                        {newLeadsCount - geocodedLeads.length} bez kodu pocztowego
+                        {newClientsCount - geocodedLeads.length} bez kodu pocztowego
                     </span>
                 )}
             </div>
@@ -306,6 +310,9 @@ export const LeadsMap: React.FC<LeadsMapProps> = ({ leads }) => {
                 <div className="flex gap-4">
                     <span className="text-slate-600">
                         <strong className="text-blue-600">{statusCounts['new'] || 0}</strong> nowych
+                    </span>
+                    <span className="text-slate-600">
+                        <strong className="text-teal-600">{statusCounts['formularz'] || 0}</strong> formularz
                     </span>
                     <span className="text-slate-600">
                         <strong className="text-pink-600">{statusCounts['fair'] || 0}</strong> z targów

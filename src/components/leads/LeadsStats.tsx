@@ -14,12 +14,54 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         const won = leads.filter(l => l.status === 'won').length;
         const lost = leads.filter(l => l.status === 'lost').length;
         const active = total - won - lost;
+        const newClients = leads.filter(l => ['new', 'formularz'].includes(l.status)).length;
 
         const conversionRate = total > 0 ? ((won / total) * 100).toFixed(1) : '0.0';
 
-        // --- Source / Fair Stats ---
+        // ── Average Response Time (hours) ──
+        const responseTimes: number[] = [];
+        leads.forEach(lead => {
+            if (lead.status !== 'new' && lead.lastContactDate && lead.createdAt) {
+                const hours = (new Date(lead.lastContactDate).getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60);
+                if (hours > 0 && hours < 720) responseTimes.push(hours); // max 30 days
+            }
+        });
+        const avgResponseHours = responseTimes.length > 0
+            ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+            : null;
+
+        // ── Monthly Trend ──
+        const now = new Date();
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const thisMonthLeads = leads.filter(l => new Date(l.createdAt) >= thisMonthStart).length;
+        const lastMonthLeads = leads.filter(l => {
+            const d = new Date(l.createdAt);
+            return d >= lastMonthStart && d < thisMonthStart;
+        }).length;
+        const trendPercent = lastMonthLeads > 0
+            ? (((thisMonthLeads - lastMonthLeads) / lastMonthLeads) * 100).toFixed(0)
+            : null;
+
+        // ── Pipeline Distribution ──
+        const pipelineStages = [
+            { id: 'new', label: 'Nowe', color: '#3B82F6' },
+            { id: 'formularz', label: 'Formularz', color: '#14B8A6' },
+            { id: 'contacted', label: 'Kontakt', color: '#6366F1' },
+            { id: 'offer_sent', label: 'Oferta', color: '#F59E0B' },
+            { id: 'measurement_scheduled', label: 'Pomiar', color: '#06B6D4' },
+            { id: 'measurement_completed', label: 'Po pomiarze', color: '#A855F7' },
+            { id: 'negotiation', label: 'Negocjacje', color: '#F97316' },
+        ];
+        const pipelineCounts = pipelineStages.map(s => ({
+            ...s,
+            count: leads.filter(l => l.status === s.id).length,
+        }));
+        const pipelineTotal = pipelineCounts.reduce((a, b) => a + b.count, 0);
+
+        // ── Source Stats ──
         interface SourceStatItem {
-            id: string; // fairId or 'website' etc.
+            id: string;
             name: string;
             count: number;
             won: number;
@@ -28,7 +70,6 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         }
 
         const sourceMap: Record<string, SourceStatItem> = {};
-
         leads.forEach(lead => {
             let key: string = lead.source;
             let name = lead.source === 'targi' ? 'Targi (Nieznane)' : (lead.source || 'Inne');
@@ -48,16 +89,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             }
 
             if (!sourceMap[key]) {
-                sourceMap[key] = {
-                    id: key,
-                    name,
-                    count: 0,
-                    won: 0,
-                    conversion: '0.0',
-                    isFair
-                };
+                sourceMap[key] = { id: key, name, count: 0, won: 0, conversion: '0.0', isFair };
             }
-
             sourceMap[key].count++;
             if (lead.status === 'won') sourceMap[key].won++;
         });
@@ -67,7 +100,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             conversion: item.count > 0 ? ((item.won / item.count) * 100).toFixed(1) : '0.0'
         })).sort((a, b) => b.count - a.count);
 
-        // Full Detailed Calculation (Group by assignee)
+        // ── Assignee Stats ──
         interface RepStats {
             id: string;
             name: string;
@@ -79,7 +112,6 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         }
 
         const assigneeStats: Record<string, RepStats> = {};
-
         leads.forEach(lead => {
             const assigneeId = lead.assignedTo || 'unassigned';
             const name = lead.assignee
@@ -87,39 +119,24 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                 : (lead.assignedTo ? 'Nieznany' : 'Nieprzypisane');
 
             if (!assigneeStats[assigneeId]) {
-                assigneeStats[assigneeId] = {
-                    id: assigneeId,
-                    name,
-                    total: 0,
-                    active: 0,
-                    won: 0,
-                    lost: 0,
-                    conversion: '0.0'
-                };
+                assigneeStats[assigneeId] = { id: assigneeId, name, total: 0, active: 0, won: 0, lost: 0, conversion: '0.0' };
             }
-
             const rep = assigneeStats[assigneeId];
             rep.total++;
-
             if (lead.status === 'won') rep.won++;
             else if (lead.status === 'lost') rep.lost++;
             else rep.active++;
         });
 
-        // Calculate Conversion and Sort
-        const sortedAssignees = Object.values(assigneeStats).map(rep => {
-            return {
-                ...rep,
-                conversion: rep.total > 0 ? ((rep.won / rep.total) * 100).toFixed(1) : '0.0'
-            };
-        }).sort((a, b) => b.total - a.total);
+        const sortedAssignees = Object.values(assigneeStats).map(rep => ({
+            ...rep,
+            conversion: rep.total > 0 ? ((rep.won / rep.total) * 100).toFixed(1) : '0.0'
+        })).sort((a, b) => b.total - a.total);
 
-        const topPerformer = sortedAssignees.length > 0 ? sortedAssignees.sort((a, b) => b.won - a.won)[0] : null;
-
-        // Re-sort by Total for the table display (usually expected)
+        const topPerformer = sortedAssignees.length > 0 ? [...sortedAssignees].sort((a, b) => b.won - a.won)[0] : null;
         const tableData = [...sortedAssignees].sort((a, b) => b.total - a.total);
 
-        // --- Lost Reason Stats ---
+        // ── Lost Reason Stats ──
         const lostLeads = leads.filter(l => l.status === 'lost');
         const lostReasonMap: Record<string, number> = {};
         lostLeads.forEach(lead => {
@@ -128,137 +145,177 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         });
         const lostReasonStats = Object.entries(lostReasonMap)
             .map(([reason, count]) => ({
-                reason,
-                count,
+                reason, count,
                 percentage: lostLeads.length > 0 ? ((count / lostLeads.length) * 100).toFixed(1) : '0.0'
             }))
             .sort((a, b) => b.count - a.count);
 
-        // --- Lost By Stats (who marked leads as lost) ---
+        // ── Lost By Stats ──
         const lostByMap: Record<string, { name: string; count: number }> = {};
         lostLeads.forEach(lead => {
             const userId = lead.lostBy || lead.assignedTo || 'unknown';
             const name = lead.lostByName
                 || (lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}`.trim() : '')
                 || 'Nieznany';
-            if (!lostByMap[userId]) {
-                lostByMap[userId] = { name, count: 0 };
-            }
+            if (!lostByMap[userId]) lostByMap[userId] = { name, count: 0 };
             lostByMap[userId].count++;
         });
         const lostByStats = Object.entries(lostByMap)
             .map(([id, { name, count }]) => ({
-                id,
-                name,
-                count,
+                id, name, count,
                 percentage: lostLeads.length > 0 ? ((count / lostLeads.length) * 100).toFixed(1) : '0.0'
             }))
             .sort((a, b) => b.count - a.count);
 
         return {
-            total,
-            won,
-            lost,
-            active,
-            conversionRate,
-            topPerformer, // Best by WON count
+            total, won, lost, active, newClients,
+            conversionRate, topPerformer,
+            avgResponseHours, thisMonthLeads, trendPercent,
+            pipelineCounts, pipelineTotal,
             uniqueAssignees: Object.keys(assigneeStats).length,
-            detailedStats: tableData,
-            sourceStats, // New
-            lostReasonStats, // Lost reasons breakdown
-            lostByStats // Who marked leads as lost
+            detailedStats: tableData, sourceStats,
+            lostReasonStats, lostByStats
         };
     }, [leads, fairs]);
 
     if (leads.length === 0) return null;
 
+    // Format response time nicely
+    const formatResponseTime = (hours: number | null): string => {
+        if (!hours) return '—';
+        if (hours < 1) return `${Math.round(hours * 60)}min`;
+        if (hours < 24) return `${hours.toFixed(1)}h`;
+        return `${(hours / 24).toFixed(1)}d`;
+    };
+
     return (
         <div className="space-y-8 mb-6">
-            {/* Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Total Leads Card */}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <svg className="w-16 h-16 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
+            {/* ══════════════ KPI Cards Grid ══════════════ */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* Total */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity">
+                        <svg className="w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     </div>
-                    <div>
-                        <h3 className="text-sm font-medium text-slate-500">Wszystkie Leady</h3>
-                        <div className="text-3xl font-bold text-slate-900 mt-2">{stats.total}</div>
-                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Wszystkie</p>
+                    <div className="text-2xl font-black text-slate-900 mt-1">{stats.total}</div>
                     {stats.topPerformer && stats.uniqueAssignees > 1 && (
-                        <div className="text-xs text-slate-400 mt-2">
-                            Lider Sprzedaży: <span className="font-semibold text-slate-600">{stats.topPerformer.name}</span> ({stats.topPerformer.won})
-                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 truncate">Lider: <span className="font-semibold text-slate-600">{stats.topPerformer.name}</span></p>
                     )}
                 </div>
 
-                {/* Active Leads Card */}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <svg className="w-16 h-16 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+                {/* New Clients */}
+                <div className="bg-gradient-to-br from-blue-50 to-teal-50 p-4 rounded-xl border border-blue-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity">
+                        <svg className="w-12 h-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                     </div>
-                    <div>
-                        <h3 className="text-sm font-medium text-slate-500">W Toku (Aktywne)</h3>
-                        <div className="text-3xl font-bold text-blue-600 mt-2">{stats.active}</div>
-                    </div>
-                    <div className="text-xs text-blue-400 mt-2 bg-blue-50 px-2 py-1 rounded inline-block self-start">
-                        Wymagają działania
-                    </div>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Nowi Klienci</p>
+                    <div className="text-2xl font-black text-blue-700 mt-1">{stats.newClients}</div>
+                    <p className="text-[10px] text-blue-400 mt-1">Leady + Formularz</p>
                 </div>
 
-                {/* Conversion Rate Card */}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <svg className="w-16 h-16 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
+                {/* Active */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity">
+                        <svg className="w-12 h-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                     </div>
-                    <div>
-                        <h3 className="text-sm font-medium text-slate-500">Skuteczność (Konwersja)</h3>
-                        <div className="text-3xl font-bold text-green-600 mt-2">{stats.conversionRate}%</div>
-                    </div>
-                    <div className="text-xs text-slate-400 mt-2">
-                        Globalna średnia dla widoku
-                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">W Toku</p>
+                    <div className="text-2xl font-black text-indigo-600 mt-1">{stats.active}</div>
+                    <p className="text-[10px] text-indigo-300 mt-1">Wymaga działania</p>
                 </div>
 
-                {/* Status Breakdown Card */}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col h-32 relative overflow-hidden">
-                    <h3 className="text-sm font-medium text-slate-500 mb-2">Rozkład Statusów</h3>
-                    <div className="flex-1 flex flex-col justify-center space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-600 flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-blue-400"></span> Nowe/Kontakt
-                            </span>
-                            <span className="font-semibold">{leads.filter(l => ['new', 'contacted'].includes(l.status)).length}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-600 flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-purple-400"></span> Oferta/Nego
-                            </span>
-                            <span className="font-semibold">{leads.filter(l => ['offer_sent', 'negotiation'].includes(l.status)).length}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-600 flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-green-500"></span> Realizacja
-                            </span>
-                            <span className="font-semibold text-green-600">{stats.won}</span>
-                        </div>
+                {/* Conversion Rate */}
+                <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-4 rounded-xl border border-emerald-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity">
+                        <svg className="w-12 h-12 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                     </div>
+                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Konwersja</p>
+                    <div className="text-2xl font-black text-emerald-700 mt-1">{stats.conversionRate}%</div>
+                    <p className="text-[10px] text-emerald-400 mt-1">{stats.won} wygranych z {stats.total}</p>
+                </div>
+
+                {/* Response Time */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity">
+                        <svg className="w-12 h-12 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Czas Reakcji</p>
+                    <div className={`text-2xl font-black mt-1 ${stats.avgResponseHours && stats.avgResponseHours < 4 ? 'text-emerald-600' : stats.avgResponseHours && stats.avgResponseHours < 24 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {formatResponseTime(stats.avgResponseHours)}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Śr. do 1. kontaktu</p>
+                </div>
+
+                {/* Monthly Trend */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity">
+                        <svg className="w-12 h-12 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ten Miesiąc</p>
+                    <div className="text-2xl font-black text-slate-800 mt-1">{stats.thisMonthLeads}</div>
+                    {stats.trendPercent && (
+                        <p className={`text-[10px] font-bold mt-1 flex items-center gap-0.5 ${Number(stats.trendPercent) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {Number(stats.trendPercent) >= 0 ? '↑' : '↓'} {Math.abs(Number(stats.trendPercent))}% vs ub. mies.
+                        </p>
+                    )}
                 </div>
             </div>
 
+            {/* ══════════════ Pipeline Distribution Bar ══════════════ */}
+            {stats.pipelineTotal > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+                            Rozkład Pipeline
+                        </h3>
+                        <span className="text-xs text-slate-400 font-medium">{stats.pipelineTotal} aktywnych</span>
+                    </div>
+                    {/* Stacked bar */}
+                    <div className="flex rounded-full overflow-hidden h-5 bg-slate-100">
+                        {stats.pipelineCounts.filter(s => s.count > 0).map(s => (
+                            <div
+                                key={s.id}
+                                className="h-full transition-all duration-500 relative group/bar"
+                                style={{
+                                    width: `${(s.count / stats.pipelineTotal) * 100}%`,
+                                    backgroundColor: s.color,
+                                    minWidth: s.count > 0 ? '16px' : 0,
+                                }}
+                                title={`${s.label}: ${s.count}`}
+                            >
+                                {(s.count / stats.pipelineTotal) > 0.08 && (
+                                    <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-sm">
+                                        {s.count}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    {/* Legend */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+                        {stats.pipelineCounts.filter(s => s.count > 0).map(s => (
+                            <div key={s.id} className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                                <span className="font-medium">{s.label}</span>
+                                <span className="text-slate-400">({s.count})</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════ Tables Grid ══════════════ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Detailed Team Performance Table */}
+                {/* Team Performance */}
                 {stats.detailedStats.length > 0 && (
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
-                                <h3 className="font-bold text-slate-800">Efektywność Zespołu</h3>
+                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                    Efektywność Zespołu
+                                </h3>
                                 <p className="text-xs text-slate-500 mt-0.5">Analiza wyników handlowców</p>
                             </div>
                         </div>
@@ -306,11 +363,14 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                     </div>
                 )}
 
-                {/* Sources Breakdown Table */}
+                {/* Sources Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <div>
-                            <h3 className="font-bold text-slate-800">Źródła Leadów</h3>
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                                Źródła Leadów
+                            </h3>
                             <p className="text-xs text-slate-500 mt-0.5">Analiza źródeł i targów</p>
                         </div>
                     </div>
@@ -335,7 +395,6 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                             ) : (
                                                 source.name
                                             )}
-
                                         </td>
                                         <td className="px-6 py-3 text-right font-semibold">{source.count}</td>
                                         <td className="px-6 py-3 text-right text-green-600 font-bold">{source.won}</td>
@@ -344,7 +403,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                                 <span>{source.conversion}%</span>
                                                 <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                     <div
-                                                        className="h-full bg-blue-500 rounded-full" // Blue for sources
+                                                        className="h-full bg-blue-500 rounded-full"
                                                         style={{ width: `${Math.min(parseFloat(source.conversion), 100)}%` }}
                                                     ></div>
                                                 </div>
@@ -358,7 +417,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                 </div>
             </div>
 
-            {/* Lost Reasons Breakdown */}
+            {/* ══════════════ Lost Analysis ══════════════ */}
             {stats.lostReasonStats.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Lost Summary Card */}
@@ -428,7 +487,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                 </div>
             )}
 
-            {/* Who Marked Leads as Lost */}
+            {/* Who Lost Leads */}
             {stats.lostByStats.length > 0 && (
                 <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-amber-100 bg-amber-50">
@@ -482,4 +541,3 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         </div>
     );
 };
-
