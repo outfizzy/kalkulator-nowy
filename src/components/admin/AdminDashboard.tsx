@@ -211,6 +211,188 @@ const actionGroups = [
 
 
 // ═══════════════════════════════════════════════════════════
+// LEADS PIPELINE WIDGET
+// ═══════════════════════════════════════════════════════════
+const PIPELINE_STAGES = [
+    { id: 'new', label: 'Nowe', color: '#3B82F6' },
+    { id: 'formularz', label: 'Nowe (Form.)', color: '#14B8A6' },
+    { id: 'contacted', label: 'Kontakt', color: '#6366F1' },
+    { id: 'offer_sent', label: 'Oferta', color: '#F59E0B' },
+    { id: 'measurement_scheduled', label: 'Pomiar', color: '#06B6D4' },
+    { id: 'measurement_completed', label: 'Po pomiarze', color: '#A855F7' },
+    { id: 'negotiation', label: 'Negocjacje', color: '#F97316' },
+];
+
+const LeadsPipelineWidget: React.FC = () => {
+    const [pipelineData, setPipelineData] = useState<{ id: string; label: string; color: string; count: number }[]>([]);
+    const [recentLeads, setRecentLeads] = useState<{ id: string; name: string; status: string; created: string; city?: string }[]>([]);
+    const [totals, setTotals] = useState({ total: 0, won: 0, lost: 0, stale: 0, thisWeek: 0 });
+
+    useEffect(() => {
+        const fetchLeads = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('leads')
+                    .select('id, status, customer_data, created_at, last_contact_date')
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                const leads = data || [];
+
+                // Pipeline counts
+                const counts = PIPELINE_STAGES.map(s => ({
+                    ...s,
+                    count: leads.filter(l => l.status === s.id).length,
+                }));
+                setPipelineData(counts);
+
+                // Totals
+                const won = leads.filter(l => l.status === 'won').length;
+                const lost = leads.filter(l => l.status === 'lost').length;
+                const now = new Date();
+                const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                const thisWeek = leads.filter(l => new Date(l.created_at) >= weekAgo).length;
+
+                // Stale leads (active but no contact in threshold days)
+                const staleThresholds: Record<string, number> = { new: 1, formularz: 2, contacted: 3, measurement_scheduled: 2, measurement_completed: 3, offer_sent: 5, negotiation: 7 };
+                const stale = leads.filter(l => {
+                    if (['won', 'lost', 'fair'].includes(l.status)) return false;
+                    const threshold = staleThresholds[l.status] || 3;
+                    const lastDate = l.last_contact_date ? new Date(l.last_contact_date) : new Date(l.created_at);
+                    return (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24) > threshold;
+                }).length;
+
+                setTotals({ total: leads.length, won, lost, stale, thisWeek });
+
+                // Recent 5
+                const recent = leads.slice(0, 5).map(l => {
+                    const cd = l.customer_data as any;
+                    return {
+                        id: l.id,
+                        name: `${cd?.firstName || ''} ${cd?.lastName || ''}`.trim() || 'Nieznany',
+                        status: l.status,
+                        created: new Date(l.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                        city: cd?.city,
+                    };
+                });
+                setRecentLeads(recent);
+            } catch (e) {
+                console.error('LeadsPipelineWidget error:', e);
+            }
+        };
+        fetchLeads();
+    }, []);
+
+    const pipelineTotal = pipelineData.reduce((a, b) => a + b.count, 0);
+    const conversionRate = totals.total > 0 ? ((totals.won / totals.total) * 100).toFixed(1) : '0.0';
+    const STATUS_COLORS_MAP: Record<string, string> = {
+        new: 'bg-blue-100 text-blue-700', formularz: 'bg-teal-100 text-teal-700',
+        contacted: 'bg-indigo-100 text-indigo-700', offer_sent: 'bg-yellow-100 text-yellow-700',
+        measurement_scheduled: 'bg-cyan-100 text-cyan-700', measurement_completed: 'bg-purple-100 text-purple-700',
+        negotiation: 'bg-orange-100 text-orange-700', won: 'bg-emerald-100 text-emerald-700',
+        lost: 'bg-red-100 text-red-700', fair: 'bg-pink-100 text-pink-700',
+    };
+    const STATUS_LABELS_MAP: Record<string, string> = {
+        new: 'Nowy', formularz: 'Form.', contacted: 'Kontakt', offer_sent: 'Oferta',
+        measurement_scheduled: 'Pomiar', measurement_completed: 'Po pom.', negotiation: 'Negocj.',
+        won: 'Wygrany', lost: 'Utracony', fair: 'Targi',
+    };
+
+    return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <div>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-800">Pipeline Leadów</h3>
+                        <p className="text-xs text-slate-400">Przegląd aktywnych procesów sprzedażowych</p>
+                    </div>
+                </div>
+                <Link to="/leads" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                    Otwórz <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </Link>
+            </div>
+
+            <div className="p-4 sm:p-5">
+                {/* KPI Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                    <div className="bg-slate-50 rounded-xl p-3">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Wszystkie</p>
+                        <p className="text-xl font-black text-slate-800">{totals.total}</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-xl p-3">
+                        <p className="text-[9px] font-bold text-blue-400 uppercase">Ten tydzień</p>
+                        <p className="text-xl font-black text-blue-700">+{totals.thisWeek}</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-3">
+                        <p className="text-[9px] font-bold text-emerald-400 uppercase">Konwersja</p>
+                        <p className="text-xl font-black text-emerald-700">{conversionRate}%</p>
+                    </div>
+                    <div className="bg-amber-50 rounded-xl p-3">
+                        <p className="text-[9px] font-bold text-amber-400 uppercase">Wygrane</p>
+                        <p className="text-xl font-black text-amber-700">{totals.won}</p>
+                    </div>
+                    <div className={`rounded-xl p-3 ${totals.stale > 0 ? 'bg-red-50' : 'bg-slate-50'}`}>
+                        <p className={`text-[9px] font-bold uppercase ${totals.stale > 0 ? 'text-red-400' : 'text-slate-400'}`}>Zagrożone</p>
+                        <p className={`text-xl font-black ${totals.stale > 0 ? 'text-red-600' : 'text-slate-600'}`}>{totals.stale}</p>
+                    </div>
+                </div>
+
+                {/* Pipeline Bar */}
+                {pipelineTotal > 0 && (
+                    <div className="mb-4">
+                        <div className="flex rounded-full overflow-hidden h-5 bg-slate-100">
+                            {pipelineData.filter(s => s.count > 0).map(s => (
+                                <div key={s.id} className="h-full transition-all duration-500 relative group"
+                                    style={{ width: `${(s.count / pipelineTotal) * 100}%`, backgroundColor: s.color, minWidth: '16px' }}
+                                    title={`${s.label}: ${s.count}`}>
+                                    {(s.count / pipelineTotal) > 0.08 && (
+                                        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-sm">{s.count}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                            {pipelineData.filter(s => s.count > 0).map(s => (
+                                <div key={s.id} className="flex items-center gap-1 text-[10px] text-slate-600">
+                                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                                    <span className="font-medium">{s.label}</span>
+                                    <span className="text-slate-400">({s.count})</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Recent Leads */}
+                {recentLeads.length > 0 && (
+                    <div>
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Ostatnio dodane</h4>
+                        <div className="divide-y divide-slate-50">
+                            {recentLeads.map(l => (
+                                <Link to={`/leads/${l.id}`} key={l.id} className="flex items-center justify-between py-1.5 hover:bg-slate-50 rounded px-1 -mx-1 transition-colors">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${STATUS_COLORS_MAP[l.status] || 'bg-slate-100 text-slate-600'}`}>
+                                            {STATUS_LABELS_MAP[l.status] || l.status}
+                                        </span>
+                                        <span className="font-medium text-sm text-slate-800 truncate">{l.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        {l.city && <span className="text-[10px] text-slate-400">{l.city}</span>}
+                                        <span className="text-[10px] text-slate-400 font-mono">{l.created}</span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════
 export const AdminDashboard: React.FC = () => {
@@ -367,6 +549,9 @@ export const AdminDashboard: React.FC = () => {
                     </Link>
                 ))}
             </div>
+
+            {/* ═══ LEADS PIPELINE MINI WIDGET ═══ */}
+            <LeadsPipelineWidget />
 
             {/* ═══ LIVE COST WIDGET ═══ */}
             <LiveCostWidget />

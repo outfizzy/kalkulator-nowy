@@ -12,6 +12,7 @@ import { LeadsKanban } from './LeadsKanban';
 import { LeadsFunnelChart } from './LeadsFunnelChart';
 import { LeadsStats } from './LeadsStats';
 import { LeadsMap } from './LeadsMap';
+import { ConfiguratorService } from '../../services/database/configurator.service';
 
 export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -30,6 +31,7 @@ export const LeadsList: React.FC = () => {
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [searchQuery, setSearchQuery] = useState('');
     const [leadActivity, setLeadActivity] = useState<Map<string, { count: number; lastActivity: Date | null; isHot: boolean }>>(new Map());
+    const [completedFormLeadIds, setCompletedFormLeadIds] = useState<Set<string>>(new Set());
 
     const loadData = async () => {
         setLoading(true);
@@ -64,6 +66,24 @@ export const LeadsList: React.FC = () => {
     useEffect(() => {
         loadData();
     }, []);
+
+    // Track which leads have completed configurator forms
+    useEffect(() => {
+        if (leads.length === 0) { setCompletedFormLeadIds(new Set()); return; }
+        const checkForms = async () => {
+            const completed = new Set<string>();
+            for (const lead of leads) {
+                try {
+                    const cfgs = await ConfiguratorService.getByLeadId(lead.id);
+                    if (cfgs.some(c => c.status === 'completed')) {
+                        completed.add(lead.id);
+                    }
+                } catch { /* ignore */ }
+            }
+            setCompletedFormLeadIds(completed);
+        };
+        checkForms();
+    }, [leads]);
 
     const filteredLeads = leads.filter(lead => {
         // Status filter
@@ -140,7 +160,7 @@ export const LeadsList: React.FC = () => {
         const labels: Record<string, string> = {
             new: 'Nowy',
             contacted: 'Skontaktowano',
-            formularz: '📋 Formularz',
+            formularz: 'Nowy (Form.)',
             measurement_scheduled: 'Umówiony na pomiar',
             measurement_completed: 'Pomiar odbył się',
             offer_sent: 'Oferta Wysłana',
@@ -207,8 +227,14 @@ export const LeadsList: React.FC = () => {
                                             {lead.customerData.firstName} {lead.customerData.lastName}
                                         </div>
                                         {leadActivity.get(lead.id)?.isHot && (
-                                            <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700 animate-pulse" title="Aktywność w ciągu 24h">
-                                                🔥 HOT
+                                            <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700 animate-pulse flex items-center gap-1" title="Aktywność w ciągu 24h">
+                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" /></svg>
+                                                HOT
+                                            </span>
+                                        )}
+                                        {completedFormLeadIds.has(lead.id) && (
+                                            <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 inline-flex items-center gap-0.5" title="Formularz konfiguracji wypełniony">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                                             </span>
                                         )}
                                     </div>
@@ -220,11 +246,17 @@ export const LeadsList: React.FC = () => {
                                     <div className="text-slate-700 text-sm flex flex-col gap-1">
                                         {/* Source Badge */}
                                         {lead.source === 'targi' ? (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 self-start">
-                                                🎡 {fair?.name || 'Targi'}
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 self-start">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                                {fair?.name || 'Targi'}
+                                            </span>
+                                        ) : lead.source === 'website' ? (
+                                            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                                                Strona WWW
                                             </span>
                                         ) : (
-                                            <span className="text-xs text-slate-400">Website / Inne</span>
+                                            <span className="text-xs text-slate-400">{lead.source || 'Inne'}</span>
                                         )}
 
                                         {/* Location */}
@@ -249,7 +281,7 @@ export const LeadsList: React.FC = () => {
                                         {getStatusBadge(lead.status)}
                                         {lead.status === 'lost' && (lead.lostByName || lead.lostReason) && (
                                             <div className="text-[10px] text-red-500 mt-0.5">
-                                                {lead.lostByName && <span className="font-medium">✕ {lead.lostByName}</span>}
+                                                {lead.lostByName && <span className="font-medium inline-flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg> {lead.lostByName}</span>}
                                                 {lead.lostReason && <div className="text-slate-400 truncate max-w-[120px]" title={lead.lostReason}>{lead.lostReason}</div>}
                                             </div>
                                         )}
@@ -258,8 +290,9 @@ export const LeadsList: React.FC = () => {
                                 <td className="px-6 py-4">
                                     {scheduledMeasurement ? (
                                         <div className="flex flex-col gap-1">
-                                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                📅 {new Date(scheduledMeasurement.scheduledDate).toLocaleDateString('pl-PL')}
+                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                {new Date(scheduledMeasurement.scheduledDate).toLocaleDateString('pl-PL')}
                                             </span>
                                             {scheduledMeasurement.salesRepName && (
                                                 <span className="text-xs text-slate-500">{scheduledMeasurement.salesRepName}</span>
@@ -272,8 +305,9 @@ export const LeadsList: React.FC = () => {
                                 <td className="px-6 py-4">
                                     {completedMeasurement && !lead.status.includes('won') ? (
                                         <div className="flex flex-col gap-1">
-                                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                                                🤔 Zastanawia się
+                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                Zastanawia się
                                             </span>
                                             <span className="text-xs text-slate-500">
                                                 Pomiar: {new Date(completedMeasurement.scheduledDate).toLocaleDateString('pl-PL')}
@@ -397,7 +431,7 @@ export const LeadsList: React.FC = () => {
                             <option value="new">Nowy</option>
                             <option value="fair">Targi (Nowy)</option>
                             <option value="contacted">Skontaktowano</option>
-                            <option value="formularz">📋 Formularz</option>
+                            <option value="formularz">Nowy (Formularz)</option>
                             <option value="measurement_scheduled">Umówiony na pomiar</option>
                             <option value="measurement_completed">Pomiar odbył się</option>
                             <option value="offer_sent">Oferta</option>
@@ -419,7 +453,7 @@ export const LeadsList: React.FC = () => {
                             <option value="fair_all">Targi (Wszystkie)</option>
                             {fairs.map(fair => (
                                 <option key={fair.id} value={fair.id}>
-                                    🎡 {fair.name} {fair.is_active ? '(Aktywne)' : ''}
+                                    ⬡ {fair.name} {fair.is_active ? '(Aktywne)' : ''}
                                 </option>
                             ))}
                         </select>
