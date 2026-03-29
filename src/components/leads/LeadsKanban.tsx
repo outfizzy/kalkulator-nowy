@@ -36,6 +36,7 @@ import { ConfiguratorService } from '../../services/database/configurator.servic
 import { LeadAutoAssignService } from '../../services/database/lead-auto-assign.service';
 import { OfferService } from '../../services/database/offer.service';
 import { supabase } from '../../lib/supabase';
+import { BulkWelcomeEmailModal } from './BulkWelcomeEmailModal';
 
 interface LeadsKanbanProps {
     leads: Lead[];
@@ -571,7 +572,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
 };
 
 // Extracted Column Component with useDroppable
-const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, offerViewMap }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; completedFormLeadIds: Set<string>; onAutoAssign?: () => void; offerViewMap: Record<string, OfferCardInfo> }) => {
+const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; completedFormLeadIds: Set<string>; onAutoAssign?: () => void; onBulkEmail?: () => void; offerViewMap: Record<string, OfferCardInfo> }) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
@@ -624,6 +625,18 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                         🤖 Przydziel automatycznie ({unassignedCount})
                     </button>
                 )}
+                {/* Bulk welcome email button — only for 'new' column */}
+                {column.id === 'new' && leads.length > 0 && onBulkEmail && (
+                    <button
+                        onClick={onBulkEmail}
+                        className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        📨 Wyślij powitalne ({leads.length})
+                    </button>
+                )}
             </div>
 
             {/* Column Content */}
@@ -663,6 +676,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const [wonModalOpen, setWonModalOpen] = useState(false);
     const [pendingWonLeadId, setPendingWonLeadId] = useState<string | null>(null);
     const [lostModalOpen, setLostModalOpen] = useState(false);
+    const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
     const [pendingLostLeadId, setPendingLostLeadId] = useState<string | null>(null);
     const [measurementLead, setMeasurementLead] = useState<Lead | null>(null);
 
@@ -1043,6 +1057,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             isAdmin={isAdmin()}
                             completedFormLeadIds={completedFormLeadIds}
                             offerViewMap={offerViewMap}
+                            onBulkEmail={column.id === 'new' ? () => setBulkEmailOpen(true) : undefined}
                             onAutoAssign={['new', 'formularz', 'contacted'].includes(column.id) ? async () => {
                                 const toastId = toast.loading('🤖 Przydzielam leady...');
                                 try {
@@ -1111,6 +1126,13 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                     onClose={() => setMeasurementLead(null)}
                 />
             )}
+
+            <BulkWelcomeEmailModal
+                isOpen={bulkEmailOpen}
+                onClose={() => setBulkEmailOpen(false)}
+                onComplete={onLeadUpdate}
+                leads={columns['new'] || []}
+            />
         </>
     );
 };
