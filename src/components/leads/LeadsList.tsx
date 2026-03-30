@@ -67,25 +67,15 @@ export const LeadsList: React.FC = () => {
         loadData();
     }, []);
 
-    // Track which leads have completed configurator forms — single batch query
+    // Track which leads have completed configurator forms — derived from already-loaded data (zero queries)
     useEffect(() => {
-        if (leads.length === 0) { setCompletedFormLeadIds(new Set()); return; }
-        const checkForms = async () => {
-            try {
-                const { supabase } = await import('../../lib/supabase');
-                const leadIds = leads.map(l => l.id);
-                const { data } = await supabase
-                    .from('lead_configurations')
-                    .select('lead_id')
-                    .in('lead_id', leadIds)
-                    .eq('status', 'completed');
-                const completed = new Set<string>(
-                    (data || []).map((row: any) => row.lead_id).filter(Boolean)
-                );
-                setCompletedFormLeadIds(completed);
-            } catch { /* ignore */ }
-        };
-        checkForms();
+        const completed = new Set<string>();
+        for (const lead of leads) {
+            if ((lead.customerData as any)?.configurationCompletedAt) {
+                completed.add(lead.id);
+            }
+        }
+        setCompletedFormLeadIds(completed);
     }, [leads]);
 
     const filteredLeads = leads.filter(lead => {
