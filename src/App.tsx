@@ -123,6 +123,8 @@ import FacebookAdsPage from './pages/admin/FacebookAdsPage';
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
 import { AliplastConfiguratorPage } from './pages/admin/AliplastConfiguratorPage';
+import { BlogPLPage } from './pages/BlogPLPage';
+import AdsManagerPage from './pages/AdsManagerPage';
 
 // Lazy load heavy components to avoid module evaluation crashes
 const ProductConfiguratorV2 = React.lazy(() => import('./components/calculator_v2/ProductConfiguratorV2').then(m => ({ default: m.ProductConfiguratorV2 })));
@@ -155,6 +157,7 @@ function DashboardRouter() {
   const { currentUser } = useAuth();
   if (currentUser?.role === 'admin') return <AdminDashboard />;
   if (currentUser?.role === 'manager') return <ManagerDashboard />;
+  if (currentUser?.role === 'sales_rep_pl') return <SalesDashboard />;
   return <SalesDashboard />;
 }
 
@@ -198,7 +201,7 @@ function App() {
 
             {/* Sales Rep / Admin Routes */}
             <Route element={
-              <ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep']}>
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep', 'sales_rep_pl']}>
                 <>
                   <SoftphoneWidget />
                   <WhatsAppFloatingWidget />
@@ -292,6 +295,9 @@ function App() {
               <Route path="/telephony/numbers" element={<ProtectedRoute allowedRoles={['admin']}><PhoneNumbersAdmin /></ProtectedRoute>} />
               {/* Email campaigns */}
               <Route path="/campaigns" element={<EmailCampaignsPage />} />
+              {/* Blog PL (zadaszto.pl) */}
+              <Route path="/blog-pl" element={<ProtectedRoute allowedRoles={['admin', 'sales_rep_pl']}><BlogPLPage /></ProtectedRoute>} />
+              <Route path="/ads-manager" element={<ProtectedRoute allowedRoles={['admin']}><AdsManagerPage /></ProtectedRoute>} />
             </Route>
 
             {/* Partner Protected Routes - Redirect to B2B */}

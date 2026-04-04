@@ -169,18 +169,20 @@ export const Layout: React.FC = () => {
                     )}
 
                     {/* ── MARKETING ── */}
-                    {(isAdmin() || currentUser?.role === 'manager') && (
+                    {(isAdmin() || currentUser?.role === 'manager' || hasPermission('blog_pl')) && (
                         <div className="space-y-1">
                             <button onClick={() => toggleSection('marketing')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Marketing</span>
                                 <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.marketing ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
                             {expandedSections.marketing && (<>
-                                <NavLink to="/admin/marketing" label="Marketing Intelligence" icon="dashboard" />
-                                <NavLink to="/campaigns" label="Kampanie e-mail" icon="mail" />
-                                <NavLink to="/admin/email-templates" label="Szablony wiadomości" icon="mail" />
-                                <NavLink to="/admin/facebook-ads" label="Facebook Ads Manager" icon="dashboard" />
-                                <NavLink to="/admin/facebook-ads?tab=contacts" label="Kontakty z Facebooka" icon="users" />
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/marketing" label="Marketing Intelligence" icon="dashboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/campaigns" label="Kampanie e-mail" icon="mail" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/email-templates" label="Szablony wiadomości" icon="mail" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/facebook-ads" label="Facebook Ads Manager" icon="dashboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/facebook-ads?tab=contacts" label="Kontakty z Facebooka" icon="users" />}
+                                {hasPermission('blog_pl') && <NavLink to="/blog-pl" label="🇵🇱 Blog PL" icon="clipboard" />}
+                                {isAdmin() && <NavLink to="/ads-manager" label="🎯 Google Ads AI" icon="dashboard" />}
                             </>)}
                         </div>
                     )}
