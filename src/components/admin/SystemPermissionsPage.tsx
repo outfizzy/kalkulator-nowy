@@ -21,7 +21,8 @@ export const SystemPermissionsPage: React.FC = () => {
     const roles: { key: UserRole; label: string }[] = [
         { key: 'admin', label: 'Administrator' },
         { key: 'manager', label: 'Manager' },
-        { key: 'sales_rep', label: 'Przedstawiciel' },
+        { key: 'sales_rep', label: 'Przedstawiciel DE' },
+        { key: 'sales_rep_pl', label: 'Przedstawiciel PL' },
         { key: 'partner', label: 'Partner' },
         { key: 'installer', label: 'Montażysta' }
     ];

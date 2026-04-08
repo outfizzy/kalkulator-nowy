@@ -142,7 +142,35 @@ export const UnifiedBacklogSidebar: React.FC<UnifiedBacklogSidebarProps> = ({
 
                 {/* 2. Service Tickets */}
                 {(activeTab === 'all' || activeTab === 'services') && serviceTickets.map(t => {
-                    if (!filterItem(t.client?.lastName || '' + t.description)) return null;
+                    const clientName = t.client ? `${t.client.firstName || ''} ${t.client.lastName || ''}`.trim() : '';
+                    const clientCity = t.client?.city || '';
+                    if (!filterItem(clientName + clientCity + t.description)) return null;
+
+                    const typeLabels: Record<string, { label: string; icon: string; color: string }> = {
+                        leak: { label: 'Nieszczelność', icon: '💧', color: 'bg-blue-100 text-blue-700' },
+                        electrical: { label: 'Elektryka', icon: '⚡', color: 'bg-yellow-100 text-yellow-700' },
+                        visual: { label: 'Wizualne', icon: '👁️', color: 'bg-purple-100 text-purple-700' },
+                        mechanical: { label: 'Mechaniczne', icon: '🔧', color: 'bg-slate-100 text-slate-700' },
+                        repair: { label: 'Naprawa', icon: '🔨', color: 'bg-orange-100 text-orange-700' },
+                        other: { label: 'Inne', icon: '📋', color: 'bg-slate-100 text-slate-600' },
+                    };
+                    const priorityLabels: Record<string, { label: string; color: string }> = {
+                        critical: { label: 'Krytyczny', color: 'bg-red-100 text-red-700 border-red-200' },
+                        high: { label: 'Wysoki', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+                        medium: { label: 'Średni', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                        low: { label: 'Niski', color: 'bg-slate-50 text-slate-500 border-slate-200' },
+                    };
+                    const typeInfo = typeLabels[t.type] || typeLabels.other;
+                    const prioInfo = priorityLabels[t.priority] || priorityLabels.medium;
+
+                    // Clean description — strip manual client info lines
+                    const cleanDesc = t.description
+                        .replace(/Klient:.*\n?/gi, '')
+                        .replace(/Adres:.*\n?/gi, '')
+                        .replace(/Telefon:.*\n?/gi, '')
+                        .replace(/---.*\n?/g, '')
+                        .trim();
+
                     return (
                         <div
                             key={t.id}
@@ -153,9 +181,23 @@ export const UnifiedBacklogSidebar: React.FC<UnifiedBacklogSidebarProps> = ({
                         >
                             <div className="absolute top-0 left-0 w-1 h-full bg-orange-400" />
                             <div className="pl-3">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="font-bold text-slate-800 text-sm">{t.client?.lastName || 'Klient'}</span>
-                                    <div className="flex gap-1">
+                                {/* Row 1: Name + Schedule Button + Service Badge */}
+                                <div className="flex justify-between items-start mb-1.5">
+                                    <div className="min-w-0 flex-1">
+                                        <span className="font-bold text-slate-800 text-sm block truncate">
+                                            {clientName || t.customerName || 'Klient nieznany'}
+                                        </span>
+                                        {clientCity && (
+                                            <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                                                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <span className="truncate">{clientCity}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0 ml-1">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -171,15 +213,26 @@ export const UnifiedBacklogSidebar: React.FC<UnifiedBacklogSidebarProps> = ({
                                         <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center">Serwis</span>
                                     </div>
                                 </div>
-                                <div className="text-xs text-slate-500 mb-2 line-clamp-2">
-                                    {t.description}
+                                {/* Row 2: Type + Priority tags */}
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 ${typeInfo.color}`}>
+                                        <span className="text-[10px]">{typeInfo.icon}</span> {typeInfo.label}
+                                    </span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${prioInfo.color}`}>
+                                        {prioInfo.label}
+                                    </span>
+                                    {t.contractNumber && (
+                                        <span className="text-[10px] text-slate-400 font-mono truncate ml-auto">{t.contractNumber}</span>
+                                    )}
                                 </div>
-                                <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    {t.client?.city || 'Brak adresu'}
+                                {/* Row 3: Description preview */}
+                                <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                    {cleanDesc || t.description.slice(0, 60)}
+                                </div>
+                                {/* Row 4: Ticket number + date */}
+                                <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
+                                    <span className="font-mono">{t.ticketNumber}</span>
+                                    <span>{t.createdAt ? new Date(t.createdAt).toLocaleDateString('pl-PL') : ''}</span>
                                 </div>
                             </div>
                         </div>

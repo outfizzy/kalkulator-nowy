@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { geocodeAddress } from '../../utils/geocoding';
 import { getOfferPhotos, addOfferPhoto, removeOfferPhoto } from '../../utils/offerPhotos';
 import { generateInstallationProtocolPDF, generateInstallationProtocolPDFAsBlob } from '../../utils/installationProtocolPDF';
+import { generateContractProtocolPDF } from '../../utils/contractProtocolPDF';
 import { PhotoGallery } from '../PhotoGallery';
 import { DatabaseService } from '../../services/database';
 import { InstallerSessionService, type WorkSession } from '../../services/database/installer-session.service';
@@ -996,6 +997,217 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                             ))}
                                         </div>
                                     )}
+
+                                    {/* ═══ INSTALLATION NOTES FOR CREW ═══ */}
+                                    {contractDetails.contract_data?.installationNotes && (
+                                        <div className="bg-orange-50 rounded-xl border-2 border-orange-300 overflow-hidden">
+                                            <div className="px-4 py-2.5 bg-orange-100 border-b border-orange-300 flex items-center gap-2">
+                                                <span className="text-base">⚠️</span>
+                                                <h3 className="font-bold text-orange-800 text-sm">Uwagi dla Ekipy Montażowej</h3>
+                                            </div>
+                                            <div className="p-4">
+                                                <p className="text-sm text-orange-900 whitespace-pre-wrap leading-relaxed">{contractDetails.contract_data.installationNotes}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ═══ TECHNICAL REQUIREMENTS ═══ */}
+                                    {contractDetails.contract_data?.requirements && (() => {
+                                        const req = contractDetails.contract_data.requirements;
+                                        const items = [
+                                            { key: 'projectBudowlany', label: 'Projekt Budowlany', icon: '📐' },
+                                            { key: 'fundamenty', label: 'Fundamenty', icon: '🧱' },
+                                            { key: 'doprowadzeniePradu', label: 'Doprowadzenie Prądu', icon: '⚡' },
+                                            { key: 'pozwolenieNaBudowe', label: 'Pozwolenie na Budowę', icon: '📋' },
+                                        ].filter(i => req[i.key]);
+                                        const inne = req.innePrace;
+                                        if (items.length === 0 && !inne) return null;
+                                        return (
+                                            <div className="bg-emerald-50 rounded-xl border border-emerald-200 overflow-hidden">
+                                                <div className="px-4 py-2.5 bg-emerald-100 border-b border-emerald-200 flex items-center gap-2">
+                                                    <span className="text-base">✅</span>
+                                                    <h3 className="font-bold text-emerald-800 text-sm">Wymagania Techniczne</h3>
+                                                </div>
+                                                <div className="p-4 space-y-2">
+                                                    {items.map(item => (
+                                                        <div key={item.key} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-emerald-100">
+                                                            <span>{item.icon}</span>
+                                                            <span className="text-sm font-medium text-emerald-800">{item.label}</span>
+                                                            <span className="ml-auto text-green-500 font-bold">✓</span>
+                                                        </div>
+                                                    ))}
+                                                    {inne && (
+                                                        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-emerald-100">
+                                                            <span>📝</span>
+                                                            <span className="text-sm text-emerald-800">Inne: <strong>{inne}</strong></span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* ═══ MEASUREMENT DATA ═══ */}
+                                    {(() => {
+                                        const m = contractDetails.contract_data?.product?.measurements;
+                                        if (!m || (!m.unterkRinne && !m.unterkWand && !m.wallType)) return null;
+                                        const wallLabels: Record<string, string> = {
+                                            massiv: 'Mur masywny', daemmung: 'Ocieplenie/WDVS',
+                                            holz: 'Drewno', blech: 'Blacha', fertighaus: 'Prefabrykat', other: 'Inne'
+                                        };
+                                        return (
+                                            <div className="bg-blue-50 rounded-xl border border-blue-200 overflow-hidden">
+                                                <div className="px-4 py-2.5 bg-blue-100 border-b border-blue-200 flex items-center gap-2">
+                                                    <span className="text-base">📏</span>
+                                                    <h3 className="font-bold text-blue-800 text-sm">Dane Techniczne (Pomiar)</h3>
+                                                </div>
+                                                <div className="p-4">
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        {m.unterkRinne && (
+                                                            <div className="bg-white p-3 rounded-lg border border-blue-100 text-center">
+                                                                <div className="text-[10px] text-blue-400 font-bold uppercase">H3 / Unterk. Rinne</div>
+                                                                <div className="text-lg font-bold text-blue-800 font-mono">{m.unterkRinne} mm</div>
+                                                            </div>
+                                                        )}
+                                                        {m.unterkWand && (
+                                                            <div className="bg-white p-3 rounded-lg border border-blue-100 text-center">
+                                                                <div className="text-[10px] text-blue-400 font-bold uppercase">H1 / Unterk. Wand</div>
+                                                                <div className="text-lg font-bold text-blue-800 font-mono">{m.unterkWand} mm</div>
+                                                            </div>
+                                                        )}
+                                                        {m.wallType && (
+                                                            <div className="bg-white p-3 rounded-lg border border-blue-100 text-center">
+                                                                <div className="text-[10px] text-blue-400 font-bold uppercase">Typ ściany</div>
+                                                                <div className="text-sm font-bold text-blue-800">{wallLabels[m.wallType] || m.wallType}</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {m.needsLevelingProfiles && (
+                                                        <div className="mt-3 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                                                            <div className="text-[10px] text-amber-600 font-bold uppercase mb-1">Profile wyrównujące</div>
+                                                            <div className="flex gap-4 text-sm font-bold text-amber-800">
+                                                                {m.slopeLeft && <span>L: {m.slopeLeft}mm</span>}
+                                                                {m.slopeFront && <span>V: {m.slopeFront}mm</span>}
+                                                                {m.slopeRight && <span>R: {m.slopeRight}mm</span>}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {m.technicalNotes && (
+                                                        <div className="mt-3 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                                                            <div className="text-[10px] text-amber-600 font-bold uppercase mb-1">Uwagi techniczne</div>
+                                                            <p className="text-sm text-amber-900">{m.technicalNotes}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* ═══ PAYMENT INFO ═══ */}
+                                    {(() => {
+                                        const pricing = contractDetails.contract_data?.pricing;
+                                        if (!pricing) return null;
+                                        const paymentMethod = pricing.paymentMethod || 'transfer';
+                                        const isCash = paymentMethod === 'cash';
+                                        const netPrice = Number(pricing.finalPriceNet || pricing.sellingPriceNet || 0);
+                                        const grossPrice = netPrice * 1.19;
+                                        const advanceAmount = Number(contractDetails.advance_amount || pricing.advancePayment || 0);
+                                        const advancePaid = contractDetails.advance_paid;
+                                        const installNet = Number(pricing.installationCosts?.totalInstallation || 0);
+                                        const installGross = installNet * 1.19;
+                                        const totalGross = grossPrice + installGross;
+                                        const remainingGross = totalGross - (advanceAmount * 1.19);
+                                        const fmt = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+
+                                        return (
+                                            <div className={`rounded-xl border-2 overflow-hidden ${isCash ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                <div className={`px-4 py-2.5 border-b flex items-center gap-2 ${isCash ? 'bg-green-100 border-green-300' : 'bg-slate-100 border-slate-200'}`}>
+                                                    <span className="text-base">{isCash ? '💵' : '🏦'}</span>
+                                                    <h3 className={`font-bold text-sm ${isCash ? 'text-green-800' : 'text-slate-700'}`}>
+                                                        Płatność: {isCash ? 'GOTÓWKA PRZY ODBIORZE' : 'Przelew bankowy'}
+                                                    </h3>
+                                                </div>
+                                                <div className="p-4 space-y-3">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="bg-white p-3 rounded-lg border border-slate-200">
+                                                            <div className="text-[10px] text-slate-400 font-bold uppercase">Wartość brutto</div>
+                                                            <div className="text-base font-bold text-slate-800">{fmt(grossPrice)}</div>
+                                                        </div>
+                                                        {installNet > 0 && (
+                                                            <div className="bg-white p-3 rounded-lg border border-slate-200">
+                                                                <div className="text-[10px] text-slate-400 font-bold uppercase">Montaż brutto</div>
+                                                                <div className="text-base font-bold text-slate-800">{fmt(installGross)}</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {advanceAmount > 0 && (
+                                                        <div className={`p-3 rounded-lg border ${advancePaid ? 'bg-green-100 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <div className="text-[10px] font-bold uppercase text-slate-500">Zaliczka</div>
+                                                                    <div className="text-sm font-bold">{fmt(advanceAmount * 1.19)}</div>
+                                                                </div>
+                                                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${advancePaid ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                                                                    {advancePaid ? '✓ Opłacona' : '✕ Nieopłacona'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {isCash && (
+                                                        <div className="bg-green-200 p-4 rounded-xl border-2 border-green-400 text-center">
+                                                            <div className="text-xs text-green-700 font-bold uppercase mb-1">Do odbioru od klienta</div>
+                                                            <div className="text-2xl font-black text-green-900">{fmt(Math.max(0, remainingGross))}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* ═══ ORDERED ITEMS ═══ */}
+                                    {(() => {
+                                        const cd = contractDetails.contract_data;
+                                        const items: Array<{ name: string; qty: number; type: string }> = [];
+                                        if (cd?.product?.customItems?.length) {
+                                            cd.product.customItems.forEach((i: any) => items.push({ name: i.name || i.description || '', qty: i.quantity || 1, type: 'Produkt' }));
+                                        }
+                                        if (cd?.product?.addons?.length) {
+                                            cd.product.addons.forEach((a: any) => items.push({ name: a.name || a, qty: a.quantity || 1, type: 'Dodatek' }));
+                                        }
+                                        if (cd?.orderedItems?.length) {
+                                            cd.orderedItems.forEach((i: any) => items.push({ name: i.name || i.description || '', qty: i.quantity || 1, type: 'Zamówiony' }));
+                                        }
+                                        if (items.length === 0) return null;
+                                        return (
+                                            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                                <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
+                                                    <span className="text-base">📦</span>
+                                                    <h3 className="font-bold text-slate-700 text-sm">Elementy Zlecenia</h3>
+                                                    <span className="ml-auto bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{items.length} poz.</span>
+                                                </div>
+                                                <div className="p-4">
+                                                    <div className="space-y-2">
+                                                        {items.map((item, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <span className="text-xs text-slate-400 font-mono w-5">{idx + 1}.</span>
+                                                                    <span className="text-sm text-slate-800 truncate">{item.name}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                                                        item.type === 'Produkt' ? 'bg-blue-100 text-blue-700' :
+                                                                        item.type === 'Dodatek' ? 'bg-purple-100 text-purple-700' :
+                                                                        'bg-green-100 text-green-700'
+                                                                    }`}>{item.type}</span>
+                                                                    <span className="text-sm font-bold text-slate-700">×{item.qty}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </>
                             ) : (
                                 <div className="text-center py-12 text-slate-400">
@@ -1213,6 +1425,35 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                         }} className="px-3 py-2 text-slate-600 text-sm hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1">
                             📄 Protokół PDF
                         </button>
+                        {contractDetails && (
+                            <button onClick={async () => {
+                                try {
+                                    const cd = contractDetails.contract_data;
+                                    const contractForPdf = {
+                                        id: contractDetails.id,
+                                        contractNumber: cd.contractNumber || contractDetails.contract_number || '',
+                                        offerId: contractDetails.offer_id,
+                                        status: contractDetails.status,
+                                        client: cd.client || cd.customer,
+                                        product: cd.product,
+                                        pricing: cd.pricing,
+                                        commission: cd.commission || 0,
+                                        requirements: cd.requirements || {},
+                                        orderedItems: cd.orderedItems || [],
+                                        comments: cd.comments || [],
+                                        attachments: cd.attachments || [],
+                                        createdAt: new Date(contractDetails.created_at),
+                                        signedAt: contractDetails.signed_at ? new Date(contractDetails.signed_at) : undefined,
+                                        installationNotes: cd.installationNotes || '',
+                                        dachrechnerData: cd.dachrechnerData,
+                                    } as any;
+                                    await generateContractProtocolPDF(contractForPdf);
+                                    toast.success('Pobrano protokół montażowy z umowy');
+                                } catch (e) { console.error('Contract PDF error:', e); toast.error('Błąd generowania PDF'); }
+                            }} className="px-3 py-2 text-blue-600 text-sm hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 font-medium">
+                                📋 Protokół z umowy
+                            </button>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={onClose} className="px-4 py-2 text-slate-600 text-sm font-medium hover:bg-slate-100 rounded-lg transition-colors">

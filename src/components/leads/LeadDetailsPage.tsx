@@ -23,6 +23,8 @@ import remarkGfm from 'remark-gfm';
 import { ConfiguratorService, type LeadConfiguration } from '../../services/database/configurator.service';
 import { QuickSMSModal } from '../telephony/QuickSMSModal';
 import { ManualContractModal } from '../contracts/ManualContractModal';
+import { LostLeadModal } from './LostLeadModal';
+import { WonLeadModal } from './WonLeadModal';
 
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -98,6 +100,8 @@ export const LeadDetailsPage: React.FC = () => {
     const [isSMSModalOpen, setIsSMSModalOpen] = useState(false);
     const [smsLogs, setSmsLogs] = useState<SMSLog[]>([]);
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+    const [isLostModalOpen, setIsLostModalOpen] = useState(false);
+    const [isWonModalOpen, setIsWonModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchLead = async () => {
@@ -371,6 +375,18 @@ export const LeadDetailsPage: React.FC = () => {
                                 onClick={() => setIsContractModalOpen(true)}
                                 className="px-2.5 py-1.5 border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
                             ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Utwórz umowę</button>
+                        {lead.status !== 'won' && lead.status !== 'lost' && (
+                            <>
+                                <button
+                                    onClick={() => setIsWonModalOpen(true)}
+                                    className="px-2.5 py-1.5 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
+                                ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Wygrane</button>
+                                <button
+                                    onClick={() => setIsLostModalOpen(true)}
+                                    className="px-2.5 py-1.5 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
+                                ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Utracony</button>
+                            </>
+                        )}
                         <div className="flex-1 hidden sm:block" />
                         <button onClick={() => setIsEditMode(true)}
                             className="px-2.5 py-1.5 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-lg font-medium transition-colors text-xs flex items-center gap-1"
@@ -1594,6 +1610,56 @@ export const LeadDetailsPage: React.FC = () => {
                 street: lead?.customerData?.address || (lead?.customerData as any)?.street || '',
                 companyName: lead?.customerData?.companyName || '',
             } as any}
+        />
+
+        {/* Lost Lead Modal */}
+        <LostLeadModal
+            isOpen={isLostModalOpen}
+            onClose={() => setIsLostModalOpen(false)}
+            onConfirm={async (reason: string, notes: string) => {
+                if (!lead) return;
+                try {
+                    const updates: Partial<Lead> = {
+                        status: 'lost',
+                        lostReason: reason,
+                        lostBy: currentUser?.id || null,
+                        lostAt: new Date(),
+                        notes: notes ? ((lead.notes || '') + '\n\n[Utrata]: ' + notes) : lead.notes,
+                    };
+                    await DatabaseService.updateLead(lead.id, updates);
+                    setLead(prev => prev ? { ...prev, ...updates } : null);
+                    setIsLostModalOpen(false);
+                    toast.success('Oznaczono jako utracone');
+                } catch (e) {
+                    console.error(e);
+                    toast.error('Błąd');
+                }
+            }}
+        />
+
+        {/* Won Lead Modal */}
+        <WonLeadModal
+            isOpen={isWonModalOpen}
+            onClose={() => setIsWonModalOpen(false)}
+            onConfirm={async (reason: string, value: string, notes: string) => {
+                if (!lead) return;
+                try {
+                    const updates: Partial<Lead> = {
+                        status: 'won',
+                        wonReason: reason,
+                        wonValue: value ? parseFloat(value) : undefined,
+                        wonAt: new Date(),
+                        notes: notes ? ((lead.notes || '') + '\n\n[Wygrana]: ' + notes) : lead.notes,
+                    };
+                    await DatabaseService.updateLead(lead.id, updates as any);
+                    setLead(prev => prev ? { ...prev, ...updates } as any : null);
+                    setIsWonModalOpen(false);
+                    toast.success('🏆 Gratulacje! Lead wygrany!');
+                } catch (e) {
+                    console.error(e);
+                    toast.error('Błąd');
+                }
+            }}
         />
     </>
     );

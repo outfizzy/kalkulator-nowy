@@ -13,6 +13,80 @@ import { LogisticsSettingsManager } from './admin/LogisticsSettings';
 import { LegacyImportModal } from './contracts/LegacyImportModal';
 import { supabase as sb } from '../lib/supabase';
 
+// ═══ Exchange Rate Section (Admin) ═══
+const ExchangeRateSection: React.FC = () => {
+    const [rate, setRate] = useState<number>(4.35);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        SettingsService.getEurRate().then(r => {
+            if (r) setRate(r);
+            setLoading(false);
+        });
+    }, []);
+
+    const handleSave = async () => {
+        if (rate <= 0) { toast.error('Kurs musi być większy od 0'); return; }
+        setSaving(true);
+        try {
+            await SettingsService.updateEurRate(rate);
+            toast.success(`Kurs EUR/PLN zapisany: ${rate.toFixed(4)}`);
+        } catch (err) {
+            toast.error('Błąd zapisu kursu');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) return <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-pulse h-32" />;
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-400">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                    <span className="text-lg">💱</span>
+                </div>
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Kurs Wymiany EUR → PLN</h3>
+                    <p className="text-sm text-slate-500">
+                        Kurs używany do przeliczania cen dla Przedstawiciela PL. Oferty w PLN = cena EUR × kurs.
+                    </p>
+                </div>
+            </div>
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 p-1">
+                    <span className="text-sm font-bold text-slate-500 px-3">1 EUR =</span>
+                    <input
+                        type="number"
+                        step="0.0001"
+                        min="0.01"
+                        value={rate}
+                        onChange={e => setRate(parseFloat(e.target.value) || 0)}
+                        className="w-28 p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-400 outline-none font-mono text-center text-lg font-bold"
+                    />
+                    <span className="text-sm font-bold text-slate-500 px-3">PLN</span>
+                </div>
+                <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold shadow-sm transition-colors disabled:opacity-50"
+                >
+                    {saving ? '⏳...' : 'Zapisz Kurs'}
+                </button>
+            </div>
+            <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-100">
+                <p className="text-xs text-red-700">
+                    💡 Przykład: Produkt kosztujący <strong>1 000 €</strong> będzie wyświetlany jako <strong>{(1000 * rate).toFixed(2)} zł</strong> netto.
+                    Z montażem (8% VAT): <strong>{(1000 * rate * 1.08).toFixed(2)} zł</strong> | Bez montażu (23% VAT): <strong>{(1000 * rate * 1.23).toFixed(2)} zł</strong>
+                </p>
+            </div>
+        </div>
+    );
+};
+
+
+
 export const SettingsPage: React.FC = () => {
     const { currentUser, refreshUser } = useAuth();
     const [dbError, setDbError] = useState(false);
@@ -515,6 +589,9 @@ export const SettingsPage: React.FC = () => {
             {/* TAB: ADMIN */}
             {settingsTab === 'admin' && isAdminOrManager && (
                 <div className="space-y-6">
+                    {/* ── KURS WYMIANY EUR/PLN ── */}
+                    <ExchangeRateSection />
+
                     {/* ── GOOGLE CALENDAR ── */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-green-500">
                         <div className="flex items-center gap-3 mb-6">

@@ -377,7 +377,16 @@ export const ServiceTicketDetailsPage = () => {
                         Kopiuj link
                     </button>
                     <button
-                        onClick={() => generateServiceProtocol(ticket)}
+                        onClick={async () => {
+                            toast.loading('Generowanie PDF...', { id: 'pdf' });
+                            try {
+                                await generateServiceProtocol(ticket);
+                                toast.success('PDF wygenerowany', { id: 'pdf' });
+                            } catch (err) {
+                                console.error('PDF error:', err);
+                                toast.error('Błąd generowania PDF', { id: 'pdf' });
+                            }
+                        }}
                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -524,14 +533,32 @@ export const ServiceTicketDetailsPage = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {ticket.photos.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-gray-200 hover:opacity-75 transition-opacity">
-                                    <img src={url} className="w-full h-full object-cover" alt={`Zdjęcie ${i + 1}`} />
-                                </a>
+                                <div key={i} className="group">
+                                    <a href={url} target="_blank" rel="noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-gray-200 hover:opacity-75 transition-opacity">
+                                        <img src={url} className="w-full h-full object-cover" alt={`Zdjęcie ${i + 1}`} />
+                                    </a>
+                                    <input
+                                        type="text"
+                                        placeholder={`Opis zdjęcia ${i + 1}...`}
+                                        defaultValue={ticket.photoCaptions?.[url] || ''}
+                                        onBlur={async (e) => {
+                                            const val = e.target.value.trim();
+                                            const current = ticket.photoCaptions?.[url] || '';
+                                            if (val !== current) {
+                                                const updated = { ...(ticket.photoCaptions || {}), [url]: val };
+                                                await ServiceService.updateTicketWithHistory(ticket.id, { photoCaptions: updated } as any);
+                                                setTicket({ ...ticket, photoCaptions: updated });
+                                                toast.success('Opis zapisany', { duration: 1200 });
+                                            }
+                                        }}
+                                        className="mt-1.5 w-full text-xs border-gray-200 rounded-md py-1 px-2 focus:ring-blue-500 focus:border-blue-500 text-gray-600 placeholder:text-gray-300"
+                                    />
+                                </div>
                             ))}
                             {ticket.photos.length === 0 && (
-                                <span className="text-sm text-gray-400 col-span-3 text-center py-4">Brak zdjęć</span>
+                                <span className="text-sm text-gray-400 col-span-2 text-center py-4">Brak zdjęć</span>
                             )}
                         </div>
                     </div>
@@ -545,6 +572,24 @@ export const ServiceTicketDetailsPage = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* Internal Notes (sales rep private) */}
+                    <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-5">
+                        <h3 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-3">📝 Notatki wewnętrzne (przedstawiciel)</h3>
+                        <textarea
+                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 min-h-[100px] resize-y"
+                            placeholder="Twoje notatki, obserwacje, ustalenia z klientem..."
+                            defaultValue={ticket.internalNotes || ''}
+                            onBlur={async (e) => {
+                                if (e.target.value !== (ticket.internalNotes || '')) {
+                                    await ServiceService.updateTicketWithHistory(ticket.id, { internalNotes: e.target.value } as any, 'Zaktualizowano notatki wewnętrzne');
+                                    setTicket({ ...ticket, internalNotes: e.target.value });
+                                    toast.success('Zapisano', { duration: 1500 });
+                                }
+                            }}
+                        />
+                        <p className="text-[10px] text-amber-500 mt-1">Widoczne tylko dla pracowników — nie trafia do klienta</p>
+                    </div>
                 </div>
 
                 {/* ===== MIDDLE COLUMN: Description, Tasks & Execution ===== */}

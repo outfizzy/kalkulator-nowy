@@ -228,6 +228,8 @@ export const ServiceService = {
             if (updates.assignedTeamId) dbUpdates.assigned_team_id = updates.assignedTeamId;
             if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
             if (updates.resolutionNotes) dbUpdates.resolution_notes = updates.resolutionNotes;
+            if ('internalNotes' in updates) dbUpdates.internal_notes = updates.internalNotes;
+            if ('photoCaptions' in updates) dbUpdates.photo_captions = updates.photoCaptions;
             if (updates.ticketNumber) dbUpdates.ticket_number = updates.ticketNumber;
 
             // Remove mapped camelCase keys
@@ -237,6 +239,8 @@ export const ServiceService = {
             delete dbUpdates.assignedTeamId;
             delete dbUpdates.scheduledDate;
             delete dbUpdates.resolutionNotes;
+            delete dbUpdates.internalNotes;
+            delete dbUpdates.photoCaptions;
             delete dbUpdates.ticketNumber;
             delete dbUpdates.client;
             delete dbUpdates.team;
@@ -362,7 +366,9 @@ export const ServiceService = {
             scheduledDate: row.scheduled_date,
             assignedTeamId: row.assigned_team_id,
             photos: row.photos || [],
+            photoCaptions: row.photo_captions || {},
             clientNotes: row.client_notes || undefined,
+            internalNotes: row.internal_notes || undefined,
             tasks: row.tasks || [], // JSONB
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at),

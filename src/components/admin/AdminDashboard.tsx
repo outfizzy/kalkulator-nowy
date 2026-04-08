@@ -11,6 +11,7 @@ import { RingostatWidget } from '../widgets/RingostatWidget';
 import { MiniTelephonyWidget } from '../widgets/MiniTelephonyWidget';
 import { MorningCoffeeAI } from './MorningCoffeeAI';
 import { LiveCostWidget } from './LiveCostWidget';
+import { ServiceTicketsWidget } from './ServiceTicketsWidget';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -552,6 +553,9 @@ export const AdminDashboard: React.FC = () => {
 
             {/* ═══ LEADS PIPELINE MINI WIDGET ═══ */}
             <LeadsPipelineWidget />
+
+            {/* ═══ SERVICE TICKETS WIDGET ═══ */}
+            <ServiceTicketsWidget />
 
             {/* ═══ LIVE COST WIDGET ═══ */}
             <LiveCostWidget />

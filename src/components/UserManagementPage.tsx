@@ -29,6 +29,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> 
     admin: { label: 'Administrator', color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
     manager: { label: 'Manager', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
     sales_rep: { label: 'Handlowiec', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+    sales_rep_pl: { label: 'Handlowiec PL', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
     b2b_partner: { label: 'Partner B2B', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
     partner: { label: 'Partner (Legacy)', color: 'text-green-700', bg: 'bg-green-50 border-green-200' },
     installer: { label: 'Monter', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
@@ -498,6 +499,7 @@ export const UserManagementPage: React.FC = () => {
                                     <option value="admin">Administrator</option>
                                     <option value="manager">Manager</option>
                                     <option value="sales_rep">Handlowiec</option>
+                                    <option value="sales_rep_pl">Handlowiec PL 🇵🇱</option>
                                     <option value="installer">Monter</option>
                                     <option value="b2b_manager">Manager B2B</option>
                                 </>
@@ -555,7 +557,7 @@ export const UserManagementPage: React.FC = () => {
                                 <div className="text-slate-500">Telefon:</div>
                                 <div className="text-right font-medium text-slate-700">{user.phone}</div>
                             </>}
-                            {activeTab === 'internal' && user.role === 'sales_rep' && <>
+                            {activeTab === 'internal' && (user.role === 'sales_rep' || user.role === 'sales_rep_pl') && <>
                                 <div className="text-slate-500">Prowizja:</div>
                                 <div className="text-right">
                                     <button onClick={() => handleSetCommissionRate(user)} className="text-blue-600 font-semibold">
@@ -679,6 +681,7 @@ export const UserManagementPage: React.FC = () => {
                                                 <option value="admin">Administrator</option>
                                                 <option value="manager">Manager</option>
                                                 <option value="sales_rep">Handlowiec</option>
+                                                <option value="sales_rep_pl">Handlowiec PL 🇵🇱</option>
                                                 <option value="b2b_partner">Partner B2B</option>
                                                 <option value="partner">Partner (Legacy)</option>
                                                 <option value="installer">Monter</option>
@@ -691,7 +694,7 @@ export const UserManagementPage: React.FC = () => {
                                         {activeTab === 'internal' && (
                                             <td className="px-5 py-3.5 whitespace-nowrap">
                                                 <div className="space-y-0.5">
-                                                    {user.role === 'sales_rep' ? (
+                                                    {(user.role === 'sales_rep' || user.role === 'sales_rep_pl') ? (
                                                         <button onClick={() => handleSetCommissionRate(user)} className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 transition-colors">
                                                             Prow: {user.commissionRate ? `${(user.commissionRate * 100).toFixed(1)}%` : '5.0%'}
                                                             <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -846,6 +849,7 @@ export const UserManagementPage: React.FC = () => {
                                     <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                         <option value="installer">Monter</option>
                                         <option value="sales_rep">Handlowiec</option>
+                                        <option value="sales_rep_pl">Handlowiec PL 🇵🇱</option>
                                         <option value="manager">Manager</option>
                                         <option value="b2b_manager">Manager B2B</option>
                                     </select>

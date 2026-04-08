@@ -431,6 +431,75 @@ Deno.serve(async (req) => {
                     if (!error) {
                         if (!targetIds) await client.markSeen(id); // Only mark seen if auto-mode
                         results.push({ status: 'created_lead', subject });
+
+                        // ═══ AUTO FOLLOW-UP EMAIL (DE) ═══
+                        const clientEmail = leadData.email;
+                        if (clientEmail && clientEmail.includes('@')) {
+                            try {
+                                const smtpHost = Deno.env.get('SMTP_HOST');
+                                const smtpUser = Deno.env.get('SMTP_USER');
+                                const smtpPass = Deno.env.get('SMTP_PASS');
+
+                                if (smtpHost && smtpUser && smtpPass) {
+                                    const nodemailer = (await import("npm:nodemailer@6.9.13")).default;
+                                    const transporter = nodemailer.createTransport({
+                                        host: smtpHost, port: 465, secure: true,
+                                        auth: { user: smtpUser, pass: smtpPass },
+                                        tls: { rejectUnauthorized: false },
+                                    });
+
+                                    const clientName = leadData.firstName || leadData.lastName || 'Kunde';
+                                    const followUpHtml = `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif;background:#f4f7fa;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:32px 32px 24px;text-align:center;">
+      <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;">Polendach24</h1>
+      <p style="color:#94a3b8;margin:8px 0 0;font-size:14px;">Premium Terrassenüberdachungen</p>
+    </div>
+    <div style="padding:32px;">
+      <h2 style="color:#1e293b;margin:0 0 16px;font-size:20px;">Vielen Dank für Ihre Anfrage, ${clientName}!</h2>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;font-size:15px;">
+        Wir haben Ihre Anfrage erhalten und an unseren zuständigen Berater weitergeleitet.
+      </p>
+      <div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:16px 20px;border-radius:0 8px 8px 0;margin:24px 0;">
+        <p style="color:#166534;margin:0;font-size:14px;font-weight:600;">✅ Wie geht es weiter?</p>
+        <p style="color:#166534;margin:8px 0 0;font-size:14px;line-height:1.6;">
+          Unser Berater wird sich <strong>innerhalb von 24 Stunden</strong> bei Ihnen melden, um die Details zu besprechen und ein unverbindliches Angebot zu erstellen.
+        </p>
+      </div>
+      <p style="color:#475569;line-height:1.7;margin:24px 0 16px;font-size:15px;">
+        In der Zwischenzeit laden wir Sie ein, unsere Produkte auf 
+        <a href="https://polendach24.de" style="color:#2563eb;text-decoration:none;font-weight:600;">polendach24.de</a> zu entdecken.
+      </p>
+      <p style="color:#475569;line-height:1.7;margin:0;font-size:15px;">
+        Bei weiteren Fragen antworten Sie einfach auf diese E-Mail — wir helfen Ihnen gerne!
+      </p>
+    </div>
+    <div style="background:#f8fafc;padding:24px 32px;border-top:1px solid #e2e8f0;">
+      <p style="color:#64748b;margin:0;font-size:13px;line-height:1.6;">
+        Mit freundlichen Grüßen,<br>
+        <strong style="color:#334155;">Ihr Polendach24 Team</strong><br>
+        Polendach24 GmbH<br>
+        <a href="mailto:${smtpUser}" style="color:#2563eb;text-decoration:none;">${smtpUser}</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+                                    await transporter.sendMail({
+                                        from: `Polendach24 <${smtpUser}>`,
+                                        to: clientEmail,
+                                        subject: `Vielen Dank für Ihre Anfrage — ${clientName}! | Polendach24`,
+                                        html: followUpHtml,
+                                    });
+                                    console.log(`[scan-emails] ✅ Auto follow-up (DE) sent to ${clientEmail}`);
+                                }
+                            } catch (emailErr) {
+                                console.error("[scan-emails] Follow-up email error:", emailErr);
+                            }
+                        }
                     } else {
                         results.push({ status: 'error_db', subject, error: error.message });
                     }

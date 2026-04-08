@@ -4,10 +4,12 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 import { DatabaseService } from '../services/database';
+import { SettingsService } from '../services/database/settings.service';
+import { ContractService } from '../services/database/contract.service';
 import { calculateCommissionStats, calculateSalesRepStats } from '../utils/statistics';
 import type { SalesRepStats } from '../utils/statistics';
 import { useAuth } from '../contexts/AuthContext';
-import type { CommissionStats, Offer, SalesProfile, Lead } from '../types';
+import type { CommissionStats, Offer, SalesProfile, Lead, Contract } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import { RingostatWidget } from './widgets/RingostatWidget';
 import { MiniTelephonyWidget } from './widgets/MiniTelephonyWidget';
@@ -18,11 +20,13 @@ import { InstallationService } from '../services/database/installation.service';
 import { InstallationSettlementModal } from './installations/InstallationSettlementModal';
 import { supabase } from '../lib/supabase';
 import type { Installation } from '../types';
+import { ServiceTicketsWidget } from './admin/ServiceTicketsWidget';
 
 export const SalesDashboard: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
     const [stats, setStats] = useState<CommissionStats | null>(null);
     const [offers, setOffers] = useState<Offer[]>([]);
+    const [contracts, setContracts] = useState<Contract[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
     const [staleLeads, setStaleLeads] = useState<Lead[]>([]);
     const [profile, setProfile] = useState<SalesProfile | null>(null);
@@ -30,7 +34,20 @@ export const SalesDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [tasksRefreshTrigger, setTasksRefreshTrigger] = useState(0);
+    const [eurRate, setEurRate] = useState<number>(4.35);
     const navigate = useNavigate();
+
+    // === PLN detection for Polish reps ===
+    const isPL = currentUser?.role === 'sales_rep_pl';
+    const fmtCurrency = (value: number, opts?: { maximumFractionDigits?: number }) => {
+        const v = isPL ? value * eurRate : value;
+        return Number(v || 0).toLocaleString(isPL ? 'pl-PL' : 'de-DE', {
+            style: 'currency',
+            currency: isPL ? 'PLN' : 'EUR',
+            ...opts,
+        });
+    };
+    const currencyLabel = isPL ? 'PLN' : 'EUR';
 
     // Telephony Presence (persisted to DB)
     const [availabilityStatus, setAvailabilityStatus] = useState<'available' | 'busy' | 'offline'>('available');
@@ -63,28 +80,38 @@ export const SalesDashboard: React.FC = () => {
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
+    // Fetch EUR rate for PL reps
+    useEffect(() => {
+        if (isPL) {
+            SettingsService.getEurRate().then(rate => { if (rate) setEurRate(rate); });
+        }
+    }, [isPL]);
+
     useEffect(() => {
         const loadData = async () => {
             if (!currentUser) return;
             setLoading(true);
 
             try {
-                // 1. Fetch Offers
-                const allOffers = await DatabaseService.getOffers();
-
-                let userOffers: Offer[] = [];
-                if (isAdmin()) {
-                    userOffers = allOffers;
-                } else {
-                    userOffers = allOffers.filter(o => o.createdBy === currentUser.id);
-                }
-                setOffers(userOffers);
-
-                // 2. Fetch Leads & Stale Leads
-                const [allLeads, fetchedStaleLeads] = await Promise.all([
+                // 1. Fetch Offers & Contracts in parallel
+                const [allOffers, allContracts, allLeads, fetchedStaleLeads] = await Promise.all([
+                    DatabaseService.getOffers(),
+                    ContractService.getContracts(),
                     DatabaseService.getLeads(),
                     DatabaseService.getStaleLeads(3)
                 ]);
+
+                let userOffers: Offer[] = [];
+                let userContracts: Contract[] = [];
+                if (isAdmin()) {
+                    userOffers = allOffers;
+                    userContracts = allContracts;
+                } else {
+                    userOffers = allOffers.filter(o => o.createdBy === currentUser.id);
+                    userContracts = allContracts.filter(c => c.salesRepId === currentUser.id);
+                }
+                setOffers(userOffers);
+                setContracts(userContracts);
                 setLeads(allLeads);
                 setStaleLeads(fetchedStaleLeads);
 
@@ -93,25 +120,23 @@ export const SalesDashboard: React.FC = () => {
                     try {
                         await InstallationService.checkAndAutoCompleteInstallations();
                         const updateTrigger = await InstallationService.getInstallations();
-                        // Filter for verification status
                         setUnsettledInstallations(updateTrigger.filter(i => i.status === 'verification'));
                     } catch (err) {
                         console.error("Error fetching unsettled installations", err);
                     }
                 }
 
-                // 3. Calculate Stats
+                // 3. Calculate Stats (offers for pipeline stats)
                 const computedStats = calculateCommissionStats(userOffers);
                 setStats(computedStats);
 
-                // 3. Set Profile (Mock for now, or fetch from DB if we store targets)
                 setProfile({
                     userId: currentUser.id,
                     firstName: currentUser.firstName,
                     lastName: currentUser.lastName,
                     email: currentUser.email,
                     phone: '',
-                    monthlyTarget: 50000 // Default target
+                    monthlyTarget: 100000
                 });
 
                 // 4. Admin: Team Stats
@@ -135,25 +160,23 @@ export const SalesDashboard: React.FC = () => {
         return <div className="p-12 text-center text-slate-400">Ładowanie danych...</div>;
     }
 
-    // Filter offers for the selected month/year
-    const soldOffers = offers.filter(o => o.status === 'sold');
+    // ── Revenue & Transactions: CONTRACTS are the source of truth ──
+    const getContractNet = (c: Contract) => {
+        const p = c.pricing || ({} as any);
+        return Math.max(Number(p.finalPriceNet) || 0, Number(p.sellingPriceNet) || 0);
+    };
 
-    const monthlySoldOffers = soldOffers.filter(o => {
-        const date = new Date(o.createdAt);
+    const monthlyContracts = contracts.filter(c => {
+        if (c.status === 'cancelled') return false;
+        const date = new Date(c.createdAt);
         return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
     });
 
-    // Calculate stats for the selected month
-    const monthlyRevenue = monthlySoldOffers.reduce((sum, o) => {
-        const pricing = o.pricing || ({} as any);
-        const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
-        const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
-        return sum + (finalNet ?? baseNet);
-    }, 0); // Use Net for settlement
+    const monthlyRevenue = monthlyContracts.reduce((sum, c) => sum + getContractNet(c), 0);
+    const monthlyCommission = monthlyContracts.reduce((sum, c) => sum + (c.commission || 0), 0);
 
-    const monthlyCommission = monthlySoldOffers.reduce((sum, o) => sum + (o.commission || 0), 0);
-
-    // Monthly Revenue Data for Chart (Last 6 months)
+    // Monthly Revenue Data for Chart (Last 6 months) — from contracts
+    const rate = isPL ? eurRate : 1;
     const monthlyData = [];
     for (let i = 5; i >= 0; i--) {
         const d = new Date();
@@ -161,27 +184,22 @@ export const SalesDashboard: React.FC = () => {
         const monthName = d.toLocaleString('pl-PL', { month: 'short' });
         const year = d.getFullYear();
 
-        const monthOffers = soldOffers.filter(o => {
-            const od = new Date(o.createdAt);
-            return od.getMonth() === d.getMonth() && od.getFullYear() === year;
+        const monthContracts = contracts.filter(c => {
+            if (c.status === 'cancelled') return false;
+            const cd = new Date(c.createdAt);
+            return cd.getMonth() === d.getMonth() && cd.getFullYear() === year;
         });
 
-        const rev = monthOffers.reduce((sum, o) => {
-            const pricing = o.pricing || ({} as any);
-            const finalNet = typeof pricing.finalPriceNet === 'number' ? pricing.finalPriceNet : undefined;
-            const baseNet = typeof pricing.sellingPriceNet === 'number' ? pricing.sellingPriceNet : 0;
-            return sum + (finalNet ?? baseNet);
-        }, 0);
-
-        const comm = monthOffers.reduce((sum, o) => sum + (o.commission || 0), 0);
+        const rev = monthContracts.reduce((sum, c) => sum + getContractNet(c), 0) * rate;
+        const comm = monthContracts.reduce((sum, c) => sum + (c.commission || 0), 0) * rate;
 
         monthlyData.push({ name: `${monthName}`, revenue: rev, commission: comm });
     }
 
-    // Status Distribution (Global)
+    // Status Distribution (Global) — offers for pipeline stats
     const statusData = [
         { name: 'Wysłane', value: stats.sentOffers, color: '#3b82f6' },
-        { name: 'Sprzedane', value: stats.soldOffers, color: '#22c55e' },
+        { name: 'Umowy', value: contracts.filter(c => c.status !== 'cancelled').length, color: '#22c55e' },
         { name: 'Odrzucone', value: stats.rejectedOffers, color: '#ef4444' },
         { name: 'Draft', value: stats.draftOffers, color: '#94a3b8' },
     ];
@@ -211,6 +229,13 @@ export const SalesDashboard: React.FC = () => {
                         Witaj, {profile?.firstName || 'Handlowcu'}! 👋
                     </h2>
                     <p className="text-slate-500 mt-1">Oto Twoje wyniki sprzedaży.</p>
+                    {isPL && (
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-lg">
+                            <span className="text-sm">🇵🇱</span>
+                            <span className="text-xs font-semibold text-rose-700">Rynek PL</span>
+                            <span className="text-xs text-rose-500">• Kurs EUR/PLN: {eurRate.toFixed(2)}</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
@@ -554,6 +579,9 @@ export const SalesDashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* Service Tickets Widget */}
+            <ServiceTicketsWidget />
+
             {/* Centrum Połączeń — full-width Ringostat section */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center gap-3">
@@ -600,20 +628,14 @@ export const SalesDashboard: React.FC = () => {
                     <div>
                         <h3 className="text-lg font-medium text-slate-300">Rozliczenie: {months[selectedMonth]} {selectedYear}</h3>
                         <div className="text-2xl sm:text-4xl font-bold mt-2 text-white">
-                            {Number(monthlyCommission || 0).toLocaleString('de-DE', {
-                                style: 'currency',
-                                currency: 'EUR'
-                            })}
+                            {fmtCurrency(monthlyCommission)}
                         </div>
                         <p className="text-sm text-slate-400 mt-1">Twoja Prowizja w tym miesiącu</p>
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-slate-400">Przychód Netto</p>
                         <p className="text-xl sm:text-2xl font-bold text-emerald-400">
-                            {Number(monthlyRevenue || 0).toLocaleString('de-DE', {
-                                style: 'currency',
-                                currency: 'EUR'
-                            })}
+                            {fmtCurrency(monthlyRevenue)}
                         </p>
                     </div>
                 </div>
@@ -622,7 +644,7 @@ export const SalesDashboard: React.FC = () => {
                 <div className="mt-6">
                     <div className="flex justify-between mb-2 text-sm">
                         <span className="text-slate-300">
-                            Realizacja Celu ({Number(target || 0).toLocaleString()} EUR)
+                            Realizacja Celu ({isPL ? (target * eurRate).toLocaleString('pl-PL', { maximumFractionDigits: 0 }) : Number(target || 0).toLocaleString()} {currencyLabel})
                         </span>
                         <span className="font-bold text-emerald-400">{progressPercent.toFixed(1)}%</span>
                     </div>
@@ -640,20 +662,14 @@ export const SalesDashboard: React.FC = () => {
                 <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Całkowity Przychód (YTD)</div>
                     <div className="text-xl sm:text-3xl font-bold text-slate-900">
-                        {Number(stats.totalRevenue || 0).toLocaleString('de-DE', {
-                            style: 'currency',
-                            currency: 'EUR'
-                        })}
+                        {fmtCurrency(stats.totalRevenue)}
                     </div>
                 </div>
 
                 <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Całkowita Prowizja (YTD)</div>
                     <div className="text-xl sm:text-3xl font-bold text-green-600">
-                        {Number(stats.totalCommission || 0).toLocaleString('de-DE', {
-                            style: 'currency',
-                            currency: 'EUR'
-                        })}
+                        {fmtCurrency(stats.totalCommission)}
                     </div>
                 </div>
 
@@ -667,10 +683,7 @@ export const SalesDashboard: React.FC = () => {
                 <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="text-slate-500 text-sm font-medium mb-1">Lejek (Otwarte)</div>
                     <div className="text-xl sm:text-3xl font-bold text-orange-500">
-                        {Number(stats.projectedCommission || 0).toLocaleString('de-DE', {
-                            style: 'currency',
-                            currency: 'EUR'
-                        })}
+                        {fmtCurrency(stats.projectedCommission)}
                     </div>
                 </div>
 
@@ -695,12 +708,7 @@ export const SalesDashboard: React.FC = () => {
                                     <XAxis dataKey="name" />
                                     <YAxis />
                                     <Tooltip
-                                        formatter={(value: number) =>
-                                            Number(value || 0).toLocaleString('de-DE', {
-                                                style: 'currency',
-                                                currency: 'EUR'
-                                            })
-                                        }
+                                        formatter={(value: number) => fmtCurrency(value)}
                                     />
                                     <Bar dataKey="revenue" fill="#3b82f6" name="Przychód" radius={[4, 4, 0, 0]} />
                                     <Bar dataKey="commission" fill="#22c55e" name="Prowizja" radius={[4, 4, 0, 0]} />
@@ -748,11 +756,11 @@ export const SalesDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Monthly Transactions Table */}
+            {/* Monthly Transactions Table — from Contracts */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 className="text-base sm:text-lg font-bold text-slate-800">Transakcje: {months[selectedMonth]} {selectedYear}</h3>
-                    <Link to="/offers" className="text-sm text-accent hover:underline">Zarządzaj ofertami</Link>
+                    <Link to="/contracts" className="text-sm text-accent hover:underline">Zarządzaj umowami</Link>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left min-w-[600px]">
@@ -760,43 +768,52 @@ export const SalesDashboard: React.FC = () => {
                             <tr>
                                 <th className="px-6 py-3">Data</th>
                                 <th className="px-6 py-3">Klient</th>
+                                <th className="px-6 py-3">Nr umowy</th>
                                 <th className="px-6 py-3 text-right">Kwota Netto</th>
                                 <th className="px-6 py-3 text-right">Prowizja</th>
                                 <th className="px-6 py-3 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {monthlySoldOffers.length > 0 ? (
-                                monthlySoldOffers.map(offer => (
-                                    <tr key={offer.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 text-slate-600">
-                                            {new Date(offer.createdAt).toLocaleDateString('pl-PL')}
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-slate-900">
-                                            {offer.customer.firstName} {offer.customer.lastName}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-slate-600">
-                                            {Number(
-                                                offer.pricing?.finalPriceNet ??
-                                                offer.pricing?.sellingPriceNet ??
-                                                0
-                                            ).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                            {offer.pricing?.finalPriceNet && <span className="ml-2 text-xs text-blue-500 font-bold">(Umowa)</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-bold text-green-600">
-                                            +{Number(offer.commission || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">
-                                                Sprzedane
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))
+                            {monthlyContracts.length > 0 ? (
+                                monthlyContracts.map(contract => {
+                                    const net = getContractNet(contract);
+                                    const statusMap: Record<string, { label: string; bg: string; text: string }> = {
+                                        signed: { label: 'Podpisana', bg: 'bg-green-100', text: 'text-green-700' },
+                                        draft: { label: 'Szkic', bg: 'bg-slate-100', text: 'text-slate-600' },
+                                        cancelled: { label: 'Anulowana', bg: 'bg-red-100', text: 'text-red-700' },
+                                        completed: { label: 'Zakończona', bg: 'bg-blue-100', text: 'text-blue-700' },
+                                    };
+                                    const st = statusMap[contract.status] || { label: contract.status, bg: 'bg-slate-100', text: 'text-slate-600' };
+                                    return (
+                                        <tr key={contract.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/contracts/${contract.id}`)}>
+                                            <td className="px-6 py-4 text-slate-600">
+                                                {new Date(contract.createdAt).toLocaleDateString('pl-PL')}
+                                            </td>
+                                            <td className="px-6 py-4 font-medium text-slate-900">
+                                                {contract.client?.firstName} {contract.client?.lastName}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500 text-xs font-mono">
+                                                {contract.contractNumber}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-slate-600">
+                                                {fmtCurrency(net)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-bold text-green-600">
+                                                +{fmtCurrency(contract.commission || 0)}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`${st.bg} ${st.text} px-2 py-1 rounded-full text-xs font-bold`}>
+                                                    {st.label}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
-                                        Brak transakcji w wybranym miesiącu.
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                                        Brak umów w wybranym miesiącu.
                                     </td>
                                 </tr>
                             )}
@@ -805,61 +822,59 @@ export const SalesDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Admin: Team Performance Section */}
-            {isAdmin() && teamStats.length > 0 && (
+            {/* Admin: Team Performance Section — from Contracts */}
+            {isAdmin() && contracts.length > 0 && (() => {
+                // Build per-rep stats from contracts
+                const repMap = new Map<string, { name: string; contracts: number; revenue: number; commission: number }>();
+                contracts.filter(c => c.status !== 'cancelled').forEach(c => {
+                    const repId = c.salesRepId || 'unknown';
+                    const repName = c.salesRep ? `${c.salesRep.firstName} ${c.salesRep.lastName}`.trim() : repId.substring(0, 8);
+                    const existing = repMap.get(repId) || { name: repName, contracts: 0, revenue: 0, commission: 0 };
+                    existing.contracts += 1;
+                    existing.revenue += getContractNet(c);
+                    existing.commission += (c.commission || 0);
+                    repMap.set(repId, existing);
+                });
+                const repStats = Array.from(repMap.entries())
+                    .map(([id, s]) => ({ id, ...s, avg: s.contracts > 0 ? s.revenue / s.contracts : 0 }))
+                    .sort((a, b) => b.revenue - a.revenue);
+
+                return (
                 <div className="mt-8">
                     <h2 className="text-2xl font-bold text-slate-800 mb-6">Wydajność Zespołu Sprzedaży</h2>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {teamStats.map(stat => (
-                            <div key={stat.user.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                        {repStats.map(stat => (
+                            <div key={stat.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center text-white font-bold text-lg">
-                                        {stat.user.firstName[0]}{stat.user.lastName[0]}
+                                        {stat.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-900">{stat.user.firstName} {stat.user.lastName}</h3>
-                                        <p className="text-xs text-slate-500">{stat.user.email}</p>
+                                        <h3 className="font-bold text-slate-900">{stat.name}</h3>
+                                        <p className="text-xs text-slate-500">{stat.contracts} umów</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm text-slate-600">Oferty razem:</span>
-                                        <span className="font-bold text-slate-900">{stat.offersCount}</span>
+                                        <span className="text-sm text-slate-600">Obrót netto:</span>
+                                        <span className="font-bold text-slate-900">
+                                            {fmtCurrency(stat.revenue, { maximumFractionDigits: 0 })}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm text-slate-600">Sprzedane:</span>
-                                        <span className="font-bold text-green-600">{stat.soldCount}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-slate-600">Wysłane/Draft:</span>
-                                        <span className="font-bold text-accent-dark">{stat.sentCount} / {stat.draftCount}</span>
+                                        <span className="text-sm text-slate-600">Prowizja:</span>
+                                        <span className="font-bold text-green-600">
+                                            {fmtCurrency(stat.commission)}
+                                        </span>
                                     </div>
                                     <div className="border-t pt-3 mt-3">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-slate-600">Przychód:</span>
+                                            <span className="text-sm text-slate-600">Śr. wartość umowy:</span>
                                             <span className="font-bold text-slate-900">
-                                                {Number(stat.revenue || 0).toLocaleString('de-DE', {
-                                                    style: 'currency',
-                                                    currency: 'EUR'
-                                                })}
+                                                {fmtCurrency(stat.avg, { maximumFractionDigits: 0 })}
                                             </span>
-                                        </div>
-                                        <div className="flex justify-between items-center mt-2">
-                                            <span className="text-sm text-slate-600">Prowizja:</span>
-                                            <span className="font-bold text-green-600">
-                                                {Number(stat.commission || 0).toLocaleString('de-DE', {
-                                                    style: 'currency',
-                                                    currency: 'EUR'
-                                                })}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="border-t pt-3 mt-3">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm text-slate-600">Raporty:</span>
-                                            <span className="font-bold text-slate-900">{stat.reportsCount}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -867,7 +882,8 @@ export const SalesDashboard: React.FC = () => {
                         ))}
                     </div>
                 </div>
-            )}
+                );
+            })()}
         </div>
     );
 };

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { generateInstallationProtocolPDF } from '../../utils/installationProtocolPDF';
+import { generateContractProtocolPDF } from '../../utils/contractProtocolPDF';
+import type { PhotoLayout } from '../../utils/contractProtocolPDF';
 import type { Contract, ContractComment, ContractAttachment, User, Installation, InstallationTeam } from '../../types';
 import { StorageService } from '../../services/database/storage.service';
 import { toast } from 'react-hot-toast';
@@ -63,9 +64,8 @@ export const ContractDetails: React.FC = () => {
             .catch(err => console.error('Cost breakdown error:', err))
             .finally(() => setCostLoading(false));
 
-        if (isAdmin()) {
-            UserService.getSalesReps().then(setSalesReps).catch(console.error);
-        }
+        // Load sales reps for editing (all roles can edit)
+        UserService.getSalesReps().then(setSalesReps).catch(console.error);
     }, [id, navigate, isAdmin]);
 
     const handleSave = async () => {
@@ -282,7 +282,10 @@ export const ContractDetails: React.FC = () => {
     if (!contract) return <div className="flex items-center justify-center h-full text-slate-400">Ładowanie...</div>;
 
     const netPrice = contract.pricing?.finalPriceNet || contract.pricing?.sellingPriceNet || 0;
-    const grossPrice = netPrice * 1.23;
+    const isPLContract = (contract.pricing as any)?.currency === 'PLN';
+    const vatRate = (contract.pricing as any)?.vatRate || (isPLContract ? 1.23 : 1.19);
+    const vatLabel = isPLContract ? `${Math.round((vatRate - 1) * 100)}% VAT` : '19% MwSt';
+    const grossPrice = netPrice * vatRate;
     const commissionRate = netPrice > 0 ? ((contract.commission || 0) / netPrice) * 100 : 0;
     const advancePercent = contract.pricing?.advancePayment ? Math.round((contract.pricing.advancePayment / grossPrice) * 100) : 0;
     const allImages = (contract.attachments || []).filter(a => a.type === 'image');
@@ -300,7 +303,7 @@ export const ContractDetails: React.FC = () => {
                             </svg>
                         </button>
                         <h1 className="text-xl md:text-2xl font-bold text-slate-800">
-                            {isEditing && isAdmin() ? (
+                            {isEditing ? (
                                 <input
                                     value={contract.contractNumber}
                                     onChange={e => setContract({ ...contract, contractNumber: e.target.value })}
@@ -336,7 +339,7 @@ export const ContractDetails: React.FC = () => {
                     </div>
                     <p className="text-slate-500 ml-9 mt-1 text-sm">
                         Data umowy:{' '}
-                        {isEditing && isAdmin() ? (
+                        {isEditing ? (
                             <input
                                 type="date"
                                 value={new Date(contract.createdAt).toISOString().split('T')[0]}
@@ -350,7 +353,7 @@ export const ContractDetails: React.FC = () => {
                     {contract.signedAt && (
                         <p className="text-slate-500 ml-9 mt-1 text-sm">
                             Data podpisania:{' '}
-                            {isEditing && isAdmin() ? (
+                            {isEditing ? (
                                 <input
                                     type="date"
                                     value={new Date(contract.signedAt).toISOString().split('T')[0]}
@@ -364,6 +367,8 @@ export const ContractDetails: React.FC = () => {
                     )}
                 </div>
                 <div className="flex gap-2 flex-wrap flex-shrink-0">
+                    {/* Protocol PDF dropdown */}
+                    <ProtocolPDFButton contract={contract} />
                     {isEditing ? (
                         <>
                             <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold hover:bg-slate-50 transition-colors text-sm">
@@ -470,7 +475,7 @@ export const ContractDetails: React.FC = () => {
                     </div>
                     <div className="min-w-0">
                         <div className="text-[10px] text-slate-500 font-bold uppercase">Handlowiec</div>
-                        {isEditing && isAdmin() ? (
+                        {isEditing ? (
                             <select value={contract.salesRepId || ''} onChange={(e) => setContract({ ...contract, salesRepId: e.target.value })} className="p-1 border rounded text-sm w-full">
                                 <option value="">Wybierz...</option>
                                 {salesReps.map(rep => (<option key={rep.id} value={rep.id}>{rep.firstName} {rep.lastName}</option>))}
@@ -823,8 +828,8 @@ export const ContractDetails: React.FC = () => {
                             {isEditing ? (
                                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kwota Brutto (EUR)</label>
-                                        <input type="number" step="0.01" value={grossPrice.toFixed(2)} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) setContract({ ...contract, pricing: { ...contract.pricing, finalPriceNet: v / 1.23 } }); }} className="w-full p-2 border rounded-lg font-bold text-sm" />
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kwota Brutto ({isPLContract ? `PLN • ${vatLabel}` : `EUR • ${vatLabel}`})</label>
+                                        <input type="number" step="0.01" value={grossPrice.toFixed(2)} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) setContract({ ...contract, pricing: { ...contract.pricing, finalPriceNet: v / vatRate } }); }} className="w-full p-2 border rounded-lg font-bold text-sm" />
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         <div>
@@ -1376,5 +1381,98 @@ export const ContractDetails: React.FC = () => {
                 )
             }
         </div >
+    );
+};
+
+// ── Protocol PDF Button with dropdown ──
+const ProtocolPDFButton: React.FC<{ contract: Contract }> = ({ contract }) => {
+    const [open, setOpen] = useState(false);
+    const [generating, setGenerating] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    // Close on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleGenerate = async (layout: PhotoLayout) => {
+        setGenerating(true);
+        setOpen(false);
+        try {
+            await generateContractProtocolPDF(contract, layout);
+            toast.success('PDF wygenerowany!');
+        } catch (err) {
+            console.error('PDF generation error:', err);
+            toast.error('Błąd generowania PDF');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const imageCount = (contract.attachments || []).filter(a => a.type === 'image').length;
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                onClick={() => setOpen(!open)}
+                disabled={generating}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 transition-colors text-sm flex items-center gap-2 shadow-sm disabled:opacity-50"
+            >
+                {generating ? (
+                    <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Generowanie...
+                    </>
+                ) : (
+                    <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Protokół PDF
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </>
+                )}
+            </button>
+
+            {open && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Protokół Montażowy</p>
+                        {imageCount > 0 && (
+                            <p className="text-[10px] text-slate-400">{imageCount} zdjęć do dołączenia</p>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => handleGenerate('2-per-page')}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-100"
+                    >
+                        <span className="text-lg">📄</span>
+                        <div>
+                            <div className="text-sm font-bold text-slate-800">2 zdjęcia na stronę</div>
+                            <div className="text-[10px] text-slate-400">Kompaktowy — mniej stron</div>
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => handleGenerate('1-per-page')}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center gap-3"
+                    >
+                        <span className="text-lg">🖼️</span>
+                        <div>
+                            <div className="text-sm font-bold text-slate-800">1 zdjęcie na stronę</div>
+                            <div className="text-[10px] text-slate-400">Pełny rozmiar — lepsze detale</div>
+                        </div>
+                    </button>
+                </div>
+            )}
+        </div>
     );
 };

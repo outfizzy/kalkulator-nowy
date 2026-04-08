@@ -262,23 +262,56 @@ export const InstallationCalendar: React.FC<InstallationCalendarProps> = ({
                                                     const isService = eventItem.type === 'service';
                                                     if (isService) {
                                                         const s = eventItem.data as ServiceTicket;
+                                                        const typeLabels: Record<string, { label: string; icon: string }> = {
+                                                            leak: { label: 'Nieszczelność', icon: '💧' },
+                                                            electrical: { label: 'Elektryka', icon: '⚡' },
+                                                            visual: { label: 'Wizualne', icon: '👁️' },
+                                                            mechanical: { label: 'Mechaniczne', icon: '🔧' },
+                                                            repair: { label: 'Naprawa', icon: '🔨' },
+                                                            other: { label: 'Inne', icon: '📋' },
+                                                        };
+                                                        const priorityColors: Record<string, string> = {
+                                                            critical: 'bg-red-500',
+                                                            high: 'bg-orange-400',
+                                                            medium: 'bg-yellow-400',
+                                                            low: 'bg-slate-300',
+                                                        };
+                                                        const typeInfo = typeLabels[s.type] || typeLabels.other;
+                                                        const clientName = s.client ? `${s.client.firstName || ''} ${s.client.lastName || ''}`.trim() : '';
+                                                        const clientCity = s.client?.city || '';
                                                         return (
                                                             <div
                                                                 key={s.id}
                                                                 draggable={!!onDragDrop && !isUnavailable}
                                                                 onDragStart={(e) => handleDragStart(e, s.id, 'service')}
                                                                 onClick={() => onEditService && onEditService(s)}
-                                                                className={`p-2 rounded border shadow-sm cursor-pointer transition-all text-xs border-amber-200 bg-amber-50 hover:ring-2 hover:ring-amber-300 ${draggedItem?.id === s.id ? 'opacity-50' : ''}`}
+                                                                className={`p-2 rounded border shadow-sm cursor-pointer transition-all text-xs border-amber-200 bg-amber-50 hover:ring-2 hover:ring-amber-300 relative ${draggedItem?.id === s.id ? 'opacity-50' : ''}`}
                                                             >
-                                                                <div className="font-bold truncate text-xs mb-0.5 pr-2 text-amber-800">
-                                                                    {s.ticketNumber} <span className="text-amber-600 font-normal">- Serwis</span>
+                                                                {/* Priority dot */}
+                                                                <div className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-1 ring-white ${priorityColors[s.priority] || 'bg-yellow-400'}`}
+                                                                    title={`Priorytet: ${s.priority}`} />
+                                                                {/* Header: Type + badge */}
+                                                                <div className="flex items-center gap-1 mb-0.5">
+                                                                    <span className="text-[10px]">{typeInfo.icon}</span>
+                                                                    <span className="font-bold text-amber-800 text-[11px] truncate pr-3">
+                                                                        {clientName || s.ticketNumber}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="text-[10px] text-amber-700 mb-0.5">
-                                                                    {s.client?.firstName} {s.client?.lastName}
+                                                                {/* City + type tag */}
+                                                                <div className="flex items-center gap-1 mb-0.5">
+                                                                    {clientCity && (
+                                                                        <span className="text-[10px] text-amber-700 truncate">{clientCity}</span>
+                                                                    )}
+                                                                    <span className="ml-auto text-[9px] bg-amber-200 text-amber-800 px-1 py-0.5 rounded font-bold leading-none whitespace-nowrap">
+                                                                        {typeInfo.label}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="text-[10px] text-amber-600 truncate">
-                                                                    {s.client?.city} - {s.description.slice(0, 20)}...
-                                                                </div>
+                                                                {/* Description snippet */}
+                                                                {s.description && (
+                                                                    <div className="text-[10px] text-amber-600 truncate mt-0.5 italic">
+                                                                        {s.description.replace(/Klient:.*\n?|Adres:.*\n?|Telefon:.*\n?/gi, '').trim().slice(0, 40)}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         );
                                                     } else {

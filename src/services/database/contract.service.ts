@@ -368,6 +368,33 @@ export const ContractService = {
             .eq('id', id);
         if (error) throw error;
 
+        // [AUTOMATION] Sync pricing & commission back to linked offer
+        // This ensures SalesDashboard shows the contract price, not the stale offer price
+        if (updates.contract_data && current.offerId) {
+            try {
+                const updatedPricing = (updates.contract_data as any)?.pricing;
+                const updatedCommission = (updates.contract_data as any)?.commission;
+                if (updatedPricing) {
+                    const offerPricingSync: Record<string, unknown> = {
+                        pricing: {
+                            ...updatedPricing,
+                            // Ensure finalPriceNet is set for dashboard reads
+                            finalPriceNet: updatedPricing.finalPriceNet ?? updatedPricing.sellingPriceNet ?? 0,
+                        },
+                    };
+                    if (updatedCommission !== undefined) {
+                        offerPricingSync.commission = updatedCommission;
+                    }
+                    await supabase
+                        .from('offers')
+                        .update(offerPricingSync)
+                        .eq('id', current.offerId);
+                }
+            } catch (syncErr) {
+                console.error('[Contract→Offer Sync] Failed to sync pricing back to offer:', syncErr);
+            }
+        }
+
         // Automation: Task for Manager when contract is signed
         if (updates.status === 'signed') {
             try {

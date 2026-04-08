@@ -33,8 +33,10 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
             };
         } else if (item.type === 'service') {
             const t = item.data as ServiceTicket;
+            const firstName = t.client?.firstName || '';
+            const lastName = t.client?.lastName || '';
             return {
-                name: t.customerName || t.client?.name || '',
+                name: t.customerName || `${firstName} ${lastName}`.trim() || t.client?.name || '',
                 city: t.client?.city || '',
                 address: t.client?.address || '',
                 postalCode: t.client?.postalCode || ''
@@ -146,31 +148,74 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
             );
         } else if (item.type === 'service') {
             const ticket = item.data as ServiceTicket;
+            const typeLabels: Record<string, { label: string; icon: string; color: string }> = {
+                leak: { label: 'Nieszczelność', icon: '💧', color: 'bg-blue-100 text-blue-700' },
+                electrical: { label: 'Elektryka', icon: '⚡', color: 'bg-yellow-100 text-yellow-700' },
+                visual: { label: 'Wizualne', icon: '👁️', color: 'bg-purple-100 text-purple-700' },
+                mechanical: { label: 'Mechaniczne', icon: '🔧', color: 'bg-slate-100 text-slate-700' },
+                repair: { label: 'Naprawa', icon: '🔨', color: 'bg-orange-100 text-orange-700' },
+                other: { label: 'Inne', icon: '📋', color: 'bg-slate-100 text-slate-600' },
+            };
+            const priorityLabels: Record<string, { label: string; color: string }> = {
+                critical: { label: 'Krytyczny', color: 'bg-red-100 text-red-700 border-red-200' },
+                high: { label: 'Wysoki', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+                medium: { label: 'Średni', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                low: { label: 'Niski', color: 'bg-slate-50 text-slate-500 border-slate-200' },
+            };
+            const typeInfo = typeLabels[ticket.type] || typeLabels.other;
+            const prioInfo = priorityLabels[ticket.priority] || priorityLabels.medium;
+            const clientName = ticket.client
+                ? `${ticket.client.firstName || ''} ${ticket.client.lastName || ''}`.trim()
+                : (ticket.customerName || '');
+
+            // Clean description — strip manual client info lines
+            const cleanDesc = ticket.description
+                .replace(/Klient:.*\n?/gi, '')
+                .replace(/Adres:.*\n?/gi, '')
+                .replace(/Telefon:.*\n?/gi, '')
+                .replace(/---.*\n?/g, '')
+                .trim();
+
             return (
                 <>
                     <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                            <h4 className="font-semibold text-slate-900 text-sm">
-                                {itemTitle}
+                        <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-slate-900 text-sm truncate">
+                                {clientName || itemTitle || 'Klient nieznany'}
                             </h4>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                                {itemSubtitle}
-                            </p>
+                            {clientData.city && (
+                                <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                                    <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    </svg>
+                                    <span className="truncate">{clientData.postalCode ? `${clientData.postalCode} ` : ''}{clientData.city}</span>
+                                </div>
+                            )}
                         </div>
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded flex-shrink-0 ml-1">
                             Serwis
                         </span>
                     </div>
-                    <div className="space-y-1 text-xs text-slate-600">
-                        <p className="line-clamp-2">{ticket.description}</p>
-                        {ticket.scheduledDate && (
-                            <div className="flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span>{new Date(ticket.scheduledDate).toLocaleDateString('pl-PL')}</span>
-                            </div>
+                    {/* Type + Priority badges */}
+                    <div className="flex items-center gap-1.5 mb-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 ${typeInfo.color}`}>
+                            <span className="text-[10px]">{typeInfo.icon}</span> {typeInfo.label}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${prioInfo.color}`}>
+                            {prioInfo.label}
+                        </span>
+                        {ticket.contractNumber && (
+                            <span className="text-[10px] text-slate-400 font-mono ml-auto truncate">{ticket.contractNumber}</span>
                         )}
+                    </div>
+                    {/* Description */}
+                    <div className="space-y-1 text-xs text-slate-600">
+                        <p className="line-clamp-2 leading-relaxed">{cleanDesc || ticket.description.slice(0, 80)}</p>
+                    </div>
+                    {/* Footer: Ticket number + date */}
+                    <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400">
+                        <span className="font-mono">{ticket.ticketNumber}</span>
+                        <span>{ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('pl-PL') : ''}</span>
                     </div>
                 </>
             );

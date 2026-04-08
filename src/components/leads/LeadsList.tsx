@@ -20,24 +20,27 @@ export const LeadsList: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [measurements, setMeasurements] = useState<Measurement[]>([]);
     const [filterAssignee, setFilterAssignee] = useState<string>('all');
-    const { isAdmin } = useAuth();
+    const { isAdmin, currentUser } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'map'>('kanban');
     const [showStats, setShowStats] = useState(false);
     const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all');
-    const [filterFair, setFilterFair] = useState<string>('all'); // 'all' | 'website' | 'fair_all' | specific_fair_id
+    const [filterFair, setFilterFair] = useState<string>(currentUser?.role === 'sales_rep_pl' ? 'website_pl' : 'all'); // 'all' | 'website' | 'website_pl' | 'fair_all' | specific_fair_id
     const [groupByRegion, setGroupByRegion] = useState(false);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [searchQuery, setSearchQuery] = useState('');
     const [leadActivity, setLeadActivity] = useState<Map<string, { count: number; lastActivity: Date | null; isHot: boolean }>>(new Map());
     const [completedFormLeadIds, setCompletedFormLeadIds] = useState<Set<string>>(new Set());
+    const [showClosedLeads, setShowClosedLeads] = useState(false);
+    const [loadingClosed, setLoadingClosed] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
         try {
+            // Phase 1: Load active pipeline leads (excludes won/lost for fast initial render)
             const [leadsData, fairsData, usersData, measurementsData] = await Promise.all([
-                DatabaseService.getLeads(),
+                DatabaseService.getLeads({ excludeStatuses: ['won', 'lost'] }),
                 FairService.getAllFairs(),
                 DatabaseService.getAllUsers(),
                 MeasurementService.getMeasurements()
@@ -47,7 +50,7 @@ export const LeadsList: React.FC = () => {
             setUsers(usersData);
             setMeasurements(measurementsData);
 
-            // Fetch activity for leads
+            // Fetch activity for pipeline leads
             const leadIds = leadsData.map(l => l.id);
             const activity = await OfferService.getRecentLeadActivity(leadIds);
             setLeadActivity(activity);
@@ -56,6 +59,26 @@ export const LeadsList: React.FC = () => {
             toast.error('Nie udało się załadować danych');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Phase 2: Load won/lost leads when user toggles them on
+    const loadClosedLeads = async () => {
+        if (loadingClosed) return;
+        setLoadingClosed(true);
+        try {
+            const closedLeads = await DatabaseService.getLeads({
+                excludeStatuses: ['new', 'formularz', 'contacted', 'offer_sent', 'measurement_scheduled', 'measurement_completed', 'negotiation', 'fair']
+            });
+            setLeads(prev => {
+                const existingIds = new Set(prev.map(l => l.id));
+                const newLeads = closedLeads.filter(l => !existingIds.has(l.id));
+                return [...prev, ...newLeads];
+            });
+        } catch (error) {
+            console.error('Error loading closed leads:', error);
+        } finally {
+            setLoadingClosed(false);
         }
     };
 
@@ -79,13 +102,27 @@ export const LeadsList: React.FC = () => {
     }, [leads]);
 
     const filteredLeads = leads.filter(lead => {
+        // Hide won/lost unless explicitly toggled or filtering by that status
+        if (!showClosedLeads && (lead.status === 'won' || lead.status === 'lost')) {
+            if (filterStatus !== 'won' && filterStatus !== 'lost' && filterStatus !== 'all') return false;
+            if (filterStatus === 'all') return false;
+        }
+
         // Status filter
         if (filterStatus !== 'all' && lead.status !== filterStatus) return false;
+
+        // ── Hard market lock for sales_rep_pl ──
+        // PL reps can ONLY see Polish leads, regardless of filter selection
+        if (currentUser?.role === 'sales_rep_pl') {
+            if (lead.source !== 'website_pl') return false;
+        }
 
         // Fair / Source filter
         if (filterFair !== 'all') {
             if (filterFair === 'website') {
-                if (lead.source === 'targi') return false;
+                if (lead.source === 'targi' || lead.source === 'website_pl') return false;
+            } else if (filterFair === 'website_pl') {
+                if (lead.source !== 'website_pl') return false;
             } else if (filterFair === 'fair_all') {
                 if (lead.source !== 'targi') return false;
             } else {
@@ -247,6 +284,11 @@ export const LeadsList: React.FC = () => {
                                             <span className="inline-flex items-center gap-1 text-xs text-slate-500">
                                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
                                                 Strona WWW
+                                            </span>
+                                        ) : lead.source === 'website_pl' ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200 self-start">
+                                                <span className="text-sm">🇵🇱</span>
+                                                zadaszto.pl
                                             </span>
                                         ) : (
                                             <span className="text-xs text-slate-400">{lead.source || 'Inne'}</span>
@@ -434,6 +476,7 @@ export const LeadsList: React.FC = () => {
                         </select>
                     </div>
 
+                    {currentUser?.role !== 'sales_rep_pl' && (
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-slate-600">Źródło:</span>
                         <select
@@ -442,7 +485,8 @@ export const LeadsList: React.FC = () => {
                             className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none min-w-[150px]"
                         >
                             <option value="all">Wszystkie Źródła</option>
-                            <option value="website">Strona WWW / Inne</option>
+                            <option value="website">Strona WWW (DE)</option>
+                            <option value="website_pl">🇵🇱 zadaszto.pl (PL)</option>
                             <option value="fair_all">Targi (Wszystkie)</option>
                             {fairs.map(fair => (
                                 <option key={fair.id} value={fair.id}>
@@ -451,6 +495,7 @@ export const LeadsList: React.FC = () => {
                             ))}
                         </select>
                     </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-slate-600">Opiekun:</span>
@@ -477,9 +522,28 @@ export const LeadsList: React.FC = () => {
                     )}
                 </div>
 
-                <button onClick={() => setSortOrder(p => p === 'desc' ? 'asc' : 'desc')} className="text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-                    {sortOrder === 'desc' ? 'Najnowsze' : 'Najstarsze'}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setSortOrder(p => p === 'desc' ? 'asc' : 'desc')} className="text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        {sortOrder === 'desc' ? 'Najnowsze' : 'Najstarsze'}
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (!showClosedLeads) {
+                                setShowClosedLeads(true);
+                                loadClosedLeads();
+                            } else {
+                                setShowClosedLeads(false);
+                            }
+                        }}
+                        className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                            showClosedLeads
+                                ? 'bg-slate-700 text-white border-slate-700'
+                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                        }`}
+                    >
+                        {loadingClosed ? '⏳ Ładuję...' : showClosedLeads ? '✓ Won/Lost' : '📋 +Won/Lost'}
+                    </button>
+                </div>
             </div>
 
             {viewMode === 'map' ? (

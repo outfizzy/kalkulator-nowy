@@ -10,6 +10,7 @@ import { DatabaseService } from '../../services/database';
 import { LeadService } from '../../services/database/lead.service';
 import { SendEmailModal } from '../leads/SendEmailModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { SettingsService } from '../../services/database/settings.service';
 import type { Customer, Lead, Offer } from '../../types';
 import { generateOfferPDF, generateOfferPDFBase64 } from '../../utils/offerPDF';
 import { CustomerForm } from '../CustomerForm';
@@ -309,6 +310,10 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
 
 // ======= COMPONENT =======
 export const ProductConfiguratorV2: React.FC = () => {
+    // === HOOKS (must be first) ===
+    const navigate = useNavigate();
+    const { currentUser } = useAuth();
+
     // === STEPS ===
     const [activeStep, setActiveStep] = useState(0);
     const steps = [
@@ -504,6 +509,10 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === MONTAGE (INSTALLATION) ===
     const [montagePrice, setMontagePrice] = useState<number>(0);
 
+    // === PLN PRICING (for sales_rep_pl) ===
+    const [eurRate, setEurRate] = useState<number>(4.35);
+    const isPL = currentUser?.role === 'sales_rep_pl';
+
 
     // === CALCULATED VALUES ===
     const areaM2 = (width * projection) / 1_000_000; // Convert mm² to m²
@@ -609,8 +618,6 @@ export const ProductConfiguratorV2: React.FC = () => {
         }
     }, [wallProduct, wallPlacement, dachrechnerResults, wallDimsAuto, width, dachH3]);
 
-    const navigate = useNavigate();
-    const { currentUser } = useAuth();
 
     // Mailbox fetching is handled by SendEmailModal via currentUser.mailboxes
 
@@ -633,6 +640,13 @@ export const ProductConfiguratorV2: React.FC = () => {
             }
         }
     }, [model, cover]);
+
+    // === FETCH EUR/PLN RATE (for PL sales rep) ===
+    useEffect(() => {
+        if (isPL) {
+            SettingsService.getEurRate().then(rate => { if (rate) setEurRate(rate); });
+        }
+    }, [isPL]);
 
     // === FETCH PURCHASE DISCOUNT FROM ADMIN ===
     useEffect(() => {
@@ -1707,6 +1721,8 @@ export const ProductConfiguratorV2: React.FC = () => {
             // 4. Build pricing object
             const manualInstallation = isManualMode ? (parseFloat(manualInstallationCost) || 0) : 0;
             const installationTotal = isManualMode ? manualInstallation : montagePrice;
+            // PL VAT: 8% with installation (usługa budowlana), 23% without (materiał)
+            const plVatRate = installationTotal > 0 ? 1.08 : 1.23;
             const pricing = {
                 basePrice: basketTotal, // Base sum of basket components
                 addonsPrice: 0,
@@ -1715,9 +1731,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                 marginValue: marginValue,
                 discountPercentage: discount,
                 discountValue: discountValue,
-                sellingPriceNet: finalPrice,
-                sellingPriceGross: finalPrice * 1.19, // 19% VAT
-                totalCost: finalPrice * 1.19,
+                sellingPriceNet: isPL ? finalPrice * eurRate : finalPrice,
+                sellingPriceGross: isPL ? finalPrice * eurRate * plVatRate : finalPrice * 1.19,
+                totalCost: isPL ? finalPrice * eurRate * plVatRate : finalPrice * 1.19,
+                currency: isPL ? 'PLN' : 'EUR',
+                vatRate: isPL ? plVatRate : 1.19,
                 installationCosts: installationTotal > 0 ? {
                     totalInstallation: installationTotal,
                     installationBase: installationTotal,
@@ -1832,11 +1850,13 @@ export const ProductConfiguratorV2: React.FC = () => {
                     extraPostTotal: extraPostTotalPrice,
                     finalPriceNet: finalPrice,
                     finalPriceGross: finalPrice * 1.19,
-                    purchaseDiscount
+                    purchaseDiscount,
+                    ...(isPL ? { currency: 'PLN', eurRate, finalPriceNetPLN: finalPrice * eurRate, finalPriceGrossPLN8: finalPrice * eurRate * 1.08, finalPriceGrossPLN23: finalPrice * eurRate * 1.23 } : { currency: 'EUR' })
                 },
                 offerNumber: savedOffer?.offerNumber || `V2-${Date.now()}`,
                 offerDate: new Date().toLocaleDateString('de-DE'),
-                salesPerson: currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : undefined
+                salesPerson: currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : undefined,
+                ...(isPL ? { currency: 'PLN', eurRate } : {})
             };
         };
 
@@ -2125,17 +2145,39 @@ export const ProductConfiguratorV2: React.FC = () => {
                         </div>
 
                         {/* Final Price */}
-                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
+                        <div className={`rounded-2xl shadow-lg p-6 text-white ${isPL ? 'bg-gradient-to-r from-red-600 to-red-700' : 'bg-gradient-to-r from-indigo-600 to-purple-600'}`}>
                             <div className="flex justify-between items-center">
                                 <div>
-                                    <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
-                                    <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                    {montagePrice > 0 && <p className="text-indigo-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
-                                    <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
+                                    {isPL ? (
+                                        <>
+                                            <p className="text-red-200 text-sm">Cena końcowa (netto)</p>
+                                            <p className="text-4xl font-black">{(finalPrice * eurRate).toFixed(2)} PLN</p>
+                                            {montagePrice > 0 && <p className="text-red-200 text-xs">w tym montaż: {(montagePrice * eurRate).toFixed(2)} PLN</p>}
+                                            {montagePrice > 0 ? (
+                                                <>
+                                                    <p className="text-white text-sm font-bold mt-1">✓ brutto (8% VAT z montażem) = {(finalPrice * eurRate * 1.08).toFixed(2)} PLN</p>
+                                                    <p className="text-red-300/50 text-xs line-through">bez montażu (23% VAT) = {(finalPrice * eurRate * 1.23).toFixed(2)} PLN</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="text-white text-sm font-bold mt-1">✓ brutto (23% VAT) = {(finalPrice * eurRate * 1.23).toFixed(2)} PLN</p>
+                                                    <p className="text-red-300/50 text-xs">z montażem byłoby: 8% VAT = {(finalPrice * eurRate * 1.08).toFixed(2)} PLN</p>
+                                                </>
+                                            )}
+                                            <p className="text-red-300 text-[10px] mt-2">Kurs: 1 EUR = {eurRate.toFixed(4)} PLN | EUR netto: {formatCurrency(finalPrice)}</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
+                                            <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
+                                            {montagePrice > 0 && <p className="text-indigo-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
+                                            <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
+                                        </>
+                                    )}
                                 </div>
                                 {!isManualMode && (
                                     <div className="text-right">
-                                        <p className="text-indigo-200 text-xs">Powierzchnia</p>
+                                        <p className={`text-xs ${isPL ? 'text-red-200' : 'text-indigo-200'}`}>Powierzchnia</p>
                                         <p className="text-2xl font-bold">{areaM2.toFixed(2)} m²</p>
                                     </div>
                                 )}
@@ -2589,16 +2631,29 @@ export const ProductConfiguratorV2: React.FC = () => {
                     </div>
 
                     {/* Final Price Preview */}
-                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl shadow-lg p-6 text-white">
+                    <div className={`rounded-2xl shadow-lg p-6 text-white ${isPL ? 'bg-gradient-to-r from-red-600 to-red-700' : 'bg-gradient-to-r from-emerald-600 to-teal-600'}`}>
                         <div className="flex justify-between items-center">
                             <div>
-                                <p className="text-emerald-200 text-sm">Endpreis (netto)</p>
-                                <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                {montagePrice > 0 && <p className="text-emerald-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
-                                <p className="text-emerald-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
+                                {isPL ? (
+                                    <>
+                                        <p className="text-red-200 text-sm">Cena końcowa (netto)</p>
+                                        <p className="text-4xl font-black">{(finalPrice * eurRate).toFixed(2)} PLN</p>
+                                        {montagePrice > 0 && <p className="text-red-200 text-xs">w tym montaż: {(montagePrice * eurRate).toFixed(2)} PLN</p>}
+                                        <p className="text-red-200 text-sm mt-1">z montażem (8% VAT) = {(finalPrice * eurRate * 1.08).toFixed(2)} PLN</p>
+                                        <p className="text-red-200 text-sm">bez montażu (23% VAT) = {(finalPrice * eurRate * 1.23).toFixed(2)} PLN</p>
+                                        <p className="text-red-300 text-[10px] mt-2">Kurs: 1 EUR = {eurRate.toFixed(4)} PLN | EUR netto: {formatCurrency(finalPrice)}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-emerald-200 text-sm">Endpreis (netto)</p>
+                                        <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
+                                        {montagePrice > 0 && <p className="text-emerald-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
+                                        <p className="text-emerald-200 text-sm mt-1">inkl. 19% MwSt. = {formatCurrency(finalPrice * 1.19)}</p>
+                                    </>
+                                )}
                             </div>
                             <div className="text-right">
-                                <p className="text-emerald-200 text-xs">Positionen</p>
+                                <p className={`text-xs ${isPL ? 'text-red-200' : 'text-emerald-200'}`}>Positionen</p>
                                 <p className="text-2xl font-bold">{customItems.length}</p>
                             </div>
                         </div>

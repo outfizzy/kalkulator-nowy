@@ -52,6 +52,21 @@ export const MailPage: React.FC = () => {
     // Selection state
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
 
+    // Bulk lead creation state
+    const [bulkLeadLoading, setBulkLeadLoading] = useState(false);
+    const [bulkLeadResults, setBulkLeadResults] = useState<{
+        show: boolean;
+        results: Array<{
+            emailFrom: string;
+            subject: string;
+            status: 'created' | 'skipped' | 'error';
+            leadName?: string;
+            missingEmail?: boolean;
+            missingPhone?: boolean;
+            error?: string;
+        }>;
+    }>({ show: false, results: [] });
+
 
     const [emails, setEmails] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -862,6 +877,188 @@ export const MailPage: React.FC = () => {
         }
     };
 
+    // ═══ BULK AI LEAD CREATION ═══
+    const handleBulkCreateLeadsAI = async () => {
+        if (selectedEmailIds.size === 0) return;
+        const ids = Array.from(selectedEmailIds);
+        setBulkLeadLoading(true);
+        const toastId = toast.loading(`Tworzę leady z ${ids.length} wiadomości...`);
+
+        const results: typeof bulkLeadResults.results = [];
+
+        try {
+            const { supabase } = await import('../lib/supabase');
+            const { LeadService } = await import('../services/database/lead.service');
+
+            for (let i = 0; i < ids.length; i++) {
+                const uid = ids[i];
+                toast.loading(`Przetwarzam ${i + 1}/${ids.length}...`, { id: toastId });
+
+                try {
+                    // 1. Fetch email body
+                    const response = await fetch('/api/fetch-email-body', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: activeConfig, uid, box: boxName }),
+                    });
+
+                    if (!response.ok) {
+                        const emailListItem = emails.find(e => e.id === uid);
+                        results.push({
+                            emailFrom: emailListItem?.from || `UID ${uid}`,
+                            subject: emailListItem?.subject || '?',
+                            status: 'error',
+                            error: 'Nie udało się pobrać treści'
+                        });
+                        continue;
+                    }
+
+                    const emailDetail: EmailDetails = await response.json();
+
+                    // Check if already converted
+                    if (convertedMessageIds.has(emailDetail.id)) {
+                        results.push({
+                            emailFrom: emailDetail.from,
+                            subject: emailDetail.subject,
+                            status: 'skipped',
+                            error: 'Lead już istnieje (duplikat)'
+                        });
+                        continue;
+                    }
+
+                    // 2. Parse with regex
+                    const body = emailDetail.text || '';
+                    const from = emailDetail.from;
+                    let regexFirstName = '', regexLastName = '', regexEmail = '', regexPhone = '';
+                    let regexPostalCode = '', regexCity = '', regexAddress = '', regexCompany = '';
+
+                    if (from.includes('<')) {
+                        const parts = from.split('<');
+                        const fromName = parts[0].trim().replace(/^"|"$/g, '');
+                        regexEmail = parts[1].replace('>', '').trim();
+                        const [fn, ...lnParts] = fromName.split(' ');
+                        regexFirstName = fn || '';
+                        regexLastName = lnParts.join(' ');
+                    } else {
+                        regexEmail = from.trim();
+                    }
+
+                    const nameMatch = body.match(/(?:Name\s*(?:und\s*Vorname)?|Imię\s*i\s*nazwisko|Vor-?\s*und\s*Nachname)\s*:\s*(.+)/i);
+                    if (nameMatch) {
+                        const raw = nameMatch[1].trim();
+                        if (raw.includes(',')) {
+                            const [last, first] = raw.split(',').map(s => s.trim());
+                            regexLastName = last; regexFirstName = first;
+                        } else {
+                            const parts = raw.split(/\s+/);
+                            regexFirstName = parts[0] || '';
+                            regexLastName = parts.slice(1).join(' ');
+                        }
+                    }
+
+                    const emailMatch = body.match(/(?:E-?Mail|Email)\s*:\s*([^\s,\n]+@[^\s,\n]+)/i);
+                    if (emailMatch) regexEmail = emailMatch[1].trim();
+                    const phoneMatch = body.match(/(?:Mobil|Telefon|Tel|Phone|Handy)\s*:\s*([+\d\s/-]+)/i);
+                    if (phoneMatch) regexPhone = phoneMatch[1].trim();
+                    const plzMatch = body.match(/(?:Postleitzahl|PLZ|Kod\s*pocztowy)\s*:\s*([0-9\s-]+)/i);
+                    if (plzMatch) regexPostalCode = plzMatch[1].trim();
+                    const cityMatch = body.match(/(?:Ort|Stadt|Miasto|City)\s*:\s*(.+)/i);
+                    if (cityMatch) regexCity = cityMatch[1].trim();
+                    const addressMatch = body.match(/(?:Straße|Strasse|Adresse|Adres|Address)\s*:\s*(.+)/i);
+                    if (addressMatch) regexAddress = addressMatch[1].trim();
+                    const companyMatch = body.match(/(?:Firma|Unternehmen|Company)\s*:\s*(.+)/i);
+                    if (companyMatch) regexCompany = companyMatch[1].trim();
+
+                    // 3. AI extraction
+                    let extracted: any = null;
+                    const fullText = `Temat: ${emailDetail.subject}\nOd: ${emailDetail.from}\n\n${body}`;
+                    const userOpenaiKey = currentUser?.emailConfig?.openaiKey;
+
+                    try {
+                        const { data, error } = await supabase.functions.invoke('extract-lead-info', {
+                            body: { text: fullText, apiKey: userOpenaiKey }
+                        });
+                        if (!error) extracted = data?.leadData;
+                    } catch { /* use regex fallback */ }
+
+                    // 4. Merge AI + regex
+                    const finalFirstName = extracted?.firstName || regexFirstName;
+                    const finalLastName = extracted?.lastName || regexLastName;
+                    const finalEmail = extracted?.email || regexEmail;
+                    const finalPhone = extracted?.phone || regexPhone;
+                    const finalPostalCode = extracted?.postalCode || regexPostalCode;
+                    const finalCity = extracted?.city || regexCity;
+                    const finalAddress = extracted?.address || regexAddress;
+                    const finalCompany = extracted?.companyName || regexCompany;
+
+                    const missingEmail = !finalEmail || !finalEmail.includes('@');
+                    const missingPhone = !finalPhone;
+
+                    // 5. Create lead
+                    const leadData: any = {
+                        customerData: {
+                            firstName: finalFirstName || 'Nieznany',
+                            lastName: finalLastName || '',
+                            email: finalEmail || '',
+                            phone: finalPhone || '',
+                            companyName: finalCompany,
+                            postalCode: finalPostalCode,
+                            city: finalCity,
+                            address: finalAddress,
+                        },
+                        source: 'email',
+                        emailMessageId: emailDetail.id,
+                        notes: `${extracted?.notes || ''}\n\n--- Pełna treść wiadomości ---\nOd: ${emailDetail.from}\nTemat: ${emailDetail.subject}\nData: ${new Date(emailDetail.date).toLocaleString()}\n\n${body || '(brak treści)'}`,
+                        status: 'new',
+                        assignedTo: currentUser?.id,
+                    };
+
+                    await LeadService.createLead(leadData);
+
+                    results.push({
+                        emailFrom: emailDetail.from,
+                        subject: emailDetail.subject,
+                        status: 'created',
+                        leadName: `${finalFirstName} ${finalLastName}`.trim() || finalEmail,
+                        missingEmail,
+                        missingPhone,
+                    });
+
+                } catch (emailErr: any) {
+                    const emailListItem = emails.find(e => e.id === uid);
+                    results.push({
+                        emailFrom: emailListItem?.from || `UID ${uid}`,
+                        subject: emailListItem?.subject || '?',
+                        status: 'error',
+                        error: emailErr?.message || 'Nieznany błąd'
+                    });
+                }
+            }
+
+            // Summary
+            const created = results.filter(r => r.status === 'created').length;
+            const skipped = results.filter(r => r.status === 'skipped').length;
+            const errors = results.filter(r => r.status === 'error').length;
+            const warnings = results.filter(r => r.missingEmail || r.missingPhone).length;
+
+            setBulkLeadResults({ show: true, results });
+            setSelectedEmailIds(new Set());
+            setRefreshTrigger(p => p + 1);
+
+            if (created > 0) {
+                toast.success(`Utworzono ${created} leadów${warnings > 0 ? ` (${warnings} z brakującymi danymi)` : ''}${skipped > 0 ? `, pominięto: ${skipped}` : ''}`, { id: toastId });
+            } else {
+                toast(`Pominięto: ${skipped}, Błędy: ${errors}`, { icon: 'ℹ️', id: toastId });
+            }
+
+        } catch (err: any) {
+            console.error('Bulk Lead Error:', err);
+            toast.error(`Błąd: ${err.message}`, { id: toastId });
+        } finally {
+            setBulkLeadLoading(false);
+        }
+    };
+
     // AI Extraction Handler (with Price Estimation)
     const handleAiExtract = async () => {
         if (!selectedEmail) return;
@@ -1271,16 +1468,31 @@ export const MailPage: React.FC = () => {
                                         </span>
                                         <div className="flex gap-1">
                                             <button
+                                                onClick={handleBulkCreateLeadsAI}
+                                                disabled={bulkLeadLoading}
+                                                className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors border border-transparent hover:border-purple-200 flex items-center gap-1"
+                                                title="Utwórz leady z zaznaczonych (AI)"
+                                            >
+                                                {bulkLeadLoading ? (
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                    </svg>
+                                                )}
+                                                <span className="text-xs font-semibold hidden md:inline">Utwórz Leady AI</span>
+                                            </button>
+                                            <button
                                                 onClick={handleAnalyzeSelected}
                                                 disabled={loading}
                                                 className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 flex items-center gap-1"
-                                                title="Analizuj zaznaczone (AI)"
+                                                title="Analizuj zaznaczone"
                                             >
                                                 {loading ? (
                                                     <RefreshCw className="w-4 h-4 animate-spin" />
                                                 ) : (
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                                     </svg>
                                                 )}
                                                 <span className="text-xs font-semibold hidden md:inline">Analizuj</span>
@@ -1859,6 +2071,93 @@ export const MailPage: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto p-5">
                             <MailboxManager onChange={refreshUser} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk Lead Results Modal */}
+            {bulkLeadResults.show && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Wyniki masowego tworzenia leadów
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-0.5">
+                                    Utworzono: {bulkLeadResults.results.filter(r => r.status === 'created').length} |
+                                    Pominięto: {bulkLeadResults.results.filter(r => r.status === 'skipped').length} |
+                                    Błędy: {bulkLeadResults.results.filter(r => r.status === 'error').length}
+                                </p>
+                            </div>
+                            <button onClick={() => setBulkLeadResults({ show: false, results: [] })} className="text-slate-400 hover:text-slate-600 p-1">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-4">
+                            <div className="space-y-2">
+                                {bulkLeadResults.results.map((r, idx) => (
+                                    <div key={idx} className={`p-3 rounded-xl border ${
+                                        r.status === 'created' ? 'bg-green-50 border-green-200' :
+                                        r.status === 'skipped' ? 'bg-slate-50 border-slate-200' :
+                                        'bg-red-50 border-red-200'
+                                    }`}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    {r.status === 'created' && <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />}
+                                                    {r.status === 'skipped' && <span className="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0" />}
+                                                    {r.status === 'error' && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                                                    <span className="font-semibold text-sm text-slate-800 truncate">
+                                                        {r.leadName || r.emailFrom}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 truncate pl-4">
+                                                    {r.subject}
+                                                </p>
+                                                {r.error && (
+                                                    <p className="text-xs text-red-600 mt-1 pl-4">{r.error}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col gap-1 items-end flex-shrink-0">
+                                                {r.status === 'created' && (
+                                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">UTWORZONO</span>
+                                                )}
+                                                {r.status === 'skipped' && (
+                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-bold">POMINIĘTO</span>
+                                                )}
+                                                {r.status === 'error' && (
+                                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-bold">BŁĄD</span>
+                                                )}
+                                                {r.missingEmail && (
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                                        ⚠️ brak maila
+                                                    </span>
+                                                )}
+                                                {r.missingPhone && (
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                                        ⚠️ brak telefonu
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setBulkLeadResults({ show: false, results: [] })}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors"
+                            >
+                                Zamknij
+                            </button>
                         </div>
                     </div>
                 </div>

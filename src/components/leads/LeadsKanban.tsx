@@ -606,6 +606,15 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                         {column.title}
                     </h3>
                     <div className="flex items-center gap-1.5">
+                        {/* Completed forms count badge — Formularz column only */}
+                        {column.id === 'formularz' && completedFormLeadIds.size > 0 && (() => {
+                            const completedCount = leads.filter(l => completedFormLeadIds.has(l.id)).length;
+                            return completedCount > 0 ? (
+                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse border border-emerald-200" title={`${completedCount} formularzy wypełnionych!`}>
+                                    ✅ {completedCount}
+                                </span>
+                            ) : null;
+                        })()}
                         {unassignedCount > 0 && ['new', 'formularz', 'contacted'].includes(column.id) && (
                             <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold" title={`${unassignedCount} bez opiekuna`}>
                                 {unassignedCount} ⚠️
@@ -647,19 +656,35 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                     strategy={verticalListSortingStrategy}
                 >
                     <div className="space-y-2 min-h-[50px]">
-                        {sortedLeads.map(lead => (
-                            <KanbanCard
-                                key={lead.id}
-                                lead={lead}
-                                onClick={onNavigate}
-                                onUpdate={onUpdate}
-                                onSchedule={onSchedule}
-                                onDelete={onDelete}
-                                isAdmin={isAdmin}
-                                formCompleted={completedFormLeadIds.has(lead.id)}
-                                offerViewInfo={offerViewMap[lead.id]}
-                            />
-                        ))}
+                        {sortedLeads.map((lead, idx) => {
+                            const isCompleted = completedFormLeadIds.has(lead.id);
+                            const prevCompleted = idx > 0 ? completedFormLeadIds.has(sortedLeads[idx - 1].id) : false;
+                            const showSeparator = column.id === 'formularz' && !isCompleted && (idx === 0 || prevCompleted);
+                            
+                            return (
+                                <React.Fragment key={lead.id}>
+                                    {showSeparator && completedFormLeadIds.size > 0 && (
+                                        <div className="flex items-center gap-2 py-1.5 px-1">
+                                            <div className="h-px flex-1 bg-slate-200" />
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                                                ⏳ Czekają ({sortedLeads.length - idx})
+                                            </span>
+                                            <div className="h-px flex-1 bg-slate-200" />
+                                        </div>
+                                    )}
+                                    <KanbanCard
+                                        lead={lead}
+                                        onClick={onNavigate}
+                                        onUpdate={onUpdate}
+                                        onSchedule={onSchedule}
+                                        onDelete={onDelete}
+                                        isAdmin={isAdmin}
+                                        formCompleted={isCompleted}
+                                        offerViewInfo={offerViewMap[lead.id]}
+                                    />
+                                </React.Fragment>
+                            );
+                        })}
                     </div>
                 </SortableContext>
             </div>
@@ -713,26 +738,43 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     }, [leads]);
 
     // Track which leads have completed configurator forms (check ALL leads, not just formularz)
-    const [completedFormLeadIds, setCompletedFormLeadIds] = useState<Set<string>>(new Set());
-    useEffect(() => {
-        if (leads.length === 0) { setCompletedFormLeadIds(new Set()); return; }
+    // HYBRID: instant zero-query from customerData + background DB fallback for missed syncs
+    const instantFormIds = useMemo(() => {
+        const completed = new Set<string>();
+        for (const lead of leads) {
+            if ((lead.customerData as any)?.configurationCompletedAt) {
+                completed.add(lead.id);
+            }
+        }
+        return completed;
+    }, [leads]);
 
-        const checkForms = async () => {
-            // BATCH: single query for all leads instead of N+1
-            const leadIds = leads.map(l => l.id);
+    const [dbFormIds, setDbFormIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        // Only run background check for formularz-status leads that aren't already detected
+        const formLeads = leads.filter(l => l.status === 'formularz' && !instantFormIds.has(l.id));
+        if (formLeads.length === 0) return;
+
+        const checkMissedSyncs = async () => {
+            const leadIds = formLeads.map(l => l.id);
             const { data } = await supabase
                 .from('lead_configurations')
                 .select('lead_id')
                 .in('lead_id', leadIds)
                 .eq('status', 'completed');
 
-            const completed = new Set<string>(
-                (data || []).map((r: any) => r.lead_id).filter(Boolean)
-            );
-            setCompletedFormLeadIds(completed);
+            if (data && data.length > 0) {
+                setDbFormIds(new Set(data.map((r: any) => r.lead_id).filter(Boolean)));
+            }
         };
-        checkForms();
-    }, [leads]);
+        checkMissedSyncs();
+    }, [leads, instantFormIds]);
+
+    const completedFormLeadIds = useMemo(() => {
+        const merged = new Set(instantFormIds);
+        dbFormIds.forEach(id => merged.add(id));
+        return merged;
+    }, [instantFormIds, dbFormIds]);
 
     // Track offer view status + customer interactions for offer_sent/negotiation leads
     const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({});

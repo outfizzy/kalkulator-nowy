@@ -329,11 +329,20 @@ export const LeadService = {
         if (error) throw error;
     },
 
-    async getLeads(): Promise<Lead[]> {
-        const { data, error } = await supabase
+    async getLeads(options?: { excludeStatuses?: string[] }): Promise<Lead[]> {
+        let query = supabase
             .from('leads')
             .select('*')
             .order('updated_at', { ascending: false });
+
+        // Optionally exclude certain statuses for faster loading
+        if (options?.excludeStatuses && options.excludeStatuses.length > 0) {
+            for (const status of options.excludeStatuses) {
+                query = query.neq('status', status);
+            }
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Error fetching leads:', error);

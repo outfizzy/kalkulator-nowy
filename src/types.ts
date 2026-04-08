@@ -32,7 +32,7 @@ export interface AppSettings {
 }
 
 // User Roles
-export type UserRole = 'admin' | 'sales_rep' | 'manager' | 'partner' | 'installer' | 'b2b_partner' | 'b2b_manager';
+export type UserRole = 'admin' | 'sales_rep' | 'sales_rep_pl' | 'manager' | 'partner' | 'installer' | 'b2b_partner' | 'b2b_manager';
 
 export interface User {
     id: string;
@@ -151,7 +151,7 @@ export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
 // --- Leads Types ---
 export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair' | 'formularz';
-export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'targi' | 'other';
+export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'website_pl' | 'targi' | 'other';
 
 export interface Lead {
     id: string;
@@ -1165,7 +1165,9 @@ export interface ServiceTicket {
     assignedTeamId?: string;
     tasks?: ServiceTicketTask[]; // New field
     photos: string[];
+    photoCaptions?: Record<string, string>; // URL → caption for each photo
     clientNotes?: string; // Notes submitted by client via public form
+    internalNotes?: string; // Internal notes from sales rep (not visible to client)
     customerName?: string; // Customer name for display
     createdAt: Date;
     updatedAt: Date;

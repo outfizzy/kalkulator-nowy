@@ -150,8 +150,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                     const fair = fairs.find(f => f.id === lead.fairId);
                     name = fair ? fair.name : lead.fairId;
                 } else { key = 'targi_unknown'; }
-            } else if (lead.source === 'website' || lead.source === 'manual') {
-                name = lead.source === 'website' ? 'Strona WWW' : 'Ręczne';
+            } else if (lead.source === 'website' || lead.source === 'manual' || lead.source === 'website_pl') {
+                name = lead.source === 'website' ? 'Strona WWW' : lead.source === 'website_pl' ? 'Strona PL (zadaszto.pl)' : 'Ręczne';
             }
             if (!sourceMap[key]) sourceMap[key] = { id: key, name, count: 0, won: 0, conversion: '0.0', isFair };
             sourceMap[key].count++;
@@ -511,6 +511,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                                 {source.isFair && <svg className="w-3.5 h-3.5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
                                                 {!source.isFair && source.name.includes('WWW') && <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>}
                                                 {!source.isFair && source.name.includes('Ręczne') && <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
+                                                {!source.isFair && source.name.includes('zadaszto') && <span className="text-sm">🇵🇱</span>}
                                                 {source.name}
                                             </div>
                                         </td>

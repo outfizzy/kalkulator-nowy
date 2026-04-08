@@ -593,7 +593,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                         {formatMoney(offer.pricing.finalPriceNet || 0)}
                                                     </div>
                                                     <div className="text-xs text-slate-400">
-                                                        {formatMoney((offer.pricing.finalPriceNet || 0) * 1.23)} Brutto
+                                                        {formatMoney((offer.pricing.finalPriceNet || 0) * ((offer.pricing as any)?.vatRate || ((offer.pricing as any)?.currency === 'PLN' ? 1.23 : 1.19)))} Brutto
                                                     </div>
                                                 </td>
                                                 <td className="p-3">
@@ -649,7 +649,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onEd
                                                     {formatMoney(contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet || 0)}
                                                 </div>
                                                 <div className="text-xs text-slate-400">
-                                                    {formatMoney((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet || 0) * 1.23)} Brutto
+                                                    {formatMoney((contract.pricing.finalPriceNet || contract.pricing.sellingPriceNet || 0) * ((contract.pricing as any)?.vatRate || ((contract.pricing as any)?.currency === 'PLN' ? 1.23 : 1.19)))} Brutto
                                                 </div>
                                             </td>
                                             <td className="p-3 text-green-600 font-medium">

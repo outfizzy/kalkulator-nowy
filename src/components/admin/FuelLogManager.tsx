@@ -37,6 +37,8 @@ export const FuelLogManager: React.FC = () => {
     // ── Add Fuel Modal State ──
     const [showAddModal, setShowAddModal] = useState(false);
     const [salesReps, setSalesReps] = useState<User[]>([]);
+    const [editingLogId, setEditingLogId] = useState<string | null>(null);
+    const [editLiters, setEditLiters] = useState<number>(0);
     const [addFuelingType, setAddFuelingType] = useState<'internal' | 'external'>('external');
     const [addUserId, setAddUserId] = useState('');
     const [addLiters, setAddLiters] = useState<number | ''>('');
@@ -302,6 +304,29 @@ export const FuelLogManager: React.FC = () => {
         } catch (error) {
             console.error('Error deleting log:', error);
             toast.error('Błąd usuwania wpisu');
+        }
+    };
+
+    const handleStartEdit = (log: FuelLog) => {
+        setEditingLogId(log.id);
+        setEditLiters(log.liters);
+    };
+
+    const handleSaveLiters = async (logId: string) => {
+        if (editLiters <= 0) { toast.error('Litry muszą być większe od 0'); return; }
+        try {
+            const { error } = await supabase
+                .from('fuel_logs')
+                .update({ liters: editLiters })
+                .eq('id', logId);
+            if (error) throw error;
+            toast.success('Litry zaktualizowane');
+            setEditingLogId(null);
+            const data = await DatabaseService.getFuelLogs();
+            setLogs(data);
+        } catch (error) {
+            console.error('Error updating liters:', error);
+            toast.error('Błąd aktualizacji');
         }
     };
 
@@ -659,7 +684,35 @@ export const FuelLogManager: React.FC = () => {
                                         </td>
                                         <td className="px-4 py-3 font-mono text-xs">{log.vehiclePlate || '-'}</td>
                                         <td className="px-4 py-3 font-mono">{log.odometerReading ? `${log.odometerReading} km` : '-'}</td>
-                                        <td className="px-4 py-3">{log.liters} L</td>
+                                        <td className="px-4 py-3">
+                                            {editingLogId === log.id ? (
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={editLiters}
+                                                        onChange={(e) => setEditLiters(parseFloat(e.target.value) || 0)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLiters(log.id); if (e.key === 'Escape') setEditingLogId(null); }}
+                                                        className="w-20 px-2 py-1 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                        autoFocus
+                                                    />
+                                                    <button onClick={() => handleSaveLiters(log.id)} className="text-green-600 hover:text-green-800" title="Zapisz">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                    </button>
+                                                    <button onClick={() => setEditingLogId(null)} className="text-slate-400 hover:text-slate-600" title="Anuluj">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span
+                                                    onClick={() => handleStartEdit(log)}
+                                                    className="cursor-pointer hover:bg-blue-50 hover:text-blue-700 px-2 py-1 rounded transition-colors"
+                                                    title="Kliknij aby edytować"
+                                                >
+                                                    {log.liters} L ✏️
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 font-medium text-emerald-600">
                                             {(() => {
                                                 const cost = calcLogCost(log, fuelPrices);
