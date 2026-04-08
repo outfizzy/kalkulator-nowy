@@ -33,10 +33,10 @@ import { WonLeadModal } from './WonLeadModal';
 import { MeasurementModal } from '../measurements/MeasurementModal';
 import type { Measurement } from '../../types';
 import { ConfiguratorService } from '../../services/database/configurator.service';
-import { LeadAutoAssignService } from '../../services/database/lead-auto-assign.service';
 import { OfferService } from '../../services/database/offer.service';
 import { supabase } from '../../lib/supabase';
 import { BulkWelcomeEmailModal } from './BulkWelcomeEmailModal';
+import { AutoAssignModal } from './AutoAssignModal';
 
 interface LeadsKanbanProps {
     leads: Lead[];
@@ -702,6 +702,8 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const [pendingWonLeadId, setPendingWonLeadId] = useState<string | null>(null);
     const [lostModalOpen, setLostModalOpen] = useState(false);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+    const [autoAssignOpen, setAutoAssignOpen] = useState(false);
+    const [autoAssignLeads, setAutoAssignLeads] = useState<Lead[]>([]);
     const [pendingLostLeadId, setPendingLostLeadId] = useState<string | null>(null);
     const [measurementLead, setMeasurementLead] = useState<Lead | null>(null);
 
@@ -1100,21 +1102,11 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             completedFormLeadIds={completedFormLeadIds}
                             offerViewMap={offerViewMap}
                             onBulkEmail={column.id === 'new' ? () => setBulkEmailOpen(true) : undefined}
-                            onAutoAssign={['new', 'formularz', 'contacted'].includes(column.id) ? async () => {
-                                const toastId = toast.loading('🤖 Przydzielam leady...');
-                                try {
-                                    const result = await LeadAutoAssignService.autoAssignUnassignedLeads();
-                                    toast.dismiss(toastId);
-                                    if (result.assigned > 0) {
-                                        toast.success(`✅ Przydzielono ${result.assigned} leadów automatycznie`);
-                                    } else {
-                                        toast.success('Wszystkie leady mają już opiekuna');
-                                    }
-                                    onLeadUpdate();
-                                } catch {
-                                    toast.dismiss(toastId);
-                                    toast.error('Błąd automatycznego przydzielania');
-                                }
+                            onAutoAssign={['new', 'formularz', 'contacted'].includes(column.id) ? () => {
+                                const columnLeads = columns[column.id] || [];
+                                const unassigned = columnLeads.filter(l => !l.assignedTo);
+                                setAutoAssignLeads(unassigned);
+                                setAutoAssignOpen(true);
                             } : undefined}
                         />
                     ))}
@@ -1174,6 +1166,13 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 onClose={() => setBulkEmailOpen(false)}
                 onComplete={onLeadUpdate}
                 leads={columns['new'] || []}
+            />
+
+            <AutoAssignModal
+                isOpen={autoAssignOpen}
+                onClose={() => setAutoAssignOpen(false)}
+                onComplete={onLeadUpdate}
+                unassignedLeads={autoAssignLeads}
             />
         </>
     );
