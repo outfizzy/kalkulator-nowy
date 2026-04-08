@@ -38,6 +38,9 @@ export const AVAILABLE_MODULES = [
     { key: 'system_logs', label: 'Logi Systemowe', category: 'Administracja', description: 'Podgląd aktywności użytkowników' },
     { key: 'system_notifications', label: 'Uprawnienia (RBAC)', category: 'Administracja', description: 'Konfiguracja tego panelu' },
     { key: 'settings_general', label: 'Ustawienia', category: 'Administracja', description: 'Ogólne ustawienia konta' },
+
+    // MARKETING
+    { key: 'blog_pl', label: 'Blog PL (zadaszto.pl)', category: 'Marketing', description: 'Zarządzanie blogiem polskim z AI' },
 ] as const;
 
 export const PermissionsService = {

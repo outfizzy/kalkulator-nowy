@@ -40,7 +40,7 @@ export type Database = {
                 Row: {
                     id: string;
                     full_name: string | null;
-                    role: 'admin' | 'user' | 'sales_rep' | 'manager' | 'partner' | 'installer';
+                    role: 'admin' | 'user' | 'sales_rep' | 'sales_rep_pl' | 'manager' | 'partner' | 'installer';
                     status: 'pending' | 'active' | 'blocked';
                     created_at: string;
                     updated_at: string;
@@ -48,12 +48,12 @@ export type Database = {
                 Insert: {
                     id: string;
                     full_name?: string | null;
-                    role?: 'admin' | 'user' | 'sales_rep' | 'manager' | 'partner' | 'installer';
+                    role?: 'admin' | 'user' | 'sales_rep' | 'sales_rep_pl' | 'manager' | 'partner' | 'installer';
                     status?: 'pending' | 'active' | 'blocked';
                 };
                 Update: {
                     full_name?: string | null;
-                    role?: 'admin' | 'user' | 'sales_rep' | 'manager' | 'partner' | 'installer';
+                    role?: 'admin' | 'user' | 'sales_rep' | 'sales_rep_pl' | 'manager' | 'partner' | 'installer';
                     status?: 'pending' | 'active' | 'blocked';
                 };
             };

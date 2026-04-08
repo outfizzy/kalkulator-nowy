@@ -188,7 +188,8 @@ export const RegisterPage: React.FC = () => {
                                 className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                                 disabled={loading}
                             >
-                                <option value="sales_rep">Przedstawiciel Handlowy</option>
+                                <option value="sales_rep">Przedstawiciel Handlowy DE</option>
+                                <option value="sales_rep_pl">Przedstawiciel Handlowy PL</option>
                                 <option value="installer">Monter</option>
                                 <option value="manager">Menedżer</option>
                                 <option value="admin">Administrator</option>

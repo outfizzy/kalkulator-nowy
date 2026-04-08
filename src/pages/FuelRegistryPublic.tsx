@@ -77,6 +77,7 @@ export const FuelRegistryPublic: React.FC = () => {
                     liters: litersNum,
                     vehicle_plate: formData.vehiclePlate || null,
                     trip_type: formData.tripType,
+                    fueling_type: 'internal',
                     entry_source: 'qr_public',
                     type: 'installer',
                     user_id: null,

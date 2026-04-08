@@ -378,23 +378,24 @@ export const PublicOfferPage: React.FC = () => {
                                     </div>
 
                                     {(() => {
+                                        // NOTE: sellingPriceNet already includes installation costs (montage)
+                                        // Do NOT add installationCosts again — it would double-count.
                                         const installNet = offer.pricing.installationCosts?.totalInstallation || 0;
-                                        const installGross = installNet * 1.19;
-                                        const productNet = offer.pricing.sellingPriceNet;
-                                        const productGross = offer.pricing.sellingPriceGross;
-                                        const totalNet = productNet + installNet;
-                                        const totalGross = productGross + installGross;
+                                        const totalNet = offer.pricing.sellingPriceNet;
+                                        const totalGross = offer.pricing.sellingPriceGross;
                                         const totalVat = totalGross - totalNet;
+                                        // Product-only net (for display breakdown): subtract installation from total
+                                        const productOnlyNet = totalNet - installNet;
                                         const hasDiscount = offer.pricing.discountValue && offer.pricing.discountValue > 0;
                                         const discountGross = hasDiscount ? offer.pricing.discountValue * 1.19 : 0;
-                                        const originalGross = hasDiscount ? productGross + discountGross : 0;
+                                        const originalGross = hasDiscount ? totalGross + discountGross : 0;
 
                                         return (
                                         <div className="space-y-2 mb-6">
                                             {/* Product price */}
                                             <div className="flex justify-between items-baseline">
                                                 <span className="text-slate-500 text-xs sm:text-sm">Terrassenüberdachung</span>
-                                                <span className="font-semibold text-sm text-slate-700">{productNet.toFixed(2)} €</span>
+                                                <span className="font-semibold text-sm text-slate-700">{productOnlyNet.toFixed(2)} €</span>
                                             </div>
 
                                             {/* Installation */}
@@ -424,7 +425,7 @@ export const PublicOfferPage: React.FC = () => {
                                                 <>
                                                     <div className="flex justify-between items-baseline pt-1">
                                                         <span className="text-slate-400 text-sm">Regulärer Bruttopreis</span>
-                                                        <span className="text-sm text-slate-400 line-through">{(originalGross + installGross).toFixed(2)} €</span>
+                                                        <span className="text-sm text-slate-400 line-through">{originalGross.toFixed(2)} €</span>
                                                     </div>
                                                     <div className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2 border border-green-100">
                                                         <span className="text-green-700 text-sm font-bold flex items-center gap-1.5">
@@ -550,10 +551,9 @@ export const PublicOfferPage: React.FC = () => {
                 <div className="flex items-center gap-3 p-3 max-w-md mx-auto">
                     <div className="flex-shrink-0">
                         {(() => {
-                            const installNet = offer.pricing.installationCosts?.totalInstallation || 0;
-                            const installGross = installNet * 1.19;
-                            const totalNet = offer.pricing.sellingPriceNet + installNet;
-                            const totalGross = offer.pricing.sellingPriceGross + installGross;
+                            // sellingPriceNet already includes installation — no double-counting
+                            const totalNet = offer.pricing.sellingPriceNet;
+                            const totalGross = offer.pricing.sellingPriceGross;
                             return (
                                 <>
                                     <p className="text-[9px] text-slate-400 leading-none">netto <span className="font-semibold text-slate-500">{totalNet.toFixed(0)} €</span></p>

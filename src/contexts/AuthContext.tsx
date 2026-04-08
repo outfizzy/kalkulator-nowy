@@ -110,6 +110,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('crm_clients');
             rolePermissions.add('contracts_list');
             rolePermissions.add('service_module');
+        } else if (role === 'sales_rep_pl') {
+            rolePermissions.add('dashboard');
+            rolePermissions.add('offers_list');
+            rolePermissions.add('offers_create');
+            rolePermissions.add('crm_leads');
+            rolePermissions.add('crm_clients');
+            rolePermissions.add('crm_mail');
+            rolePermissions.add('crm_tasks');
+            rolePermissions.add('installations_calendar');
+            rolePermissions.add('measurement_reports');
+            rolePermissions.add('blog_pl');
         }
 
         setPermissions(rolePermissions);
@@ -129,7 +140,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 const rawRole = data.role as string | null;
 
                 const normalizedRole = ((): UserRole => {
-                    if (rawRole === 'admin' || rawRole === 'sales_rep' || rawRole === 'manager' || rawRole === 'partner' || rawRole === 'installer' || rawRole === 'b2b_partner' || rawRole === 'b2b_manager') {
+                    if (rawRole === 'admin' || rawRole === 'sales_rep' || rawRole === 'sales_rep_pl' || rawRole === 'manager' || rawRole === 'partner' || rawRole === 'installer' || rawRole === 'b2b_partner' || rawRole === 'b2b_manager') {
                         return rawRole;
                     }
                     return 'sales_rep';
