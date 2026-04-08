@@ -7,7 +7,7 @@ export const UserService = {
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('role', 'sales_rep');
+            .in('role', ['sales_rep', 'sales_rep_pl']);
 
         if (error) throw error;
 

@@ -506,7 +506,7 @@ export const LeadsList: React.FC = () => {
                         >
                             <option value="all">Wszyscy</option>
                             <option value="unassigned">Nieprzypisany</option>
-                            {users.filter(u => u.role === 'sales_rep' || u.role === 'admin' || u.role === 'manager').map(user => (
+                            {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(user => (
                                 <option key={user.id} value={user.id}>
                                     {user.firstName} {user.lastName}
                                 </option>
