@@ -344,4 +344,78 @@ export const FinanceService = {
             processedByName: tx.processed_by_profile?.full_name
         })) || [];
     },
+
+    /**
+     * Kantor z salda — wymiana waluty z ogólnego salda.
+     * Tworzy parę transakcji: wydatek w źródłowej walucie + wpływ w docelowej.
+     */
+    async balanceExchange(params: {
+        fromCurrency: 'EUR' | 'PLN';
+        toCurrency: 'EUR' | 'PLN';
+        amount: number;
+        exchangeRate: number;
+    }): Promise<{ expense: WalletTransaction; income: WalletTransaction }> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const convertedAmount = params.amount * params.exchangeRate;
+        const now = new Date().toISOString();
+
+        // 1. Wydatek ze źródłowej waluty
+        const { data: expenseData, error: expenseErr } = await supabase
+            .from('wallet_transactions')
+            .insert({
+                type: 'expense',
+                amount: params.amount,
+                currency: params.fromCurrency,
+                category: 'Kantor',
+                description: `Wymiana ${params.amount.toFixed(2)} ${params.fromCurrency} → ${convertedAmount.toFixed(2)} ${params.toCurrency} (kurs: ${params.exchangeRate})`,
+                date: now,
+                processed_by: user.id,
+                exchange_rate: params.exchangeRate,
+                original_currency: params.fromCurrency,
+                original_amount: params.amount
+            })
+            .select()
+            .single();
+
+        if (expenseErr) throw expenseErr;
+
+        // 2. Wpływ w docelowej walucie
+        const { data: incomeData, error: incomeErr } = await supabase
+            .from('wallet_transactions')
+            .insert({
+                type: 'income',
+                amount: convertedAmount,
+                currency: params.toCurrency,
+                category: 'Kantor',
+                description: `Wymiana z ${params.amount.toFixed(2)} ${params.fromCurrency} (kurs: ${params.exchangeRate})`,
+                date: now,
+                processed_by: user.id,
+                exchange_rate: params.exchangeRate,
+                original_currency: params.fromCurrency,
+                original_amount: params.amount
+            })
+            .select()
+            .single();
+
+        if (incomeErr) throw incomeErr;
+
+        const mapTx = (row: any): WalletTransaction => ({
+            id: row.id,
+            type: row.type,
+            amount: Number(row.amount),
+            currency: row.currency,
+            category: row.category,
+            description: row.description,
+            date: row.date,
+            processedBy: row.processed_by,
+            createdAt: new Date(row.created_at),
+            exchangeRate: row.exchange_rate,
+            originalCurrency: row.original_currency,
+            originalAmount: row.original_amount ? Number(row.original_amount) : undefined
+        });
+
+        return { expense: mapTx(expenseData), income: mapTx(incomeData) };
+    },
 };

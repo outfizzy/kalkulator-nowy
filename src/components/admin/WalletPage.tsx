@@ -4,6 +4,8 @@ import type { WalletTransaction, WalletStats } from '../../types';
 import { AddTransactionModal } from './AddTransactionModal';
 import { ExchangeRateModal } from './ExchangeRateModal';
 import { DeleteTransactionModal } from './DeleteTransactionModal';
+import { BalanceExchangeModal } from './BalanceExchangeModal';
+import { CashFlowChart } from './CashFlowChart';
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subMonths } from 'date-fns';
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'custom';
@@ -34,6 +36,9 @@ export const WalletPage: React.FC = () => {
     // Deleted transactions view
     const [showDeleted, setShowDeleted] = useState(false);
     const [deletedTransactions, setDeletedTransactions] = useState<any[]>([]);
+
+    // Kantor Modal State
+    const [showKantorModal, setShowKantorModal] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -168,7 +173,16 @@ export const WalletPage: React.FC = () => {
                     <h1 className="text-3xl font-bold text-slate-800">Wirtualny Portfel</h1>
                     <p className="text-slate-500 mt-1">Zarządzanie finansami i przepływem gotówki</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
+                    <button
+                        onClick={() => setShowKantorModal(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        Kantor
+                    </button>
                     <button
                         onClick={() => {
                             setModalType('expense');
@@ -233,6 +247,9 @@ export const WalletPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Cash Flow Chart */}
+            <CashFlowChart transactions={allTransactions} months={6} />
 
             {/* Date Range Selector */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
@@ -567,6 +584,14 @@ export const WalletPage: React.FC = () => {
                 onClose={() => setShowDeleteModal(false)}
                 onDelete={handleDelete}
                 transaction={deleteTransaction}
+            />
+
+            <BalanceExchangeModal
+                isOpen={showKantorModal}
+                onClose={() => setShowKantorModal(false)}
+                onSuccess={loadData}
+                eurBalance={stats?.eur.currentBalance || 0}
+                plnBalance={stats?.pln.currentBalance || 0}
             />
         </div>
     );
