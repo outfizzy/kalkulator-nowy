@@ -23,7 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
-.env*.local
+
+# Environment / Secrets (NEVER commit these)
+.env
+.env.*
+!.env.example
+supabase/functions/**/.env
 
 # Aliplast session cookies (sensitive)
 scripts/aliplast-cookies.txt
