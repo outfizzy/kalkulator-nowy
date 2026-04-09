@@ -312,26 +312,80 @@ export const LeadService = {
     },
 
     async deleteLead(id: string): Promise<void> {
+        // Check current user's role
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        const isAdmin = profile?.role === 'admin';
+
         // 1. Check for existing offers
-        const { count, error: countError } = await supabase
+        const { data: offers, error: offersError } = await supabase
             .from('offers')
-            .select('*', { count: 'exact', head: true })
+            .select('id')
             .eq('lead_id', id);
 
-        if (countError) throw countError;
-        if (count && count > 0) {
-            throw new Error('Nie można usunąć leada, który posiada utworzone oferty. Najpierw usuń oferty.');
+        if (offersError) throw offersError;
+
+        if (offers && offers.length > 0) {
+            if (!isAdmin) {
+                throw new Error('Nie można usunąć leada, który posiada utworzone oferty. Najpierw usuń oferty.');
+            }
+
+            // Admin cascade: delete all related data for each offer
+            const offerIds = offers.map(o => o.id);
+
+            // Delete offer interactions
+            const { error: interErr } = await supabase
+                .from('offer_interactions')
+                .delete()
+                .in('offer_id', offerIds);
+            if (interErr) console.warn('[DeleteLead] offer_interactions cleanup:', interErr.message);
+
+            // Delete notifications referencing these offers (via metadata)
+            // (non-critical, skip errors)
+            try {
+                for (const offerId of offerIds) {
+                    await supabase
+                        .from('notifications')
+                        .delete()
+                        .contains('metadata', { offer_id: offerId });
+                }
+            } catch { /* non-critical */ }
+
+            // Delete lead configurations
+            const { error: configErr } = await supabase
+                .from('lead_configurations')
+                .delete()
+                .eq('lead_id', id);
+            if (configErr) console.warn('[DeleteLead] lead_configurations cleanup:', configErr.message);
+
+            // Delete the offers themselves
+            const { error: delOffersErr } = await supabase
+                .from('offers')
+                .delete()
+                .in('id', offerIds);
+            if (delOffersErr) throw new Error(`Nie udało się usunąć ofert: ${delOffersErr.message}`);
+
+            console.log(`[DeleteLead] Admin cascade: deleted ${offerIds.length} offers for lead ${id}`);
         }
 
-        // 2. Cascade delete messages (if foreign key cascade isn't set, better safe than sorry)
+        // 2. Delete lead messages
         const { error: msgError } = await supabase
             .from('lead_messages')
             .delete()
             .eq('lead_id', id);
+        if (msgError) console.warn('[DeleteLead] lead_messages cleanup:', msgError.message);
 
-        if (msgError) console.warn('Error cleaning up lead messages:', msgError);
+        // 3. Delete lead configurations (if no offers existed, might still have configs)
+        await supabase.from('lead_configurations').delete().eq('lead_id', id);
 
-        // 3. Delete the Lead
+        // 4. Delete the lead
         const { error } = await supabase
             .from('leads')
             .delete()
