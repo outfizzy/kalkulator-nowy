@@ -175,6 +175,23 @@ $$;
 -- Ensure Realtime is enabled for notifications table
 ALTER TABLE IF EXISTS notifications REPLICA IDENTITY FULL;
 
+-- Add notifications to Supabase Realtime publication
+-- (safe to run multiple times — DROP first to avoid duplicate errors)
+DO $$
+BEGIN
+    -- Check if the publication exists
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        -- Try to add the table; ignore if already added
+        BEGIN
+            ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+        EXCEPTION WHEN duplicate_object THEN
+            -- Already added, ignore
+            NULL;
+        END;
+    END IF;
+END;
+$$;
+
 -- Make sure anon/authenticated can call this function
 GRANT EXECUTE ON FUNCTION public.notify_offer_action(text, text, jsonb) TO anon;
 GRANT EXECUTE ON FUNCTION public.notify_offer_action(text, text, jsonb) TO authenticated;

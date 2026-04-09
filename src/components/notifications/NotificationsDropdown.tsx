@@ -32,7 +32,15 @@ export const NotificationsDropdown: React.FC = () => {
         if (currentUser) {
             fetchNotifications();
             const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
-            return () => clearInterval(interval);
+
+            // Listen for realtime notification events for instant bell refresh
+            const handleRealtime = () => fetchNotifications();
+            window.addEventListener('realtime-notification', handleRealtime);
+
+            return () => {
+                clearInterval(interval);
+                window.removeEventListener('realtime-notification', handleRealtime);
+            };
         }
     }, [currentUser, fetchNotifications]);
 

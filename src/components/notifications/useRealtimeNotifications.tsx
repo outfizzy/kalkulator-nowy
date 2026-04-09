@@ -151,6 +151,8 @@ export const useRealtimeNotifications = () => {
                         type: row.type || 'info',
                         link: row.link,
                     });
+                    // Dispatch event so NotificationsDropdown bell refreshes immediately
+                    window.dispatchEvent(new CustomEvent('realtime-notification'));
                 }
             )
             .subscribe();
