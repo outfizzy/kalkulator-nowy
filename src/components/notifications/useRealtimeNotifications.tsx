@@ -132,6 +132,7 @@ export const useRealtimeNotifications = () => {
         }
 
         // Subscribe to realtime INSERT on notifications table for this user
+        console.log('[RealtimeNotif] Subscribing for user:', currentUser.id);
         const channel = supabase
             .channel(`notifications:${currentUser.id}`)
             .on(
@@ -144,6 +145,7 @@ export const useRealtimeNotifications = () => {
                 },
                 (payload) => {
                     const row = payload.new as any;
+                    console.log('[RealtimeNotif] Event received:', row.title, row.id);
                     showNotificationToast({
                         id: row.id,
                         title: row.title || 'Nowe powiadomienie',
@@ -155,7 +157,9 @@ export const useRealtimeNotifications = () => {
                     window.dispatchEvent(new CustomEvent('realtime-notification'));
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log('[RealtimeNotif] Subscription status:', status);
+            });
 
         channelRef.current = channel;
 
