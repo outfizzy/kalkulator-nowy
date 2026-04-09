@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { formatPhoneDisplay } from '../../utils/phone';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -34,6 +34,12 @@ export const LeadsList: React.FC = () => {
     const [completedFormLeadIds, setCompletedFormLeadIds] = useState<Set<string>>(new Set());
     const [showClosedLeads, setShowClosedLeads] = useState(false);
     const [loadingClosed, setLoadingClosed] = useState(false);
+    // Bulk actions
+    const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+    const [bulkAction, setBulkAction] = useState<string>('');
+    const [bulkAssignee, setBulkAssignee] = useState<string>('');
+    const [bulkStatus, setBulkStatus] = useState<string>('');
+    const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
@@ -219,6 +225,67 @@ export const LeadsList: React.FC = () => {
 
     const sortedRegions = Object.keys(groupedLeads).sort();
 
+    // Bulk actions
+    const toggleLead = (id: string) => {
+        setSelectedLeads(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleAll = () => {
+        if (selectedLeads.size === filteredLeads.length) {
+            setSelectedLeads(new Set());
+        } else {
+            setSelectedLeads(new Set(filteredLeads.map(l => l.id)));
+        }
+    };
+
+    const executeBulkAction = async () => {
+        if (selectedLeads.size === 0) return;
+        setBulkProcessing(true);
+        try {
+            const ids = Array.from(selectedLeads);
+            if (bulkAction === 'assign' && bulkAssignee) {
+                const assignTo = bulkAssignee === 'unassign' ? null : bulkAssignee;
+                for (const id of ids) {
+                    await DatabaseService.updateLead(id, { assignedTo: assignTo } as any);
+                }
+                toast.success(`Zmieniono opiekuna ${ids.length} leadów`);
+            } else if (bulkAction === 'status' && bulkStatus) {
+                for (const id of ids) {
+                    await DatabaseService.updateLead(id, { status: bulkStatus as any });
+                }
+                toast.success(`Zmieniono status ${ids.length} leadów`);
+            } else if (bulkAction === 'delete') {
+                if (!window.confirm(`Czy na pewno chcesz usunąć ${ids.length} leadów? Ta operacja jest nieodwracalna.`)) {
+                    setBulkProcessing(false);
+                    return;
+                }
+                let deleted = 0;
+                for (const id of ids) {
+                    try {
+                        await DatabaseService.deleteLead(id);
+                        deleted++;
+                    } catch (err: any) {
+                        console.warn(`Failed to delete lead ${id}:`, err.message);
+                    }
+                }
+                toast.success(`Usunięto ${deleted}/${ids.length} leadów`);
+            }
+            setSelectedLeads(new Set());
+            setBulkAction('');
+            setBulkAssignee('');
+            setBulkStatus('');
+            await loadData();
+        } catch (err: any) {
+            toast.error(err.message || 'Błąd masowej operacji');
+        } finally {
+            setBulkProcessing(false);
+        }
+    };
+
     if (loading) {
         return <div className="p-12 text-center text-slate-400">Ładowanie leadów...</div>;
     }
@@ -228,6 +295,11 @@ export const LeadsList: React.FC = () => {
             <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-500 font-medium">
                     <tr>
+                        {isAdmin() && (
+                            <th className="px-3 py-3 w-10">
+                                <input type="checkbox" checked={selectedLeads.size === filteredLeads.length && filteredLeads.length > 0} onChange={toggleAll} className="w-4 h-4 rounded border-slate-300 text-accent cursor-pointer" />
+                            </th>
+                        )}
                         <th className="px-6 py-3">Klient</th>
                         <th className="px-6 py-3">Źródło / Lokalizacja</th>
                         <th className="px-6 py-3">Kontakt</th>
@@ -247,7 +319,12 @@ export const LeadsList: React.FC = () => {
                         const completedMeasurement = leadMeasurements.find(m => m.status === 'completed');
 
                         return (
-                            <tr key={lead.id} className={`hover:bg-slate-50 transition-colors ${leadActivity.get(lead.id)?.isHot ? 'bg-orange-50/50' : ''}`}>
+                            <tr key={lead.id} className={`hover:bg-slate-50 transition-colors ${leadActivity.get(lead.id)?.isHot ? 'bg-orange-50/50' : ''} ${selectedLeads.has(lead.id) ? 'bg-accent/5' : ''}`}>
+                                {isAdmin() && (
+                                    <td className="px-3 py-4">
+                                        <input type="checkbox" checked={selectedLeads.has(lead.id)} onChange={() => toggleLead(lead.id)} className="w-4 h-4 rounded border-slate-300 text-accent cursor-pointer" />
+                                    </td>
+                                )}
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
                                         <div
@@ -506,11 +583,20 @@ export const LeadsList: React.FC = () => {
                         >
                             <option value="all">Wszyscy</option>
                             <option value="unassigned">Nieprzypisany</option>
-                            {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(user => (
-                                <option key={user.id} value={user.id}>
-                                    {user.firstName} {user.lastName}
-                                </option>
-                            ))}
+                            <optgroup label="Handlowcy">
+                                {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(user => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.firstName} {user.lastName}
+                                    </option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Administracja">
+                                {users.filter(u => u.role === 'admin' || u.role === 'manager').map(user => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.firstName} {user.lastName} ({user.role === 'admin' ? 'Admin' : 'Manager'})
+                                    </option>
+                                ))}
+                            </optgroup>
                         </select>
                     </div>
 
@@ -551,6 +637,61 @@ export const LeadsList: React.FC = () => {
             ) : viewMode === 'kanban' ? (
                 <LeadsKanban leads={filteredLeads} onLeadUpdate={handleLeadUpdate} />
             ) : (
+                <>
+                {/* Bulk actions toolbar */}
+                {isAdmin() && selectedLeads.size > 0 && (
+                    <div className="bg-accent/10 border border-accent/30 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 mb-3">
+                        <span className="text-sm font-bold text-accent">{selectedLeads.size} zaznaczon{selectedLeads.size === 1 ? 'y' : 'ych'}</span>
+                        <div className="h-5 w-px bg-accent/30" />
+                        <select value={bulkAction} onChange={e => { setBulkAction(e.target.value); setBulkAssignee(''); setBulkStatus(''); }} className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none">
+                            <option value="">Wybierz akcję...</option>
+                            <option value="assign">Zmień opiekuna</option>
+                            <option value="status">Zmień status</option>
+                            <option value="delete">Usuń zaznaczone</option>
+                        </select>
+
+                        {bulkAction === 'assign' && (
+                            <select value={bulkAssignee} onChange={e => setBulkAssignee(e.target.value)} className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none min-w-[160px]">
+                                <option value="">Kogo przypisać...</option>
+                                <option value="unassign">— Brak opiekuna —</option>
+                                <optgroup label="Handlowcy">
+                                    {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(u => (
+                                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="Administracja">
+                                    {users.filter(u => u.role === 'admin' || u.role === 'manager').map(u => (
+                                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                                    ))}
+                                </optgroup>
+                            </select>
+                        )}
+
+                        {bulkAction === 'status' && (
+                            <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none">
+                                <option value="">Jaki status...</option>
+                                <option value="new">Nowy</option>
+                                <option value="formularz">Nowy (Form.)</option>
+                                <option value="contacted">Skontaktowano</option>
+                                <option value="offer_sent">Oferta Wysłana</option>
+                                <option value="measurement_scheduled">Umówiony na pomiar</option>
+                                <option value="measurement_completed">Pomiar odbył się</option>
+                                <option value="negotiation">Negocjacje</option>
+                                <option value="won">Wygrany</option>
+                                <option value="lost">Utracony</option>
+                            </select>
+                        )}
+
+                        <button
+                            onClick={executeBulkAction}
+                            disabled={bulkProcessing || (!bulkAction || (bulkAction === 'assign' && !bulkAssignee) || (bulkAction === 'status' && !bulkStatus))}
+                            className="text-sm px-4 py-1.5 rounded-lg font-bold text-white bg-accent hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {bulkProcessing ? '⏳ Przetwarzam...' : 'Wykonaj'}
+                        </button>
+                        <button onClick={() => { setSelectedLeads(new Set()); setBulkAction(''); }} className="text-sm text-slate-500 hover:text-slate-700 ml-auto">✕ Anuluj</button>
+                    </div>
+                )}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     {filteredLeads.length === 0 ? (
                         <div className="p-12 text-center text-slate-400">Brak leadów.</div>
@@ -570,6 +711,7 @@ export const LeadsList: React.FC = () => {
                         <LeadsTable items={filteredLeads} />
                     )}
                 </div>
+                </>
             )}
         </div>
     );
