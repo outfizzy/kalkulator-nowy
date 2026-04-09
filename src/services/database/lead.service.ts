@@ -150,6 +150,7 @@ export const LeadService = {
         if (updates.wonAt !== undefined) dbUpdates.won_at = updates.wonAt instanceof Date ? updates.wonAt.toISOString() : updates.wonAt;
 
         // --- Auto-Assignment: When moving out of 'new' with no owner, assign current user ---
+        // But NOT for admins/managers — they shouldn't be auto-assigned
         if (updates.status && updates.status !== 'new' && updates.assignedTo === undefined) {
             // Check if lead currently has no owner
             const { data: currentLead } = await supabase
@@ -161,15 +162,26 @@ export const LeadService = {
             if (currentLead && !currentLead.assigned_to) {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
-                    dbUpdates.assigned_to = user.id;
+                    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                    if (!['admin', 'manager'].includes(prof?.role || '')) {
+                        dbUpdates.assigned_to = user.id;
+                    }
                 }
             }
         }
 
         // --- Assignment Protection Logic ---
         if (updates.assignedTo !== undefined) {
-            if (updates.assignedTo === null) {
-                // Only allow clearing assignment when moving to 'new' status
+            // Check if current user is admin — admins can always change assignments
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', authUser?.id || '').single();
+            const userIsAdmin = userProfile?.role === 'admin';
+
+            if (userIsAdmin) {
+                // Admin can set any value, including null (unassign)
+                dbUpdates.assigned_to = updates.assignedTo;
+            } else if (updates.assignedTo === null) {
+                // Non-admin: Only allow clearing assignment when moving to 'new' status
                 if (updates.status === 'new') {
                     dbUpdates.assigned_to = null;
                 } else {
@@ -384,6 +396,14 @@ export const LeadService = {
 
         // 3. Delete lead configurations (if no offers existed, might still have configs)
         await supabase.from('lead_configurations').delete().eq('lead_id', id);
+
+        // 3b. Delete whatsapp campaign recipients referencing this lead
+        await supabase.from('whatsapp_campaign_recipients').delete().eq('lead_id', id);
+
+        // 3c. Delete notifications referencing this lead
+        try {
+            await supabase.from('notifications').delete().contains('metadata', { lead_id: id });
+        } catch { /* non-critical */ }
 
         // 4. Delete the lead
         const { error } = await supabase
