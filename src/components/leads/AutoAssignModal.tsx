@@ -20,7 +20,6 @@ interface RepAllocation {
 }
 
 export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClose, onComplete, unassignedLeads }) => {
-    const [reps, setReps] = useState<User[]>([]);
     const [allocations, setAllocations] = useState<RepAllocation[]>([]);
     const [strategy, setStrategy] = useState<Strategy>('equal');
     const [loading, setLoading] = useState(false);
@@ -33,12 +32,19 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
         const loadReps = async () => {
             setLoading(true);
             try {
-                const { data } = await supabase
+                const { data, error: profileError } = await supabase
                     .from('profiles')
-                    .select('*')
+                    .select('id, full_name, role, status, phone')
                     .in('role', ['sales_rep', 'sales_rep_pl'])
                     .eq('status', 'active')
                     .order('full_name');
+
+                if (profileError) {
+                    console.error('[AutoAssign] Profile query error:', profileError);
+                    toast.error('Błąd ładowania przedstawicieli');
+                    setLoading(false);
+                    return;
+                }
 
                 const users: User[] = (data || []).map(row => ({
                     id: row.id,
@@ -47,11 +53,16 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                     lastName: (row.full_name || '').split(' ').slice(1).join(' ') || '',
                     email: '',
                     role: row.role as User['role'],
-                    createdAt: new Date(row.created_at),
+                    createdAt: new Date(),
                     phone: row.phone,
                     status: row.status as 'pending' | 'active' | 'blocked',
                 }));
-                setReps(users);
+
+                if (users.length === 0) {
+                    toast.error('Brak aktywnych przedstawicieli');
+                    setLoading(false);
+                    return;
+                }
 
                 // Load current workload (active leads per rep)
                 const repIds = users.map(u => u.id);
@@ -76,7 +87,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                     previewLeads: [],
                 })));
             } catch (err) {
-                console.error('Failed to load reps:', err);
+                console.error('[AutoAssign] Failed to load reps:', err);
                 toast.error('Nie udało się załadować przedstawicieli');
             } finally {
                 setLoading(false);
@@ -90,7 +101,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
 
     // Calculate distribution preview
     const distribution = useMemo(() => {
-        if (selectedReps.length === 0) return [];
+        if (selectedReps.length === 0 || totalLeads === 0) return [];
 
         if (strategy === 'equal') {
             const perRep = Math.floor(totalLeads / selectedReps.length);
@@ -105,7 +116,6 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
         }
 
         if (strategy === 'plz') {
-            // Group leads by PLZ prefix, then distribute PLZ clusters to reps with round-robin 
             const plzGroups = new Map<string, Lead[]>();
             unassignedLeads.forEach(lead => {
                 const plz = lead.customerData?.postalCode?.substring(0, 2) || 'XX';
@@ -113,15 +123,12 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                 plzGroups.get(plz)!.push(lead);
             });
 
-            // Sort PLZ groups by size (largest first) for better balance
             const sortedGroups = [...plzGroups.entries()].sort((a, b) => b[1].length - a[1].length);
 
-            // Greedy assignment: assign each PLZ group to the rep with fewest assigned so far
             const repLeads = new Map<string, Lead[]>();
             selectedReps.forEach(a => repLeads.set(a.rep.id, []));
 
             for (const [, leads] of sortedGroups) {
-                // Find rep with fewest leads so far
                 let minRep = selectedReps[0].rep.id;
                 let minCount = Infinity;
                 for (const a of selectedReps) {
@@ -141,7 +148,6 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
             }));
         }
 
-        // Manual strategy 
         if (strategy === 'manual') {
             let offset = 0;
             return selectedReps.map(a => {
@@ -171,7 +177,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
     };
 
     const handleAssign = async () => {
-        if (distribution.length === 0) return;
+        if (distribution.length === 0 || totalAssigned === 0) return;
 
         setAssigning(true);
         const toastId = toast.loading('Przydzielam leady...');
@@ -180,34 +186,39 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
         let errors = 0;
 
         try {
+            // Batch update per rep — much faster than one-by-one
             for (const alloc of distribution) {
-                for (const lead of alloc.previewLeads) {
-                    const { error } = await supabase
-                        .from('leads')
-                        .update({ assigned_to: alloc.rep.id, updated_at: new Date().toISOString() })
-                        .eq('id', lead.id)
-                        .is('assigned_to', null);
+                if (alloc.previewLeads.length === 0) continue;
 
-                    if (error) {
-                        errors++;
-                        console.error(`Failed to assign lead ${lead.id}:`, error);
-                    } else {
-                        assigned++;
-                    }
+                const leadIds = alloc.previewLeads.map(l => l.id);
+
+                // Batch update all leads for this rep at once
+                const { error, count } = await supabase
+                    .from('leads')
+                    .update({
+                        assigned_to: alloc.rep.id,
+                        updated_at: new Date().toISOString()
+                    })
+                    .in('id', leadIds)
+                    .select('id', { count: 'exact', head: true });
+
+                if (error) {
+                    console.error(`[AutoAssign] Batch update failed for ${alloc.rep.firstName}:`, error);
+                    errors += leadIds.length;
+                } else {
+                    assigned += count || leadIds.length;
                 }
 
                 // Send notification to rep
-                if (alloc.previewLeads.length > 0) {
-                    try {
-                        await supabase.from('notifications').insert({
-                            user_id: alloc.rep.id,
-                            type: 'info',
-                            title: 'Nowe leady przydzielone',
-                            message: `Otrzymałeś ${alloc.previewLeads.length} nowych leadów do obsługi`,
-                            link: '/leads'
-                        });
-                    } catch { /* non-critical */ }
-                }
+                try {
+                    await supabase.from('notifications').insert({
+                        user_id: alloc.rep.id,
+                        type: 'info',
+                        title: 'Nowe leady przydzielone',
+                        message: `Otrzymałeś ${alloc.previewLeads.length} nowych leadów do obsługi`,
+                        link: '/leads'
+                    });
+                } catch { /* non-critical */ }
             }
 
             toast.dismiss(toastId);
@@ -222,7 +233,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
         } catch (err) {
             toast.dismiss(toastId);
             toast.error('Błąd przydzielania leadów');
-            console.error(err);
+            console.error('[AutoAssign] Error:', err);
         } finally {
             setAssigning(false);
         }
@@ -255,7 +266,14 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
 
                 <div className="p-5 overflow-y-auto max-h-[calc(90vh-180px)] space-y-5">
                     {loading ? (
-                        <div className="py-12 text-center text-slate-400">Ładowanie przedstawicieli...</div>
+                        <div className="py-12 text-center">
+                            <div className="w-8 h-8 mx-auto mb-3 rounded-full border-3 border-indigo-200 border-t-indigo-600 animate-spin" />
+                            <p className="text-slate-400 text-sm">Ładowanie przedstawicieli...</p>
+                        </div>
+                    ) : allocations.length === 0 ? (
+                        <div className="py-12 text-center text-slate-400">
+                            <p className="text-sm">Brak aktywnych przedstawicieli handlowych</p>
+                        </div>
                     ) : (
                         <>
                             {/* Strategy Selector */}
@@ -264,7 +282,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                 <div className="grid grid-cols-3 gap-2">
                                     <button
                                         onClick={() => setStrategy('equal')}
-                                        className={`p-3 rounded-xl border-2 text-left transition-all ${strategy === 'equal' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                        className={`p-3 rounded-xl border-2 text-left transition-all ${strategy === 'equal' ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
                                     >
                                         <div className="mb-1"><svg className="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg></div>
                                         <div className="text-sm font-bold text-slate-800">Równo</div>
@@ -272,7 +290,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                     </button>
                                     <button
                                         onClick={() => setStrategy('plz')}
-                                        className={`p-3 rounded-xl border-2 text-left transition-all ${strategy === 'plz' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                        className={`p-3 rounded-xl border-2 text-left transition-all ${strategy === 'plz' ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
                                     >
                                         <div className="mb-1"><svg className="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg></div>
                                         <div className="text-sm font-bold text-slate-800">Wg regionu</div>
@@ -280,7 +298,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                     </button>
                                     <button
                                         onClick={() => setStrategy('manual')}
-                                        className={`p-3 rounded-xl border-2 text-left transition-all ${strategy === 'manual' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                        className={`p-3 rounded-xl border-2 text-left transition-all ${strategy === 'manual' ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
                                     >
                                         <div className="mb-1"><svg className="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></div>
                                         <div className="text-sm font-bold text-slate-800">Manualnie</div>
@@ -295,7 +313,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                     Przedstawiciele ({selectedReps.length} wybranych)
                                 </label>
                                 <div className="space-y-2">
-                                    {allocations.map((alloc, idx) => {
+                                    {allocations.map((alloc) => {
                                         const workload = workloadMap.get(alloc.rep.id) || 0;
                                         const distItem = distribution.find(d => d.rep.id === alloc.rep.id);
                                         const willGet = distItem?.previewLeads.length || 0;
@@ -323,7 +341,10 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                                         {alloc.rep.firstName} {alloc.rep.lastName}
                                                     </div>
                                                     <div className="text-[10px] text-slate-500 flex items-center gap-2">
-                                                        <span>Aktywne: {workload}</span>
+                                                        <span className="flex items-center gap-1">
+                                                            <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                                            Aktywne: {workload}
+                                                        </span>
                                                         {alloc.rep.role === 'sales_rep_pl' && (
                                                             <span className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[9px] font-bold">PL</span>
                                                         )}
@@ -343,7 +364,7 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                                                 className="w-16 p-1.5 text-center text-sm font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                                                             />
                                                         ) : (
-                                                            <div className="flex items-center gap-1.5">
+                                                            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
                                                                 <span className="text-lg font-bold text-indigo-600">{willGet}</span>
                                                                 <span className="text-xs text-slate-400">leadów</span>
                                                             </div>
@@ -355,6 +376,38 @@ export const AutoAssignModal: React.FC<AutoAssignModalProps> = ({ isOpen, onClos
                                     })}
                                 </div>
                             </div>
+
+                            {/* PLZ Preview — show distribution by region when PLZ strategy */}
+                            {strategy === 'plz' && distribution.length > 0 && (
+                                <div className="bg-violet-50/50 rounded-xl p-4 border border-violet-200">
+                                    <div className="text-xs font-medium text-violet-700 mb-2 flex items-center gap-1.5">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                        Podgląd regionów
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {distribution.filter(d => d.previewLeads.length > 0).map(d => {
+                                            const plzCounts = new Map<string, number>();
+                                            d.previewLeads.forEach(l => {
+                                                const plz = l.customerData?.postalCode?.substring(0, 2) || '??';
+                                                plzCounts.set(plz, (plzCounts.get(plz) || 0) + 1);
+                                            });
+                                            const plzList = [...plzCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+                                            return (
+                                                <div key={d.rep.id} className="flex items-center gap-2 text-xs">
+                                                    <span className="font-medium text-slate-700 min-w-[100px]">{d.rep.firstName} {d.rep.lastName?.charAt(0)}.</span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {plzList.map(([plz, count]) => (
+                                                            <span key={plz} className="px-1.5 py-0.5 bg-white rounded border border-violet-200 text-violet-700 text-[10px] font-mono">
+                                                                {plz}×{count}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Summary */}
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
