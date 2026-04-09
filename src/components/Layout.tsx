@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationsDropdown } from './notifications/NotificationsDropdown';
+import { useRealtimeNotifications } from './notifications/useRealtimeNotifications';
 import { GlobalSearch } from './GlobalSearch';
 import { AIAssistantSidebar } from './AIAssistantSidebar';
 import { TaskSidebar } from './tasks/TaskSidebar';
@@ -16,6 +17,9 @@ export const Layout: React.FC = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ crm: true });
     const toggleSection = (key: string) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+    // Real-time push notifications from Supabase (offer views, messages, acceptances)
+    useRealtimeNotifications();
 
     // Poll unread email count every 3 minutes
     const checkUnread = useCallback(async () => {
