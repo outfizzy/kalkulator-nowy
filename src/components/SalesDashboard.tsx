@@ -21,6 +21,7 @@ import { InstallationSettlementModal } from './installations/InstallationSettlem
 import { supabase } from '../lib/supabase';
 import type { Installation } from '../types';
 import { ServiceTicketsWidget } from './admin/ServiceTicketsWidget';
+import { LiveActivityFeed } from './notifications/LiveActivityFeed';
 
 export const SalesDashboard: React.FC = () => {
     const { currentUser, isAdmin } = useAuth();
@@ -569,6 +570,13 @@ export const SalesDashboard: React.FC = () => {
                         <StaleLeadsWidget leads={staleLeads} />
                     </div>
                 )}
+
+                {/* Live Activity Feed */}
+                <div className="lg:col-span-1">
+                    <div style={{ maxHeight: '480px' }} className="overflow-hidden rounded-xl">
+                        <LiveActivityFeed maxItems={10} />
+                    </div>
+                </div>
 
             </div>
 

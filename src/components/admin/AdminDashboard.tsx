@@ -5,6 +5,7 @@ import { WalletWidget } from './WalletWidget';
 import { TasksList } from '../tasks/TasksList';
 import { TaskModal } from '../tasks/TaskModal';
 import { ActivityFeed } from './ActivityFeed';
+import { LiveActivityFeed } from '../notifications/LiveActivityFeed';
 import { CompanyOverview } from './CompanyOverview';
 import { UpcomingSchedule } from './UpcomingSchedule';
 import { RingostatWidget } from '../widgets/RingostatWidget';
@@ -597,7 +598,7 @@ export const AdminDashboard: React.FC = () => {
 
                 {/* Activity Feed */}
                 <div className="overflow-hidden rounded-2xl" style={{ maxHeight: '480px' }}>
-                    <ActivityFeed />
+                    <LiveActivityFeed maxItems={15} />
                 </div>
             </div>
 
