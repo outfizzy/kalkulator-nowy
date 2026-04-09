@@ -16,6 +16,15 @@ export const LeadService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // Fetch creator's role — admins/managers should NOT be auto-assigned as lead owners
+        const { data: creatorProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+        const creatorRole = creatorProfile?.role || '';
+        const isAdminOrManager = ['admin', 'manager'].includes(creatorRole);
+
         // Ensure customer exists
         let customerId = lead.customerId;
 
@@ -50,7 +59,8 @@ export const LeadService = {
                     email: lead.customerData.email || '',
                     country: 'Deutschland',
                     // [Fix 2026-01-13] Pass Representative ID to bypass RLS and ensure ownership
-                    representative_id: lead.assignedTo || user.id,
+                // Admins/managers should not become the customer's representative
+                representative_id: lead.assignedTo || (isAdminOrManager ? null : user.id),
                     source: lead.source || 'targi'
                 };
 
@@ -83,8 +93,9 @@ export const LeadService = {
                 source: lead.source,
                 customer_data: lead.customerData,
                 customer_id: customerId,
-                // Leads with status 'new' have no owner until manually assigned
-                assigned_to: lead.assignedTo || (lead.status === 'new' ? null : user.id),
+                // Admin/manager creating leads should NOT be auto-assigned as owner
+                // Only sales_rep gets auto-assigned when status isn't 'new'
+                assigned_to: lead.assignedTo || (lead.status === 'new' || isAdminOrManager ? null : user.id),
                 email_message_id: lead.emailMessageId,
                 notes: lead.notes,
                 last_contact_date: lead.lastContactDate ? lead.lastContactDate.toISOString() : null,
