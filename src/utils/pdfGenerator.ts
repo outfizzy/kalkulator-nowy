@@ -821,7 +821,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     // Trust badges (Text based)
     doc.setFontSize(8);
     doc.setTextColor(...THEME.textLight);
-    const badges = "Premium Qualität Made in Germany  |  5 Jahre Garantie  |  Alles aus einer Hand";
+    const badges = "Premium Qualität Made in EU  |  5 Jahre Garantie  |  Alles aus einer Hand";
     doc.text(badges, pageWidth / 2, y, { align: 'center' });
 
     y += 8;

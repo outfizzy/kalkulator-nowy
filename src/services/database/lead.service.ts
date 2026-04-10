@@ -111,6 +111,15 @@ export const LeadService = {
 
         if (error) throw error;
 
+        // Auto-assign if lead has no owner (e.g., created by admin, webhook, or status=new)
+        if (!data.assigned_to) {
+            try {
+                await LeadAutoAssignService.autoAssignLead(data.id);
+            } catch (assignErr) {
+                console.warn('[LeadService] Auto-assign failed (non-critical):', assignErr);
+            }
+        }
+
         return {
             ...lead,
             id: data.id,
