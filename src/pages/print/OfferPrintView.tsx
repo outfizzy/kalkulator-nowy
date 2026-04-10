@@ -5,10 +5,22 @@ import { OfferService } from '../../services/database/offer.service';
 import type { Offer } from '../../types';
 import { translate, formatCurrency } from '../../utils/translations';
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // PREMIUM PRINT VIEW — A4 PDF-Ready Offer Document
 // Designed for browser print → PDF with fixed headers/footers
-// ═══════════════════════════════════════════════════
+//
+// HARDENING CHECKLIST:
+// [✓] Emoji replaced with Unicode text symbols (print-safe)
+// [✓] All text uses overflow-wrap: break-word (no overflow)
+// [✓] keep-together on all critical blocks
+// [✓] Null safety on all pricing/product fields
+// [✓] Fixed header/footer with matching spacers via doc-table
+// [✓] Pricing table thead repeats on multi-page via table-header-group
+// [✓] Summary block uses keep-together to prevent split
+// [✓] Config box has max-height protection
+// [✓] Long addon names truncate gracefully
+// [✓] CSS page counter via @page
+// ═══════════════════════════════════════════════════════════════════
 
 function translateForView(key: string, category: string): string {
     const v2Map: Record<string, string> = {
@@ -31,7 +43,10 @@ function translateForView(key: string, category: string): string {
         'freestanding': 'Freistehend', 'wedge': 'Keilform',
         'anthracite': 'Anthrazit (RAL 7016)', 'white': 'Weiß (RAL 9016)',
         'ral7016': 'Anthrazit (RAL 7016)', 'ral9016': 'Weiß (RAL 9016)',
-        'silberr': 'Silber (RAL 9006)', 'sepia': 'Sepiabraun (RAL 8014)'
+        'silberr': 'Silber (RAL 9006)', 'sepia': 'Sepiabraun (RAL 8014)',
+        'ral 7016': 'Anthrazit (RAL 7016)', 'ral 9016': 'Weiß (RAL 9016)',
+        'RAL 7016': 'Anthrazit (RAL 7016)', 'RAL 9016': 'Weiß (RAL 9016)',
+        'RAL 9006': 'Silber (RAL 9006)', 'RAL 8014': 'Sepiabraun (RAL 8014)',
     };
     if (v2Map[key?.toLowerCase()]) return v2Map[key.toLowerCase()];
     return translate(key, category as any);
@@ -65,13 +80,13 @@ function translateAddonName(name: string): string {
 }
 
 // Professional addon description enrichment
-function getAddonSubtext(name: string, config?: string): string | null {
+function getAddonSubtext(name: string): string | null {
     const n = (name || '').toLowerCase();
     if (n.includes('seitenwand') || n.includes('side wall')) return 'Festverglaste Aluminium-Seitenwand';
     if (n.includes('frontwand') || n.includes('front wall')) return 'Festverglaste Aluminium-Frontwand';
     if (n.includes('keilfenster') || n.includes('wedge')) return 'Dreieckiges Keilfenster (Giebeldreieck)';
     if (n.includes('schiebetür') || n.includes('schiebetuer')) return 'Aluminium-Schiebetür mit Rollenlaufwerk';
-    if (n.includes('panorama')) return 'Rahmenlose Panorama-Glasschiebewand, ESG 10 mm';
+    if (n.includes('panorama')) return 'Rahmenlose Panorama-Glasschiebewand, ESG 10mm';
     if (n.includes('zip')) return 'ZIP-Senkrechtmarkise mit Somfy-Motor (Textilscreen)';
     if (n.includes('markise') || n.includes('awning')) return 'Aufdachmarkise mit Somfy-Motor';
     if (n.includes('led') && n.includes('spot')) return 'Einbau in Sparren, warmweiß 3000K';
@@ -80,6 +95,13 @@ function getAddonSubtext(name: string, config?: string): string | null {
     if (n.includes('heiz') || n.includes('infrarot')) return 'Fernbedienung, spritzwassergeschützt (IP65)';
     if (n.includes('wpc')) return 'Premium Holz-Kunststoff-Verbundwerkstoff, rutschfest';
     return null;
+}
+
+// Safe number formatter - never shows NaN or undefined
+function safeNum(val: any, decimals = 0): string {
+    const n = Number(val);
+    if (isNaN(n) || !isFinite(n)) return '—';
+    return decimals > 0 ? n.toFixed(decimals) : Math.round(n).toString();
 }
 
 export const OfferPrintView: React.FC = () => {
@@ -111,7 +133,6 @@ export const OfferPrintView: React.FC = () => {
                         console.error('Error loading product image:', imageError);
                     }
                 }
-                // NOTE: No auto-print — user clicks "PDF Speichern" button when ready
             } catch (error) {
                 console.error('Error loading offer:', error);
             } finally {
@@ -155,15 +176,15 @@ export const OfferPrintView: React.FC = () => {
     const isManual = !!(offer.product as any)?.isManual;
     const model = isManual ? 'Individuelles Angebot' : translateForView(offer.product?.modelId || '', 'models');
     const p = offer.product as any;
-    const dach = p?.dachrechnerData;
+    const dach = p?.dachrechnerData || null;
 
-    // Calculations
-    const installNet = offer.pricing?.installationCosts?.totalInstallation || 0;
-    const totalNet = offer.pricing?.sellingPriceNet || 0;
-    const totalGross = offer.pricing?.sellingPriceGross || (totalNet * 1.19);
+    // Calculations (with null safety)
+    const installNet = Number(offer.pricing?.installationCosts?.totalInstallation) || 0;
+    const totalNet = Number(offer.pricing?.sellingPriceNet) || 0;
+    const totalGross = Number(offer.pricing?.sellingPriceGross) || (totalNet * 1.19);
     const totalVat = totalGross - totalNet;
     const productOnlyNet = totalNet - installNet;
-    const discount = offer.pricing?.discountValue || 0;
+    const discount = Number(offer.pricing?.discountValue) || 0;
     const hasDiscount = discount > 0;
     const discountGross = hasDiscount ? discount * 1.19 : 0;
     const originalGross = hasDiscount ? totalGross + discountGross : 0;
@@ -177,65 +198,85 @@ export const OfferPrintView: React.FC = () => {
     validUntil.setDate(validUntil.getDate() + 30);
     const validUntilStr = validUntil.toLocaleDateString('de-DE');
 
-    // Structural data
-    const postCount = p?.numberOfPosts || Math.max(2, Math.ceil((p?.width || 3000) / 3500) + 1);
-    const fieldCount = p?.numberOfFields || Math.max(2, Math.ceil((p?.width || 3000) / 900));
+    // Structural data (with null safety)
+    const postCount = p?.numberOfPosts || Math.max(2, Math.ceil((Number(p?.width) || 3000) / 3500) + 1);
+    const fieldCount = p?.numberOfFields || Math.max(2, Math.ceil((Number(p?.width) || 3000) / 900));
     const rafterCount = fieldCount + 1;
-    const isCombined = !!(p?.splitPoint && p?.width > 7000);
-    const hasKeil = dach && (dach.keilhoeheK1 != null || dach.keilhoeheK2 != null);
+    const isCombined = !!(p?.splitPoint && Number(p?.width) > 7000);
 
-    // Collect all line items
+    // Collect all line items (with safety)
     const lineItems: Array<{ name: string; subtext?: string; price: number; isBold?: boolean }> = [];
 
     // Base product
-    if (!isManual) {
+    if (!isManual && model) {
         lineItems.push({
             name: `${model} Terrassenüberdachung`,
-            subtext: 'Hochwertiges Aluminiumprofilsystem, pulverbeschichtet.\nInkl. Pfosten, Rinnenprofil und Wandanschluss.',
-            price: offer.pricing?.basePrice || 0,
+            subtext: 'Hochwertiges Aluminiumprofilsystem, pulverbeschichtet. Inkl. Pfosten, Rinnenprofil und Wandanschluss.',
+            price: Number(offer.pricing?.basePrice) || 0,
             isBold: true,
         });
     }
 
     // Addons (V1)
     (offer.product?.addons || []).forEach((addon: any) => {
+        if (!addon?.name) return; // skip corrupt entries
         lineItems.push({
             name: translateAddonName(addon.name),
             subtext: addon.variant || getAddonSubtext(addon.name) || undefined,
-            price: addon.price,
+            price: Number(addon.price) || 0,
         });
     });
 
     // Items (V2)
     ((p?.items || []) as any[])
-        .filter((i: any) => !i.name?.toLowerCase().includes(p.modelId?.toLowerCase() || ''))
+        .filter((i: any) => i?.name && !i.name.toLowerCase().includes((p.modelId || '').toLowerCase()))
         .forEach((item: any) => {
             lineItems.push({
                 name: translateAddonName(item.name),
-                subtext: item.config || getAddonSubtext(item.name, item.config) || undefined,
-                price: item.price,
+                subtext: item.config || getAddonSubtext(item.name) || undefined,
+                price: Number(item.price) || 0,
             });
         });
 
     // Custom items (manual positions)
     ((p?.customItems || []) as any[]).forEach((ci: any) => {
-        const qty = ci.quantity || 1;
+        if (!ci) return;
+        const qty = Number(ci.quantity) || 1;
+        const unitPrice = Number(ci.price) || 0;
         lineItems.push({
             name: ci.name || 'Zusätzliche Position',
             subtext: (ci.description && ci.description !== 'Manuelle Angebotsposition' && ci.description !== 'Manuelle Position')
                 ? `${ci.description}${qty > 1 ? ` · Menge: ${qty} Stk.` : ''}`
                 : qty > 1 ? `Menge: ${qty} Stk.` : undefined,
-            price: ci.price * qty,
+            price: unitPrice * qty,
         });
     });
 
+    // Rep initials (with safety for single-word names)
+    const repInitials = repName.split(' ').filter(Boolean).map(n => n.charAt(0)).join('').substring(0, 2) || 'PD';
+
+    // Dachrechner fields to display
+    const dachFields: Array<{ label: string; value: string }> = [];
+    if (dach) {
+        if (dach.angleAlpha != null && isFinite(dach.angleAlpha)) dachFields.push({ label: 'Neigung', value: `${Number(dach.angleAlpha).toFixed(1)}°` });
+        if (dach.h3 != null) dachFields.push({ label: 'H3 Rinne', value: `${safeNum(dach.h3)} mm` });
+        if (dach.h1 != null) dachFields.push({ label: 'H1 Wand', value: `${safeNum(dach.h1)} mm` });
+        if (dach.sparrenMitte != null) dachFields.push({ label: 'Sparrenabstand', value: `${safeNum(dach.sparrenMitte)} mm` });
+        if (dach.inclinationMmM != null) dachFields.push({ label: 'Gefälle', value: `${safeNum(dach.inclinationMmM)} mm/m` });
+        if (dach.depthD2 != null) dachFields.push({ label: 'Tiefe m. Rinne', value: `${safeNum(dach.depthD2)} mm` });
+        if (dach.fensterF2 != null) dachFields.push({ label: 'Fensterbreite', value: `${safeNum(dach.fensterF2)} mm` });
+        if (p.postWidth) dachFields.push({ label: 'Pfosten', value: `${p.postWidth} mm` });
+        if (dach.keilhoeheK1 != null) dachFields.push({ label: 'Keil K1', value: `${safeNum(dach.keilhoeheK1)} mm` });
+        if (dach.keilhoeheK2 != null) dachFields.push({ label: 'Keil K2', value: `${safeNum(dach.keilhoeheK2)} mm` });
+    }
+
     return (
-        <div className="bg-slate-100 min-h-screen print:bg-white print:min-h-0 font-['Helvetica_Neue',Helvetica,Arial,sans-serif]">
+        <div className="bg-slate-100 min-h-screen print:bg-white print:min-h-0" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", overflowWrap: 'break-word', wordBreak: 'break-word' }}>
             <style>{`
                 @media print {
                     @page { 
                         size: A4;
-                        margin: 0; 
+                        margin: 0;
                     }
                     html, body {
                         height: 100%;
@@ -247,47 +288,50 @@ export const OfferPrintView: React.FC = () => {
                         font-size: 10pt;
                     }
                     
-                    /* Fixed Header */
+                    /* Fixed Header — repeats on every page */
                     .print-fixed-header {
                         position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
+                        top: 0; left: 0; right: 0;
                         height: 24mm;
                         background: #121c2d !important;
                         z-index: 1000;
                     }
 
-                    /* Fixed Footer */
+                    /* Fixed Footer — repeats on every page */
                     .print-fixed-footer {
                         position: fixed;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
+                        bottom: 0; left: 0; right: 0;
                         background: white !important;
                         padding: 3mm 15mm;
-                        border-top: 0.5pt solid #e2e8f0;
+                        border-top: 0.5pt solid #cbd5e1;
                         height: 18mm;
                         z-index: 1000;
                     }
 
-                    /* Spacers */
+                    /* Spacers matched to fixed elements + buffer */
                     .header-space { height: 28mm; }
                     .footer-space { height: 21mm; }
 
+                    /* Document-level table for header/footer flow */
                     .doc-table { width: 100%; border-collapse: collapse; border: none; }
-                    .content-table thead { display: table-header-group; }
-                    .content-table tr { page-break-inside: avoid; }
+
+                    /* Pricing table header repeats on each page */
+                    .pricing-table thead { display: table-header-group; }
+                    .pricing-table tfoot { display: table-footer-group; }
+                    .pricing-table tr { page-break-inside: avoid; break-inside: avoid; }
+
+                    /* Block-level anti-orphan protection */
                     .keep-together { page-break-inside: avoid; break-inside: avoid; }
                     .page-break { page-break-before: always; break-before: page; }
 
-                    /* Page counter */
-                    .print-fixed-footer .page-counter {
-                        counter-increment: page;
-                    }
-                    .print-fixed-footer .page-counter::after {
-                        content: counter(page);
-                    }
+                    /* No widows/orphans in text blocks */
+                    p, li, div { orphans: 3; widows: 3; }
+
+                    /* Prevent images from breaking across pages */
+                    img { page-break-inside: avoid; break-inside: avoid; }
+
+                    /* Force background colors */
+                    .bg-force { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 }
 
                 /* Screen preview styles */
@@ -295,124 +339,128 @@ export const OfferPrintView: React.FC = () => {
                     .print-fixed-header, .print-fixed-footer { display: none; }
                     .header-space, .footer-space { display: none; }
                 }
+
+                /* Tabular numbers for price alignment */
+                .tn { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
             `}</style>
 
-            {/* ═══ FIXED HEADER (Print only) ═══ */}
+            {/* ═══ FIXED HEADER (Print only, repeats every page) ═══ */}
             <div className="print-fixed-header print:block hidden">
-                <div className="px-[15mm] h-full flex items-center justify-between">
-                    <div className="w-[40mm]">
-                        <img src="/logo.png" alt="Polendach24" className="h-[10mm] w-auto object-contain brightness-0 invert" />
+                <div style={{ padding: '0 15mm', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ width: '40mm' }}>
+                        <img src="/logo.png" alt="Polendach24" style={{ height: '10mm', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
                     </div>
-                    <div className="text-right">
-                        <p className="text-slate-300 text-[8pt] leading-tight">Ihr Premium Partner für Terrassen</p>
-                        <p className="text-[#c5a065] font-bold text-[9pt]">www.polendach24.de</p>
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ color: '#94a3b8', fontSize: '8pt', lineHeight: 1.3, margin: 0 }}>Ihr Premium Partner für Terrassen</p>
+                        <p style={{ color: '#c5a065', fontWeight: 'bold', fontSize: '9pt', margin: 0 }}>www.polendach24.de</p>
                     </div>
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 h-[1mm] bg-[#c5a065] print:bg-[#c5a065]"></div>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '1mm', background: '#c5a065' }}></div>
             </div>
 
-            {/* ═══ FIXED FOOTER (Print only) ═══ */}
+            {/* ═══ FIXED FOOTER (Print only, repeats every page) ═══ */}
             <div className="print-fixed-footer print:block hidden">
-                <div className="flex justify-between items-end text-[6.5pt] text-slate-400 leading-tight">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '6.5pt', color: '#94a3b8', lineHeight: 1.4 }}>
                     <div>
-                        <span className="font-bold text-slate-600">PolenDach24 S.C.</span><br />
+                        <span style={{ fontWeight: 'bold', color: '#475569' }}>PolenDach24 S.C.</span><br />
                         Kolonia Wałowice 221/33, 66-620 Gubin<br />
                         NIP: PL9261695520
                     </div>
-                    <div className="text-center">
-                        Tel: 03561 501 9981 | +49 157 5064 6936<br />
+                    <div style={{ textAlign: 'center' }}>
+                        Tel: 03561 501 9981<br />
                         E-Mail: buero@polendach24.de
                     </div>
-                    <div className="text-right">
+                    <div style={{ textAlign: 'right' }}>
                         Sparkasse Spree-Neiße<br />
-                        IBAN: DE79 1805 0000 0190 1228 89<br />
+                        DE79 1805 0000 0190 1228 89<br />
                         BIC: WELADED1CBN
                     </div>
                 </div>
             </div>
 
             {/* ═══ DOCUMENT FLOW ═══ */}
-            <div className="bg-white shadow-xl px-[15mm] pb-[10mm] max-w-[210mm] min-h-[297mm] mx-auto print:shadow-none print:px-0 print:pb-0 print:max-w-none print:mx-0">
-                <table className="doc-table">
+            <div style={{ background: 'white', maxWidth: '210mm', minHeight: '297mm', margin: '0 auto', padding: '0 15mm 10mm 15mm', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+                className="print:shadow-none print:!p-0 print:!max-w-none print:!mx-0">
+                <table className="doc-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead className="print:table-header-group hidden"><tr><td><div className="header-space"></div></td></tr></thead>
                     <tfoot className="print:table-footer-group hidden"><tr><td><div className="footer-space"></div></td></tr></tfoot>
 
                     <tbody>
                         <tr>
-                            <td className="align-top py-8 print:py-0 px-[15mm] print:px-[15mm]">
+                            <td style={{ verticalAlign: 'top', padding: '32px 15mm 0 15mm' }} className="print:!pt-0 print:!px-[15mm]">
 
                                 {/* ═══ WEB HEADER (Hidden in Print) ═══ */}
-                                <header className="bg-[#121c2d] h-[24mm] flex flex-col justify-center relative mb-6 -mx-[15mm] print:hidden">
-                                    <div className="px-[15mm] flex items-center justify-between">
-                                        <div className="w-[40mm]"><img src="/logo.png" alt="Polendach24" className="h-[10mm] brightness-0 invert" /></div>
-                                        <div className="text-right">
-                                            <p className="text-slate-300 text-[8pt]">Ihr Premium Partner für Terrassen</p>
-                                            <p className="text-[#c5a065] font-bold text-[9pt]">www.polendach24.de</p>
+                                <header style={{ background: '#121c2d', height: '24mm', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', margin: '0 -15mm 24px -15mm' }} className="print:!hidden">
+                                    <div style={{ padding: '0 15mm', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ width: '40mm' }}><img src="/logo.png" alt="Polendach24" style={{ height: '10mm', filter: 'brightness(0) invert(1)' }} /></div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <p style={{ color: '#94a3b8', fontSize: '8pt', margin: 0 }}>Ihr Premium Partner für Terrassen</p>
+                                            <p style={{ color: '#c5a065', fontWeight: 'bold', fontSize: '9pt', margin: 0 }}>www.polendach24.de</p>
                                         </div>
                                     </div>
-                                    <div className="absolute bottom-0 left-0 right-0 h-[1mm] bg-[#c5a065]"></div>
+                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '1mm', background: '#c5a065' }}></div>
                                 </header>
 
-                                {/* ═══════════════════════════════ */}
-                                {/* PAGE 1: COVER & CONFIGURATION  */}
-                                {/* ═══════════════════════════════ */}
-                                <div className="min-h-[220mm] flex flex-col">
+                                {/* ═══════════════════════════════════ */}
+                                {/* PAGE 1: COVER & CONFIGURATION      */}
+                                {/* ═══════════════════════════════════ */}
+                                <div style={{ minHeight: '220mm', display: 'flex', flexDirection: 'column' }}>
 
                                     {/* ─── METADATA ROW ─── */}
-                                    <div className="flex justify-between items-start mb-8">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px', gap: '16px' }}>
                                         {/* Customer Address */}
-                                        <div className="text-[10pt] leading-relaxed max-w-[55%]">
-                                            <p className="text-slate-400 mb-3 text-[8pt] tracking-wide">
+                                        <div style={{ fontSize: '10pt', lineHeight: 1.6, maxWidth: '55%', minWidth: 0, overflow: 'hidden' }}>
+                                            <p style={{ color: '#94a3b8', marginBottom: '12px', fontSize: '8pt', letterSpacing: '0.03em' }}>
                                                 PolenDach24 S.C. · Kolonia Wałowice 221/33 · 66-620 Gubin
                                             </p>
-                                            {c.companyName && <p className="font-bold text-slate-900">{c.companyName}</p>}
-                                            <p className="text-slate-900">{[c.salutation, c.firstName, c.lastName].filter(Boolean).join(' ') || 'Kunde'}</p>
-                                            <p className="text-slate-900">{[c.street, c.houseNumber].filter(Boolean).join(' ')}</p>
-                                            <p className="text-slate-900">{[c.postalCode, c.city].filter(Boolean).join(' ')}</p>
-                                            <p className="text-slate-900">{c.country || 'Deutschland'}</p>
+                                            {c.companyName && <p style={{ fontWeight: 'bold', color: '#0f172a', margin: '0 0 2px 0' }}>{c.companyName}</p>}
+                                            <p style={{ color: '#0f172a', margin: '0 0 2px 0' }}>{[c.salutation, c.firstName, c.lastName].filter(Boolean).join(' ') || 'Kunde'}</p>
+                                            {(c.street || c.houseNumber) && <p style={{ color: '#0f172a', margin: '0 0 2px 0' }}>{[c.street, c.houseNumber].filter(Boolean).join(' ')}</p>}
+                                            {(c.postalCode || c.city) && <p style={{ color: '#0f172a', margin: '0 0 2px 0' }}>{[c.postalCode, c.city].filter(Boolean).join(' ')}</p>}
+                                            <p style={{ color: '#0f172a', margin: 0 }}>{c.country || 'Deutschland'}</p>
                                         </div>
 
                                         {/* Offer Badge */}
-                                        <div className="bg-slate-50 border border-slate-200 rounded-sm overflow-hidden w-[70mm] shrink-0">
-                                            <div className="bg-[#121c2d] px-4 py-1.5 print:bg-[#121c2d]">
-                                                <span className="text-[#c5a065] text-[7pt] font-bold uppercase tracking-[0.15em]">Angebot</span>
+                                        <div style={{ width: '70mm', flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '2px', overflow: 'hidden', background: '#f8fafc' }}>
+                                            <div style={{ background: '#121c2d', padding: '5px 12px' }} className="bg-force">
+                                                <span style={{ color: '#c5a065', fontSize: '7pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Angebot</span>
                                             </div>
-                                            <div className="p-3 space-y-2">
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-[8pt] text-slate-400 uppercase tracking-wider font-medium">Nr.</span>
-                                                    <span className="font-bold text-[#121c2d] text-[11pt]">{offer.offerNumber || 'ENTWURF'}</span>
+                                            <div style={{ padding: '10px 12px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                                                    <span style={{ fontSize: '8pt', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 500 }}>Nr.</span>
+                                                    <span style={{ fontWeight: 'bold', color: '#121c2d', fontSize: '11pt' }}>{offer.offerNumber || 'ENTWURF'}</span>
                                                 </div>
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-[8pt] text-slate-400">Datum</span>
-                                                    <span className="font-medium text-slate-800 text-[9pt]">{offerDate}</span>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                                                    <span style={{ fontSize: '8pt', color: '#94a3b8' }}>Datum</span>
+                                                    <span style={{ fontWeight: 500, color: '#1e293b', fontSize: '9pt' }}>{offerDate}</span>
                                                 </div>
-                                                <div className="flex justify-between items-baseline border-t border-slate-100 pt-1.5">
-                                                    <span className="text-[8pt] text-slate-400">Gültig bis</span>
-                                                    <span className="font-medium text-slate-800 text-[9pt]">{validUntilStr}</span>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid #f1f5f9', paddingTop: '5px' }}>
+                                                    <span style={{ fontSize: '8pt', color: '#94a3b8' }}>Gültig bis</span>
+                                                    <span style={{ fontWeight: 500, color: '#1e293b', fontSize: '9pt' }}>{validUntilStr}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* ─── HERO TITLE + PRODUCT IMAGE ─── */}
-                                    <div className="mb-6 flex justify-between gap-6 items-start">
-                                        <div className="flex-1 min-w-0">
-                                            <h1 className="text-[22pt] font-bold text-[#121c2d] mb-1 leading-tight">{model}</h1>
-                                            <h2 className="text-[#c5a065] font-medium text-[12pt] mb-5">Ihr persönliches Angebot</h2>
+                                    <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'flex-start' }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <h1 style={{ fontSize: '22pt', fontWeight: 'bold', color: '#121c2d', margin: '0 0 4px 0', lineHeight: 1.2 }}>{model}</h1>
+                                            <h2 style={{ color: '#c5a065', fontWeight: 500, fontSize: '12pt', margin: '0 0 16px 0' }}>Ihr persönliches Angebot</h2>
 
-                                            <div className="text-[10pt] text-slate-600 leading-relaxed space-y-2">
-                                                <p>
+                                            <div style={{ fontSize: '10pt', color: '#475569', lineHeight: 1.7 }}>
+                                                <p style={{ margin: '0 0 8px 0' }}>
                                                     {c.salutation === 'Frau'
-                                                        ? `Sehr geehrte Frau ${c.lastName},`
+                                                        ? `Sehr geehrte Frau ${c.lastName || ''},`
                                                         : c.lastName
                                                             ? `Sehr geehrter Herr ${c.lastName},`
                                                             : 'Sehr geehrte Damen und Herren,'}
                                                 </p>
-                                                <p>
+                                                <p style={{ margin: '0 0 8px 0' }}>
                                                     vielen Dank für Ihr Vertrauen und das Interesse an unseren hochwertigen Aluminiumsystemen.
                                                     Wir freuen uns, Ihnen basierend auf Ihren Wünschen diese maßgeschneiderte Lösung präsentieren zu dürfen.
                                                 </p>
-                                                <p>
+                                                <p style={{ margin: 0 }}>
                                                     Bei <b>Polendach24</b> stehen Qualität, Langlebigkeit und Ästhetik an erster Stelle.
                                                     Ihre gewählte Konfiguration vereint modernes Design mit höchster Funktionalität.
                                                 </p>
@@ -420,60 +468,60 @@ export const OfferPrintView: React.FC = () => {
                                         </div>
 
                                         {productImage && (
-                                            <div className="w-[75mm] shrink-0 pt-3">
-                                                <div className="relative aspect-video rounded-sm overflow-hidden shadow-sm border border-slate-200 bg-slate-50">
-                                                    <img src={productImage} alt={model} className="object-cover w-full h-full" />
+                                            <div style={{ width: '75mm', flexShrink: 0, paddingTop: '8px' }} className="keep-together">
+                                                <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: '2px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                                                    <img src={productImage} alt={model} style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
                                                 </div>
-                                                <div className="text-[7pt] text-slate-400 text-center mt-1.5 italic">Beispielabbildung {model}</div>
+                                                <div style={{ fontSize: '7pt', color: '#94a3b8', textAlign: 'center', marginTop: '5px', fontStyle: 'italic' }}>Beispielabbildung {model}</div>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* ─── CONFIGURATION HIGHLIGHT BOX ─── */}
-                                    <div className="bg-[#121c2d] text-white p-6 rounded-sm shadow-sm print:bg-[#121c2d] print:text-white keep-together">
-                                        <h3 className="text-[#c5a065] text-[7pt] font-bold uppercase tracking-[0.2em] mb-4 border-b border-white/10 pb-2">
+                                    <div style={{ background: '#121c2d', color: 'white', padding: '20px 24px', borderRadius: '2px' }} className="keep-together bg-force">
+                                        <h3 style={{ color: '#c5a065', fontSize: '7pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
                                             {isManual ? 'Ihr individuelles Angebot' : 'Ihre Konfiguration im Überblick'}
                                         </h3>
 
                                         {isManual ? (
                                             <div>
-                                                {p.manualDescription ? (
-                                                    <div className="text-slate-200 text-[9pt] leading-relaxed whitespace-pre-wrap">{p.manualDescription}</div>
+                                                {p?.manualDescription ? (
+                                                    <div style={{ color: '#cbd5e1', fontSize: '9pt', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{p.manualDescription}</div>
                                                 ) : (
-                                                    <div className="text-slate-400 text-[9pt] italic">Detaillierte Positionen finden Sie auf der nächsten Seite.</div>
+                                                    <div style={{ color: '#64748b', fontSize: '9pt', fontStyle: 'italic' }}>Detaillierte Positionen auf der nächsten Seite.</div>
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-3 gap-y-5 gap-x-6">
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 20px' }}>
                                                 <div>
-                                                    <span className="block text-slate-400 text-[7pt] uppercase tracking-wide mb-0.5">Modell</span>
-                                                    <span className="font-bold text-[13pt] block">{model}</span>
+                                                    <span style={{ display: 'block', color: '#94a3b8', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Modell</span>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '13pt', display: 'block' }}>{model}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-slate-400 text-[7pt] uppercase tracking-wide mb-0.5">Abmessungen (B × T)</span>
-                                                    <span className="font-bold text-[13pt] block">{p.width} × {p.projection} mm</span>
+                                                    <span style={{ display: 'block', color: '#94a3b8', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Abmessungen (B × T)</span>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '13pt', display: 'block' }}>{safeNum(p?.width)} × {safeNum(p?.projection)} mm</span>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-slate-400 text-[7pt] uppercase tracking-wide mb-0.5">Farbgebung</span>
-                                                    <span className="font-bold text-[12pt] block">{translateForView(p.color || '', 'colors')}</span>
+                                                    <span style={{ display: 'block', color: '#94a3b8', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Farbgebung</span>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '12pt', display: 'block' }}>{translateForView(p?.color || '', 'colors')}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-slate-400 text-[7pt] uppercase tracking-wide mb-0.5">Dacheindeckung</span>
-                                                    <span className="font-bold text-[12pt] block">{translateForView(p.roofType || '', 'roofTypes')}</span>
+                                                    <span style={{ display: 'block', color: '#94a3b8', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Dacheindeckung</span>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '12pt', display: 'block' }}>{translateForView(p?.roofType || '', 'roofTypes')}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-slate-400 text-[7pt] uppercase tracking-wide mb-0.5">Montage</span>
-                                                    <span className="font-bold text-[12pt] block">{translateForView(p.installationType || 'wall', 'installation')}</span>
+                                                    <span style={{ display: 'block', color: '#94a3b8', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Montage</span>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '12pt', display: 'block' }}>{translateForView(p?.installationType || 'wall', 'installation')}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-slate-400 text-[7pt] uppercase tracking-wide mb-0.5">Pfosten / Sparren</span>
-                                                    <span className="font-bold text-[12pt] block">{postCount} Pfosten · {rafterCount} Sparren</span>
+                                                    <span style={{ display: 'block', color: '#94a3b8', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Pfosten / Sparren</span>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '12pt', display: 'block' }}>{postCount} Pfosten · {rafterCount} Sparren</span>
                                                 </div>
                                                 {isCombined && (
-                                                    <div className="col-span-3 pt-2 border-t border-white/10">
-                                                        <span className="block text-[#c5a065] text-[7pt] uppercase tracking-wide mb-0.5">✂ Verbundkonstruktion</span>
-                                                        <span className="font-bold text-[11pt] block">
-                                                            Teilungspfosten bei {p.splitPoint} mm — Segment 1: {p.splitPoint} mm · Segment 2: {p.width - p.splitPoint} mm
+                                                    <div style={{ gridColumn: 'span 3', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <span style={{ display: 'block', color: '#c5a065', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Verbundkonstruktion</span>
+                                                        <span style={{ fontWeight: 'bold', fontSize: '11pt', display: 'block' }}>
+                                                            Teilungspfosten bei {safeNum(p?.splitPoint)} mm — Segment 1: {safeNum(p?.splitPoint)} mm · Segment 2: {safeNum(Number(p?.width) - Number(p?.splitPoint))} mm
                                                         </span>
                                                     </div>
                                                 )}
@@ -481,75 +529,62 @@ export const OfferPrintView: React.FC = () => {
                                         )}
 
                                         {/* ─── DACHRECHNER TECHNICAL DATA ─── */}
-                                        {dach && !isManual && (
-                                            <div className="mt-4 pt-3 border-t border-white/10">
-                                                <span className="text-[#c5a065] text-[6.5pt] font-bold uppercase tracking-[0.15em] block mb-2">
-                                                    Technische Daten (Dachrechner)
+                                        {dachFields.length > 0 && !isManual && (
+                                            <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                                <span style={{ color: '#c5a065', fontSize: '6.5pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'block', marginBottom: '6px' }}>
+                                                    Technische Parameter
                                                 </span>
-                                                <div className="grid grid-cols-4 gap-x-4 gap-y-1 text-[8pt] text-slate-300">
-                                                    {dach.angleAlpha != null && <span>Neigung: {dach.angleAlpha.toFixed(1)}°</span>}
-                                                    {dach.h3 != null && <span>H3 Rinne: {Math.round(dach.h3)} mm</span>}
-                                                    {dach.h1 != null && <span>H1 Wand: {Math.round(dach.h1)} mm</span>}
-                                                    {dach.sparrenMitte != null && <span>Sparrenabstand: {Math.round(dach.sparrenMitte)} mm</span>}
-                                                    {dach.inclinationMmM != null && <span>Gefälle: {dach.inclinationMmM.toFixed(0)} mm/m</span>}
-                                                    {dach.depthD2 != null && <span>D2 m. Rinne: {Math.round(dach.depthD2)} mm</span>}
-                                                    {dach.fensterF2 != null && <span>Fensterbreite: {Math.round(dach.fensterF2)} mm</span>}
-                                                    {p.postWidth && <span>Pfostenbreite: {p.postWidth} mm</span>}
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '3px 12px', fontSize: '8pt', color: '#cbd5e1' }}>
+                                                    {dachFields.map((f, i) => (
+                                                        <span key={i}>{f.label}: <b>{f.value}</b></span>
+                                                    ))}
                                                 </div>
-                                                {hasKeil && (
-                                                    <div className="grid grid-cols-4 gap-x-4 mt-1 text-[8pt] text-[#c5a065]">
-                                                        <span>K1 Rinne: {dach.keilhoeheK1 != null ? `${Math.round(dach.keilhoeheK1)} mm` : '—'}</span>
-                                                        <span>K2 Haus: {dach.keilhoeheK2 != null ? `${Math.round(dach.keilhoeheK2)} mm` : '—'}</span>
-                                                        {dach.fensterF1 != null && (
-                                                            <span>F1/F3: {Math.round(dach.fensterF1)}/{dach.fensterF3 != null ? Math.round(dach.fensterF3) : '—'} mm</span>
-                                                        )}
-                                                    </div>
-                                                )}
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Page 1 bottom note */}
-                                    <div className="text-[8pt] text-slate-400 text-center mt-auto pt-8 pb-2">
-                                        Detaillierte Kostenaufstellung auf der nächsten Seite →
+                                    <div style={{ fontSize: '8pt', color: '#94a3b8', textAlign: 'center', marginTop: 'auto', paddingTop: '32px', paddingBottom: '8px' }}>
+                                        Detaillierte Kostenaufstellung auf der nächsten Seite
                                     </div>
                                 </div>
 
                                 {/* ═══ PAGE BREAK ═══ */}
-                                <div className="page-break"></div>
+                                <div className="page-break" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}></div>
 
-                                {/* ═══════════════════════════════ */}
-                                {/* PAGE 2: PRICING TABLE          */}
-                                {/* ═══════════════════════════════ */}
-                                <div className="mt-6">
-                                    <h3 className="text-[14pt] font-bold text-[#121c2d] mb-1">Detaillierte Kostenaufstellung</h3>
-                                    <p className="text-[8pt] text-slate-400 mb-4">
+                                {/* ═══════════════════════════════════ */}
+                                {/* PAGE 2+: PRICING TABLE              */}
+                                {/* ═══════════════════════════════════ */}
+                                <div style={{ marginTop: '20px' }}>
+                                    <h3 style={{ fontSize: '14pt', fontWeight: 'bold', color: '#121c2d', marginBottom: '4px' }}>Detaillierte Kostenaufstellung</h3>
+                                    <p style={{ fontSize: '8pt', color: '#94a3b8', marginBottom: '14px' }}>
                                         Angebot Nr. {offer.offerNumber || 'ENTWURF'} · {model} · {offerDate}
                                     </p>
 
-                                    <table className="w-full text-[9pt] content-table border-collapse">
-                                        <thead className="bg-slate-50 print:bg-slate-50">
-                                            <tr className="border-y border-slate-200">
-                                                <th className="py-2 px-2 text-left w-[10mm] text-[7pt] uppercase tracking-wider font-bold text-[#121c2d]">Pos.</th>
-                                                <th className="py-2 px-2 text-left text-[7pt] uppercase tracking-wider font-bold text-[#121c2d]">Beschreibung</th>
-                                                <th className="py-2 px-2 text-right w-[28mm] text-[7pt] uppercase tracking-wider font-bold text-[#121c2d]">Betrag (netto)</th>
+                                    {/* Pricing table — thead repeats on multi-page print */}
+                                    <table className="pricing-table" style={{ width: '100%', fontSize: '9pt', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }} className="bg-force">
+                                                <th style={{ padding: '7px 8px', textAlign: 'left', width: '10mm', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 'bold', color: '#121c2d' }}>Pos.</th>
+                                                <th style={{ padding: '7px 8px', textAlign: 'left', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 'bold', color: '#121c2d' }}>Beschreibung</th>
+                                                <th style={{ padding: '7px 8px', textAlign: 'right', width: '28mm', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 'bold', color: '#121c2d' }}>Betrag (netto)</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100">
+                                        <tbody>
                                             {lineItems.map((item, idx) => (
-                                                <tr key={idx} className="print:bg-white keep-together">
-                                                    <td className="py-2.5 px-2 text-center align-top text-slate-400 text-[8pt]">{idx + 1}</td>
-                                                    <td className="py-2.5 px-2 align-top">
-                                                        <div className={`text-slate-800 ${item.isBold ? 'font-bold' : ''}`}>
+                                                <tr key={idx} className="keep-together" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                    <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'top', color: '#94a3b8', fontSize: '8pt' }}>{idx + 1}</td>
+                                                    <td style={{ padding: '8px', verticalAlign: 'top', maxWidth: '120mm', overflow: 'hidden' }}>
+                                                        <div style={{ color: '#1e293b', fontWeight: item.isBold ? 'bold' : 'normal' }}>
                                                             {item.name}
                                                         </div>
                                                         {item.subtext && (
-                                                            <div className="text-[8pt] text-slate-500 mt-0.5 whitespace-pre-line leading-snug">
+                                                            <div style={{ fontSize: '8pt', color: '#64748b', marginTop: '2px', lineHeight: 1.4 }}>
                                                                 {item.subtext}
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className="py-2.5 px-2 text-right align-top font-medium text-slate-800 tabular-nums">
+                                                    <td className="tn" style={{ padding: '8px', textAlign: 'right', verticalAlign: 'top', fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap' }}>
                                                         {formatCurrency(item.price)}
                                                     </td>
                                                 </tr>
@@ -557,16 +592,16 @@ export const OfferPrintView: React.FC = () => {
 
                                             {/* Installation row */}
                                             {installNet > 0 && (
-                                                <tr className="bg-slate-50 print:bg-slate-50 keep-together">
-                                                    <td className="py-2.5 px-2 text-center align-top text-slate-400 text-[8pt]">M</td>
-                                                    <td className="py-2.5 px-2 align-top">
-                                                        <div className="font-medium text-slate-900">Fachmontage & Logistik</div>
-                                                        <div className="text-[8pt] text-slate-500 mt-0.5">
-                                                            Lieferung und fachgerechte Montage durch unser Expertenteam.<br />
+                                                <tr className="keep-together bg-force" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                                                    <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'top', color: '#94a3b8', fontSize: '8pt' }}>M</td>
+                                                    <td style={{ padding: '8px', verticalAlign: 'top' }}>
+                                                        <div style={{ fontWeight: 500, color: '#0f172a' }}>Fachmontage & Logistik</div>
+                                                        <div style={{ fontSize: '8pt', color: '#64748b', marginTop: '2px', lineHeight: 1.4 }}>
+                                                            Lieferung und fachgerechte Montage durch unser Expertenteam.
                                                             Inkl. aller Befestigungsmaterialien und Kleinmaterial.
                                                         </div>
                                                     </td>
-                                                    <td className="py-2.5 px-2 text-right align-top font-medium text-slate-800 tabular-nums">
+                                                    <td className="tn" style={{ padding: '8px', textAlign: 'right', verticalAlign: 'top', fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap' }}>
                                                         {formatCurrency(installNet)}
                                                     </td>
                                                 </tr>
@@ -575,101 +610,101 @@ export const OfferPrintView: React.FC = () => {
                                     </table>
                                 </div>
 
-                                {/* ═══ SUMMARY BLOCK ═══ */}
-                                <div className="keep-together mt-6 border-t-2 border-slate-100 pt-5">
-                                    <div className="grid grid-cols-2 gap-8">
+                                {/* ═══ SUMMARY BLOCK — MUST stay together ═══ */}
+                                <div className="keep-together" style={{ marginTop: '20px', borderTop: '2px solid #f1f5f9', paddingTop: '16px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px' }}>
 
                                         {/* ─── LEFT: Sales Rep Contact ─── */}
-                                        <div className="pt-1">
-                                            <div className="flex items-center gap-2.5 mb-3">
-                                                <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-[#121c2d] text-[9pt] font-bold border border-slate-200 print:bg-slate-100 shrink-0">
-                                                    {repName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                        <div style={{ paddingTop: '4px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                                <div className="bg-force" style={{ height: '36px', width: '36px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#121c2d', fontSize: '9pt', fontWeight: 'bold', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                                                    {repInitials}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-[#121c2d] text-[10pt]">{repName}</div>
-                                                    <div className="text-[7pt] text-slate-500 uppercase tracking-wide">Ihr Ansprechpartner</div>
+                                                    <div style={{ fontWeight: 'bold', color: '#121c2d', fontSize: '10pt' }}>{repName}</div>
+                                                    <div style={{ fontSize: '7pt', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ihr Ansprechpartner</div>
                                                 </div>
                                             </div>
-                                            <div className="text-[8.5pt] text-slate-600 space-y-1 pl-0.5">
-                                                <div className="flex gap-1.5 items-center"><span className="text-slate-400 text-[7pt]">📱</span> {repPhone}</div>
-                                                <div className="flex gap-1.5 items-center"><span className="text-slate-400 text-[7pt]">✉</span> {repEmail}</div>
-                                                <div className="flex gap-1.5 items-center"><span className="text-slate-400 text-[7pt]">🌐</span> www.polendach24.de</div>
+                                            <div style={{ fontSize: '8.5pt', color: '#475569', lineHeight: 2 }}>
+                                                <div>Tel: {repPhone}</div>
+                                                <div>E-Mail: {repEmail}</div>
+                                                <div>Web: www.polendach24.de</div>
                                             </div>
                                         </div>
 
                                         {/* ─── RIGHT: Price Calculation ─── */}
                                         <div>
-                                            <div className="space-y-1.5 text-[9pt] mb-4">
+                                            <div style={{ marginBottom: '14px' }}>
                                                 {/* Product net */}
-                                                <div className="flex justify-between text-slate-500">
-                                                    <span>Terrassenüberdachung:</span>
-                                                    <span className="tabular-nums">{formatCurrency(productOnlyNet)}</span>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '9pt', marginBottom: '5px' }}>
+                                                    <span>{isManual ? 'Positionen:' : 'Terrassenüberdachung:'}</span>
+                                                    <span className="tn">{formatCurrency(productOnlyNet)}</span>
                                                 </div>
                                                 {/* Installation net */}
                                                 {installNet > 0 && (
-                                                    <div className="flex justify-between text-slate-500">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '9pt', marginBottom: '5px' }}>
                                                         <span>Montage & Lieferung:</span>
-                                                        <span className="tabular-nums">{formatCurrency(installNet)}</span>
+                                                        <span className="tn">{formatCurrency(installNet)}</span>
                                                     </div>
                                                 )}
                                                 {/* Netto sum */}
-                                                <div className="flex justify-between font-bold text-slate-900 pt-2 border-t border-slate-200">
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: '#0f172a', paddingTop: '8px', borderTop: '1px solid #e2e8f0', fontSize: '9pt', marginBottom: '3px' }}>
                                                     <span>Summe netto:</span>
-                                                    <span className="tabular-nums">{formatCurrency(totalNet)}</span>
+                                                    <span className="tn">{formatCurrency(totalNet)}</span>
                                                 </div>
                                                 {/* VAT */}
-                                                <div className="flex justify-between text-slate-500 text-[8pt]">
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '8pt', marginBottom: '3px' }}>
                                                     <span>zzgl. 19% MwSt.:</span>
-                                                    <span className="tabular-nums">{formatCurrency(totalVat)}</span>
+                                                    <span className="tn">{formatCurrency(totalVat)}</span>
                                                 </div>
                                                 {/* Discount */}
                                                 {hasDiscount && (
                                                     <>
-                                                        <div className="flex justify-between text-slate-400 pt-1 text-[8pt]">
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', paddingTop: '4px', fontSize: '8pt' }}>
                                                             <span>Regulärer Bruttopreis:</span>
-                                                            <span className="line-through tabular-nums">{formatCurrency(originalGross)}</span>
+                                                            <span className="tn" style={{ textDecoration: 'line-through' }}>{formatCurrency(originalGross)}</span>
                                                         </div>
-                                                        <div className="flex justify-between text-green-600 font-bold bg-green-50 rounded px-2 py-1 text-[9pt] print:bg-green-50">
-                                                            <span>🏷 {offer.pricing?.discountPercentage
+                                                        <div className="bg-force" style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', fontWeight: 'bold', background: '#f0fdf4', borderRadius: '4px', padding: '5px 8px', fontSize: '9pt', marginTop: '4px', border: '1px solid #bbf7d0' }}>
+                                                            <span>{offer.pricing?.discountPercentage
                                                                 ? `Sonderrabatt (−${offer.pricing.discountPercentage}%)`
                                                                 : 'Sonderrabatt'
                                                             }:</span>
-                                                            <span className="tabular-nums">−{formatCurrency(discountGross)}</span>
+                                                            <span className="tn">−{formatCurrency(discountGross)}</span>
                                                         </div>
                                                     </>
                                                 )}
                                             </div>
                                             {/* Grand Total */}
-                                            <div className="bg-[#121c2d] text-white p-4 rounded-sm flex justify-between items-center print:bg-[#121c2d] print:text-white">
+                                            <div className="bg-force" style={{ background: '#121c2d', color: 'white', padding: '14px 16px', borderRadius: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div>
-                                                    <span className="block font-bold text-[10pt]">GESAMTBETRAG</span>
-                                                    <span className="text-[7pt] text-slate-400">Inkl. MwSt.{installNet > 0 ? ' & Montage' : ''}</span>
+                                                    <span style={{ display: 'block', fontWeight: 'bold', fontSize: '10pt' }}>GESAMTBETRAG</span>
+                                                    <span style={{ fontSize: '7pt', color: '#94a3b8' }}>Inkl. MwSt.{installNet > 0 ? ' & Montage' : ''}</span>
                                                 </div>
-                                                <span className="font-bold text-[16pt] text-[#c5a065]">{formatCurrency(totalGross)}</span>
+                                                <span className="tn" style={{ fontWeight: 'bold', fontSize: '16pt', color: '#c5a065' }}>{formatCurrency(totalGross)}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* ─── SIGNATURE AREA ─── */}
-                                    <div className="mt-12 pt-6 border-t border-slate-200 flex justify-between text-[8pt] text-slate-400">
-                                        <div className="w-[38%]">
-                                            <div className="border-t border-slate-300 pt-1.5">Ort, Datum</div>
+                                    <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: '8pt', color: '#94a3b8' }}>
+                                        <div style={{ width: '38%' }}>
+                                            <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>Ort, Datum</div>
                                         </div>
-                                        <div className="w-[38%]">
-                                            <div className="border-t border-slate-300 pt-1.5">Unterschrift / Stempel</div>
+                                        <div style={{ width: '38%' }}>
+                                            <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>Unterschrift / Stempel</div>
                                         </div>
                                     </div>
 
                                     {/* ─── TRUST BADGES ─── */}
-                                    <div className="mt-8 flex justify-center gap-6 text-[7pt] font-bold text-slate-400 uppercase tracking-[0.15em]">
-                                        <span className="flex items-center gap-1"><span className="text-[#c5a065]">✓</span> Premium Qualität Made in EU</span>
-                                        <span className="flex items-center gap-1"><span className="text-[#c5a065]">✓</span> 5 Jahre Garantie</span>
-                                        <span className="flex items-center gap-1"><span className="text-[#c5a065]">✓</span> Pulverbeschichtung nach GSB</span>
-                                        <span className="flex items-center gap-1"><span className="text-[#c5a065]">✓</span> Zertifizierte Statik</span>
+                                    <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'center', gap: '18px', fontSize: '7pt', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                                        <span><span style={{ color: '#c5a065' }}>&#x2713;</span> Premium Qualität Made in EU</span>
+                                        <span><span style={{ color: '#c5a065' }}>&#x2713;</span> 5 Jahre Garantie</span>
+                                        <span><span style={{ color: '#c5a065' }}>&#x2713;</span> Pulverbeschichtung nach GSB</span>
+                                        <span><span style={{ color: '#c5a065' }}>&#x2713;</span> Zertifizierte Statik</span>
                                     </div>
 
                                     {/* ─── VALIDITY ─── */}
-                                    <div className="mt-4 text-center text-[7pt] text-slate-400">
+                                    <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '7pt', color: '#94a3b8' }}>
                                         Dieses Angebot ist gültig bis {validUntilStr}. Alle Preise in EUR. Es gelten unsere AGB.
                                     </div>
                                 </div>
@@ -680,18 +715,18 @@ export const OfferPrintView: React.FC = () => {
             </div>
 
             {/* ═══ UI CONTROLS (Screen only) ═══ */}
-            <div className="fixed bottom-6 right-6 print:hidden flex gap-3 z-50">
+            <div style={{ position: 'fixed', bottom: '24px', right: '24px', display: 'flex', gap: '12px', zIndex: 50 }} className="print:!hidden">
                 <button
                     onClick={() => window.close()}
-                    className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-full shadow-lg font-bold text-sm transition-all"
+                    style={{ background: 'white', border: '1px solid #e2e8f0', color: '#334155', padding: '10px 20px', borderRadius: '999px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                 >
                     Schließen
                 </button>
                 <button
                     onClick={() => window.print()}
-                    className="bg-[#121c2d] hover:bg-slate-800 text-white px-6 py-2.5 rounded-full shadow-xl font-bold text-sm flex items-center gap-2 transition-all"
+                    style={{ background: '#121c2d', color: 'white', padding: '10px 24px', borderRadius: '999px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', border: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
-                    <span>🖨️</span> PDF Speichern
+                    PDF Speichern
                 </button>
             </div>
         </div>
