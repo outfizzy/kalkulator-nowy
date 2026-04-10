@@ -16,6 +16,32 @@ import { generateOfferPDF, generateOfferPDFBase64 } from '../../utils/offerPDF';
 import { CustomerForm } from '../CustomerForm';
 import { calculateDachrechner, type RoofModelId, type DachrechnerResults } from '../../services/dachrechner.service';
 
+// ======= PROFESSIONAL SVG ICONS =======
+// Thin-line icons for premium calculator UI — replaces all emoji
+const _i = (d: string, cls = 'w-5 h-5') => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={cls}><path d={d} /></svg>
+);
+const IC = {
+    roof:     (c?: string) => _i('M3 21h18M4 21V10l8-7 8 7v11M9 21v-6h6v6', c),
+    ruler:    (c?: string) => _i('M21 3H3v18M21 3l-8 8M21 3v4M21 3h-4M3 21h4M3 21v-4', c),
+    palette:  (c?: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={c || 'w-5 h-5'}><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12" cy="6" r="1" fill="currentColor"/><circle cx="16" cy="9" r="1" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor"/></svg>,
+    puzzle:   (c?: string) => _i('M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-1.705.707 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.878-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877L2.293 13.439a2.403 2.403 0 0 1-.707-1.706c0-.618.236-1.235.707-1.706l1.568-1.568c.23-.23.556-.338.877-.29.493.074.84.504 1.02.968a2.5 2.5 0 1 0 3.237-3.237c-.464-.18-.894-.527-.967-1.02a1.026 1.026 0 0 1 .289-.877l1.61-1.61A2.404 2.404 0 0 1 11.633.886c.618 0 1.234.236 1.704.707l1.568 1.568c.23.23.556.338.878.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.968 1.02z', c),
+    check:    (c?: string) => _i('M5 13l4 4L19 7', c),
+    wall:     (c?: string) => _i('M3 21V8l9-5 9 5v13M3 8h18M3 21h18M8 8v13M13 8v13M18 8v13', c),
+    freestand:(c?: string) => _i('M4 21V8h16v13M4 8l8-4 8 4M4 21h16M8 8v13M12 4v17M16 8v13', c),
+    cart:     (c?: string) => _i('M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0', c),
+    compass:  (c?: string) => _i('M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12', c),
+    clipboard:(c?: string) => _i('M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z', c),
+    build:    (c?: string) => _i('M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z', c),
+    alert:    (c?: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={c || 'w-5 h-5'}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+    link:     (c?: string) => _i('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71', c),
+    measure:  (c?: string) => _i('M2 2l20 20M2 8V2h6M22 16v6h-6', c),
+    sun:      (c?: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={c || 'w-5 h-5'}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+    wood:     (c?: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={c || 'w-5 h-5'}><rect x="2" y="6" width="20" height="3" rx=".5"/><rect x="2" y="11" width="20" height="3" rx=".5"/><rect x="2" y="16" width="20" height="3" rx=".5"/></svg>,
+    square:   (c?: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={c || 'w-5 h-5'}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18" opacity=".4"/></svg>,
+    wrench:   (c?: string) => _i('M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z', c),
+};
+
 // ======= TYPES =======
 type CoverType = 'Poly' | 'Glass';
 type ConstructionType = 'wall' | 'freestanding';
@@ -104,31 +130,31 @@ const ROOF_MODELS: RoofModel[] = [
 
 // Glass variant options
 const GLASS_VARIANTS = [
-    { id: 'klar', name: 'Klar (VSG)', description: 'Klares Sicherheitsglas', icon: '🟢' },
-    { id: 'matt', name: 'Matt (VSG)', description: 'Satiniert, Sichtschutz', icon: '⚪' },
-    { id: 'stopsol', name: 'UV Reflex', description: 'Sonnenschutzglas', icon: '🔶' },
+    { id: 'klar', name: 'Klar (VSG)', description: 'Klares Sicherheitsglas', color: '#22c55e' },
+    { id: 'matt', name: 'Matt (VSG)', description: 'Satiniert, Sichtschutz', color: '#e5e7eb' },
+    { id: 'stopsol', name: 'UV Reflex', description: 'Sonnenschutzglas', color: '#f97316' },
 ];
 
 // Polycarbonate variant options (per Excel: klar/opal share price, IR Gold is surcharge)
 const POLY_VARIANTS = [
-    { id: 'opal', name: 'Opal', description: 'Lichtstreuend, milchig', icon: '⚪' },
-    { id: 'klar', name: 'Klar', description: 'Transparent', icon: '🟢' },
-    { id: 'ir-gold', name: 'IR Gold', description: 'IR-Wärmeschutz', icon: '🟡' },
-    { id: 'smokey', name: 'Smokey Grey', description: 'Getönt, UV-Schutz', icon: '🌫️' },
+    { id: 'opal', name: 'Opal', description: 'Lichtstreuend, milchig', color: '#e5e7eb' },
+    { id: 'klar', name: 'Klar', description: 'Transparent', color: '#22c55e' },
+    { id: 'ir-gold', name: 'IR Gold', description: 'IR-Wärmeschutz', color: '#eab308' },
+    { id: 'smokey', name: 'Smokey Grey', description: 'Getönt, UV-Schutz', color: '#6b7280' },
 ];
 
 const WALL_PRODUCTS = [
-    { id: 'Side Wall (Glass)', name: 'Seitenwand (Glas)', icon: '🔲', description: 'Aluminium-Seitenwand mit VSG-Verglasung' },
-    { id: 'Front Wall (Glass)', name: 'Frontwand (Glas)', icon: '⬛', description: 'Aluminium-Frontwand mit VSG-Verglasung' },
-    { id: 'Wedge (Glass)', name: 'Keilfenster', icon: '📐', description: 'Dreieckiges Keilfenster' },
+    { id: 'Side Wall (Glass)', name: 'Seitenwand (Glas)', icon: 'square', description: 'Aluminium-Seitenwand mit VSG-Verglasung' },
+    { id: 'Front Wall (Glass)', name: 'Frontwand (Glas)', icon: 'square', description: 'Aluminium-Frontwand mit VSG-Verglasung' },
+    { id: 'Wedge (Glass)', name: 'Keilfenster', icon: 'measure', description: 'Dreieckiges Keilfenster' },
 ];
 
 // Keilfenster (Wedge) accessories from Aluxe pricelist
 const KEILFENSTER_ACCESSORIES = [
-    { id: 'uProfil', name: 'U-Profil 55x29mm', price: 38.40, icon: '📏', description: 'Ausgleichs-U-Profil für Fenster' },
-    { id: 'schraubenSet', name: 'Schrauben-Set', price: 15.32, icon: '🔩', description: 'Montage-Schrauben-Set' },
-    { id: 'kippFenster', name: 'Kipp-Fenster', price: 564.75, icon: '🪟', description: 'Dreh-Kipp-Fenster im Keil' },
-    { id: 'abdeckungEL891', name: 'Abdeckung EL891', price: 20.07, icon: '🔳', description: 'Abdeckung 3200mm' },
+    { id: 'uProfil', name: 'U-Profil 55x29mm', price: 38.40, icon: 'ruler', description: 'Ausgleichs-U-Profil für Fenster' },
+    { id: 'schraubenSet', name: 'Schrauben-Set', price: 15.32, icon: 'wrench', description: 'Montage-Schrauben-Set' },
+    { id: 'kippFenster', name: 'Kipp-Fenster', price: 564.75, icon: 'square', description: 'Dreh-Kipp-Fenster im Keil' },
+    { id: 'abdeckungEL891', name: 'Abdeckung EL891', price: 20.07, icon: 'square', description: 'Abdeckung 3200mm' },
 ];
 
 // ======= MATERIAL BOM COSTS (Aluxe Loses Material Preisliste 2025/2026) =======
@@ -238,25 +264,25 @@ function calculateRoofMaterialCost(
 
 // Glass type options for Side/Front walls
 const WALL_GLASS_TYPES = [
-    { id: 'klar', name: 'Klar (VSG 44.2)', icon: '🪟', price: 'Standard' },
-    { id: 'matt', name: 'Matt (VSG 44.2)', icon: '🌫️', price: '+ Aufpreis' },
-    { id: 'iso', name: 'Isolierglas', icon: '🔥', price: '+ Aufpreis' },
+    { id: 'klar', name: 'Klar (VSG 44.2)', color: '#22c55e', price: 'Standard' },
+    { id: 'matt', name: 'Matt (VSG 44.2)', color: '#e5e7eb', price: '+ Aufpreis' },
+    { id: 'iso', name: 'Isolierglas', color: '#ef4444', price: '+ Aufpreis' },
 ];
 
 
 // Schiebetür - framed sliding doors
 const SCHIEBETUR_PRODUCTS = [
-    { id: 'Schiebetür (VSG klar)', name: 'VSG klar', icon: '🚪', description: 'Alu-Schiebetür mit klarem Sicherheitsglas' },
-    { id: 'Schiebetür (VSG matt)', name: 'VSG matt', icon: '🚪', description: 'Alu-Schiebetür mit mattem Sicherheitsglas' },
-    { id: 'Schiebetür (Isolierglas)', name: 'Isolierglas', icon: '🚪', description: 'Alu-Schiebetür mit Wärmedämmglas' },
+    { id: 'Schiebetür (VSG klar)', name: 'VSG klar', icon: 'square', description: 'Alu-Schiebetür mit klarem Sicherheitsglas' },
+    { id: 'Schiebetür (VSG matt)', name: 'VSG matt', icon: 'square', description: 'Alu-Schiebetür mit mattem Sicherheitsglas' },
+    { id: 'Schiebetür (Isolierglas)', name: 'Isolierglas', icon: 'square', description: 'Alu-Schiebetür mit Wärmedämmglas' },
 ];
 
 // Schiebetür handle types (from Aluxe ACSL catalog)
 const SCHIEBETUR_HANDLES = [
-    { id: 'ACSL2042', name: 'Handgriff flach (innen)', description: 'Flacher Griff, Innenseite', icon: '🔲' },
-    { id: 'ACSL2046', name: 'Handgriff fest (außen)', description: 'Fester Griff, Außenseite', icon: '🔳' },
-    { id: 'ACSL2044', name: 'Handgriff fest (innen)', description: 'Fester Griff, Innenseite', icon: '🔳' },
-    { id: 'ACSL2047', name: 'Handgriff mit Zylinder (außen)', description: 'Abschließbarer Griff, Außenseite', icon: '🔐' },
+    { id: 'ACSL2042', name: 'Handgriff flach (innen)', description: 'Flacher Griff, Innenseite', icon: 'square' },
+    { id: 'ACSL2046', name: 'Handgriff fest (außen)', description: 'Fester Griff, Außenseite', icon: 'square' },
+    { id: 'ACSL2044', name: 'Handgriff fest (innen)', description: 'Fester Griff, Innenseite', icon: 'square' },
+    { id: 'ACSL2047', name: 'Handgriff mit Zylinder (außen)', description: 'Abschließbarer Griff, Außenseite', icon: 'wrench' },
 ];
 
 // Schiebetür opening directions
@@ -457,11 +483,11 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     // === STEPS ===
     const [activeStep, setActiveStep] = useState(0);
-    const steps = [
-        { id: 0, label: 'Model', icon: '🏠' },
-        { id: 1, label: 'Wymiary', icon: '📏' },
-        { id: 2, label: 'Specyfikacja', icon: '⚙️' },
-        { id: 3, label: 'Dodatki', icon: '🧩' },
+    const steps: { id: number; label: string; icon: React.ReactNode }[] = [
+        { id: 0, label: 'Model', icon: IC.roof() },
+        { id: 1, label: 'Wymiary', icon: IC.ruler() },
+        { id: 2, label: 'Specyfikacja', icon: IC.palette() },
+        { id: 3, label: 'Dodatki', icon: IC.puzzle() },
     ];
 
     // === VIEW STATE ===
@@ -2095,7 +2121,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {!isManualMode ? (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    📐 Technische Daten
+                                    <span className="inline-flex items-center gap-1.5">{IC.compass('w-4 h-4')} Technische Daten</span>
                                 </h2>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                     <div className="bg-slate-50 p-3 rounded-lg text-center">
@@ -2124,7 +2150,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         ) : (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    ✍️ Manuelles Angebot
+                                    <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-5 h-5')} Manuelles Angebot</span>
                                 </h2>
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden border border-indigo-100">
@@ -2148,7 +2174,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
                             <div className="flex justify-between items-start">
                                 <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    👤 Kundendaten
+                                    <span className="inline-flex items-center gap-1.5">{IC.roof('w-5 h-5')} Kundendaten</span>
                                 </h2>
                                 <button
                                     onClick={() => setView('customer')}
@@ -2184,7 +2210,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {/* Items Table */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4">🛒 Positionen</h2>
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.cart('w-5 h-5')} Positionen</h2>
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-slate-100">
@@ -2201,7 +2227,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             <td className="py-3 text-slate-600 text-xs max-w-[200px]">
                                                 <div className="truncate">{item.config}</div>
                                                 {item.dimensions && (
-                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">📐 {item.dimensions}</div>
+                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">{IC.measure('w-3 h-3')} {item.dimensions}</div>
                                                 )}
                                             </td>
                                             <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
@@ -2218,7 +2244,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     ))}
                                     {customItems.map((item) => (
                                         <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
-                                            <td className="py-3 font-medium text-blue-700">📝 {item.name}</td>
+                                            <td className="py-3 font-medium text-blue-700"><span className="inline-flex items-center gap-1">{IC.clipboard('w-3.5 h-3.5')} {item.name}</span></td>
                                             <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
                                             <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
                                             <td className="py-3 text-center">
@@ -2235,7 +2261,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <tfoot>
                                     {montagePrice > 0 && (
                                         <tr className="border-t border-slate-100 bg-blue-50">
-                                            <td className="py-3 font-medium text-blue-700">🔧 Montage</td>
+                                            <td className="py-3 font-medium text-blue-700"><span className="inline-flex items-center gap-1">{IC.wrench('w-3.5 h-3.5')} Montage</span></td>
                                             <td className="py-3 text-slate-600 text-xs">Montagekosten (netto, ohne Aufschlag)</td>
                                             <td className="py-3 text-right font-bold text-blue-700">{formatCurrency(montagePrice)}</td>
                                             <td></td>
@@ -2243,7 +2269,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     )}
                                     {extraPostTotalPrice > 0 && (
                                         <tr className="border-t border-slate-100 bg-amber-50">
-                                            <td className="py-3 font-medium text-amber-700">🏗️ Zusatzpfosten</td>
+                                            <td className="py-3 font-medium text-amber-700"><span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Zusatzpfosten</span></td>
                                             <td className="py-3 text-slate-600 text-xs">
                                                 {extraPosts > 0 && `${extraPosts}× Zusatzpfosten`}
                                                 {extraPostHeight === 3000 && ` + Höhenaufschlag 3000mm (${totalPostCount} Pfosten)`}
@@ -2291,13 +2317,13 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {/* Margin & Discount */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.compass('w-5 h-5')} Marge & Rabatt</h2>
 
                             {/* Purchase Discount Info (from Admin) */}
                             {purchaseDiscount > 0 && (
                                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm text-green-700">🏷️ Einkaufsrabatt (Admin):</span>
+                                        <span className="text-sm text-green-700 inline-flex items-center gap-1">{IC.check('w-3.5 h-3.5')} Einkaufsrabatt (Admin):</span>
                                         <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1 text-xs text-green-600">
@@ -2310,7 +2336,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             {/* Internal Costs: Pfand + Transport — visible only to sales rep */}
                             {subtotal > 0 && (
                                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                                    <p className="text-xs font-bold text-amber-700 uppercase mb-2">📦 Interne Kosten (nicht auf dem Angebot sichtbar)</p>
+                                    <p className="text-xs font-bold text-amber-700 uppercase mb-2 flex items-center gap-1">{IC.cart('w-3.5 h-3.5')} Interne Kosten (nicht auf dem Angebot sichtbar)</p>
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-center text-sm text-amber-800">
                                             <span>Pfand (Verpackungspfand):</span>
@@ -2333,7 +2359,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 <span className="font-bold text-amber-900">{formatCurrency(finalPrice)}</span>
                                             </div>
                                             <div className={`flex justify-between items-center text-sm font-bold mt-1 ${(finalPrice - totalPurchaseCostInternal - montagePrice) > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                                                <span>💰 Rohertrag:</span>
+                                                <span className="inline-flex items-center gap-1">{IC.compass('w-3.5 h-3.5')} Rohertrag:</span>
                                                 <span>{formatCurrency(finalPrice - totalPurchaseCostInternal - montagePrice)} ({totalPurchaseCostInternal > 0 ? (((finalPrice - totalPurchaseCostInternal - montagePrice) / totalPurchaseCostInternal) * 100).toFixed(1) : 0}%)</span>
                                             </div>
                                         </div>
@@ -2370,7 +2396,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                             {/* MONTAGE PRICE */}
                             <div className="mt-4 pt-4 border-t border-slate-100">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">{IC.wrench('w-3 h-3')} Montage (netto)</label>
                                 <div className="flex items-center gap-3">
                                     <input
                                         type="number"
@@ -2431,7 +2457,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {savedOfferId ? (
                             <div className="bg-green-50 border border-green-200 rounded-2xl p-6 space-y-4">
                                 <div className="flex items-center gap-3 text-green-700">
-                                    <span className="text-2xl">✅</span>
+                                    <span className="text-2xl">{IC.check('w-8 h-8')}</span>
                                     <div>
                                         <p className="font-bold">Angebot erfolgreich gespeichert!</p>
                                         <p className="text-xs text-green-600">ID: {savedOfferId}</p>
@@ -2442,7 +2468,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {publicLink && (
                                     <div className="bg-white p-4 rounded-xl border border-green-100 space-y-2">
                                         <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                            🔗 Link zur interaktiven Angebotsseite
+                                            <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} Link zur interaktiven Angebotsseite</span>
                                         </p>
                                         <div className="flex gap-2">
                                             <input
@@ -2477,13 +2503,13 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         onClick={() => setShowSendEmailModal(true)}
                                         className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                                     >
-                                        ✉️ E-Mail senden
+                                        <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} E-Mail senden</span>
                                     </button>
                                     <button
                                         onClick={handleGeneratePDF}
                                         className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
                                     >
-                                        📄 PDF herunterladen
+                                        <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-4 h-4')} PDF herunterladen</span>
                                     </button>
                                     <button
                                         onClick={() => navigate('/dashboard')}
@@ -2504,7 +2530,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
                                         }`}
                                 >
-                                    {savingOffer ? 'Speichern...' : '💾 Angebot speichern'}
+                                    {savingOffer ? 'Speichern...' : <><span className="inline-flex items-center gap-1.5">{IC.check('w-4 h-4')} Angebot speichern</span></>}
                                 </button>
                                 <button
                                     onClick={() => setShowSendEmailModal(true)}
@@ -2514,7 +2540,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
                                         }`}
                                 >
-                                    ✉️ E-Mail senden
+                                    <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} E-Mail senden</span>
                                 </button>
                             </div>
                         )}
@@ -2565,7 +2591,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             onClick={() => { setIsManualMode(false); setView('config'); }}
                             className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-indigo-400 hover:shadow-lg transition-all text-left group"
                         >
-                            <div className="text-4xl mb-4">🧮</div>
+                            <div className="flex items-center justify-center mb-4">{IC.compass('w-12 h-12 text-indigo-400')}</div>
                             <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">Kalkulator</h2>
                             <p className="text-sm text-slate-500 leading-relaxed">
                                 Automatische Preisberechnung basierend auf Modell, Maßen und Konfiguration.
@@ -2579,7 +2605,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             onClick={() => { setIsManualMode(true); setView('manual'); }}
                             className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-emerald-400 hover:shadow-lg transition-all text-left group"
                         >
-                            <div className="text-4xl mb-4">✍️</div>
+                            <div className="flex items-center justify-center mb-4">{IC.clipboard('w-12 h-12 text-slate-400')}</div>
                             <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">Manuelles Angebot</h2>
                             <p className="text-sm text-slate-500 leading-relaxed">
                                 Positionen frei eingeben mit Name und Preis.
@@ -2610,14 +2636,14 @@ export const ProductConfiguratorV2: React.FC = () => {
                         >
                             ← Zurück zur Auswahl
                         </button>
-                        <h1 className="text-2xl font-black text-slate-900">✍️ Manuelles Angebot</h1>
+                        <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">{IC.clipboard('w-7 h-7')} Manuelles Angebot</h1>
                     </div>
 
                     {/* Customer compact header */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                <span className="text-xl">👤</span>
+                                <span className="text-xl">{IC.roof('w-6 h-6')}</span>
                             </div>
                             <div>
                                 <span className="font-bold text-slate-800 block">
@@ -2634,7 +2660,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     {/* Model Selection */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            🏠 Modell auswählen <span className="text-xs text-red-500 font-normal">(erforderlich)</span>
+                            <span className="inline-flex items-center gap-1.5">{IC.roof('w-5 h-5')} Modell auswählen</span> <span className="text-xs text-red-500 font-normal">(erforderlich)</span>
                         </h2>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                             {ROOF_MODELS.map(m => (
@@ -2663,7 +2689,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     {/* Dimensions (optional) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            📐 Abmessungen <span className="text-xs text-slate-400 font-normal">(optional — wird in der Kundenansicht angezeigt)</span>
+                            <span className="inline-flex items-center gap-1.5">{IC.measure('w-5 h-5')} Abmessungen</span> <span className="text-xs text-slate-400 font-normal">(optional — wird in der Kundenansicht angezeigt)</span>
                         </h2>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -2692,7 +2718,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     {/* Line Items */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            📋 Angebotspositionen
+                            <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-5 h-5')} Angebotspositionen</span>
                         </h2>
 
                         {customItems.length > 0 && (
@@ -2734,7 +2760,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {customItems.length === 0 && (
                             <div className="text-center py-8 text-slate-400">
-                                <p className="text-3xl mb-2">📝</p>
+                                <p className="text-3xl mb-2 flex items-center justify-center">{IC.clipboard('w-10 h-10 text-slate-400')}</p>
                                 <p className="text-sm">Noch keine Positionen. Fügen Sie Ihre erste Position hinzu.</p>
                             </div>
                         )}
@@ -2793,7 +2819,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     {/* Installation Cost (optional) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            🔧 Montagekosten <span className="text-xs text-slate-400 font-normal">(optional — wird dem Kunden separat angezeigt)</span>
+                            <span className="inline-flex items-center gap-1.5">{IC.wrench('w-5 h-5')} Montagekosten</span> <span className="text-xs text-slate-400 font-normal">(optional — wird dem Kunden separat angezeigt)</span>
                         </h2>
                         <div className="max-w-xs">
                             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Montage netto (€)</label>
@@ -2813,12 +2839,12 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                     {/* Margin & Discount */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4">💰 Marge & Rabatt</h2>
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.compass('w-5 h-5')} Marge & Rabatt</h2>
 
                         {purchaseDiscount > 0 && (
                             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
+                                    <span className="text-sm text-green-700 inline-flex items-center gap-1">{IC.check('w-3.5 h-3.5')} Rabat zakupowy (Admin):</span>
                                     <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                 </div>
                                 <div className="flex justify-between items-center mt-1 text-xs text-green-600">
@@ -2831,7 +2857,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {/* Internal Costs: Pfand + Transport */}
                         {subtotal > 0 && (
                             <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                                <p className="text-xs font-bold text-amber-700 uppercase mb-2">📦 Koszty wewnętrzne (nie widoczne dla klienta)</p>
+                                <p className="text-xs font-bold text-amber-700 uppercase mb-2 flex items-center gap-1">{IC.cart('w-3.5 h-3.5')} Koszty wewnętrzne (nie widoczne dla klienta)</p>
                                 <div className="space-y-1">
                                     <div className="flex justify-between items-center text-sm text-amber-800">
                                         <span>Pfand:</span>
@@ -2878,7 +2904,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {/* Montage Price */}
                         <div className="mt-4 pt-4 border-t border-slate-100">
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">🔧 Montage (netto)</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">{IC.wrench('w-3 h-3')} Montage (netto)</label>
                             <div className="flex items-center gap-3">
                                 <input
                                     type="number"
@@ -2946,7 +2972,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-8 flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                    <span className="text-xl">👤</span>
+                                    <span className="text-xl">{IC.roof('w-6 h-6')}</span>
                                 </div>
                                 <div>
                                     <span className="font-bold text-slate-800 block">
@@ -2976,11 +3002,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         onClick={() => setActiveStep(index)}
                                         className={`flex flex-col items-center gap-2 group transition-all ${index <= activeStep ? 'opacity-100' : 'opacity-50'}`}
                                     >
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 transition-all ${index === activeStep ? 'border-indigo-600 bg-white text-indigo-600 shadow-md scale-110' :
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${index === activeStep ? 'border-indigo-600 bg-white text-indigo-600 shadow-md scale-110' :
                                             index < activeStep ? 'border-indigo-600 bg-indigo-600 text-white' :
                                                 'border-slate-300 bg-white text-slate-400'
                                             }`}>
-                                            {index < activeStep ? '✓' : step.icon}
+                                            {index < activeStep ? IC.check('w-4 h-4') : step.icon}
                                         </div>
                                         <span className={`text-xs font-bold ${index === activeStep ? 'text-indigo-900' : 'text-slate-500'}`}>
                                             {step.label}
@@ -3006,8 +3032,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     className="w-full flex items-center justify-between px-5 py-3 bg-indigo-50 hover:bg-indigo-100 transition-colors"
                                 >
                                     <span className="text-sm font-bold text-indigo-700 flex items-center gap-2">
-                                        📋 Ściąga z leada
-                                        {leadConfig?.status === 'completed' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px]">Formularz ✅</span>}
+                                        <span className="inline-flex items-center gap-1">{IC.clipboard('w-4 h-4')} Ściąga z leada</span>
+                                        {leadConfig?.status === 'completed' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px]">Formularz {IC.check('w-3 h-3')}</span>}
                                     </span>
                                     <svg className={`w-4 h-4 text-indigo-500 transition-transform ${contextOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -3019,7 +3045,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {/* Configuration from form */}
                                         {(leadConfig || leadCustomerData?.configuredModel) && (
                                             <div>
-                                                <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">⚙️ Konfiguracja klienta</h4>
+                                                <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">{IC.palette('w-4 h-4')} Konfiguracja klienta</h4>
                                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                                     {(leadConfig?.modelDisplayName || leadCustomerData?.configuredModel) && (
                                                         <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
@@ -3062,16 +3088,16 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Extras */}
                                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                                     {(leadConfig?.heater || leadCustomerData?.configuredHeater) && (
-                                                        <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-200">🔥 Grzejnik</span>
+                                                        <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-200 inline-flex items-center gap-0.5">{IC.sun('w-3 h-3')} Grzejnik</span>
                                                     )}
                                                     {(leadConfig?.led || leadCustomerData?.configuredLed) && (
-                                                        <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200">💡 LED</span>
+                                                        <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 inline-flex items-center gap-0.5">{IC.sun('w-3 h-3')} LED</span>
                                                     )}
                                                     {leadConfig?.glazingSides && Object.entries(leadConfig.glazingSides).filter(([, v]) => v).map(([side, type]) => (
-                                                        <span key={side} className="bg-sky-50 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold border border-sky-200">🪟 {side}: {type}</span>
+                                                        <span key={side} className="bg-sky-50 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold border border-sky-200 inline-flex items-center gap-0.5">{IC.square('w-3 h-3')} {side}: {type}</span>
                                                     ))}
                                                     {leadConfig?.zipScreen?.enabled && (
-                                                        <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200">🔲 ZipScreen</span>
+                                                        <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200 inline-flex items-center gap-0.5">{IC.square('w-3 h-3')} ZipScreen</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -3080,7 +3106,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {/* Notes from form */}
                                         {(leadConfig?.notes || leadCustomerData?.configuredNotes) && (
                                             <div>
-                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">💬 Uwagi klienta (z formularza)</h4>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">{IC.clipboard('w-4 h-4')} Uwagi klienta (z formularza)</h4>
                                                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-slate-700 text-sm whitespace-pre-wrap">
                                                     {leadConfig?.notes || leadCustomerData?.configuredNotes}
                                                 </div>
@@ -3090,7 +3116,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {/* Lead Notizen */}
                                         {leadNotes && (
                                             <div>
-                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">📝 Notizen</h4>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">{IC.clipboard('w-4 h-4')} Notizen</h4>
                                                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-slate-700 text-sm whitespace-pre-wrap">
                                                     {leadNotes}
                                                 </div>
@@ -3100,7 +3126,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {/* Photos from form */}
                                         {leadConfig?.photos && leadConfig.photos.length > 0 && (
                                             <div>
-                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">📸 Zdjęcia klienta</h4>
+                                                <h4 className="font-bold text-slate-700 mb-1 flex items-center gap-1">{IC.link('w-4 h-4')} Zdjęcia klienta</h4>
                                                 <div className="flex gap-2 overflow-x-auto pb-1">
                                                     {leadConfig.photos.map((url, i) => (
                                                         <a key={i} href={url} target="_blank" rel="noopener noreferrer">
@@ -3119,7 +3145,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {activeStep === 0 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">🏠</span> Wybierz Model
+                                    <span className="text-2xl">{IC.roof('w-7 h-7')}</span> Wybierz Model
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {ROOF_MODELS.map(m => (
@@ -3153,7 +3179,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {activeStep === 1 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">📏</span> Wymiary i Konstrukcja
+                                    <span className="text-2xl">{IC.ruler('w-7 h-7')}</span> Wymiary i Konstrukcja
                                 </h2>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -3193,7 +3219,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         </div>
                                         {dimensionLimits && (
                                             <div className="mt-3 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                                                ⚠️ Max. Tiefe für dieses Modell: <strong>{dimensionLimits.maxDepth} mm</strong>
+                                                <span className="inline-flex items-center gap-1">{IC.alert('w-4 h-4')} Max. Tiefe für dieses Modell: <strong>{dimensionLimits.maxDepth} mm</strong></span>
                                             </div>
                                         )}
                                     </div>
@@ -3267,7 +3293,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {/* Model Info Badge + Dachrechner Results */}
                                 <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
                                     <div className="flex items-center justify-between mb-3">
-                                        <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">📐 {modelDrConfig.label} – Dachrechner</h5>
+                                        <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">{IC.compass('w-4 h-4')} {modelDrConfig.label} – Dachrechner</h5>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">Pfosten: {modelDrConfig.postWidth}mm</span>
                                             {modelDrConfig.fixedAngle && (
@@ -3337,7 +3363,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {structuralMetadata && (
                                     <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4">
                                         <h5 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-3">
-                                            🏗️ Konstruktionsdaten
+                                            <span className="inline-flex items-center gap-1.5">{IC.build('w-4 h-4')} Konstruktionsdaten</span>
                                         </h5>
 
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
@@ -3374,7 +3400,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         <div className="bg-white/80 rounded-xl p-3 border border-amber-200">
                                             <div className="flex items-center justify-between flex-wrap gap-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold text-slate-700">➕ Zusatzpfosten</span>
+                                                    <span className="text-sm font-bold text-slate-700 inline-flex items-center gap-1">{IC.build('w-4 h-4')} Zusatzpfosten</span>
                                                     <span className="text-[10px] text-slate-400">(zusätzliche Pfosten)</span>
                                                 </div>
 
@@ -3431,7 +3457,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             {/* Total posts summary */}
                                             {(extraPosts > 0 || extraPostHeight === 3000) && (
                                                 <div className="mt-2 text-xs bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-emerald-800">
-                                                    ✅ Gesamt: <strong>{totalPostCount} Pfosten</strong>
+                                                    <span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} Gesamt: <strong>{totalPostCount} Pfosten</strong></span>
                                                     {extraPosts > 0 && <> ({structuralMetadata.posts_count} im Preis + {extraPosts} extra)</>}
                                                     {extraPostHeight === 3000 && <>, Höhe 3000mm</>}
                                                     {dachrechnerResults?.innerWidth != null && (
@@ -3448,8 +3474,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         <label className="block text-sm font-bold text-slate-600 mb-3">Montagetyp</label>
                                         <div className="flex gap-3">
                                             {[
-                                                { id: 'wall', label: 'Wandmontage', icon: '🏠' },
-                                                { id: 'freestanding', label: 'Freistehend', icon: '⛺' }
+                                                { id: 'wall', label: 'Wandmontage', icon: 'wall' },
+                                                { id: 'freestanding', label: 'Freistehend', icon: 'freestand' }
                                             ].map(t => (
                                                 <button
                                                     key={t.id}
@@ -3459,7 +3485,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         : 'border-slate-200 hover:border-slate-300 text-slate-600'
                                                         }`}
                                                 >
-                                                    <span>{t.icon}</span> {t.label}
+                                                    {(IC as any)[t.icon]?.('w-5 h-5')} {t.label}
                                                 </button>
                                             ))}
                                         </div>
@@ -3493,7 +3519,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
                                         {plzZoneResult && (
                                             <p className="mb-2 text-xs text-green-600 font-medium flex items-center gap-1">
-                                                ✅ {plzZoneResult}
+                                                <span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} {plzZoneResult}</span>
                                             </p>
                                         )}
                                         <div className="flex gap-2">
@@ -3522,7 +3548,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {activeStep === 2 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    📋 Konfiguration
+                                    <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-6 h-6')} Konfiguration</span>
                                 </h2>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -3577,7 +3603,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     : 'border-cyan-100 bg-white/50 hover:border-cyan-300'
                                                                     }`}
                                                             >
-                                                                <div className="text-lg mb-1">{v.icon}</div>
+                                                                <div className="flex items-center justify-center mb-1"><span className="w-4 h-4 rounded-full border border-slate-200" style={{ background: v.color }} /></div>
                                                                 <div className="font-bold text-xs text-slate-800">{v.name}</div>
                                                                 <div className="text-[9px] text-slate-500 leading-tight">{v.description}</div>
                                                             </button>
@@ -3598,7 +3624,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     : 'border-blue-100 bg-white/50 hover:border-blue-300'
                                                                     }`}
                                                             >
-                                                                <div className="text-lg mb-1">{v.icon}</div>
+                                                                <div className="flex items-center justify-center mb-1"><span className="w-4 h-4 rounded-full border border-slate-200" style={{ background: v.color }} /></div>
                                                                 <div className="font-bold text-xs text-slate-800">{v.name}</div>
                                                                 <div className="text-[9px] text-slate-500 leading-tight">{v.description}</div>
                                                             </button>
@@ -3656,7 +3682,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {model === 'Designline' && (
                                             <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
                                                 <h4 className="font-bold text-indigo-800 mb-3 flex items-center gap-2">
-                                                    <span className="text-lg">🔄</span>
+                                                    <span className="flex items-center justify-center">{IC.link('w-5 h-5')}</span>
                                                     Schiebeeinheit (Dach-Schiebeglas)
                                                 </h4>
                                                 <p className="text-xs text-indigo-600 mb-4">
@@ -3723,7 +3749,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                                 {/* Header */}
                                 <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl">🧩</div>
+                                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">{IC.puzzle('w-7 h-7 text-white')}</div>
                                     <div>
                                         <h3 className="text-xl font-bold text-white">Zubehör & Optionen</h3>
                                         <p className="text-slate-300 text-sm">Verglasung, Markisen & mehr</p>
@@ -3733,11 +3759,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {/* Main Category Tabs */}
                                 <div className="flex border-b border-slate-200 bg-slate-50">
                                     {[
-                                        { id: 'walls', label: 'Verglasung', icon: '🏗️', desc: 'Wände & Glas' },
-                                        { id: 'awnings', label: 'Komfort', icon: '☀️', desc: 'Markisen, LED' },
-                                        { id: 'wpc', label: 'WPC-Boden', icon: '🪵', desc: 'Terrassen' },
-                                        { id: 'aluminum', label: 'Alu-Wände', icon: '🔲', desc: 'Voll, Lamellen' },
-                                        { id: 'materials', label: 'Material', icon: '🔧', desc: 'Komponenten' },
+                                        { id: 'walls', label: 'Verglasung', icon: 'wall', desc: 'Wände & Glas' },
+                                        { id: 'awnings', label: 'Komfort', icon: 'sun', desc: 'Markisen, LED' },
+                                        { id: 'wpc', label: 'WPC-Boden', icon: 'wood', desc: 'Terrassen' },
+                                        { id: 'aluminum', label: 'Alu-Wände', icon: 'square', desc: 'Voll, Lamellen' },
+                                        { id: 'materials', label: 'Material', icon: 'wrench', desc: 'Komponenten' },
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
@@ -3747,7 +3773,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 : 'border-b-4 border-transparent text-slate-500 hover:bg-white/50'
                                                 }`}
                                         >
-                                            <div className="text-2xl mb-1">{tab.icon}</div>
+                                            <div className="flex items-center justify-center mb-1">{(IC as any)[tab.icon]?.('w-6 h-6')}</div>
                                             <div className="font-bold text-sm">{tab.label}</div>
                                             <div className="text-[10px] opacity-60">{tab.desc}</div>
                                         </button>
@@ -3764,7 +3790,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                                                 {/* 0. Wall Placement Selector */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                                                    <h5 className="text-sm font-bold text-slate-700 mb-3">📍 Platzierung</h5>
+                                                    <h5 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">{IC.measure('w-4 h-4')} Platzierung</h5>
                                                     <div className="grid grid-cols-3 gap-2">
                                                         {(() => {
                                                             // Keilfenster and Seitenwand: only Links/Rechts
@@ -3805,7 +3831,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         return (
                                                             <div className="mt-3 text-xs bg-blue-50 rounded-lg p-2 border border-blue-200 space-y-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-blue-600 font-bold">📐</span>
+                                                                    <span className="text-blue-600 font-bold">{IC.measure('w-4 h-4')}</span>
                                                                     <span className="text-blue-800">
                                                                         {isFrontPlacement ? 'Front' : wallPlacement === 'left' ? 'Links' : 'Rechts'}:
                                                                         {' '}<strong>{wallWidth} × {wallHeight} mm</strong>
@@ -3830,9 +3856,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                                     <div className="flex border-b border-slate-100">
                                                         {[
-                                                            { id: 'fixed', label: 'Festverglasung', icon: '🧱' },
-                                                            { id: 'sliding', label: 'Schiebetür', icon: '🚪' },
-                                                            { id: 'panorama', label: 'Panorama', icon: '🌅' },
+                                                            { id: 'fixed', label: 'Festverglasung', icon: 'square' },
+                                                            { id: 'sliding', label: 'Schiebetür', icon: 'square' },
+                                                            { id: 'panorama', label: 'Panorama', icon: 'sun' },
                                                         ].map(cat => (
                                                             <button
                                                                 key={cat.id}
@@ -3848,7 +3874,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     : 'bg-white text-slate-500 hover:bg-slate-50'
                                                                     }`}
                                                             >
-                                                                <span>{cat.icon}</span> {cat.label}
+                                                                <span>{(IC as any)[cat.icon]?.('w-4 h-4') || cat.icon}</span> {cat.label}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -3866,7 +3892,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                 ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200 shadow-sm'
                                                                                 : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'}`}
                                                                         >
-                                                                            <span className="text-3xl bg-white p-2 rounded-lg shadow-sm">{p.icon}</span>
+                                                                            <span className="bg-white p-2 rounded-lg shadow-sm flex items-center justify-center">{(IC as any)[p.icon]?.('w-7 h-7 text-slate-600') || p.icon}</span>
                                                                             <div>
                                                                                 <div className="font-bold text-slate-700">{p.name}</div>
                                                                                 <div className="text-xs text-slate-400 mt-1">{p.description}</div>
@@ -3878,7 +3904,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 {/* GLASS TYPE FOR SIDE/FRONT WALLS */}
                                                                 {(wallProduct.includes('Side Wall') || wallProduct.includes('Front Wall')) && (
                                                                     <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                                                        <h4 className="text-sm font-bold text-blue-800 mb-3">🪟 Glasart</h4>
+                                                                        <h4 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-1.5">{IC.square('w-4 h-4')} Glasart</h4>
                                                                         <div className="grid grid-cols-3 gap-2">
                                                                             {WALL_GLASS_TYPES.map(v => (
                                                                                 <button
@@ -3889,7 +3915,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                         : 'border-blue-100 bg-white/50 hover:border-blue-300'
                                                                                         }`}
                                                                                 >
-                                                                                    <div className="text-lg mb-1">{v.icon}</div>
+                                                                                    <div className="flex items-center justify-center mb-1"><span className="w-4 h-4 rounded-full border border-slate-200" style={{ background: v.color }} /></div>
                                                                                     <div className="font-bold text-xs text-slate-800">{v.name}</div>
                                                                                     <div className="text-[9px] text-slate-500 leading-tight">{v.price}</div>
                                                                                 </button>
@@ -3902,7 +3928,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
                                                                     <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
                                                                         {/* Keilfenster Side Selector */}
-                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">📐 Seite Keilfenster</h4>
+                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-1.5">{IC.measure('w-4 h-4')} Seite Keilfenster</h4>
                                                                         <div className="grid grid-cols-2 gap-2 mb-4">
                                                                             {([
                                                                                 { id: 'left' as const, label: 'Lewy', icon: '◀', desc: 'Keilfenster po lewej' },
@@ -3943,9 +3969,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                         <h4 className="text-sm font-bold text-orange-800 mb-3">Glasart (Keilfenster)</h4>
                                                                         <div className="grid grid-cols-3 gap-2">
                                                                             {[
-                                                                                { id: 'clear', name: 'Klar (VSG 44.2)', icon: '🪟', price: 'Standard' },
-                                                                                { id: 'matt', name: 'Matt (VSG 44.2)', icon: '🌫️', price: '+ Aufpreis' },
-                                                                                { id: 'iso', name: 'Isolierglas', icon: '🔥', price: '+ Aufpreis' }
+                                                                                { id: 'clear', name: 'Klar (VSG 44.2)', color: '#22c55e', price: 'Standard' },
+                                                                                { id: 'matt', name: 'Matt (VSG 44.2)', color: '#e5e7eb', price: '+ Aufpreis' },
+                                                                                { id: 'iso', name: 'Isolierglas', color: '#ef4444', price: '+ Aufpreis' }
                                                                             ].map(v => (
                                                                                 <button
                                                                                     key={v.id}
@@ -3955,7 +3981,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                         : 'border-orange-100 bg-white/50 hover:border-orange-300'
                                                                                         }`}
                                                                                 >
-                                                                                    <div className="text-lg mb-1">{v.icon}</div>
+                                                                                    <div className="flex items-center justify-center mb-1"><span className="w-4 h-4 rounded-full border border-slate-200" style={{ background: (v as any).color || '#ccc' }} /></div>
                                                                                     <div className="font-bold text-xs text-slate-800">{v.name}</div>
                                                                                     <div className="text-[9px] text-slate-500 leading-tight">{v.price}</div>
                                                                                 </button>
@@ -3988,7 +4014,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                     />
                                                                                     <div className="flex-1 min-w-0">
                                                                                         <div className="flex items-center gap-2">
-                                                                                            <span className="text-lg">{acc.icon}</span>
+                                                                                            <span className="flex items-center justify-center">{(IC as any)[acc.icon]?.('w-5 h-5') || acc.icon}</span>
                                                                                             <span className="font-bold text-xs text-slate-800 truncate">{acc.name}</span>
                                                                                         </div>
                                                                                         <div className="text-[10px] text-slate-500">{acc.description}</div>
@@ -4014,7 +4040,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                 ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200 shadow-sm'
                                                                                 : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'}`}
                                                                         >
-                                                                            <span className="text-2xl bg-white p-2 rounded-lg shadow-sm flex-shrink-0">{p.icon}</span>
+                                                                            <span className="bg-white p-2 rounded-lg shadow-sm flex-shrink-0 flex items-center justify-center">{(IC as any)[p.icon]?.('w-6 h-6 text-slate-600') || p.icon}</span>
                                                                             <div className="min-w-0">
                                                                                 <div className="font-bold text-slate-700 text-sm">{p.name}</div>
                                                                                 <div className="text-xs text-slate-400 mt-0.5 truncate">{p.description}</div>
@@ -4029,7 +4055,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     <div className="mt-4 p-3 bg-indigo-50 rounded-xl border border-indigo-200">
                                                                         <div className="flex items-center justify-between">
                                                                             <div className="flex items-center gap-2">
-                                                                                <span className="text-lg">📐</span>
+                                                                                <span className="flex items-center justify-center">{IC.measure('w-5 h-5')}</span>
                                                                                 <span className="text-sm font-bold text-indigo-800">Anzahl Flügel</span>
                                                                             </div>
                                                                             <span className="text-sm font-black text-indigo-700 bg-white px-3 py-1 rounded-lg shadow-sm">
@@ -4077,7 +4103,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                         : 'border-slate-100 bg-white/50 hover:border-indigo-300'
                                                                                         }`}
                                                                                 >
-                                                                                    <span className="text-lg">{h.icon}</span>
+                                                                                    <span className="flex items-center justify-center">{(IC as any)[h.icon]?.('w-5 h-5') || h.icon}</span>
                                                                                     <div>
                                                                                         <div className="font-bold text-xs text-slate-800">{h.name}</div>
                                                                                         <div className="text-[9px] text-slate-400">{h.id}</div>
@@ -4091,7 +4117,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 {/* INCLUDED INFO */}
                                                                 {wallProduct.includes('Schiebetür') && (
                                                                     <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-200 text-xs text-green-700">
-                                                                        <strong className="block mb-1">✅ W cenie zawarte:</strong>
+                                                                        <strong className="block mb-1 flex items-center gap-1">{IC.check('w-4 h-4')} W cenie zawarte:</strong>
                                                                         <ul className="list-disc list-inside space-y-0.5">
                                                                             <li>Uszczelki (Dichtung) 44.2 VSG klar</li>
                                                                             <li>Entwässerungskappen</li>
@@ -4175,7 +4201,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                     ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
                                                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
                                                                             >
-                                                                                🚪 Griff (14.21 €)
+                                                                                <span className="inline-flex items-center gap-1">{IC.square('w-3.5 h-3.5')} Griff (14.21 €)</span>
                                                                             </button>
                                                                             <button
                                                                                 onClick={() => setPanoramaHandleType('knauf')}
@@ -4183,7 +4209,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                     ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
                                                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
                                                                             >
-                                                                                🔘 Knauf (36.68 €)
+                                                                                <span className="inline-flex items-center gap-1">{IC.wrench('w-3.5 h-3.5')} Knauf (36.68 €)</span>
                                                                             </button>
                                                                         </div>
                                                                     </div>
@@ -4198,7 +4224,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                     ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
                                                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
                                                                             >
-                                                                                🔳 Klar (Standard)
+                                                                                <span className="inline-flex items-center gap-1">{IC.square('w-3.5 h-3.5')} Klar (Standard)</span>
                                                                             </button>
                                                                             <button
                                                                                 onClick={() => setPanoramaGlassType('planibel_grau')}
@@ -4206,7 +4232,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                     ? 'border-purple-500 bg-purple-50 text-purple-700 font-bold'
                                                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'}`}
                                                                             >
-                                                                                🌫️ Planibel Grau (+47.95 €/m²)
+                                                                                <span className="inline-flex items-center gap-1">{IC.square('w-3.5 h-3.5')} Planibel Grau (+47.95 €/m²)</span>
                                                                             </button>
                                                                         </div>
                                                                     </div>
@@ -4234,14 +4260,14 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {dachrechnerResults && (
                                                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-200 p-3">
                                                         <div className="flex items-center justify-between mb-2">
-                                                            <h5 className="text-xs font-bold text-blue-800">📐 Maße aus Dachrechner</h5>
+                                                            <h5 className="text-xs font-bold text-blue-800 flex items-center gap-1">{IC.measure('w-3.5 h-3.5')} Maße aus Dachrechner</h5>
                                                             <button
                                                                 onClick={() => setWallDimsAuto(!wallDimsAuto)}
                                                                 className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${wallDimsAuto
                                                                     ? 'bg-green-500 text-white'
                                                                     : 'bg-slate-200 text-slate-600'}`}
                                                             >
-                                                                {wallDimsAuto ? '⚡ Auto' : '✏️ Manuell'}
+                                                                {wallDimsAuto ? <><span className="inline-flex items-center gap-0.5">{IC.sun('w-3 h-3')} Auto</span></> : <><span className="inline-flex items-center gap-0.5">{IC.clipboard('w-3 h-3')} Manuell</span></>}
                                                             </button>
                                                         </div>
                                                         <div className="grid grid-cols-4 gap-1.5 text-[10px]">
@@ -4293,7 +4319,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     <div className="flex items-center justify-between mb-4">
                                                         <h5 className="text-sm font-bold text-slate-700">Wymiary zabudowy</h5>
                                                         {wallDimsAuto && dachrechnerResults && (
-                                                            <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded-full font-bold">⚡ Automatisch berechnet</span>
+                                                            <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded-full font-bold inline-flex items-center gap-0.5">{IC.sun('w-3 h-3')} Automatisch berechnet</span>
                                                         )}
                                                     </div>
 
@@ -4314,7 +4340,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                             />
                                                             {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
                                                                 <p className="text-xs text-slate-400 mt-2">
-                                                                    📐 Breite D1 z cennika producenta (2000-5000mm)
+                                                                    <span className="inline-flex items-center gap-1">{IC.measure('w-3 h-3')} Breite D1 z cennika producenta (2000-5000mm)</span>
                                                                 </p>
                                                             )}
                                                         </div>
@@ -4471,14 +4497,14 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 }`}
                                                         >
                                                             <span>Hinzufügen</span>
-                                                            <span>➡️</span>
+                                                            <span>{IC.build('w-4 h-4')}</span>
                                                         </button>
                                                     </div>
                                                 </div>
 
                                                 {/* Helper Text */}
                                                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-700 leading-relaxed">
-                                                    <strong className="block mb-1">💡 Hinweis:</strong>
+                                                    <strong className="block mb-1 inline-flex items-center gap-1">{IC.sun('w-3.5 h-3.5')} Hinweis:</strong>
                                                     Wählen Sie den Verglasungstyp aus der Liste links. Die Vorschau zeigt die gewählte Lösung im Kontext der Konstruktion.
                                                 </div>
                                             </div>
@@ -4490,16 +4516,16 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             {/* Awnings Section */}
                                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                 <h4 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                    <span className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">☀️</span>
+                                                    <span className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">{IC.sun('w-4 h-4')}</span>
                                                     Markizy & ZIP Screen
                                                 </h4>
 
                                                 {/* Type Selector with Images */}
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                                                     {[
-                                                        { id: 'aufdach', label: 'Aufdachmarkise', desc: 'Markiza na dachu', icon: '🌤️', color: 'bg-orange-50' },
-                                                        { id: 'unterdach', label: 'Unterdachmarkise', desc: 'Markiza pod dachem', icon: '🏠', color: 'bg-amber-50' },
-                                                        { id: 'zip', label: 'ZIP Screen', desc: 'Ekran pionowy', icon: '📱', color: 'bg-slate-50' },
+                                                        { id: 'aufdach', label: 'Aufdachmarkise', desc: 'Markiza na dachu', icon: 'sun', color: 'bg-orange-50' },
+                                                        { id: 'unterdach', label: 'Unterdachmarkise', desc: 'Markiza pod dachem', icon: 'roof', color: 'bg-amber-50' },
+                                                        { id: 'zip', label: 'ZIP Screen', desc: 'Ekran pionowy', icon: 'square', color: 'bg-slate-50' },
                                                     ].map(type => (
                                                         <button
                                                             key={type.id}
@@ -4508,7 +4534,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 ? 'border-orange-500 bg-orange-50/50 ring-1 ring-orange-200'
                                                                 : 'border-slate-100 hover:border-orange-200 bg-white'}`}
                                                         >
-                                                            <div className="text-2xl mb-2">{type.icon}</div>
+                                                            <div className="flex items-center justify-center mb-2">{(IC as any)[type.icon]?.('w-7 h-7') || type.icon}</div>
                                                             <div className="font-bold text-sm text-slate-800">{type.label}</div>
                                                             <div className="text-[10px] text-slate-500">{type.desc}</div>
                                                             {awningType === type.id && (
@@ -4608,7 +4634,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:shadow-md transform hover:-translate-y-0.5'
                                                                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                                                         >
-                                                            {awningPrice !== null ? '➕ Hinzufügen' : 'Berechnung...'}
+                                                            {awningPrice !== null ? <><span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Hinzufügen</span></> : 'Berechnung...'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -4617,7 +4643,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             {/* LED & Accessories Section */}
                                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                 <h4 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                    <span className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">✨</span>
+                                                    <span className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">{IC.sun('w-4 h-4')}</span>
                                                     LED & Akcesoria
                                                 </h4>
 
@@ -4631,7 +4657,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 <div key={acc.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${qty > 0 ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
                                                                     <div className="flex items-center gap-4">
                                                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${qty > 0 ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                                            {acc.category === 'led' ? '💡' : '🔧'}
+                                                                            {acc.category === 'led' ? IC.sun('w-4 h-4') : IC.wrench('w-4 h-4')}
                                                                         </div>
                                                                         <div>
                                                                             <div className="font-bold text-slate-700">{acc.name}</div>
@@ -4660,7 +4686,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         onClick={handleAddAccessoryBatch}
                                                         className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all transform hover:-translate-y-0.5"
                                                     >
-                                                        Zubehör hinzufügen ➕
+                                                        <span className="inline-flex items-center gap-1">Zubehör hinzufügen {IC.build('w-4 h-4')}</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -4680,7 +4706,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Profile Column */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                        <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-sm">📏</span>
+                                                        <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">{IC.ruler('w-4 h-4')}</span>
                                                         Profile
                                                     </h5>
                                                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -4708,7 +4734,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Other Materials Column */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                        <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm">🔩</span>
+                                                        <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">{IC.wrench('w-4 h-4')}</span>
                                                         Sonstige Materialien
                                                     </h5>
                                                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -4747,7 +4773,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     }}
                                                     className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all transform hover:-translate-y-0.5"
                                                 >
-                                                    ➕ Material hinzufügen
+                                                    <span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Material hinzufügen</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -4766,7 +4792,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Dimensions */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                        <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm">📐</span>
+                                                        <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">{IC.measure('w-4 h-4')}</span>
                                                         Wymiary Tarasu
                                                     </h5>
                                                     <div className="space-y-4">
@@ -4808,7 +4834,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Pricing */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                        <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">💰</span>
+                                                        <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">{IC.compass('w-4 h-4')}</span>
                                                         Cena WPC
                                                     </h5>
                                                     <div className="space-y-4">
@@ -4843,12 +4869,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                                         }`}
                                                 >
-                                                    ➕ WPC hinzufügen
+                                                    <span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} WPC hinzufügen</span>
                                                 </button>
                                             </div>
 
                                             <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-700 border border-blue-100">
-                                                <strong>💡 Hinweis:</strong> WPC-Preis wird unter Admin → Preislisten V2 → WPC-Böden eingestellt.
+                                                <strong className="inline-flex items-center gap-1">{IC.sun('w-3.5 h-3.5')} Hinweis:</strong> WPC-Preis wird unter Admin → Preislisten V2 → WPC-Böden eingestellt.
                                             </div>
                                         </div>
                                     )}
@@ -4857,7 +4883,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {wallTab === 'aluminum' && (
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                                <span className="text-slate-900 font-medium">🔲 Aluminium-Wände</span>
+                                                <span className="text-slate-900 font-medium inline-flex items-center gap-1">{IC.square('w-4 h-4')} Aluminium-Wände</span>
                                                 <span className="font-bold text-slate-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-slate-300 shadow-sm">Vollwand / Lamellen</span>
                                             </div>
 
@@ -4886,7 +4912,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Dimensions */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                        <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-sm">📐</span>
+                                                        <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">{IC.measure('w-4 h-4')}</span>
                                                         Wymiary
                                                     </h5>
                                                     <div className="grid grid-cols-2 gap-4">
@@ -4921,7 +4947,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Pricing */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                                     <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                        <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">💰</span>
+                                                        <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">{IC.compass('w-4 h-4')}</span>
                                                         Preis
                                                     </h5>
                                                     {aluWallPriceLoading ? (
@@ -4945,7 +4971,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         </div>
                                                     ) : (
                                                         <div className="text-center py-8 text-slate-400">
-                                                            <div className="text-3xl mb-2">📊</div>
+                                                            <div className="flex items-center justify-center mb-2">{IC.compass('w-10 h-10 text-slate-400')}</div>
                                                             <p>Kein Preis für gewählte Maße</p>
                                                             <p className="text-xs mt-2">Preisliste ergänzen: Admin → Preislisten V2 → Alu-Wände</p>
                                                         </div>
@@ -4972,7 +4998,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                                         }`}
                                                 >
-                                                    ➕ Alu-Wand hinzufügen
+                                                    <span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Alu-Wand hinzufügen</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -4981,7 +5007,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {/* LED tab redirect - merge into awnings */}
                                     {wallTab === 'led' && (
                                         <div className="text-center py-12">
-                                            <div className="text-4xl mb-4">✨</div>
+                                            <div className="flex items-center justify-center mb-4">{IC.sun('w-12 h-12 text-slate-300')}</div>
                                             <p className="text-slate-500 mb-4">LED und Zubehör wurden in den Tab "Komfort" verschoben</p>
                                             <button onClick={() => setWallTab('awnings')} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold">
                                                 Weiter zu Komfort →
@@ -5017,7 +5043,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                         (view === 'config') && (
                             <div className="col-span-12 lg:col-span-3 space-y-4 lg:sticky lg:top-4">
                                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Zusammenfassung</h3>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">{IC.clipboard('w-4 h-4')} Zusammenfassung</h3>
 
                                     {/* Main Config Summary */}
                                     <div className="mb-6 space-y-2">
@@ -5030,10 +5056,27 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             <span className="font-bold text-slate-800">{width} × {projection}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-500">Montage</span>
+                                            <span className="text-slate-500">Montaż</span>
                                             <span className={`font-bold ${construction === 'freestanding' ? 'text-amber-600' : 'text-slate-800'}`}>
                                                 {construction === 'wall' ? 'Wandmontage' : `Freistehend ${freestandingSurchargePrice > 0 ? '(+' + formatCurrency(freestandingSurchargePrice) + ')' : ''}`}
                                             </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500">Pokrycie</span>
+                                            <span className="font-bold text-slate-800">
+                                                {cover === 'Glass' ? `Glas VSG (${glassVariant === 'klar' ? 'Klar' : glassVariant === 'matt' ? 'Matt' : glassVariant === 'stopsol' ? 'Stopsol' : glassVariant})` : `Polycarbonat (${polyVariant === 'opal' ? 'Opal' : polyVariant === 'klar' ? 'Klar' : polyVariant})`}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500">Kolor</span>
+                                            <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                                                <span className="w-3 h-3 rounded-full border border-slate-300" style={{ background: color === 'RAL 7016' ? '#383E42' : color === 'RAL 9016' ? '#F1F0EA' : color === 'RAL 9001' ? '#E9E0D2' : color === 'RAL 9006' ? '#A6A9AD' : color === 'RAL 9007' ? '#8F8F8C' : color === 'DB 703' ? '#695C4F' : '#666' }} />
+                                                {color}{sonderfarben ? ' *' : ''}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500">Strefa śniegowa</span>
+                                            <span className="font-bold text-slate-800">Zone {zone}</span>
                                         </div>
                                         {model === 'Designline' && schiebeeinheitCount > 0 && (
                                             <div className="flex justify-between items-center text-sm">
@@ -5043,10 +5086,29 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </span>
                                             </div>
                                         )}
+
+                                        {/* Structural info */}
+                                        {structuralMetadata && (
+                                            <div className="mt-1 pt-2 border-t border-slate-100 space-y-1">
+                                                {structuralMetadata.fields_count != null && structuralMetadata.fields_count > 0 && (
+                                                    <div className="flex justify-between items-center text-xs text-slate-500">
+                                                        <span>Sparren / Felder</span>
+                                                        <span className="font-medium text-slate-700">{structuralMetadata.fields_count + 1} / {structuralMetadata.fields_count}</span>
+                                                    </div>
+                                                )}
+                                                {structuralMetadata.posts_count != null && (
+                                                    <div className="flex justify-between items-center text-xs text-slate-500">
+                                                        <span>Pfosten</span>
+                                                        <span className="font-medium text-slate-700">{structuralMetadata.posts_count + (extraPosts || 0)} Stk.</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {materialBOM && (
-                                            <div className="space-y-0.5">
+                                            <div className="mt-1 pt-2 border-t border-slate-100 space-y-0.5">
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-slate-500">Material (BOM)</span>
+                                                    <span className="text-slate-500">Materialien</span>
                                                     <span className="font-bold text-amber-600">
                                                         +{formatCurrency(materialBOM.total)}
                                                     </span>
@@ -5072,7 +5134,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {/* Technical Specs from Technikmappe */}
                                         {TECH_SPECS[model] && (
                                             <div className="mb-2 p-2 bg-slate-50 rounded-lg">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">📋 Technische Daten</p>
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">{IC.compass('w-3 h-3')} Technische Daten</p>
                                                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
                                                     <span>Glasgefälle:</span>
                                                     <span className="font-medium text-slate-700">{TECH_SPECS[model].glassFall}</span>
@@ -5130,7 +5192,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         {TECH_SPECS[model] && (width > TECH_SPECS[model].maxWidth || projection > TECH_SPECS[model].maxDepth || width < TECH_SPECS[model].minWidth || projection < TECH_SPECS[model].minDepth) && (
                                             <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
                                                 <p className="text-[10px] font-bold text-red-600">
-                                                    ⚠️ Abmessungen außerhalb der Spezifikation!
+                                                    <span className="inline-flex items-center gap-1">{IC.alert('w-3.5 h-3.5')} Abmessungen außerhalb der Spezifikation!</span>
                                                     {width > TECH_SPECS[model].maxWidth && ` Breite max. ${TECH_SPECS[model].maxWidth}mm.`}
                                                     {width < TECH_SPECS[model].minWidth && ` Breite min. ${TECH_SPECS[model].minWidth}mm.`}
                                                     {projection > TECH_SPECS[model].maxDepth && ` Tiefe max. ${TECH_SPECS[model].maxDepth}mm.`}
@@ -5147,7 +5209,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     <div className="text-[10px] text-slate-400 font-medium mt-1">Nettopreis (ohne MwSt.)</div>
                                                     {structureCount > 1 && (
                                                         <div className="text-xs text-amber-600 font-medium mt-2 bg-amber-50 rounded-lg py-1.5 px-3 inline-block">
-                                                            🔗 {structureCount}× Verbundkonstruktion
+                                                            <span className="inline-flex items-center gap-1">{IC.link('w-3.5 h-3.5')} {structureCount}× Verbundkonstruktion</span>
                                                         </div>
                                                     )}
                                                 </>
@@ -5173,7 +5235,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <div className="bg-white rounded-2xl shadow border border-slate-200 p-4">
                                     <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowBasket(!showBasket)}>
                                         <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                            🛒 Positionen <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
+                                            {IC.cart('w-5 h-5')} Positionen <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{basket.length}</span>
                                         </h3>
                                         <span className="text-slate-400 text-sm">{showBasket ? '▼' : '▲'}</span>
                                     </div>
@@ -5197,7 +5259,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     </div>
                                                     <div className="text-xs text-slate-400 truncate pr-4">{item.config}</div>
                                                     {item.dimensions && (
-                                                        <div className="text-[10px] text-slate-400/70 font-mono truncate pr-4">📐 {item.dimensions}</div>
+                                                        <div className="text-[10px] text-slate-400/70 font-mono truncate pr-4 flex items-center gap-1">{IC.measure('w-3 h-3')} {item.dimensions}</div>
                                                     )}
                                                 </div>
                                             ))}
