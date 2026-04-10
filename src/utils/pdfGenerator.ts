@@ -38,13 +38,16 @@ function translateForPDF(key: string, category: string): string {
         'trendline': 'Trendstyle', 'trendstyle': 'Trendstyle',
         'trendline_new': 'Trendstyle New', 'trendstyle_new': 'Trendstyle New',
         'trendline_plus': 'Trendstyle+', 'trendstyle_plus': 'Trendstyle+',
+        'trendline+': 'Trendstyle+', 'trendstyle+': 'Trendstyle+',
         'skyline': 'Skystyle', 'skystyle': 'Skystyle',
         'ultraline': 'Ultrastyle', 'ultrastyle': 'Ultrastyle',
         'topline': 'Topstyle', 'topstyle': 'Topstyle',
         'topline_xl': 'Topstyle XL', 'topstyle_xl': 'Topstyle XL',
+        'topline xl': 'Topstyle XL', 'topstyle xl': 'Topstyle XL',
         'designline': 'Designstyle', 'designstyle': 'Designstyle',
         'orangeline': 'Orangestyle', 'orangestyle': 'Orangestyle',
         'orangeline+': 'Orangestyle+', 'orangestyle+': 'Orangestyle+',
+        'carport': 'Carport', 'pergola': 'Pergola', 'pergola deluxe': 'Pergola Deluxe',
         // Roof types
         'poly': 'Polycarbonat', 'polycarbonate': 'Polycarbonat', 'glass': 'Glas VSG 8mm',
         'clear': 'Klar', 'klar': 'Klar', 'opal': 'Opal', 'matt': 'Matt',
@@ -565,22 +568,56 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     y += boxHeight + 10;
 
     // 4. PRICING TABLE
+    // CRITICAL: Prices in the offer DB are stored as PURCHASE/CATALOG prices.
+    // The PDF must show CUSTOMER SALE PRICES. We compute a multiplier from
+    // the relationship: sellingPriceNet (includes margin, excludes installation)
+    // vs sum of catalog items (basePrice + customItemsPrice).
+    const installNet = offer.pricing?.installationCosts?.totalInstallation || 0;
+    const catalogTotal = (offer.pricing?.basePrice || 0) + ((offer.pricing as any)?.customItemsPrice || 0);
+    const sellingNet = (offer.pricing?.sellingPriceNet || catalogTotal) - installNet;
+    // If sellingNet includes discount, we show positions BEFORE discount,
+    // and show discount as a separate line in summary. So we need pre-discount selling.
+    const discountPct = (offer.pricing as any)?.discountPercentage || 0;
+    const preDiscountSelling = discountPct > 0 ? sellingNet / (1 - discountPct / 100) : sellingNet;
+    const saleMultiplier = catalogTotal > 0 ? preDiscountSelling / catalogTotal : 1;
+
     const bodyRows: any[] = [];
     let pos = 1;
 
     // Main Product — include roof cover type from config
     const roofConfig = (offer.product as any).items?.find((i: any) => i.category === 'roof')?.config || '';
     const coverLabel = getRoofCoverLabel(roofConfig || (offer.product as any).cover || '');
+    // Build structural details string from saved offer metadata
+    const savedTech = (offer.product as any)?.technical || (offer.product as any)?.structuralMetadata;
+    const structParts: string[] = [];
+    if (savedTech?.postsCount || savedTech?.posts_count) {
+        const pc = savedTech.postsCount || savedTech.posts_count;
+        structParts.push(`${pc} Pfosten`);
+    }
+    if (savedTech?.fieldsCount || savedTech?.fields_count) {
+        const fc = savedTech.fieldsCount || savedTech.fields_count;
+        structParts.push(`${fc} Felder`);
+    }
+    if (savedTech?.rafterType || savedTech?.rafter_type) {
+        const rt = savedTech.rafterType || savedTech.rafter_type;
+        const dim = savedTech?.sparrenDim || '';
+        structParts.push(`${rt}-Sparren${dim ? ' ' + dim : ''}`);
+    }
+    if (savedTech?.pfostenDim && savedTech.pfostenDim !== '—') {
+        structParts.push(`Pfosten ${savedTech.pfostenDim}`);
+    }
+    const structLine = structParts.length > 0 ? `\n${structParts.join(' · ')}` : '';
+
     const mainDesc = coverLabel
-        ? `${model} Aluminiumkonstruktion\ninkl. ${coverLabel} · Pulverbeschichtung · Integrierte Entwässerung`
-        : `${model} Aluminiumkonstruktion\nPremium Pulverbeschichtung, Verstärkte Profile, Integrierte Entwässerung.`;
+        ? `${model} Aluminiumkonstruktion\ninkl. ${coverLabel} · Pulverbeschichtung · Integrierte Entwässerung${structLine}`
+        : `${model} Aluminiumkonstruktion\nPremium Pulverbeschichtung, Verstärkte Profile, Integrierte Entwässerung.${structLine}`;
     bodyRows.push([
         { content: String(pos++), styles: { halign: 'center' } },
         {
             content: mainDesc,
             styles: { fontStyle: 'bold' }
         },
-        formatCurrency(offer.pricing?.basePrice || 0)
+        formatCurrency(Math.round((offer.pricing?.basePrice || 0) * saleMultiplier * 100) / 100)
     ]);
 
     // Items (basket items from configurator)
@@ -591,7 +628,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
                 (professionalItemDescription(item.name, item.config)),
-                formatCurrency(item.price)
+                formatCurrency(Math.round((item.price || 0) * saleMultiplier * 100) / 100)
             ]);
         });
     } else if (offer.product?.addons) {
@@ -599,7 +636,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
                 (professionalItemDescription(a.name, a.variant)),
-                formatCurrency(a.price)
+                formatCurrency(Math.round((a.price || 0) * saleMultiplier * 100) / 100)
             ]);
         });
     }
@@ -611,7 +648,7 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
             bodyRows.push([
                 { content: String(pos++), styles: { halign: 'center' } },
                 (ci.name || ci.description || 'Zusätzliche Position'),
-                formatCurrency(ci.price || 0)
+                formatCurrency(Math.round((ci.price || 0) * saleMultiplier * 100) / 100)
             ]);
         });
     }
@@ -728,12 +765,12 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
 
     doc.setFontSize(9);
     const productNet = offer.pricing?.sellingPriceNet || 0;
-    const installNet = offer.pricing?.installationCosts?.totalInstallation || 0;
-    const installGross = installNet * 1.19;
+    const totalsInstallNet = offer.pricing?.installationCosts?.totalInstallation || 0;
+    const totalsInstallGross = totalsInstallNet * 1.19;
     const productGross = offer.pricing?.sellingPriceGross || (productNet * 1.19);
-    const totalNet = productNet + installNet;
+    const totalNet = productNet + totalsInstallNet;
     const totalVat = totalNet * 0.19;
-    const totalGross = productGross + installGross;
+    const totalGross = productGross + totalsInstallGross;
     const discount = offer.pricing?.discountValue || 0;
     const discountGross = discount > 0 ? discount * 1.19 : 0;
 

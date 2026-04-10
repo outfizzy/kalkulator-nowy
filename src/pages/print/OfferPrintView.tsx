@@ -27,13 +27,16 @@ function translateForView(key: string, category: string): string {
         'trendline': 'Trendstyle', 'trendstyle': 'Trendstyle',
         'trendline_new': 'Trendstyle New', 'trendstyle_new': 'Trendstyle New',
         'trendline_plus': 'Trendstyle+', 'trendstyle_plus': 'Trendstyle+',
+        'trendline+': 'Trendstyle+', 'trendstyle+': 'Trendstyle+',
         'skyline': 'Skystyle', 'skystyle': 'Skystyle',
         'ultraline': 'Ultrastyle', 'ultrastyle': 'Ultrastyle',
         'topline': 'Topstyle', 'topstyle': 'Topstyle',
         'topline_xl': 'Topstyle XL', 'topstyle_xl': 'Topstyle XL',
+        'topline xl': 'Topstyle XL', 'topstyle xl': 'Topstyle XL',
         'designline': 'Designstyle', 'designstyle': 'Designstyle',
         'orangeline': 'Orangestyle', 'orangestyle': 'Orangestyle',
         'orangeline+': 'Orangestyle+', 'orangestyle+': 'Orangestyle+',
+        'carport': 'Carport',
         'pergola': 'Pergola', 'pergola_bio': 'Pergola',
         'pergola deluxe': 'Pergola Deluxe', 'pergola_deluxe': 'Pergola Deluxe',
         'poly': 'Polycarbonat', 'polycarbonate': 'Polycarbonat', 'glass': 'Glas VSG 8mm',
@@ -204,7 +207,16 @@ export const OfferPrintView: React.FC = () => {
     const rafterCount = fieldCount + 1;
     const isCombined = !!(p?.splitPoint && Number(p?.width) > 7000);
 
-    // Collect all line items (with safety)
+    // ═══ SALE PRICE MULTIPLIER ═══
+    // Items stored in DB have CATALOG (purchase) prices.
+    // We must scale them proportionally so their SUM matches the customer-facing sellingPriceNet.
+    const catalogTotal = (Number(offer.pricing?.basePrice) || 0) + (Number((offer.pricing as any)?.customItemsPrice) || 0);
+    const sellingNetForProducts = totalNet - installNet; // sellingPriceNet includes install, remove it
+    const discountPct = Number((offer.pricing as any)?.discountPercentage) || 0;
+    const preDiscountSelling = discountPct > 0 ? sellingNetForProducts / (1 - discountPct / 100) : sellingNetForProducts;
+    const saleMultiplier = catalogTotal > 0 ? preDiscountSelling / catalogTotal : 1;
+
+    // Collect all line items (with safety) — prices multiplied by saleMultiplier
     const lineItems: Array<{ name: string; subtext?: string; price: number; isBold?: boolean }> = [];
 
     // Base product
@@ -212,7 +224,7 @@ export const OfferPrintView: React.FC = () => {
         lineItems.push({
             name: `${model} Terrassenüberdachung`,
             subtext: 'Hochwertiges Aluminiumprofilsystem, pulverbeschichtet. Inkl. Pfosten, Rinnenprofil und Wandanschluss.',
-            price: Number(offer.pricing?.basePrice) || 0,
+            price: Math.round((Number(offer.pricing?.basePrice) || 0) * saleMultiplier * 100) / 100,
             isBold: true,
         });
     }
@@ -223,7 +235,7 @@ export const OfferPrintView: React.FC = () => {
         lineItems.push({
             name: translateAddonName(addon.name),
             subtext: addon.variant || getAddonSubtext(addon.name) || undefined,
-            price: Number(addon.price) || 0,
+            price: Math.round((Number(addon.price) || 0) * saleMultiplier * 100) / 100,
         });
     });
 
@@ -234,7 +246,7 @@ export const OfferPrintView: React.FC = () => {
             lineItems.push({
                 name: translateAddonName(item.name),
                 subtext: item.config || getAddonSubtext(item.name) || undefined,
-                price: Number(item.price) || 0,
+                price: Math.round((Number(item.price) || 0) * saleMultiplier * 100) / 100,
             });
         });
 
@@ -248,7 +260,7 @@ export const OfferPrintView: React.FC = () => {
             subtext: (ci.description && ci.description !== 'Manuelle Angebotsposition' && ci.description !== 'Manuelle Position')
                 ? `${ci.description}${qty > 1 ? ` · Menge: ${qty} Stk.` : ''}`
                 : qty > 1 ? `Menge: ${qty} Stk.` : undefined,
-            price: unitPrice * qty,
+            price: Math.round(unitPrice * qty * saleMultiplier * 100) / 100,
         });
     });
 

@@ -32,3 +32,7 @@ supabase/functions/**/.env
 
 # Aliplast session cookies (sensitive)
 scripts/aliplast-cookies.txt
+
+# Manufacturer confidential data
+danetechniczne.pdf
+AluxePreisliste.xlsx

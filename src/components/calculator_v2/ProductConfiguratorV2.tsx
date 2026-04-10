@@ -51,20 +51,55 @@ interface BasketItem {
     quantity: number;
 }
 
+// ======= TECHNICAL SPECIFICATIONS (from Aluxe Technikmappe V01.05) =======
+const TECH_SPECS: Record<string, {
+    minWidth: number; maxWidth: number; minDepth: number; maxDepth: number;
+    maxHeight: number; glassFall: string; keilmassMin: number | null;
+    options: string[];
+}> = {
+    'Orangeline':   { minWidth: 1000, maxWidth: 6000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '8°', keilmassMin: 39, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'LED-Strips (L ED)'] },
+    'Orangeline+':  { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '8-12° Poly / 5-12° Glas', keilmassMin: 34, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'LED-Strips (L ED)'] },
+    'Trendline':    { minWidth: 1000, maxWidth: 7950, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: 39, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'LED-Strips (L ED)'] },
+    'Trendline+':   { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: 50, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'LED-Strips (L ED)'] },
+    'Topline':      { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: 84, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'LED-Strips (L ED)'] },
+    'Topline XL':   { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: 106, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'LED-Strips (L ED)'] },
+    'Designline':   { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '4-12° / 6-8° Schiebe', keilmassMin: 93, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Keilfenster', 'Heizsystem', 'LED-Spots', 'Schiebeeinheit'] },
+    'Ultraline':    { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 6000, maxHeight: 3000, glassFall: '1,5-3,1°', keilmassMin: null, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Heizsystem', 'LED-Spots', 'LED-Strips'] },
+    'Skyline':      { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '1,1-1,9°', keilmassMin: null, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Heizsystem', 'LED-Spots', 'LED-Strips'] },
+    'Carport':      { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3500, glassFall: '~1° Trapez', keilmassMin: null, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Heizsystem', 'LED-Strips'] },
+};
+
+// ======= PROFILE SPECIFICATIONS (from Excel "Materialien" sheets per model) =======
+// Physical profile dimensions for technical display and PDF offers
+const PROFILE_SPECS: Record<string, {
+    pfosten: string; // Pfosten cross-section (e.g. "110×110mm")
+    sparrenTypes: { type: string; dim: string }[];
+    rinne: string; // Rinne identifier
+}> = {
+    'Orangeline':  { pfosten: '—', sparrenTypes: [{ type: 'S', dim: '86×55mm' }, { type: 'M', dim: '100×55mm' }, { type: 'L', dim: '100×55mm' }, { type: 'XL', dim: '112×55mm' }], rinne: 'Rinne Orangeline (11431)' },
+    'Orangeline+': { pfosten: '—', sparrenTypes: [{ type: 'S', dim: '86×55mm' }, { type: 'M', dim: '100×55mm' }, { type: 'L', dim: '100×55mm' }, { type: 'XL', dim: '112×55mm' }], rinne: 'Rinne Orangeline+ (11078)' },
+    'Trendline':   { pfosten: '110×110mm', sparrenTypes: [{ type: 'S', dim: '86×55mm' }, { type: 'M', dim: '100×55mm' }, { type: 'L', dim: '100×55mm' }, { type: 'XL', dim: '112×55mm' }], rinne: 'Rinne Trendline (11145)' },
+    'Trendline+':  { pfosten: '110×110mm', sparrenTypes: [{ type: 'S', dim: '86×55mm' }, { type: 'M', dim: '100×55mm' }, { type: 'L', dim: '100×55mm' }, { type: 'XL', dim: '112×55mm' }], rinne: 'Rinne Trendline+ (11002)' },
+    'Topline':     { pfosten: '110×150mm', sparrenTypes: [{ type: 'S', dim: '86×55mm' }, { type: 'M', dim: '100×55mm' }, { type: 'L', dim: '100×55mm' }, { type: 'XL', dim: '112×55mm' }], rinne: 'Rinne Topline (11003)' },
+    'Topline XL':  { pfosten: '117×196mm', sparrenTypes: [{ type: 'S', dim: '86×55mm' }, { type: 'M', dim: '100×55mm' }, { type: 'L', dim: '100×55mm' }, { type: 'XL', dim: '112×55mm' }], rinne: 'Rinne Topline XL (11441)' },
+    'Designline':  { pfosten: '117×196mm', sparrenTypes: [{ type: 'Mittel', dim: '90×142mm' }, { type: 'Außen', dim: '55×142mm' }], rinne: 'Rinne Designline (11430)' },
+    'Ultraline':   { pfosten: '200×200mm', sparrenTypes: [{ type: 'Standard', dim: '100×200mm' }], rinne: 'Rinne Ultraline (11147)' },
+    'Skyline':     { pfosten: '117×160mm', sparrenTypes: [{ type: 'Außen', dim: '117×241mm' }, { type: 'Mittel', dim: '40×160mm' }], rinne: 'Rinne Skyline (11165)' },
+    'Carport':     { pfosten: '117×160mm', sparrenTypes: [{ type: 'Außen', dim: '117×241mm' }, { type: 'Mittel', dim: '40×160mm' }], rinne: 'Rinne Carport (11165)' },
+};
+
 // ======= PRODUCT CATALOG =======
 const ROOF_MODELS: RoofModel[] = [
-    { id: 'Orangeline', name: 'Orangestyle', description: 'Ekonomiczny profil 50mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline.jpg' },
-    { id: 'Orangeline+', name: 'Orangestyle+', description: 'Ekonomiczny Plus 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline-plus.jpg' },
-    { id: 'Trendline', name: 'Trendstyle', description: 'Klasyczny profil 60mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg' },
-    { id: 'Trendline+', name: 'Trendstyle+', description: 'Klasyczny Plus 70mm • od 2000mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-plus.jpg' },
-    { id: 'Topline', name: 'Topstyle', description: 'Premium profil 80mm • od 2500mm', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg' },
+    { id: 'Orangeline', name: 'Orangestyle', description: 'Einstiegsprofil • max. 6.000mm Breite', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline.jpg' },
+    { id: 'Orangeline+', name: 'Orangestyle+', description: 'Einstieg Plus • max. 7.000mm Breite', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/orangeline-plus.jpg' },
+    { id: 'Trendline', name: 'Trendstyle', description: 'Klassisches Profil • max. 7.950mm Breite', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline.jpg' },
+    { id: 'Trendline+', name: 'Trendstyle+', description: 'Klassisch Plus • max. 7.000mm Breite', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/trendline-plus.jpg' },
+    { id: 'Topline', name: 'Topstyle', description: 'Premium Profil • max. 7.000mm Breite', hasPoly: true, hasGlass: true, hasFreestanding: true, image_url: '/images/models/topline.jpg' },
     { id: 'Topline XL', name: 'Topstyle XL', description: 'Extra große XL-Konstruktion', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/topline-xl.jpg' },
-    { id: 'Designline', name: 'Designstyle', description: 'Elegantes Design • nur Glas', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
-    { id: 'Ultraline', name: 'Ultrastyle', description: 'Premium 100mm • nur Glas', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
-    { id: 'Skyline', name: 'Skystyle', description: 'Pergola bioklimatyczna z lamelami', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
-    { id: 'Carport', name: 'Carport', description: 'Carport mit Stahlblech', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
-    { id: 'Pergola', name: 'Pergola', description: 'Bioklimatische Pergola mit Lamellen', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola.jpg' },
-    { id: 'Pergola Deluxe', name: 'Pergola Deluxe', description: 'Premium Pergola mit Lamellen', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-deluxe.jpg' },
+    { id: 'Designline', name: 'Designstyle', description: 'Elegantes Design • nur Glas • Schiebeeinheit', hasPoly: false, hasGlass: true, hasFreestanding: true, image_url: '/images/models/designline.jpg' },
+    { id: 'Ultraline', name: 'Ultrastyle', description: 'Premium 100mm Profil • max. 6.000mm Tiefe', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
+    { id: 'Skyline', name: 'Skystyle', description: 'Pergola mit Lamellen', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
+    { id: 'Carport', name: 'Carport', description: 'Carport mit Stahlblech • max. 3.500mm Höhe', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
 ];
 
 // Glass variant options
@@ -79,6 +114,7 @@ const POLY_VARIANTS = [
     { id: 'opal', name: 'Opal', description: 'Lichtstreuend, milchig', icon: '⚪' },
     { id: 'klar', name: 'Klar', description: 'Transparent', icon: '🟢' },
     { id: 'ir-gold', name: 'IR Gold', description: 'IR-Wärmeschutz', icon: '🟡' },
+    { id: 'smokey', name: 'Smokey Grey', description: 'Getönt, UV-Schutz', icon: '🌫️' },
 ];
 
 const WALL_PRODUCTS = [
@@ -94,6 +130,111 @@ const KEILFENSTER_ACCESSORIES = [
     { id: 'kippFenster', name: 'Kipp-Fenster', price: 564.75, icon: '🪟', description: 'Dreh-Kipp-Fenster im Keil' },
     { id: 'abdeckungEL891', name: 'Abdeckung EL891', price: 20.07, icon: '🔳', description: 'Abdeckung 3200mm' },
 ];
+
+// ======= MATERIAL BOM COSTS (Aluxe Loses Material Preisliste 2025/2026) =======
+// Prices verified 1:1 against "Loses Material allgemein" sheet in AluxePreisliste.xlsx
+// Physical materials (glass panels, rafters, accessories) billed separately from system price
+const COVER_RATES_PER_M2: Record<string, number> = {
+    // VSG Glass — from Excel sheet "Loses Material allgemein" rows 250-255
+    'Glass_8mm_klar':     33.12,   // Glas klar 8mm VSG (11128)
+    'Glass_8mm_matt':     41.40,   // Glas matt 8mm VSG (11129)
+    'Glass_8mm_planibel': 61.272,  // Glas planibel grey 8mm VSG (11905)
+    'Glass_10mm_klar':    38.295,  // Glas klar 10mm VSG (11131)
+    'Glass_10mm_matt':    46.575,  // Glas matt 10mm VSG (11132)
+    'Glass_10mm_stopsol': 64.899,  // Glas Stopsol klar 10mm VSG (11391) = Sonnenschutzglas
+    // Polycarbonate — from Excel rows 233-237
+    'Poly_standard':      20.844,  // Polycarbonat klar/opal 16mm (11288/11290)
+    'Poly_ir_gold':       28.035,  // Polycarbonat IR Gold 16mm (11284/11286)
+    'Poly_smokey':        27.477,  // Polycarbonat smokey grey 16mm (11675)
+};
+
+// Per-piece Sparren rate, derived from Excel EXKL price progression per model.
+// Methodology: EXKL progression per 500mm depth / rafter count × Sparren share ratio (94.14%)
+// Calibrated against Aluxe calculator screenshot: Trendline L-Sparren = €13.50/piece (verified ✅)
+const SPARREN_PRICES_PER_PIECE: Record<string, number> = {
+    'Orangeline': 12.82, 'Orangeline+': 12.85,
+    'Trendline': 13.50, 'Trendline+': 13.53,
+    'Topline': 15.53, 'Topline XL': 15.83,
+    'Designline': 22.15, 'Ultraline': 49.52,
+};
+
+const FIXED_ROOF_ACCESSORIES_BOM = [
+    { name: 'Lochbohrer 83mm HWA', price: 7.37 },
+    { name: 'Silikon transparent', price: 3.46 },
+    { name: 'Bogen 90 Grad', price: 4.22 },
+];
+
+const PFAND_RATES = {
+    roof_palette: 26.00,
+    roof_glass_crate: 110.00,
+    panorama_crate: 90.00, // Excel Vorwort: Panoramakiste = €90 p/st
+    keilfenster_crate: 110.00,
+    markise_palette: 26.00,
+    schiebetuer_crate: 110.00,
+};
+
+const TRANSPORT_COST = 375.00; // Aluxe standard transport cost
+
+// Panorama per-system mandatory accessories (from Aluxe BOM)
+const PANORAMA_BOM_ACCESSORIES = [
+    { name: 'Koppelprofil Keil/Panorama', price: 26.17 },
+    { name: 'Silikon transparent', price: 3.46 },
+];
+
+const MARKISE_BOM_ACCESSORIES = [
+    { name: 'Befestigungs Winkel (1 set)', price: 45.00 },
+];
+
+// Calculate physical material costs for a roof structure
+// Logic verified against Aluxe calculator output (Apr 2026)
+// Area calculation uses Excel's "Oberfläche in m²" column which = width × projection / 1,000,000
+function calculateRoofMaterialCost(
+    model: string, cover: 'Poly' | 'Glass', width: number, projection: number,
+    fieldsCount: number, postsCount: number, polyVar: string, glassVar: string
+): { coverCost: number; sparrenCost: number; accessoriesCost: number; total: number; details: string } {
+    // 1. Cover material — Excel uses simple width×projection for area (Oberfläche column)
+    const areaM2 = (width * projection) / 1_000_000;
+    const is10mm = ['Topline', 'Topline XL', 'Designline', 'Ultraline'].includes(model);
+    let rate: number;
+    let rateLabel: string;
+    if (cover === 'Glass') {
+        if (glassVar === 'stopsol') {
+            rate = is10mm ? COVER_RATES_PER_M2['Glass_10mm_stopsol'] : COVER_RATES_PER_M2['Glass_8mm_planibel'];
+            rateLabel = is10mm ? 'Stopsol 10mm' : 'Planibel 8mm';
+        } else if (glassVar === 'matt') {
+            rate = is10mm ? COVER_RATES_PER_M2['Glass_10mm_matt'] : COVER_RATES_PER_M2['Glass_8mm_matt'];
+            rateLabel = `Matt ${is10mm ? '10' : '8'}mm`;
+        } else {
+            rate = is10mm ? COVER_RATES_PER_M2['Glass_10mm_klar'] : COVER_RATES_PER_M2['Glass_8mm_klar'];
+            rateLabel = `Klar ${is10mm ? '10' : '8'}mm`;
+        }
+    } else {
+        if (polyVar === 'ir-gold') {
+            rate = COVER_RATES_PER_M2['Poly_ir_gold'];
+            rateLabel = 'IR Gold';
+        } else if (polyVar === 'smokey') {
+            rate = COVER_RATES_PER_M2['Poly_smokey'];
+            rateLabel = 'Smokey Grey';
+        } else {
+            rate = COVER_RATES_PER_M2['Poly_standard'];
+            rateLabel = 'Standard';
+        }
+    }
+    const coverCost = Math.round(areaM2 * rate * 100) / 100;
+
+    // 2. L-Sparren (rafters) = fields + 1 (verified: Aluxe 6000×3000 = 8 fields + 1 = 9 Sparren)
+    const sparrenCount = fieldsCount + 1;
+    const sparrenUnit = SPARREN_PRICES_PER_PIECE[model] || 13.50;
+    const sparrenCost = Math.round(sparrenUnit * sparrenCount * 100) / 100;
+
+    // 3. Fixed accessories (from Aluxe calculator output)
+    const accessoriesCost = Math.round(FIXED_ROOF_ACCESSORIES_BOM.reduce((s, a) => s + a.price, 0) * 100) / 100;
+
+    const total = Math.round((coverCost + sparrenCost + accessoriesCost) * 100) / 100;
+    const label = cover === 'Glass' ? `VSG ${rateLabel}` : `Poly ${rateLabel}`;
+    const details = `${label}: ${areaM2.toFixed(1)}m² × €${rate.toFixed(3)} = €${coverCost.toFixed(2)} | Sparren: ${sparrenCount}× €${sparrenUnit} = €${sparrenCost.toFixed(2)}`;
+    return { coverCost, sparrenCost, accessoriesCost, total, details };
+}
 
 // Glass type options for Side/Front walls
 const WALL_GLASS_TYPES = [
@@ -400,7 +541,7 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [extraPosts, setExtraPosts] = useState<number>(0);
     const [extraPostHeight, setExtraPostHeight] = useState<2400 | 3000>(2400);
     const EXTRA_POST_BASE_PRICE = 58.20; // per extra post, 2400mm
-    const EXTRA_POST_3000_SURCHARGE = 15.0; // per post surcharge for 3000mm — applies to ALL posts (base + extra)
+    const EXTRA_POST_3000_SURCHARGE = 14.55; // per post surcharge for 3000mm from Aluxe Materialien sheet — applies to ALL posts (base + extra)
     const totalPostCount = (structuralMetadata?.posts_count || 2) + extraPosts;
     const heightSurcharge = extraPostHeight === 3000 ? totalPostCount * EXTRA_POST_3000_SURCHARGE : 0;
     const extraPostTotalPrice = (extraPosts * EXTRA_POST_BASE_PRICE) + heightSurcharge;
@@ -787,7 +928,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                         awningWidth,
                         awningProjection
                     );
-                    if (price !== null) setAwningPrice(price);
+                    if (price !== null) {
+                        // Add mandatory BOM accessories (Befestigungswinkel — always in Aluxe orders)
+                        const markiseBom = MARKISE_BOM_ACCESSORIES.reduce((s, a) => s + a.price, 0);
+                        setAwningPrice(price + markiseBom);
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -887,6 +1032,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                             if (panoramaSteelLook) {
                                 accessoriesTotal += 18.95 * 2;
                             }
+
+                            // Mandatory BOM accessories (Koppelprofil + Silikon — always in Aluxe orders)
+                            const bomTotal = PANORAMA_BOM_ACCESSORIES.reduce((s, a) => s + a.price, 0);
+                            accessoriesTotal += bomTotal;
 
                             setPanoramaAccessoriesPrice(accessoriesTotal);
                             finalPrice += accessoriesTotal;
@@ -1469,10 +1618,25 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === TOTALS ===
     const currentModel = useMemo(() => ROOF_MODELS.find(m => m.id === model), [model]);
 
+    // === MATERIAL BOM (physical materials: glass/poly panels, rafters, accessories) ===
+    const materialBOM = useMemo(() => {
+        if (!price || !structuralMetadata?.fields_count) return null;
+        // Skyline/Carport/Pergola don't have standard BOM logic
+        if (['Skyline', 'Carport', 'Pergola', 'Pergola Deluxe'].includes(model)) return null;
+        return calculateRoofMaterialCost(
+            model, cover, width, projection,
+            structuralMetadata.fields_count,
+            structuralMetadata.posts_count || 2,
+            polyVariant,
+            glassVariant
+        );
+    }, [model, cover, width, projection, structuralMetadata, price, polyVariant, glassVariant]);
+
     const totalPrice = useMemo(() => {
         if (price === null) return null;
-        return price + freestandingSurchargePrice + variantSurchargePrice + sonderfarbenSurcharge + schiebeeinheitTotalPrice + extraPostTotalPrice;
-    }, [price, freestandingSurchargePrice, variantSurchargePrice, sonderfarbenSurcharge, schiebeeinheitTotalPrice, extraPostTotalPrice]);
+        const matCost = materialBOM?.total || 0;
+        return price + freestandingSurchargePrice + variantSurchargePrice + sonderfarbenSurcharge + schiebeeinheitTotalPrice + extraPostTotalPrice + matCost;
+    }, [price, freestandingSurchargePrice, variantSurchargePrice, sonderfarbenSurcharge, schiebeeinheitTotalPrice, extraPostTotalPrice, materialBOM]);
 
     const addToBasket = (itemName: string, itemPrice: number, configStr: string, dimStr: string, category: BasketItem['category']) => {
         const newItem: BasketItem = {
@@ -1499,6 +1663,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
             (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}× (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
             (extraPosts > 0 ? ` | Zusatzpfosten: ${extraPosts}× ${extraPostHeight}mm (+${formatCurrency(extraPostTotalPrice)})` : '') +
+            (materialBOM ? ` | Material: +${formatCurrency(materialBOM.total)}` : '') +
             (structureNote ? ` (${structureNote})` : '');
         const roofDisplayName = ROOF_MODELS.find(m => m.id === model)?.name || model;
         addToBasket(roofDisplayName, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
@@ -1531,6 +1696,25 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const basketTotal = useMemo(() => basket.reduce((sum, item) => sum + item.price, 0), [basket]);
 
+    // === PFAND (packaging deposits) — internal only, not shown to customer ===
+    const pfandTotal = useMemo(() => {
+        let total = 0;
+        for (const item of basket) {
+            if (item.category === 'roof') {
+                total += PFAND_RATES.roof_palette + PFAND_RATES.roof_glass_crate;
+            } else if (item.name.includes('Panorama') || item.category === 'panorama') {
+                total += PFAND_RATES.panorama_crate;
+            } else if (item.name.includes('Keilfenster') || item.name.includes('Wedge')) {
+                total += PFAND_RATES.keilfenster_crate;
+            } else if (item.name.includes('Markise') || item.name.includes('markise')) {
+                total += PFAND_RATES.markise_palette;
+            } else if (item.name.includes('Schiebetür')) {
+                total += PFAND_RATES.schiebetuer_crate;
+            }
+        }
+        return total;
+    }, [basket]);
+
     const removeFromBasket = (itemId: string) => {
         setBasket(prev => prev.filter(item => item.id !== itemId));
         toast.success('Entfernt');
@@ -1562,9 +1746,13 @@ export const ProductConfiguratorV2: React.FC = () => {
     const purchaseDiscountValue = subtotal * (purchaseDiscount / 100);
     const purchasePrice = subtotal - purchaseDiscountValue;
 
-    // Step 2: Apply margin on top of purchase price
-    const marginValue = purchasePrice * (margin / 100);
-    const priceAfterMargin = purchasePrice + marginValue;
+    // Internal costs (not shown to customer, but factored into true purchase cost)
+    const internalCosts = pfandTotal + TRANSPORT_COST;
+    const totalPurchaseCostInternal = purchasePrice + internalCosts; // True cost to company
+
+    // Step 2: Apply margin on top of purchase price (margin covers product + pfand + transport)
+    const marginValue = totalPurchaseCostInternal * (margin / 100);
+    const priceAfterMargin = totalPurchaseCostInternal + marginValue;
 
     // Step 3: Apply customer discount (manual discount given to customer)
     const discountValue = priceAfterMargin * (discount / 100);
@@ -1795,22 +1983,38 @@ export const ProductConfiguratorV2: React.FC = () => {
 
 
 
-        // buildPDFData is only used for PDF download now
+        // buildPDFData — prepares data for customer-facing PDF offer.
+        // CRITICAL: positions must show CUSTOMER SALE PRICES, not our internal purchase prices.
+        // The sale price per position = proportional share of the final price (before montage/discount).
         const buildPDFData = () => {
+            // priceAfterMargin = what the customer pays for products (before discount, before montage)
+            // subtotal = sum of basket catalog prices
+            // We scale each position proportionally to distribute priceAfterMargin across items
+            const saleMultiplier = subtotal > 0
+                ? (priceAfterMargin) / subtotal
+                : 1;
+
             const positions = [
                 ...basket.map(b => ({
                     name: b.name,
                     description: b.config,
                     dimensions: b.dimensions || '',
-                    price: b.price
+                    price: Math.round(b.price * saleMultiplier * 100) / 100
                 })),
                 ...customItems.map(ci => ({
                     name: ci.name,
                     description: 'Manuelle Position',
                     dimensions: '',
-                    price: ci.price
+                    price: Math.round(ci.price * saleMultiplier * 100) / 100
                 }))
             ];
+
+            // Recalculate sums from scaled positions
+            const pdfSubtotal = positions.reduce((s, p) => s + p.price, 0);
+            const pdfDiscountValue = pdfSubtotal * (discount / 100);
+            const pdfNetAfterDiscount = pdfSubtotal - pdfDiscountValue;
+            const pdfFinalNet = pdfNetAfterDiscount + montagePrice;
+
             return {
                 customer: {
                     salutation: customerState?.salutation || '',
@@ -1837,21 +2041,26 @@ export const ProductConfiguratorV2: React.FC = () => {
                     postsCount: structuralMetadata?.posts_count,
                     extraPosts,
                     extraPostHeight,
-                    rafterType: structuralMetadata?.rafter_type
+                    rafterType: structuralMetadata?.rafter_type,
+                    fieldsCount: structuralMetadata?.fields_count,
+                    pfostenDim: PROFILE_SPECS[model]?.pfosten,
+                    sparrenDim: structuralMetadata?.rafter_type && PROFILE_SPECS[model]
+                        ? PROFILE_SPECS[model].sparrenTypes.find(s => s.type === structuralMetadata.rafter_type)?.dim
+                            || PROFILE_SPECS[model].sparrenTypes[0]?.dim
+                        : PROFILE_SPECS[model]?.sparrenTypes[0]?.dim,
                 },
                 positions,
                 pricing: {
-                    subtotal,
-                    marginPercent: margin,
-                    marginValue,
+                    subtotal: pdfSubtotal,
+                    marginPercent: 0, // margin is already baked into position prices
+                    marginValue: 0,
                     discountPercent: discount,
-                    discountValue,
+                    discountValue: pdfDiscountValue,
                     montagePrice,
-                    extraPostTotal: extraPostTotalPrice,
-                    finalPriceNet: finalPrice,
-                    finalPriceGross: finalPrice * 1.19,
-                    purchaseDiscount,
-                    ...(isPL ? { currency: 'PLN', eurRate, finalPriceNetPLN: finalPrice * eurRate, finalPriceGrossPLN8: finalPrice * eurRate * 1.08, finalPriceGrossPLN23: finalPrice * eurRate * 1.23 } : { currency: 'EUR' })
+                    extraPostTotal: 0, // already in positions
+                    finalPriceNet: pdfFinalNet,
+                    finalPriceGross: pdfFinalNet * 1.19,
+                    ...(isPL ? { currency: 'PLN', eurRate, finalPriceNetPLN: pdfFinalNet * eurRate, finalPriceGrossPLN8: pdfFinalNet * eurRate * 1.08, finalPriceGrossPLN23: pdfFinalNet * eurRate * 1.23 } : { currency: 'EUR' })
                 },
                 offerNumber: savedOffer?.offerNumber || `V2-${Date.now()}`,
                 offerDate: new Date().toLocaleDateString('de-DE'),
@@ -1907,7 +2116,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                                    <div><span className="text-slate-500">Modell:</span> <strong>{model}</strong></div>
+                                    <div><span className="text-slate-500">Modell:</span> <strong>{ROOF_MODELS.find(m => m.id === model)?.name || model}</strong></div>
                                     <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
                                     <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
                                 </div>
@@ -2088,13 +2297,47 @@ export const ProductConfiguratorV2: React.FC = () => {
                             {purchaseDiscount > 0 && (
                                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm text-green-700">🏷️ Rabat zakupowy (Admin):</span>
+                                        <span className="text-sm text-green-700">🏷️ Einkaufsrabatt (Admin):</span>
                                         <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                        <span>Einkaufspreis:</span>
+                                        <span>Einkaufspreis (Produkte):</span>
                                         <span className="font-bold">{formatCurrency(purchasePrice)}</span>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Internal Costs: Pfand + Transport — visible only to sales rep */}
+                            {subtotal > 0 && (
+                                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <p className="text-xs font-bold text-amber-700 uppercase mb-2">📦 Interne Kosten (nicht auf dem Angebot sichtbar)</p>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-center text-sm text-amber-800">
+                                            <span>Pfand (Verpackungspfand):</span>
+                                            <span className="font-bold">{formatCurrency(pfandTotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm text-amber-800">
+                                            <span>Transport (Aluxe → Lager):</span>
+                                            <span className="font-bold">{formatCurrency(TRANSPORT_COST)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm font-bold text-amber-900 pt-1 border-t border-amber-200">
+                                            <span>Gesamte Einkaufskosten:</span>
+                                            <span>{formatCurrency(totalPurchaseCostInternal)}</span>
+                                        </div>
+                                    </div>
+                                    {/* Profit display */}
+                                    {finalPrice > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-amber-300">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-amber-800">Verkaufspreis (netto):</span>
+                                                <span className="font-bold text-amber-900">{formatCurrency(finalPrice)}</span>
+                                            </div>
+                                            <div className={`flex justify-between items-center text-sm font-bold mt-1 ${(finalPrice - totalPurchaseCostInternal - montagePrice) > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                                <span>💰 Rohertrag:</span>
+                                                <span>{formatCurrency(finalPrice - totalPurchaseCostInternal - montagePrice)} ({totalPurchaseCostInternal > 0 ? (((finalPrice - totalPurchaseCostInternal - montagePrice) / totalPurchaseCostInternal) * 100).toFixed(1) : 0}%)</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -2579,8 +2822,29 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                 </div>
                                 <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                    <span>Einkaufspreis:</span>
+                                    <span>Einkaufspreis (Produkte):</span>
                                     <span className="font-bold">{formatCurrency(purchasePrice)}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Internal Costs: Pfand + Transport */}
+                        {subtotal > 0 && (
+                            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p className="text-xs font-bold text-amber-700 uppercase mb-2">📦 Koszty wewnętrzne (nie widoczne dla klienta)</p>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center text-sm text-amber-800">
+                                        <span>Pfand:</span>
+                                        <span className="font-bold">{formatCurrency(pfandTotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm text-amber-800">
+                                        <span>Transport:</span>
+                                        <span className="font-bold">{formatCurrency(TRANSPORT_COST)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-bold text-amber-900 pt-1 border-t border-amber-200">
+                                        <span>Einkaufskosten gesamt:</span>
+                                        <span>{formatCurrency(totalPurchaseCostInternal)}</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -4409,7 +4673,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                                                 <span className="text-indigo-900 font-medium">Materialien für Modell:</span>
-                                                <span className="font-bold text-indigo-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-indigo-200 shadow-sm">{model}</span>
+                                                <span className="font-bold text-indigo-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-indigo-200 shadow-sm">{ROOF_MODELS.find(m => m.id === model)?.name || model}</span>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4759,7 +5023,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     <div className="mb-6 space-y-2">
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Model</span>
-                                            <span className="font-bold text-slate-800">{model}</span>
+                                            <span className="font-bold text-slate-800">{ROOF_MODELS.find(m => m.id === model)?.name || model}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Wymiar</span>
@@ -4779,7 +5043,101 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </span>
                                             </div>
                                         )}
+                                        {materialBOM && (
+                                            <div className="space-y-0.5">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500">Material (BOM)</span>
+                                                    <span className="font-bold text-amber-600">
+                                                        +{formatCurrency(materialBOM.total)}
+                                                    </span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 pl-2 space-y-0.5">
+                                                    <div className="flex justify-between">
+                                                        <span>├ {cover === 'Glass' ? 'VSG' : 'Poly'} Eindeckung</span>
+                                                        <span>{formatCurrency(materialBOM.coverCost)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>├ Sparren ({structuralMetadata?.fields_count ? structuralMetadata.fields_count + 1 : '?'}×)</span>
+                                                        <span>{formatCurrency(materialBOM.sparrenCost)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>└ Zubehör</span>
+                                                        <span>{formatCurrency(materialBOM.accessoriesCost)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="h-px bg-slate-100 my-2" />
+
+                                        {/* Technical Specs from Technikmappe */}
+                                        {TECH_SPECS[model] && (
+                                            <div className="mb-2 p-2 bg-slate-50 rounded-lg">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">📋 Technische Daten</p>
+                                                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                                                    <span>Glasgefälle:</span>
+                                                    <span className="font-medium text-slate-700">{TECH_SPECS[model].glassFall}</span>
+                                                    <span>Breite:</span>
+                                                    <span className="font-medium text-slate-700">{TECH_SPECS[model].minWidth}–{TECH_SPECS[model].maxWidth}mm</span>
+                                                    <span>Tiefe:</span>
+                                                    <span className="font-medium text-slate-700">{TECH_SPECS[model].minDepth}–{TECH_SPECS[model].maxDepth}mm</span>
+                                                    <span>Max. Höhe:</span>
+                                                    <span className="font-medium text-slate-700">{TECH_SPECS[model].maxHeight}mm</span>
+                                                    {TECH_SPECS[model].keilmassMin && (
+                                                        <>
+                                                            <span>Keilmaß min.:</span>
+                                                            <span className="font-medium text-slate-700">{TECH_SPECS[model].keilmassMin}mm</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {/* Profile Specs from Excel */}
+                                                {PROFILE_SPECS[model] && (
+                                                    <div className="mt-1.5 pt-1.5 border-t border-slate-200">
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Profile</p>
+                                                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                                                            {PROFILE_SPECS[model].pfosten !== '—' && (
+                                                                <>
+                                                                    <span>Pfosten:</span>
+                                                                    <span className="font-medium text-slate-700">{PROFILE_SPECS[model].pfosten}</span>
+                                                                </>
+                                                            )}
+                                                            {structuralMetadata?.rafter_type && (
+                                                                <>
+                                                                    <span>Sparren:</span>
+                                                                    <span className="font-medium text-slate-700">
+                                                                        {structuralMetadata.rafter_type}-Sparren {PROFILE_SPECS[model].sparrenTypes.find(s => s.type === structuralMetadata.rafter_type)?.dim || ''}
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                            {structuralMetadata?.fields_count != null && structuralMetadata.fields_count > 0 && (
+                                                                <>
+                                                                    <span>Felder:</span>
+                                                                    <span className="font-medium text-slate-700">{structuralMetadata.fields_count} Felder / {structuralMetadata.fields_count + 1} Sparren</span>
+                                                                </>
+                                                            )}
+                                                            {structuralMetadata?.posts_count != null && (
+                                                                <>
+                                                                    <span>Pfosten Anz.:</span>
+                                                                    <span className="font-medium text-slate-700">{structuralMetadata.posts_count + (extraPosts || 0)} Stk.</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Dimension validation warning */}
+                                        {TECH_SPECS[model] && (width > TECH_SPECS[model].maxWidth || projection > TECH_SPECS[model].maxDepth || width < TECH_SPECS[model].minWidth || projection < TECH_SPECS[model].minDepth) && (
+                                            <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                                                <p className="text-[10px] font-bold text-red-600">
+                                                    ⚠️ Abmessungen außerhalb der Spezifikation!
+                                                    {width > TECH_SPECS[model].maxWidth && ` Breite max. ${TECH_SPECS[model].maxWidth}mm.`}
+                                                    {width < TECH_SPECS[model].minWidth && ` Breite min. ${TECH_SPECS[model].minWidth}mm.`}
+                                                    {projection > TECH_SPECS[model].maxDepth && ` Tiefe max. ${TECH_SPECS[model].maxDepth}mm.`}
+                                                    {projection < TECH_SPECS[model].minDepth && ` Tiefe min. ${TECH_SPECS[model].minDepth}mm.`}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Price Display */}
                                         <div className="text-center py-2">
@@ -4794,7 +5152,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     )}
                                                 </>
                                             ) : (
-                                                <div className="text-slate-400 italic text-sm">{error || 'Obliczam...'}</div>
+                                                <div className="text-slate-400 italic text-sm">{error || 'Wird berechnet...'}</div>
                                             )}
                                         </div>
 

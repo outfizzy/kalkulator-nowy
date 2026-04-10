@@ -27,6 +27,9 @@ interface OfferPDFData {
         extraPosts?: number;
         extraPostHeight?: number;
         rafterType?: string | null;
+        fieldsCount?: number;
+        pfostenDim?: string;
+        sparrenDim?: string;
     };
     positions: Array<{
         name: string;
@@ -44,7 +47,6 @@ interface OfferPDFData {
         extraPostTotal: number;
         finalPriceNet: number;
         finalPriceGross: number;
-        purchaseDiscount?: number;
     };
     offerNumber?: string;
     offerDate?: string;
@@ -229,11 +231,19 @@ const buildOfferDoc = (data: OfferPDFData): { doc: jsPDF; filename: string } => 
         if (t.postsCount) {
             const total = t.postsCount + (t.extraPosts || 0);
             let desc = `${total} Stück`;
-            if (t.extraPosts && t.extraPosts > 0) desc += ` (${t.postsCount} Std. + ${t.extraPosts} Zusatz)`;
+            if (t.pfostenDim && t.pfostenDim !== '—') desc += ` (${t.pfostenDim})`;
+            if (t.extraPosts && t.extraPosts > 0) desc += ` — davon ${t.extraPosts} Zusatz`;
             if (t.extraPostHeight === 3000) desc += ' — Höhe 3.000 mm';
             techRows.push(['Pfosten', desc]);
         }
-        if (t.rafterType) techRows.push(['Sparrentyp', t.rafterType]);
+        if (t.fieldsCount && t.fieldsCount > 0) {
+            techRows.push(['Felder / Sparren', `${t.fieldsCount} Felder / ${t.fieldsCount + 1} Sparren`]);
+        }
+        if (t.rafterType) {
+            let sparrenDesc = `${t.rafterType}-Sparren`;
+            if (t.sparrenDim) sparrenDesc += ` (${t.sparrenDim})`;
+            techRows.push(['Sparrentyp', sparrenDesc]);
+        }
 
         const boxH = techRows.length * 6 + 8;
         doc.roundedRect(ML, Y - 2, CW, boxH, 2, 2, 'F');
