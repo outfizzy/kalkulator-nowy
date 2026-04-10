@@ -70,6 +70,7 @@ export const MailPage: React.FC = () => {
 
     const [emails, setEmails] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadingBody, setLoadingBody] = useState(false);
     const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
 
     // Feature 1: Search
@@ -467,6 +468,7 @@ export const MailPage: React.FC = () => {
         }
 
         setSelectedEmail(null); // Clear previous selection while loading
+        setLoadingBody(true);
         setShowLeadForm(false); // Reset lead form
         try {
             const response = await fetch('/api/fetch-email-body', {
@@ -489,6 +491,8 @@ export const MailPage: React.FC = () => {
         } catch (error: any) {
             console.error('Error loading email details:', error);
             toast.error(`Błąd: ${error.message}`);
+        } finally {
+            setLoadingBody(false);
         }
     };
 
@@ -1406,6 +1410,9 @@ export const MailPage: React.FC = () => {
                             </svg>
                             <span>Odebrane</span>
                         </div>
+                        {unreadCount > 0 && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-full min-w-[20px] text-center">{unreadCount}</span>
+                        )}
                     </button>
                     <button
                         onClick={() => { setActiveTab('sent'); setSelectedEmailIds(new Set()); }}
@@ -1418,6 +1425,9 @@ export const MailPage: React.FC = () => {
                             </svg>
                             <span>Wysłane</span>
                         </div>
+                        {emails.length > 0 && activeTab === 'sent' && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-500 rounded-full">{emails.length}</span>
+                        )}
                     </button>
                 </div>
 
@@ -1545,13 +1555,21 @@ export const MailPage: React.FC = () => {
                         </div>
 
                         {/* Scanner toolbar removed */}
-                        {loading ? (
-                            <div className="p-8 text-center text-slate-400">
-                                <svg className="w-8 h-8 animate-spin mx-auto mb-2" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <p className="text-sm">Odświeżanie...</p>
+                        {loading && emails.length === 0 ? (
+                            <div className="p-3 space-y-3">
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <div key={i} className="animate-pulse flex items-start gap-3 p-3">
+                                        <div className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0" />
+                                        <div className="flex-1 space-y-2">
+                                            <div className="flex justify-between">
+                                                <div className="h-3.5 bg-slate-200 rounded w-32" />
+                                                <div className="h-3 bg-slate-100 rounded w-12" />
+                                            </div>
+                                            <div className="h-3 bg-slate-200 rounded w-48" />
+                                            <div className="h-2.5 bg-slate-100 rounded w-full" />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : !isConfigured ? (
                             <div className="p-8 text-center text-slate-400">
@@ -1571,54 +1589,96 @@ export const MailPage: React.FC = () => {
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
-                                {filteredEmails.map(email => (
-                                    <div
-                                        key={email.id}
-                                        className={`p-3 border-b border-slate-50 transition-colors ${selectedEmail?.id === email.messageId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                                            } ${!email.flags?.includes('\\Seen') ? 'font-semibold bg-white' : 'text-slate-600 bg-slate-50/50'} relative group`}
-                                    >
-                                        <div className="absolute left-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedEmailIds.has(email.id)}
-                                                onChange={(e) => {
-                                                    const newSet = new Set(selectedEmailIds);
-                                                    if (e.target.checked) newSet.add(email.id);
-                                                    else newSet.delete(email.id);
-                                                    setSelectedEmailIds(newSet);
-                                                }}
-                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
-                                            />
-                                        </div>
-                                        <div
-                                            className="pl-6 cursor-pointer" // Space for checkbox (even when hidden)
-                                            onClick={(e) => {
-                                                // Prevent click if clicking checkbox (handled by input above) but just in case
-                                                handleSelectEmail(email.id);
-                                            }}
-                                        >
-                                            <div className="flex justify-between items-baseline mb-1">
-                                                <span className="truncate text-sm font-medium text-slate-900 max-w-[70%] flex items-center gap-1">
-                                                    {selectedEmailIds.has(email.id) && (
-                                                        <span className="text-blue-600 scale-75 transform -ml-1">✓</span>
-                                                    )}
-                                                    {convertedMessageIds.has(String(email.id)) && (
-                                                        <span title="Utworzono Lead" className="text-emerald-500">
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        </span>
-                                                    )}
-                                                    {email.from.replace(/<.*>/, '').trim()}
-                                                </span>
-                                                <span className="text-xs text-slate-400 flex-shrink-0">
-                                                    {new Date(email.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                                                </span>
-                                            </div>
-                                            <h3 className="text-sm text-slate-800 truncate mb-1">{email.subject}</h3>
-                                        </div>
+                                {loading && emails.length > 0 && (
+                                    <div className="px-3 py-1.5 bg-blue-50 flex items-center gap-2 text-xs text-blue-600">
+                                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Aktualizowanie...
                                     </div>
-                                ))}
+                                )}
+                                {filteredEmails.map(email => {
+                                    const isUnread = !email.flags?.includes('\\Seen');
+                                    const isSelected = selectedEmail?.id === email.messageId;
+                                    const isChecked = selectedEmailIds.has(email.id);
+                                    const senderName = email.from.replace(/<.*>/, '').trim() || email.from;
+                                    const senderInitial = senderName.charAt(0).toUpperCase();
+                                    const previewText = (email.text || '').replace(/\s+/g, ' ').substring(0, 90);
+                                    const emailDate = new Date(email.date);
+                                    const isToday = emailDate.toDateString() === new Date().toDateString();
+                                    const dateStr = isToday
+                                        ? emailDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+                                        : emailDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+
+                                    return (
+                                        <div
+                                            key={email.id}
+                                            className={`relative group cursor-pointer transition-all duration-150 ${
+                                                isSelected ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : isChecked ? 'bg-blue-50/50' : isUnread ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/30 hover:bg-slate-50'
+                                            }`}
+                                            onClick={() => handleSelectEmail(email.id)}
+                                        >
+                                            <div className="flex items-start gap-3 p-3 pl-3">
+                                                {/* Checkbox / Avatar */}
+                                                <div className="relative flex-shrink-0 mt-0.5">
+                                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                                                        isChecked ? 'bg-blue-600 text-white' : isUnread ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                                                    }`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const newSet = new Set(selectedEmailIds);
+                                                            if (newSet.has(email.id)) newSet.delete(email.id);
+                                                            else newSet.add(email.id);
+                                                            setSelectedEmailIds(newSet);
+                                                        }}
+                                                    >
+                                                        {isChecked ? (
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                        ) : senderInitial}
+                                                    </div>
+                                                    {convertedMessageIds.has(String(email.id)) && (
+                                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
+                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-baseline gap-2 mb-0.5">
+                                                        <span className={`truncate text-sm ${isUnread ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
+                                                            {senderName}
+                                                        </span>
+                                                        <span className={`text-[11px] flex-shrink-0 ${isUnread ? 'text-blue-600 font-semibold' : 'text-slate-400'}`}>
+                                                            {dateStr}
+                                                        </span>
+                                                    </div>
+                                                    <h3 className={`text-[13px] truncate mb-0.5 ${isUnread ? 'text-slate-900 font-semibold' : 'text-slate-700'}`}>
+                                                        {email.subject || '(Kein Betreff)'}
+                                                    </h3>
+                                                    {previewText && (
+                                                        <p className="text-xs text-slate-400 truncate leading-relaxed">
+                                                            {previewText}{previewText.length >= 90 ? '…' : ''}
+                                                        </p>
+                                                    )}
+                                                    {/* Attachment indicator */}
+                                                    {email.hasAttachments && (
+                                                        <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                            Załącznik
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Unread dot */}
+                                                {isUnread && !isSelected && (
+                                                    <div className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0 mt-2" />
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -1631,8 +1691,27 @@ export const MailPage: React.FC = () => {
                             <form onSubmit={handleSend} className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                 {/* Compose UI Header */}
                                 <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-bold text-slate-800">Nowa Wiadomość</h2>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setActiveTab('inbox'); setSelectedEmail(null); }}
+                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                        </button>
+                                        <h2 className="text-xl font-bold text-slate-800">Nowa Wiadomość</h2>
+                                    </div>
                                     <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleLoadTemplates}
+                                            className="px-3 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors flex items-center gap-2 text-sm font-medium"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                                            </svg>
+                                            <span className="hidden md:inline">Szablon</span>
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => setShowAiPresets(!showAiPresets)}
@@ -1641,7 +1720,7 @@ export const MailPage: React.FC = () => {
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                             </svg>
-                                            AI Asystent
+                                            <span className="hidden md:inline">AI Asystent</span>
                                         </button>
                                         <button
                                             type="submit"
@@ -1817,12 +1896,37 @@ export const MailPage: React.FC = () => {
                     ) : (
                         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                             {/* Email Reading Pane */}
-                            {selectedEmail ? (
+                            {loadingBody ? (
+                                <div className="flex-1 flex flex-col p-6 animate-pulse">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-full bg-slate-200" />
+                                        <div className="space-y-2">
+                                            <div className="h-4 bg-slate-200 rounded w-48" />
+                                            <div className="h-3 bg-slate-100 rounded w-32" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="h-3 bg-slate-200 rounded w-full" />
+                                        <div className="h-3 bg-slate-200 rounded w-5/6" />
+                                        <div className="h-3 bg-slate-100 rounded w-4/6" />
+                                        <div className="h-3 bg-slate-100 rounded w-full" />
+                                        <div className="h-3 bg-slate-200 rounded w-3/4" />
+                                    </div>
+                                </div>
+                            ) : selectedEmail ? (
                                 <div className="flex-1 flex flex-col overflow-hidden">
                                     <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white z-10 shadow-sm">
-                                        <h2 className="text-lg font-bold text-slate-800 truncate flex-1 pr-4">
-                                            {selectedEmail.subject}
-                                        </h2>
+                                        <div className="flex items-center gap-3 min-w-0 flex-1 pr-4">
+                                            <button
+                                                onClick={() => { setSelectedEmail(null); setShowLeadForm(false); }}
+                                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0 lg:hidden"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                            </button>
+                                            <h2 className="text-lg font-bold text-slate-800 truncate">
+                                                {selectedEmail.subject}
+                                            </h2>
+                                        </div>
                                         <div className="flex gap-2 flex-shrink-0">
                                             {!showLeadForm && (
                                                 <>
@@ -1832,7 +1936,6 @@ export const MailPage: React.FC = () => {
                                                         title="Automatycznie wyciągnij dane z treści"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            ```
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                                         </svg>
                                                         <span className="hidden sm:inline">Utwórz Lead (AI)</span>
@@ -1892,15 +1995,33 @@ export const MailPage: React.FC = () => {
 
                                             {/* Header Info */}
                                             <div className="mb-6">
-                                                <div className="flex items-center gap-3 mb-4">
-                                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg">
-                                                        {selectedEmail.from.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-slate-900">{selectedEmail.from}</p>
-                                                        <p className="text-xs text-slate-500">{new Date(selectedEmail.date).toLocaleString()}</p>
-                                                    </div>
-                                                </div>
+                                                {(() => {
+                                                    const fromRaw = selectedEmail.from;
+                                                    const fromName = fromRaw.includes('<') ? fromRaw.split('<')[0].trim().replace(/^"|"$/g, '') : '';
+                                                    const fromEmail = fromRaw.includes('<') ? fromRaw.match(/<(.+?)>/)?.[1] || fromRaw : fromRaw;
+                                                    const initial = (fromName || fromEmail).charAt(0).toUpperCase();
+                                                    const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500'];
+                                                    const colorIdx = (initial.charCodeAt(0) || 0) % colors.length;
+                                                    return (
+                                                        <div className="flex items-start gap-3 mb-4">
+                                                            <div className={`w-10 h-10 rounded-full ${colors[colorIdx]} flex items-center justify-center text-white font-bold text-lg flex-shrink-0`}>
+                                                                {initial}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-baseline gap-2 flex-wrap">
+                                                                    <span className="font-semibold text-slate-900">{fromName || fromEmail}</span>
+                                                                    {fromName && <span className="text-xs text-slate-400">&lt;{fromEmail}&gt;</span>}
+                                                                </div>
+                                                                <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                                                                    <span>{new Date(selectedEmail.date).toLocaleString('de-DE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    {selectedEmail.to && (
+                                                                        <span className="truncate">An: {selectedEmail.to}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
 
                                             {/* Body */}
