@@ -243,14 +243,23 @@ export const OfferPrintView: React.FC = () => {
         });
     });
 
-    // Items (V2)
+    // Items (V2) — these are the internal purchase breakdown of basePrice
+    // They must NOT add separate prices since basePrice already includes everything.
+    // We show them as "included" descriptive lines (price = 0) so the customer sees
+    // what's included, without exposing purchase prices.
     ((p?.items || []) as any[])
         .filter((i: any) => i?.name && !i.name.toLowerCase().includes((p.modelId || '').toLowerCase()))
         .forEach((item: any) => {
+            // Skip if an addon with similar name already exists (V1 addons handle those)
+            const alreadyHasAddon = (offer.product?.addons || []).some((a: any) =>
+                a?.name && translateAddonName(a.name).toLowerCase() === translateAddonName(item.name).toLowerCase()
+            );
+            if (alreadyHasAddon) return;
+
             lineItems.push({
                 name: translateAddonName(item.name),
                 subtext: item.config || getAddonSubtext(item.name) || undefined,
-                price: Math.round((Number(item.price) || 0) * saleMultiplier * 100) / 100,
+                price: 0, // included in basePrice — don't show purchase cost
             });
         });
 
@@ -601,7 +610,10 @@ export const OfferPrintView: React.FC = () => {
                                                         )}
                                                     </td>
                                                     <td className="tn" style={{ padding: '8px', textAlign: 'right', verticalAlign: 'top', fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap' }}>
-                                                        {formatCurrency(item.price)}
+                                                        {item.price === 0
+                                                            ? <span style={{ color: '#15803d', fontWeight: 600, fontSize: '8pt' }}>INKL.</span>
+                                                            : formatCurrency(item.price)
+                                                        }
                                                     </td>
                                                 </tr>
                                             ))}
