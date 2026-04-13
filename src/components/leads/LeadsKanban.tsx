@@ -276,6 +276,48 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 )}
             </div>
 
+            {/* Notes / Configuration Preview — compact card snippet */}
+            {lead.notes && (() => {
+                const raw = lead.notes;
+                // Extract key lines from zadaszto.pl configurator notes
+                const modelMatch = raw.match(/Model:\s*(.+)/i);
+                const wymiarMatch = raw.match(/Wymiary:\s*(.+)/i);
+                const kolorMatch = raw.match(/Kolor:\s*(.+)/i);
+                const montazMatch = raw.match(/Monta[żz]:\s*(.+)/i);
+                const hasCfg = modelMatch || wymiarMatch;
+                // For quick contact, show first non-tag line
+                const isQuickContact = raw.includes('[Szybki kontakt]');
+                const isConfig = raw.includes('[Konfiguracja');
+
+                if (hasCfg || isQuickContact || isConfig) {
+                    return (
+                        <div className="mb-2 px-2.5 py-2 rounded-lg bg-indigo-50 border border-indigo-100 text-[11px] text-indigo-800 space-y-0.5">
+                            {modelMatch && (
+                                <div className="font-bold truncate flex items-center gap-1">
+                                    <svg className="w-3 h-3 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    {modelMatch[1].trim()}
+                                </div>
+                            )}
+                            {wymiarMatch && (
+                                <div className="text-indigo-600 truncate pl-4">📐 {wymiarMatch[1].trim()}</div>
+                            )}
+                            {kolorMatch && (
+                                <div className="text-indigo-600 truncate pl-4">🎨 {kolorMatch[1].trim()}</div>
+                            )}
+                            {montazMatch && (
+                                <div className="text-indigo-600 truncate pl-4">🔧 {montazMatch[1].trim()}</div>
+                            )}
+                            {!hasCfg && isQuickContact && (
+                                <div className="text-indigo-600 truncate italic">
+                                    💬 {raw.replace('[Szybki kontakt] ', '').substring(0, 80)}{raw.length > 80 ? '…' : ''}
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+                return null;
+            })()}
+
             {/* Lost Reason — visible directly on card */}
             {lead.status === 'lost' && (lead.lostReason || lead.lostByName || lead.lostAt) && (
                 <div className="mb-2 px-2.5 py-2 rounded-lg bg-red-50 border border-red-100">
