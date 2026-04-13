@@ -832,14 +832,87 @@ export const LeadDetailsPage: React.FC = () => {
                                         <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                         Notizen
                                     </h3>
-                                    {lead.notes && (
-                                        <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg mb-3 text-sm text-slate-700">
-                                            <div className="text-[10px] font-bold text-amber-700 uppercase mb-1">Hauptnotiz</div>
-                                            <div className="prose prose-sm prose-amber max-w-none">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{lead.notes}</ReactMarkdown>
+                                    {lead.notes && (() => {
+                                        // Parse structured config from zadaszto.pl leads
+                                        const raw = lead.notes;
+                                        const isZadaszto = lead.source === 'website_pl' && (raw.includes('[Konfiguracja') || raw.includes('Model:'));
+                                        const isQuickContact = raw.includes('[Szybki kontakt]');
+
+                                        if (isZadaszto) {
+                                            // Parse key-value lines
+                                            const extract = (key: string) => {
+                                                const m = raw.match(new RegExp(`${key}:\\s*(.+)`, 'i'));
+                                                return m ? m[1].trim() : null;
+                                            };
+                                            const model = extract('Model');
+                                            const wymiary = extract('Wymiary');
+                                            const kolor = extract('Kolor');
+                                            const montaz = extract('Montaż') || extract('Montaz');
+                                            const dach = extract('Pokrycie dachu') || extract('Dach');
+                                            const dodatki = extract('Dodatki');
+                                            const uwagi = extract('Uwagi');
+
+                                            const fields = [
+                                                { label: 'Model', value: model, icon: '🏠', bold: true },
+                                                { label: 'Wymiary', value: wymiary, icon: '📐', bold: false },
+                                                { label: 'Kolor', value: kolor, icon: '🎨', bold: false },
+                                                { label: 'Montaż', value: montaz, icon: '🔧', bold: false },
+                                                { label: 'Pokrycie dachu', value: dach, icon: '🪟', bold: false },
+                                                { label: 'Dodatki', value: dodatki, icon: '➕', bold: false },
+                                            ].filter(f => f.value);
+
+                                            return (
+                                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-3 shadow-sm">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <span className="text-lg">🇵🇱</span>
+                                                        <div>
+                                                            <h4 className="text-sm font-bold text-blue-900">Zapytanie z zadaszto.pl</h4>
+                                                            <p className="text-[10px] text-blue-600">Konfiguracja do wyceny</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        {fields.map((f, i) => (
+                                                            <div key={i} className={`bg-white/80 rounded-lg border border-blue-100 px-3 py-2 ${f.bold ? 'sm:col-span-2' : ''}`}>
+                                                                <span className="text-[10px] text-blue-500 uppercase font-semibold block">{f.icon} {f.label}</span>
+                                                                <span className={`text-sm text-slate-800 ${f.bold ? 'font-bold text-base' : 'font-medium'}`}>{f.value}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {uwagi && (
+                                                        <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                            <span className="text-[10px] text-amber-600 uppercase font-semibold block">💬 Uwagi klienta</span>
+                                                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{uwagi}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        if (isQuickContact) {
+                                            const message = raw.replace('[Szybki kontakt] ', '').trim();
+                                            return (
+                                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-3 shadow-sm">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-lg">🇵🇱</span>
+                                                        <h4 className="text-sm font-bold text-blue-900">Wiadomość z zadaszto.pl</h4>
+                                                    </div>
+                                                    <div className="bg-white/80 rounded-lg border border-blue-100 px-3 py-2">
+                                                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{message}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // Default: generic markdown rendering
+                                        return (
+                                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg mb-3 text-sm text-slate-700">
+                                                <div className="text-[10px] font-bold text-amber-700 uppercase mb-1">Hauptnotiz</div>
+                                                <div className="prose prose-sm prose-amber max-w-none">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{lead.notes}</ReactMarkdown>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                     <NotesList
                                         entityType="lead"
                                         entityId={lead.id}
