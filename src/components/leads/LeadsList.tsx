@@ -392,9 +392,9 @@ export const LeadsList: React.FC = () => {
                                     <div className="flex flex-col gap-1">
                                         {getStatusBadge(lead.status)}
                                         {lead.status === 'lost' && (lead.lostByName || lead.lostReason) && (
-                                            <div className="text-[10px] text-red-500 mt-0.5">
-                                                {lead.lostByName && <span className="font-medium inline-flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg> {lead.lostByName}</span>}
-                                                {lead.lostReason && <div className="text-slate-400 truncate max-w-[120px]" title={lead.lostReason}>{lead.lostReason}</div>}
+                                            <div className="text-[10px] mt-1 px-2 py-1.5 bg-red-50 rounded-md border border-red-100">
+                                                {lead.lostReason && <div className="text-red-600 font-medium max-w-[250px]" title={lead.lostReason}>{lead.lostReason}</div>}
+                                                {lead.lostByName && <div className="text-red-400 mt-0.5 flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> {lead.lostByName}</div>}
                                             </div>
                                         )}
                                     </div>

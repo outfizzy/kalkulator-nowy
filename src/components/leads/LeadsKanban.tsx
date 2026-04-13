@@ -276,6 +276,29 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 )}
             </div>
 
+            {/* Lost Reason — visible directly on card */}
+            {lead.status === 'lost' && (lead.lostReason || lead.lostByName || lead.lostAt) && (
+                <div className="mb-2 px-2.5 py-2 rounded-lg bg-red-50 border border-red-100">
+                    {lead.lostReason && (
+                        <div className="flex items-start gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <p className="text-xs text-red-700 font-medium leading-relaxed">{lead.lostReason}</p>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-red-400">
+                        {lead.lostByName && (
+                            <span className="flex items-center gap-0.5 font-semibold">
+                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                {lead.lostByName}
+                            </span>
+                        )}
+                        {lead.lostAt && (
+                            <span>{new Date(lead.lostAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* AI Score + Priority Stars */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
                 {lead.aiScore !== undefined ? (
