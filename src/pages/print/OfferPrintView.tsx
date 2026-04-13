@@ -243,12 +243,36 @@ export const OfferPrintView: React.FC = () => {
         });
     });
 
-    // Items (V2) — these are the internal purchase breakdown of basePrice
-    // They must NOT add separate prices since basePrice already includes everything.
-    // We show them as "included" descriptive lines (price = 0) so the customer sees
-    // what's included, without exposing purchase prices.
+    // Items (V2) — these are the internal purchase breakdown of basePrice.
+    // The base model product is ALREADY shown as Pos 1 via basePrice.
+    // We must: (a) SKIP the model item entirely, (b) show remaining addon items as INKL. only.
+    const translatedModel = (model || '').toLowerCase(); // e.g. "trendstyle 15"
+    const rawModelId = (p.modelId || '').toLowerCase();  // e.g. "tr15"
+
     ((p?.items || []) as any[])
-        .filter((i: any) => i?.name && !i.name.toLowerCase().includes((p.modelId || '').toLowerCase()))
+        .filter((i: any) => {
+            if (!i?.name) return false;
+            const itemName = i.name.toLowerCase();
+
+            // Skip if item IS the base model product (multiple detection strategies)
+            if (rawModelId && itemName.includes(rawModelId)) return false;
+            if (translatedModel && itemName.includes(translatedModel)) return false;
+            if (translatedModel && translatedModel.includes(itemName)) return false;
+
+            // Teranda model IDs → their display names
+            const terandaMap: Record<string, string[]> = {
+                'tr10': ['orangestyle', 'orangeline'],
+                'tr15': ['trendstyle', 'trendline'],
+                'tr20': ['topstyle', 'topline'],
+            };
+            const terandaNames = terandaMap[rawModelId];
+            if (terandaNames && terandaNames.some(tn => itemName.includes(tn))) return false;
+
+            // Also skip items containing "Terrassenüberdachung" — always the base model
+            if (itemName.includes('terrassenüberdachung') || itemName.includes('terrassenuberdachung')) return false;
+
+            return true;
+        })
         .forEach((item: any) => {
             // Skip if an addon with similar name already exists (V1 addons handle those)
             const alreadyHasAddon = (offer.product?.addons || []).some((a: any) =>

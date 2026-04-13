@@ -393,14 +393,35 @@ function getGermanInfo(itemName: string): { label: string; description: string; 
 // Helper: check if item name matches model/roof/color (to filter duplicates)
 function isRedundantItem(itemName: string, modelId: string, roofType: string, color: string): boolean {
     const lower = itemName.toLowerCase().trim();
-    // Skip items that are just the model name
     const modelLower = (modelId || '').toLowerCase();
+
+    // Direct substring match in both directions
     if (modelLower && (lower.includes(modelLower) || modelLower.includes(lower))) return true;
-    // Skip display-name matches (e.g. "Trendstyle" vs internal "Trendline")
+
+    // Teranda model IDs → their display names
+    const terandaMap: Record<string, string[]> = {
+        'tr10': ['orangestyle', 'orangeline'],
+        'tr15': ['trendstyle', 'trendline'],
+        'tr20': ['topstyle', 'topline'],
+    };
+
+    // Check Teranda model → display name mappings
+    const terandaNames = terandaMap[modelLower];
+    if (terandaNames) {
+        for (const tn of terandaNames) {
+            if (lower.includes(tn)) return true;
+        }
+    }
+
+    // Check display-name ↔ internal-name aliases
     const displayNames = ['orangestyle', 'trendstyle', 'topstyle', 'ultrastyle', 'skystyle', 'designstyle', 'designline'];
     for (const dn of displayNames) {
         if (lower.includes(dn) && (modelLower.includes(dn) || modelLower.includes(dn.replace('style', 'line')))) return true;
     }
+
+    // Any item containing 'Terrassenüberdachung' is the base model — always redundant
+    if (lower.includes('terrassenüberdachung') || lower.includes('terrassenuberdachung')) return true;
+
     // Skip items that just restate the roof type
     if (roofType === 'glass' && (lower === 'glass' || lower === 'vsg' || lower === 'verbundsicherheitsglas')) return true;
     if (roofType !== 'glass' && (lower === 'polycarbonate' || lower === 'polycarbonat')) return true;
