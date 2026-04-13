@@ -26,7 +26,12 @@ export const LeadsList: React.FC = () => {
     const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'map'>('kanban');
     const [showStats, setShowStats] = useState(false);
     const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all');
-    const [filterFair, setFilterFair] = useState<string>(currentUser?.role === 'sales_rep_pl' ? 'website_pl' : 'all'); // 'all' | 'website' | 'website_pl' | 'fair_all' | specific_fair_id
+    // ── Market switcher: pl = zadaszto.pl, de = polendach24.de ──
+    const isPLOnly = currentUser?.role === 'sales_rep_pl';
+    const isDEOnly = currentUser?.role === 'sales_rep'; // DE rep sees only DE
+    const canSwitchMarket = isAdmin() || currentUser?.role === 'manager';
+    const [marketFilter, setMarketFilter] = useState<'de' | 'pl'>(isPLOnly ? 'pl' : 'de');
+    const [filterFair, setFilterFair] = useState<string>(isPLOnly ? 'website_pl' : 'all'); // 'all' | 'website' | 'website_pl' | 'fair_all' | specific_fair_id
     const [groupByRegion, setGroupByRegion] = useState(false);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [searchQuery, setSearchQuery] = useState('');
@@ -117,13 +122,14 @@ export const LeadsList: React.FC = () => {
         // Status filter
         if (filterStatus !== 'all' && lead.status !== filterStatus) return false;
 
-        // ── Hard market lock for sales_rep_pl ──
-        // PL reps can ONLY see Polish leads, regardless of filter selection
-        if (currentUser?.role === 'sales_rep_pl') {
+        // ── Market filter (PL vs DE) ──
+        if (marketFilter === 'pl') {
             if (lead.source !== 'website_pl') return false;
+        } else if (marketFilter === 'de') {
+            if (lead.source === 'website_pl') return false;
         }
 
-        // Fair / Source filter
+        // Fair / Source filter (within selected market)
         if (filterFair !== 'all') {
             if (filterFair === 'website') {
                 if (lead.source === 'targi' || lead.source === 'website_pl') return false;
@@ -483,9 +489,40 @@ export const LeadsList: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Leady</h1>
-                    <p className="text-slate-500 mt-1">Zarządzaj potencjalnymi klientami</p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900">Leady</h1>
+                        <p className="text-slate-500 mt-1">Zarządzaj potencjalnymi klientami</p>
+                    </div>
+                    {/* ── Market Switcher ── */}
+                    {(canSwitchMarket || isPLOnly || isDEOnly) && (
+                        <div className="flex bg-slate-100 rounded-xl p-1 gap-1 ml-2">
+                            {(canSwitchMarket || isDEOnly) && (
+                                <button
+                                    onClick={() => { setMarketFilter('de'); setFilterFair('all'); }}
+                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                        marketFilter === 'de'
+                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <span className="text-base">🇩🇪</span> polendach24.de
+                                </button>
+                            )}
+                            {(canSwitchMarket || isPLOnly) && (
+                                <button
+                                    onClick={() => { setMarketFilter('pl'); setFilterFair('all'); }}
+                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                        marketFilter === 'pl'
+                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <span className="text-base">🇵🇱</span> zadaszto.pl
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-4">
                     <div className="bg-white p-1 rounded-lg border border-slate-200 flex items-center">
@@ -553,7 +590,7 @@ export const LeadsList: React.FC = () => {
                         </select>
                     </div>
 
-                    {currentUser?.role !== 'sales_rep_pl' && (
+                    {marketFilter === 'de' && currentUser?.role !== 'sales_rep_pl' && (
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-slate-600">Źródło:</span>
                         <select
