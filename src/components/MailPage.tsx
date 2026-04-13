@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -51,6 +51,7 @@ export const MailPage: React.FC = () => {
 
     // Selection state
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
+    const lastSelectedIdxRef = useRef<number | null>(null);
 
     // Bulk lead creation state
     const [bulkLeadLoading, setBulkLeadLoading] = useState(false);
@@ -78,6 +79,9 @@ export const MailPage: React.FC = () => {
 
     // Feature 2: Auto-polling
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // Debounced search
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const lastEmailCountRef = useRef<number>(0);
 
     // Feature 3: Smart Reply
@@ -440,20 +444,68 @@ export const MailPage: React.FC = () => {
         setSmartReplies([]);
     };
 
-    // Filtered emails for search
-    const filteredEmails = searchQuery.trim()
-        ? emails.filter(e => {
-            const q = searchQuery.toLowerCase();
-            return (
-                (e.from || '').toLowerCase().includes(q) ||
-                (e.subject || '').toLowerCase().includes(q) ||
-                (e.text || '').toLowerCase().includes(q)
-            );
-        })
-        : emails;
+    // Debounced search effect
+    useEffect(() => {
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+        return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+    }, [searchQuery]);
+
+    // Memoized filtered emails
+    const filteredEmails = useMemo(() => {
+        if (!debouncedSearch.trim()) return emails;
+        const q = debouncedSearch.toLowerCase();
+        return emails.filter(e =>
+            (e.from || '').toLowerCase().includes(q) ||
+            (e.subject || '').toLowerCase().includes(q) ||
+            (e.text || '').toLowerCase().includes(q)
+        );
+    }, [emails, debouncedSearch]);
 
     // Unread count for badge
-    const unreadCount = emails.filter(e => !e.flags?.includes('\\Seen')).length;
+    const unreadCount = useMemo(() => emails.filter(e => !e.flags?.includes('\\Seen')).length, [emails]);
+
+    // Date group helper
+    const getDateGroup = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const today = new Date();
+        const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+        if (d.toDateString() === today.toDateString()) return 'Dzisiaj';
+        if (d.toDateString() === yesterday.toDateString()) return 'Wczoraj';
+        if (d.getTime() > today.getTime() - 7 * 86400000) return 'Ten tydzień';
+        return 'Starsze';
+    };
+
+    // Shift+Click handler
+    const handleCheckboxClick = (e: React.MouseEvent, emailId: number) => {
+        e.stopPropagation();
+        const idx = filteredEmails.findIndex(em => em.id === emailId);
+        const newSet = new Set(selectedEmailIds);
+
+        if (e.shiftKey && lastSelectedIdxRef.current !== null) {
+            const start = Math.min(lastSelectedIdxRef.current, idx);
+            const end = Math.max(lastSelectedIdxRef.current, idx);
+            for (let i = start; i <= end; i++) {
+                newSet.add(filteredEmails[i].id);
+            }
+        } else {
+            if (newSet.has(emailId)) newSet.delete(emailId);
+            else newSet.add(emailId);
+        }
+        lastSelectedIdxRef.current = idx;
+        setSelectedEmailIds(newSet);
+    };
+
+    // Select All toggle
+    const handleSelectAll = () => {
+        if (selectedEmailIds.size === filteredEmails.length) {
+            setSelectedEmailIds(new Set());
+        } else {
+            setSelectedEmailIds(new Set(filteredEmails.map(e => e.id)));
+        }
+    };
+
+    const isSentView = activeTab === 'sent';
 
     const handleSelectEmail = async (uid: number | string) => {
         const emailIdAsNumber = Number(uid);
@@ -1350,92 +1402,101 @@ export const MailPage: React.FC = () => {
             )}
 
 
-            {/* 1. Sidebar (Navigation) - Fixed width */}
-            <div className="w-full md:w-48 flex flex-col gap-2 flex-shrink-0">
-                <div className="mb-2 space-y-1">
-                    {/* Dynamic Mailbox Selector */}
-                    {userMailboxes.map((mb, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => setSelectedMailboxIdx(idx)}
-                            className={`w-full py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${selectedMailboxIdx === idx
-                                ? 'bg-white shadow-sm border'
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                                }`}
-                            style={selectedMailboxIdx === idx ? { borderColor: mb.color || '#3b82f6', color: mb.color || '#3b82f6' } : {}}
-                        >
-                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: mb.color || '#3b82f6' }} />
-                            <span className="truncate">{mb.name}</span>
-                        </button>
-                    ))}
-                    {/* Admin: Manage Mailboxes */}
-                    {currentUser?.role === 'admin' && (
-                        <button
-                            onClick={() => setShowMailboxAdmin(true)}
-                            className="w-full py-1.5 px-2 text-[11px] font-medium rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 mt-1 border border-dashed border-slate-200"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Zarządzaj skrzynkami
-                        </button>
-                    )}
-                </div>
-
+            {/* 1. Sidebar — Premium */}
+            <div className="w-full md:w-52 flex flex-col gap-3 flex-shrink-0">
+                {/* Compose Button */}
                 <button
                     onClick={() => { setActiveTab('compose'); setSelectedEmail(null); }}
-                    className={`p-3 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm text-sm ${activeTab === 'compose'
-                        ? 'bg-accent text-white shadow-accent/30'
-                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                    className={`p-3 rounded-xl flex items-center justify-center gap-2 font-bold transition-all text-sm ${activeTab === 'compose'
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 scale-[1.02]'
+                        : 'bg-white text-slate-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 border border-slate-200 hover:border-blue-300 hover:shadow-md'
                         }`}
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Nowa
+                    Nowa wiadomość
                 </button>
 
-
-
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-2 overflow-hidden">
+                {/* Navigation */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <button
                         onClick={() => { setActiveTab('inbox'); setSelectedEmailIds(new Set()); }}
-                        className={`w-full p-3 flex items-center justify-between text-left transition-colors text-sm ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                        className={`w-full p-3 flex items-center justify-between text-left transition-all text-sm ${activeTab === 'inbox' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-bold border-l-[3px] border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
-                        <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                            </svg>
+                        <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${activeTab === 'inbox' ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                                <svg className={`w-4 h-4 ${activeTab === 'inbox' ? 'text-blue-600' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                </svg>
+                            </div>
                             <span>Odebrane</span>
                         </div>
                         {unreadCount > 0 && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-full min-w-[20px] text-center">{unreadCount}</span>
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-full min-w-[22px] text-center animate-pulse">{unreadCount}</span>
                         )}
                     </button>
+                    <div className="h-px bg-slate-100" />
                     <button
                         onClick={() => { setActiveTab('sent'); setSelectedEmailIds(new Set()); }}
-                        className={`w-full p-3 flex items-center justify-between text-left transition-colors text-sm ${activeTab === 'sent' ? 'bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                        className={`w-full p-3 flex items-center justify-between text-left transition-all text-sm ${activeTab === 'sent' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-bold border-l-[3px] border-blue-600' : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
-                        <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                            </svg>
+                        <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${activeTab === 'sent' ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                                <svg className={`w-4 h-4 ${activeTab === 'sent' ? 'text-blue-600' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                            </div>
                             <span>Wysłane</span>
                         </div>
-                        {emails.length > 0 && activeTab === 'sent' && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-500 rounded-full">{emails.length}</span>
-                        )}
                     </button>
                 </div>
 
+                {/* Mailbox Selector */}
+                {userMailboxes.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2.5 space-y-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1.5">Skrzynki</p>
+                        {userMailboxes.map((mb, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => setSelectedMailboxIdx(idx)}
+                                className={`w-full py-2 px-2.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2.5 ${selectedMailboxIdx === idx
+                                    ? 'bg-gradient-to-r from-slate-50 to-slate-100 shadow-sm border border-slate-200'
+                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                style={selectedMailboxIdx === idx ? { borderColor: `${mb.color || '#3b82f6'}40`, background: `linear-gradient(135deg, ${mb.color || '#3b82f6'}08, ${mb.color || '#3b82f6'}15)` } : {}}
+                            >
+                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm" style={{ backgroundColor: mb.color || '#3b82f6' }} />
+                                <span className="truncate" style={selectedMailboxIdx === idx ? { color: mb.color || '#3b82f6' } : {}}>{mb.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Admin: Manage Mailboxes */}
+                {currentUser?.role === 'admin' && (
+                    <button
+                        onClick={() => setShowMailboxAdmin(true)}
+                        className="w-full py-2 px-3 text-[11px] font-medium rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white hover:shadow-sm transition-all flex items-center gap-2 border border-dashed border-slate-200 hover:border-slate-300"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Zarządzaj skrzynkami
+                    </button>
+                )}
+
                 {!isConfigured && (
-                    <div className="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-800">
-                        <p className="font-bold mb-1">Konfiguracja Wymagana</p>
-                        <p className="mb-2">Aby w pełni korzystać z poczty, skonfiguruj ustawienia SMTP/IMAP w swoim profilu.</p>
-                        <Link to="/settings" className="text-orange-900 underline font-bold text-xs">
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl p-4 text-sm text-amber-800">
+                        <p className="font-bold mb-1 flex items-center gap-1.5">
+                            <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                            Konfiguracja Wymagana
+                        </p>
+                        <p className="mb-2 text-xs">Skonfiguruj SMTP/IMAP w ustawieniach.</p>
+                        <Link to="/settings" className="text-amber-900 underline font-bold text-xs">
                             Przejdź do ustawień →
                         </Link>
                     </div>
@@ -1469,88 +1530,66 @@ export const MailPage: React.FC = () => {
                             </div>
                             {searchQuery && <p className="text-[10px] text-slate-400 mt-1 px-1">Znaleziono: {filteredEmails.length} z {emails.length}</p>}
                         </div>
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 min-h-[60px]">
+                        <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white min-h-[52px]">
                             {selectedEmailIds.size > 0 ? (
                                 <div className="flex items-center justify-between w-full animate-fade-in-up">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-slate-700 bg-white px-2 py-1 rounded shadow-sm border border-slate-200">
-                                            {selectedEmailIds.size}
-                                        </span>
-                                        <div className="flex gap-1">
-                                            <button
-                                                onClick={handleBulkCreateLeadsAI}
-                                                disabled={bulkLeadLoading}
-                                                className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors border border-transparent hover:border-purple-200 flex items-center gap-1"
-                                                title="Utwórz leady z zaznaczonych (AI)"
-                                            >
-                                                {bulkLeadLoading ? (
-                                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                                ) : (
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                                    </svg>
-                                                )}
-                                                <span className="text-xs font-semibold hidden md:inline">Utwórz Leady AI</span>
+                                        <button onClick={handleSelectAll} className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors" title="Zaznacz/odznacz wszystkie">
+                                            {selectedEmailIds.size === filteredEmails.length ? (
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M18 12H6" /></svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                            )}
+                                        </button>
+                                        <span className="text-sm font-bold text-slate-700">{selectedEmailIds.size}<span className="text-slate-400 font-normal"> / {filteredEmails.length}</span></span>
+                                        <div className="w-px h-5 bg-slate-200 mx-1" />
+                                        <div className="flex gap-0.5">
+                                            <button onClick={handleBulkCreateLeadsAI} disabled={bulkLeadLoading}
+                                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-all flex items-center gap-1" title="Utwórz leady (AI)">
+                                                {bulkLeadLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
+                                                <span className="text-xs font-semibold hidden xl:inline">Leady AI</span>
                                             </button>
-                                            <button
-                                                onClick={handleAnalyzeSelected}
-                                                disabled={loading}
-                                                className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 flex items-center gap-1"
-                                                title="Analizuj zaznaczone"
-                                            >
-                                                {loading ? (
-                                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                                ) : (
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                                    </svg>
-                                                )}
-                                                <span className="text-xs font-semibold hidden md:inline">Analizuj</span>
+                                            <button onClick={handleAnalyzeSelected} disabled={loading}
+                                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all flex items-center gap-1" title="Analizuj">
+                                                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
                                             </button>
-                                            <div className="w-px h-6 bg-slate-300 mx-1" />
-
-                                            <button
-                                                onClick={() => handleEmailAction('mark_read')}
-                                                className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200" title="Oznacz jako przeczytane">
-                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" /></svg>
+                                            <div className="w-px h-5 bg-slate-200 mx-0.5 self-center" />
+                                            <button onClick={() => handleEmailAction('mark_read')} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Przeczytane">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" /></svg>
                                             </button>
-                                            <button
-                                                onClick={() => handleEmailAction('mark_unread')}
-                                                className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200" title="Oznacz jako nieprzeczytane">
-                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                            <button onClick={() => handleEmailAction('mark_unread')} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Nieprzeczytane">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                             </button>
-                                            <button
-                                                onClick={() => handleEmailAction('delete')}
-                                                className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200" title="Usuń">
-                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            <button onClick={() => handleEmailAction('delete')} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Usuń">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                             </button>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setSelectedEmailIds(new Set())}
-                                        className="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                                    <button onClick={() => setSelectedEmailIds(new Set())} className="text-xs text-slate-400 hover:text-slate-700 font-medium px-2 py-1 rounded-md hover:bg-slate-100 transition-all">
                                         Anuluj
                                     </button>
                                 </div>
                             ) : (
-                                <>
-                                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                        {activeTab === 'inbox' ? 'Skrzynka Odbiorcza' : 'Wysłane'}
-                                        {activeTab === 'inbox' && unreadCount > 0 && (
-                                            <span className="px-2 py-0.5 text-xs font-bold bg-blue-600 text-white rounded-full animate-pulse">{unreadCount}</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2.5">
+                                        <button onClick={handleSelectAll} className="w-6 h-6 rounded border-2 border-slate-300 hover:border-blue-400 flex items-center justify-center transition-colors" title="Zaznacz wszystkie">
+                                            <span />
+                                        </button>
+                                        <h2 className="text-sm font-bold text-slate-800">{isSentView ? 'Wysłane' : 'Odebrane'}</h2>
+                                        {!isSentView && unreadCount > 0 && (
+                                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-full">{unreadCount}</span>
                                         )}
-                                    </h2>
-                                    <div className="flex gap-2">
-                                        {activeTab === 'inbox' && (
-                                            <button
-                                                onClick={() => setRefreshTrigger(prev => prev + 1)} className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors" title="Odśwież">
-                                                <svg className={`w-5 h-5 ${loading ? 'animate-spin text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8 0 01-15.357-2m15.357 2H15" />
-                                                </svg>
-                                            </button>
+                                        {filteredEmails.length > 0 && (
+                                            <span className="text-[11px] text-slate-400">{filteredEmails.length} wiadomości</span>
                                         )}
                                     </div>
-                                </>
+                                    <button onClick={() => setRefreshTrigger(prev => prev + 1)}
+                                        className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all" title="Odśwież">
+                                        <svg className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -1598,12 +1637,14 @@ export const MailPage: React.FC = () => {
                                         Aktualizowanie...
                                     </div>
                                 )}
-                                {filteredEmails.map(email => {
+                                {filteredEmails.map((email, idx) => {
                                     const isUnread = !email.flags?.includes('\\Seen');
                                     const isSelected = selectedEmail?.id === email.messageId;
                                     const isChecked = selectedEmailIds.has(email.id);
-                                    const senderName = email.from.replace(/<.*>/, '').trim() || email.from;
-                                    const senderInitial = senderName.charAt(0).toUpperCase();
+                                    // In sent view, show recipient; in inbox, show sender
+                                    const displayPerson = isSentView ? (email.to || 'Unknown') : email.from;
+                                    const personName = displayPerson.replace(/<.*>/, '').trim() || displayPerson;
+                                    const personInitial = personName.charAt(0).toUpperCase();
                                     const previewText = (email.text || '').replace(/\s+/g, ' ').substring(0, 90);
                                     const emailDate = new Date(email.date);
                                     const isToday = emailDate.toDateString() === new Date().toDateString();
@@ -1611,72 +1652,91 @@ export const MailPage: React.FC = () => {
                                         ? emailDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
                                         : emailDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 
+                                    // Date separator
+                                    const group = getDateGroup(email.date);
+                                    const prevGroup = idx > 0 ? getDateGroup(filteredEmails[idx - 1].date) : null;
+                                    const showDateSep = idx === 0 || group !== prevGroup;
+
+                                    // Avatar gradient colors
+                                    const gradients = [
+                                        'from-blue-500 to-indigo-600', 'from-emerald-500 to-teal-600',
+                                        'from-purple-500 to-pink-600', 'from-amber-500 to-orange-600',
+                                        'from-rose-500 to-red-600', 'from-cyan-500 to-blue-600',
+                                        'from-indigo-500 to-violet-600'
+                                    ];
+                                    const gradIdx = (personInitial.charCodeAt(0) || 0) % gradients.length;
+
                                     return (
-                                        <div
-                                            key={email.id}
-                                            className={`relative group cursor-pointer transition-all duration-150 ${
-                                                isSelected ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : isChecked ? 'bg-blue-50/50' : isUnread ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/30 hover:bg-slate-50'
-                                            }`}
-                                            onClick={() => handleSelectEmail(email.id)}
-                                        >
-                                            <div className="flex items-start gap-3 p-3 pl-3">
-                                                {/* Checkbox / Avatar */}
-                                                <div className="relative flex-shrink-0 mt-0.5">
-                                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                                                        isChecked ? 'bg-blue-600 text-white' : isUnread ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
-                                                    }`}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const newSet = new Set(selectedEmailIds);
-                                                            if (newSet.has(email.id)) newSet.delete(email.id);
-                                                            else newSet.add(email.id);
-                                                            setSelectedEmailIds(newSet);
-                                                        }}
-                                                    >
-                                                        {isChecked ? (
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                        ) : senderInitial}
-                                                    </div>
-                                                    {convertedMessageIds.has(String(email.id)) && (
-                                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
-                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                        <React.Fragment key={email.id}>
+                                            {showDateSep && (
+                                                <div className="px-4 py-1.5 bg-slate-50/80 border-b border-slate-100 sticky top-0 z-[5]">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group}</span>
+                                                </div>
+                                            )}
+                                            <div
+                                                className={`relative group cursor-pointer transition-all duration-150 ${
+                                                    isSelected ? 'bg-blue-50/80 border-l-[3px] border-l-blue-600' : isChecked ? 'bg-blue-50/40' : isUnread ? 'bg-white hover:bg-slate-50/80' : 'bg-slate-50/20 hover:bg-slate-50/60'
+                                                }`}
+                                                onClick={() => handleSelectEmail(email.id)}
+                                            >
+                                                <div className="flex items-start gap-3 p-3 pl-3">
+                                                    {/* Checkbox / Avatar */}
+                                                    <div className="relative flex-shrink-0 mt-0.5">
+                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all cursor-pointer ${
+                                                            isChecked ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : isUnread ? `bg-gradient-to-br ${gradients[gradIdx]} text-white shadow-sm` : 'bg-slate-200 text-slate-500'
+                                                        }`}
+                                                            onClick={(e) => handleCheckboxClick(e, email.id)}
+                                                        >
+                                                            {isChecked ? (
+                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                            ) : personInitial}
                                                         </div>
+                                                        {convertedMessageIds.has(String(email.id)) && (
+                                                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                                                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                            </div>
+                                                        )}
+                                                        {isSentView && (
+                                                            <div className="absolute -top-0.5 -left-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center border-[1.5px] border-white">
+                                                                <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-baseline gap-2 mb-0.5">
+                                                            <span className={`truncate text-sm ${isUnread ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
+                                                                {isSentView && <span className="text-slate-400 font-normal mr-1">Do:</span>}
+                                                                {personName}
+                                                            </span>
+                                                            <span className={`text-[11px] flex-shrink-0 ${isUnread ? 'text-blue-600 font-semibold' : 'text-slate-400'}`}>
+                                                                {dateStr}
+                                                            </span>
+                                                        </div>
+                                                        <h3 className={`text-[13px] truncate mb-0.5 ${isUnread ? 'text-slate-900 font-semibold' : 'text-slate-700'}`}>
+                                                            {email.subject || '(Kein Betreff)'}
+                                                        </h3>
+                                                        {previewText && (
+                                                            <p className="text-xs text-slate-400 truncate leading-relaxed">
+                                                                {previewText}{previewText.length >= 90 ? '…' : ''}
+                                                            </p>
+                                                        )}
+                                                        {email.hasAttachments && (
+                                                            <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                                Załącznik
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Unread dot */}
+                                                    {isUnread && !isSelected && (
+                                                        <div className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0 mt-2 shadow-sm shadow-blue-600/30" />
                                                     )}
                                                 </div>
-
-                                                {/* Content */}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-baseline gap-2 mb-0.5">
-                                                        <span className={`truncate text-sm ${isUnread ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
-                                                            {senderName}
-                                                        </span>
-                                                        <span className={`text-[11px] flex-shrink-0 ${isUnread ? 'text-blue-600 font-semibold' : 'text-slate-400'}`}>
-                                                            {dateStr}
-                                                        </span>
-                                                    </div>
-                                                    <h3 className={`text-[13px] truncate mb-0.5 ${isUnread ? 'text-slate-900 font-semibold' : 'text-slate-700'}`}>
-                                                        {email.subject || '(Kein Betreff)'}
-                                                    </h3>
-                                                    {previewText && (
-                                                        <p className="text-xs text-slate-400 truncate leading-relaxed">
-                                                            {previewText}{previewText.length >= 90 ? '…' : ''}
-                                                        </p>
-                                                    )}
-                                                    {/* Attachment indicator */}
-                                                    {email.hasAttachments && (
-                                                        <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
-                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                                                            Załącznik
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Unread dot */}
-                                                {isUnread && !isSelected && (
-                                                    <div className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0 mt-2" />
-                                                )}
                                             </div>
-                                        </div>
+                                        </React.Fragment>
                                     );
                                 })}
                             </div>
@@ -1791,7 +1851,7 @@ export const MailPage: React.FC = () => {
                                                     type="button"
                                                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm transition-colors shadow-sm"
                                                 >
-                                                    ✨ Przeredaguj
+                                                    Przeredaguj
                                                 </button>
                                             </div>
                                         </div>
@@ -1996,26 +2056,34 @@ export const MailPage: React.FC = () => {
                                             {/* Header Info */}
                                             <div className="mb-6">
                                                 {(() => {
-                                                    const fromRaw = selectedEmail.from;
-                                                    const fromName = fromRaw.includes('<') ? fromRaw.split('<')[0].trim().replace(/^"|"$/g, '') : '';
-                                                    const fromEmail = fromRaw.includes('<') ? fromRaw.match(/<(.+?)>/)?.[1] || fromRaw : fromRaw;
-                                                    const initial = (fromName || fromEmail).charAt(0).toUpperCase();
-                                                    const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500'];
-                                                    const colorIdx = (initial.charCodeAt(0) || 0) % colors.length;
+                                                    const raw = isSentView ? (selectedEmail.to || '') : selectedEmail.from;
+                                                    const parsedName = raw.includes('<') ? raw.split('<')[0].trim().replace(/^"|"$/g, '') : '';
+                                                    const parsedEmail = raw.includes('<') ? raw.match(/<(.+?)>/)?.[1] || raw : raw;
+                                                    const initial = (parsedName || parsedEmail).charAt(0).toUpperCase();
+                                                    const gradients = [
+                                                        'from-blue-500 to-indigo-600', 'from-emerald-500 to-teal-600',
+                                                        'from-purple-500 to-pink-600', 'from-amber-500 to-orange-600',
+                                                        'from-rose-500 to-red-600', 'from-cyan-500 to-blue-600',
+                                                        'from-indigo-500 to-violet-600'
+                                                    ];
+                                                    const gIdx = (initial.charCodeAt(0) || 0) % gradients.length;
                                                     return (
                                                         <div className="flex items-start gap-3 mb-4">
-                                                            <div className={`w-10 h-10 rounded-full ${colors[colorIdx]} flex items-center justify-center text-white font-bold text-lg flex-shrink-0`}>
+                                                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[gIdx]} flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm`}>
                                                                 {initial}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-baseline gap-2 flex-wrap">
-                                                                    <span className="font-semibold text-slate-900">{fromName || fromEmail}</span>
-                                                                    {fromName && <span className="text-xs text-slate-400">&lt;{fromEmail}&gt;</span>}
+                                                                    {isSentView && <span className="text-xs text-slate-400 font-medium">Do:</span>}
+                                                                    <span className="font-semibold text-slate-900">{parsedName || parsedEmail}</span>
+                                                                    {parsedName && <span className="text-xs text-slate-400">&lt;{parsedEmail}&gt;</span>}
                                                                 </div>
                                                                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                                                                     <span>{new Date(selectedEmail.date).toLocaleString('de-DE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                                                                    {selectedEmail.to && (
-                                                                        <span className="truncate">An: {selectedEmail.to}</span>
+                                                                    {isSentView ? (
+                                                                        selectedEmail.from && <span className="truncate">Od: {selectedEmail.from.replace(/<.*>/, '').trim()}</span>
+                                                                    ) : (
+                                                                        selectedEmail.to && <span className="truncate">An: {selectedEmail.to}</span>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -2126,29 +2194,43 @@ export const MailPage: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
-                                    <svg className="w-16 h-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
-                                    <p className="text-lg font-medium text-slate-600 mb-2">Wybierz wiadomość z listy</p>
-                                    <p className="text-sm">lub</p>
-                                    <button
-                                        onClick={() => {
-                                            setLeadInitialData({});
-                                            setShowLeadForm(true);
-                                        }}
-                                        className="mt-4 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
-                                    >
-                                        Dodaj Leada Ręcznie
-                                    </button>
+                                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-gradient-to-br from-slate-50/80 to-blue-50/30">
+                                    <div className="relative mb-6">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-sm">
+                                            <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                        <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+                                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
+                                        </div>
+                                    </div>
+                                    <p className="text-lg font-bold text-slate-700 mb-1">Wybierz wiadomość</p>
+                                    <p className="text-sm text-slate-400 mb-5">lub utwórz nową konwersację</p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => { setActiveTab('compose'); setSelectedEmail(null); }}
+                                            className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-600/20 transition-all font-medium text-sm flex items-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                            Nowa Wiadomość
+                                        </button>
+                                        <button
+                                            onClick={() => { setLeadInitialData({}); setShowLeadForm(true); }}
+                                            className="px-5 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all font-medium text-sm flex items-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                            Dodaj Leada
+                                        </button>
+                                    </div>
                                     {showLeadForm && (
                                         <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" onClick={() => setShowLeadForm(false)}></div>
                                     )}
                                     {showLeadForm && (
                                         <div className="absolute top-0 right-0 bottom-0 w-full md:w-[450px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200">
-                                            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                                            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                                                 <h3 className="font-bold text-slate-800">Nowy Lead</h3>
-                                                <button onClick={() => setShowLeadForm(false)} className="p-2 text-slate-400 hover:text-slate-600">
+                                                <button onClick={() => setShowLeadForm(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                     </svg>
@@ -2258,12 +2340,12 @@ export const MailPage: React.FC = () => {
                                                 )}
                                                 {r.missingEmail && (
                                                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                                        ⚠️ brak maila
+                                                        Brak maila
                                                     </span>
                                                 )}
                                                 {r.missingPhone && (
                                                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                                        ⚠️ brak telefonu
+                                                        Brak telefonu
                                                     </span>
                                                 )}
                                             </div>

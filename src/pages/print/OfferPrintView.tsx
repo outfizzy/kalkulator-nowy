@@ -36,6 +36,10 @@ function translateForView(key: string, category: string): string {
         'designline': 'Designstyle', 'designstyle': 'Designstyle',
         'orangeline': 'Orangestyle', 'orangestyle': 'Orangestyle',
         'orangeline+': 'Orangestyle+', 'orangestyle+': 'Orangestyle+',
+        // Teranda models
+        'tr10': 'Orangestyle 10', 'TR10': 'Orangestyle 10',
+        'tr15': 'Trendstyle 15', 'TR15': 'Trendstyle 15',
+        'tr20': 'Topstyle 20', 'TR20': 'Topstyle 20',
         'carport': 'Carport',
         'pergola': 'Pergola', 'pergola_bio': 'Pergola',
         'pergola deluxe': 'Pergola Deluxe', 'pergola_deluxe': 'Pergola Deluxe',

@@ -93,6 +93,10 @@ const TECH_SPECS: Record<string, {
     'Ultraline':    { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 6000, maxHeight: 3000, glassFall: '1,5-3,1°', keilmassMin: null, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Heizsystem', 'LED-Spots', 'LED-Strips'] },
     'Skyline':      { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '1,1-1,9°', keilmassMin: null, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Heizsystem', 'LED-Spots', 'LED-Strips'] },
     'Carport':      { minWidth: 1000, maxWidth: 7000, minDepth: 1000, maxDepth: 5000, maxHeight: 3500, glassFall: '~1° Trapez', keilmassMin: null, options: ['Aufdachmarkise', 'Unterdachmarkise', 'Senkrechtmarkise', 'Shutter', 'Panorama', 'Heizsystem', 'LED-Strips'] },
+    // Teranda models
+    'TR10':         { minWidth: 2000, maxWidth: 7000, minDepth: 1000, maxDepth: 3500, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
+    'TR15':         { minWidth: 2060, maxWidth: 12060, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
+    'TR20':         { minWidth: 3060, maxWidth: 12060, minDepth: 1000, maxDepth: 6000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
 };
 
 // ======= PROFILE SPECIFICATIONS (from Excel "Materialien" sheets per model) =======
@@ -112,6 +116,10 @@ const PROFILE_SPECS: Record<string, {
     'Ultraline':   { pfosten: '200×200mm', sparrenTypes: [{ type: 'Standard', dim: '100×200mm' }], rinne: 'Rinne Ultraline (11147)' },
     'Skyline':     { pfosten: '117×160mm', sparrenTypes: [{ type: 'Außen', dim: '117×241mm' }, { type: 'Mittel', dim: '40×160mm' }], rinne: 'Rinne Skyline (11165)' },
     'Carport':     { pfosten: '117×160mm', sparrenTypes: [{ type: 'Außen', dim: '117×241mm' }, { type: 'Mittel', dim: '40×160mm' }], rinne: 'Rinne Carport (11165)' },
+    // Teranda
+    'TR10':        { pfosten: '—', sparrenTypes: [{ type: 'Standard', dim: '—' }], rinne: '—' },
+    'TR15':        { pfosten: '—', sparrenTypes: [{ type: 'Standard', dim: '—' }], rinne: '—' },
+    'TR20':        { pfosten: '—', sparrenTypes: [{ type: 'Standard', dim: '—' }], rinne: '—' },
 };
 
 // ======= PRODUCT CATALOG =======
@@ -126,6 +134,10 @@ const ROOF_MODELS: RoofModel[] = [
     { id: 'Ultraline', name: 'Ultrastyle', description: 'Premium 100mm Profil • max. 6.000mm Tiefe', hasPoly: false, hasGlass: true, hasFreestanding: false, image_url: '/images/models/ultraline.jpg' },
     { id: 'Skyline', name: 'Skystyle', description: 'Pergola mit Lamellen', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/skyline.jpg' },
     { id: 'Carport', name: 'Carport', description: 'Carport mit Stahlblech • max. 3.500mm Höhe', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/carport.jpg' },
+    // --- Teranda ---
+    { id: 'TR10', name: 'Orangestyle 10', description: 'Einstiegsprofil • max. 7.000mm • VSG 44.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr10.jpg' },
+    { id: 'TR15', name: 'Trendstyle 15', description: 'Standard Profil • max. 12.060mm • VSG 44.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr15.jpg' },
+    { id: 'TR20', name: 'Topstyle 20', description: 'Premium Profil • max. 12.060mm • VSG 55.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr20.jpg' },
 ];
 
 // Glass variant options
@@ -133,6 +145,12 @@ const GLASS_VARIANTS = [
     { id: 'klar', name: 'Klar (VSG)', description: 'Klares Sicherheitsglas', color: '#22c55e' },
     { id: 'matt', name: 'Matt (VSG)', description: 'Satiniert, Sichtschutz', color: '#e5e7eb' },
     { id: 'stopsol', name: 'UV Reflex', description: 'Sonnenschutzglas', color: '#f97316' },
+];
+
+// Teranda-specific glass variants (Klar + Matt only, different lookup)
+const TERANDA_GLASS_VARIANTS = [
+    { id: 'klar', name: 'Klar (VSG)', description: 'Klares Sicherheitsglas', color: '#22c55e' },
+    { id: 'matt', name: 'Matt (VSG)', description: 'Satiniert / Milchglas', color: '#e5e7eb' },
 ];
 
 // Polycarbonate variant options (per Excel: klar/opal share price, IR Gold is surcharge)
@@ -143,19 +161,252 @@ const POLY_VARIANTS = [
     { id: 'smokey', name: 'Smokey Grey', description: 'Getönt, UV-Schutz', color: '#6b7280' },
 ];
 
+// Teranda-specific poly variants (Klar + Reflex Pearl only)
+const TERANDA_POLY_VARIANTS = [
+    { id: 'klar', name: 'Klar', description: 'Transparent', color: '#22c55e' },
+    { id: 'reflex-pearl', name: 'Reflex Pearl', description: 'Lichtstreuend, Perlmutt', color: '#f5f5dc' },
+];
+
 const WALL_PRODUCTS = [
     { id: 'Side Wall (Glass)', name: 'Seitenwand (Glas)', icon: 'square', description: 'Aluminium-Seitenwand mit VSG-Verglasung' },
     { id: 'Front Wall (Glass)', name: 'Frontwand (Glas)', icon: 'square', description: 'Aluminium-Frontwand mit VSG-Verglasung' },
-    { id: 'Wedge (Glass)', name: 'Keilfenster', icon: 'measure', description: 'Dreieckiges Keilfenster' },
 ];
 
 // Keilfenster (Wedge) accessories from Aluxe pricelist
 const KEILFENSTER_ACCESSORIES = [
-    { id: 'uProfil', name: 'U-Profil 55x29mm', price: 38.40, icon: 'ruler', description: 'Ausgleichs-U-Profil für Fenster' },
-    { id: 'schraubenSet', name: 'Schrauben-Set', price: 15.32, icon: 'wrench', description: 'Montage-Schrauben-Set' },
-    { id: 'kippFenster', name: 'Kipp-Fenster', price: 564.75, icon: 'square', description: 'Dreh-Kipp-Fenster im Keil' },
-    { id: 'abdeckungEL891', name: 'Abdeckung EL891', price: 20.07, icon: 'square', description: 'Abdeckung 3200mm' },
+    { id: 'uProfil', name: 'U-Profil 55x29mm', price: 38.40, icon: 'ruler', description: 'Ausgleichs-U-Profil für Fenster', image: '/materials/u-profil_kopplung.png' },
+    { id: 'schraubenSet', name: 'Schrauben-Set Keilfenster', price: 15.32, icon: 'wrench', description: 'Montage-Schrauben-Set', image: '/materials/schraubenset_keilfenster.png' },
+    { id: 'kippFenster', name: 'Kipp-Fenster Keilfenster', price: 564.75, icon: 'square', description: 'Dreh-Kipp-Fenster im Keil', image: '/materials/kippprofil.png' },
+    { id: 'abdeckungEL891', name: 'Abdeckung Keilfenster EL891', price: 20.07, icon: 'square', description: 'Abdeckung 3200mm', image: '/materials/abdeckleiste.png' },
 ];
+
+// ======= MATERIAL IMAGE MAP (extracted via RichData vm attribute from AluxePreisliste.xlsx) =======
+// Verified: cell E{row} vm=N → imageN.png, product name from column A same row
+// Each product has its exact technical profile drawing from the manufacturer
+const MATERIAL_IMAGES: [string, string][] = [
+    // === RINNE (Gutters) — model-specific ===
+    ['Rinne Orangeline+', '/materials/rinne_orangeline+.png'],
+    ['Rinne Orangeline', '/materials/rinne_orangeline.png'],
+    ['Rinne Trendline plus', '/materials/rinne_trendline_plus.png'],
+    ['Rinne Trendline', '/materials/rinne_trendline.png'],
+    ['Rinne Topline XL', '/materials/rinne_topline_xl.png'],
+    ['Rinne Topline', '/materials/rinne_topline.png'],
+    ['Rinne Designline', '/materials/rinne_designline.png'],
+    ['Rinne Ultraline', '/materials/rinne_ultraline.png'],
+    ['Rinne Skyline', '/materials/rinne_skyline__carport.png'],
+    ['Rinne Carport', '/materials/rinne_skyline__carport.png'],
+
+    // === PFOSTEN (Posts) — model-specific ===
+    ['Pfosten Trendline Klassik', '/materials/pfosten_trendline_klassik.png'],
+    ['Pfosten Trendline Rund', '/materials/pfosten_trendline_rund.png'],
+    ['Pfosten Trendline', '/materials/pfosten_trendline.png'],
+    ['Pfosten Designline / Topline XL', '/materials/pfosten_designline__topline_xl.png'],
+    ['Pfosten Designline', '/materials/pfosten_designline__topline_xl.png'],
+    ['Pfosten Topline XL', '/materials/pfosten_designline__topline_xl.png'],
+    ['Pfosten Topline', '/materials/pfosten_topline.png'],
+    ['Pfosten Ultraline', '/materials/pfosten_ultraline.png'],
+    ['Pfosten Skyline', '/materials/pfosten_skyline__carport.png'],
+    ['Pfosten Carport', '/materials/pfosten_skyline__carport.png'],
+    ['Pfosten', '/materials/pfosten.png'],
+    ['Ausgleichspfosten', '/materials/pfosten.png'],
+
+    // === SPARREN (Rafters) — model-specific ===
+    ['Mittlere Sparren Designline', '/materials/mittlere_sparren_designline.png'],
+    ['Mittelsparren Skyline', '/materials/mittelsparren_skyline.png'],
+    ['Außensparren Designline', '/materials/aussensparren_designline.png'],
+    ['Außensparren Skyline', '/materials/aussensparren_skyline__carport.png'],
+    ['Sparren Ultraline', '/materials/sparren_ultraline.png'],
+    ['S-Sparren', '/materials/s-sparren.png'],
+    ['M-Sparren', '/materials/m-sparren.png'],
+    ['L-Sparren', '/materials/l-sparren.png'],
+    ['XL-Sparren', '/materials/xl-sparren.png'],
+
+    // === ABDECKLEISTEN ===
+    ['Abdeckleiste Wandprofil Designline', '/materials/abdeckleiste_wandprofil_designline.png'],
+    ['Abdeckleiste Sparren Designline', '/materials/abdeckleiste_sparren_designline.png'],
+    ['Abdeckleiste', '/materials/abdeckleiste.png'],
+    ['Seitenklickleiste', '/materials/seitenklickleiste.png'],
+
+    // === KLICKLEISTEN ===
+    ['Klickleiste Ultraline Rinne oben', '/materials/klickleiste_ultraline_rinne_oben.png'],
+    ['Klickleiste Ultraline', '/materials/klickleiste_ultraline_sparren_pfostenrinne_unten.png'],
+    ['Klickleiste Pfosten Designline', '/materials/klickleiste_pfosten_designline__topline_xl.png'],
+    ['Klickleiste Pfosten Skyline', '/materials/klickleiste_pfosten_skyline__carport.png'],
+    ['Klickleiste LED Skyline', '/materials/klickleiste_led_skyline__carport.png'],
+
+    // === WAND ===
+    ['Wandanschlussprofil Designline', '/materials/wandanschlussprofil_designline.png'],
+    ['Wandanschluss Ultraline', '/materials/wandanschluss_ultraline.png'],
+    ['Wandanschluss Skyline', '/materials/wandanschluss_skyline__carport.png'],
+    ['Wandanschluss XL', '/materials/wandanschluss_xl.png'],
+    ['Wandanschluss', '/materials/wandanschluss.png'],
+    ['Kippprofil Wandseite Designline', '/materials/kippprofil_wandseite_designline.png'],
+    ['Kippprofil', '/materials/kippprofil.png'],
+
+    // === DISTANZPROFIL ===
+    ['Distanzprofil Ultraline Frontleiste', '/materials/distanzprofil_ultraline_frontleiste.png'],
+    ['Distanzprofil Ultraline', '/materials/distanzprofil_ultraline.png'],
+    ['Distanzprofil Wandanschluss oben Skyline', '/materials/distanzprofil_wandanschluss_oben_skyline__carport.png'],
+    ['Distanzprofil Wandanschluss unten Skyline', '/materials/distanzprofil_wandanschluss_unten_skyline__carport.png'],
+    ['Distanzprofil  Rinnenseite Skyline', '/materials/distanzprofil_rinnenseite_skyline__carport.png'],
+    ['Distanzprofil hinten bei Freistand', '/materials/distanzprofil_hinten_bei_freistand_skyline.png'],
+    ['Distanzprofil XL', '/materials/distanzprofil_xl.png'],
+    ['Distanzprofil', '/materials/distanzprofil.png'],
+
+    // === GLASLEISTEN ===
+    ['Glasleiste Ultraline oben', '/materials/glasleiste_ultraline_oben.png'],
+    ['Glasleiste Ultraline unten', '/materials/glasleiste_ultraline_unten.png'],
+    ['Glashalteleiste Skyline', '/materials/glashalteleiste_skyline.png'],
+    ['Glasleiste', '/materials/glasleiste.png'],
+    ['Frontleiste Ultraline', '/materials/frontleiste_ultraline.png'],
+    ['Abtropfleiste', '/materials/abtropfleiste_glas_8mm.png'],
+
+    // === MONTAGE ===
+    ['Montagewinkel Ultraline Sparren/Rinne mitte', '/materials/montagewinkel_ultraline_sparren_rinne_mitte_al10009.png'],
+    ['Montagewinkel Ultraline Sparren/Rinne links', '/materials/montagewinkel_ultraline_sparren_rinne_links_al10009b.png'],
+    ['Montagewinkel Ultraline Pfosten', '/materials/montagewinkel_ultraline_pfosten_rinne_links.png'],
+    ['Montagewinkel Rinne/Pfosten', '/materials/montagewinkel_rinne_pfosten.png'],
+    ['Montagewinkel Rinne/Ständer', '/materials/montagewinkel_rinne_staender_designline.png'],
+    ['Montageplatte Außensparren links', '/materials/montageplatte_aussensparren_links.png'],
+    ['Montageplatte Außensparren rechts', '/materials/montageplatte_aussensparren_rechts.png'],
+    ['Montageplatte Mittelsparren', '/materials/montageplatte_mittelsparren_skyline.png'],
+    ['Montageprofil Carport', '/materials/montageprofil_carport.png'],
+    ['Befestigung Rinne/Sparren', '/materials/befestigung_rinne_sparren_designline.png'],
+    ['Befestigungsplatte Sparren mittig', '/materials/befestigungsplatte_sparren_mittig_wand_ultraline.png'],
+    ['Befestigungsplatte Seite Sparren', '/materials/befestigungsplatte_seite_sparren_wand_ultraline.png'],
+    ['Niederhalter Carport', '/materials/niederhalter_carport.png'],
+
+    // === ZIERLEISTEN ===
+    ['Zierleiste Flach', '/materials/zierleiste_flach.png'],
+    ['Zierleiste Rund', '/materials/zierleiste_rund.png'],
+    ['Zierleiste Klassik', '/materials/zierleiste_klassik.png'],
+
+    // === DICHTUNGEN ===
+    ['Dichtung Glas Ultraline/Designline', '/materials/dichtung_glas_ultraline_designline.png'],
+    ['Dichtung Glas unten', '/materials/dichtung_glas_unten.png'],
+    ['Dichtung Glas', '/materials/dichtung_glas.png'],
+    ['Dichtung Glasleiste Ultraline', '/materials/dichtung_glasleiste_ultraline_seitlich.png'],
+    ['Dichtung Wandanschluss Designline', '/materials/dichtung_wandanschluss_designline.png'],
+    ['Dichtung Wandanschluß', '/materials/dichtung_wandanschluss.png'],
+    ['Dichtung Rinne', '/materials/dichtung_rinne_und_distanzprofil_ultraline.png'],
+    ['Dichtung Polycarbonat', '/materials/dichtung_polycarbonat.png'],
+    ['Dichtung XL', '/materials/dichtung_xl.png'],
+
+    // === ABDECKKAPPEN ===
+    ['Abdeckkappe Rinne Designline', '/materials/abdeckkappe_rinne_designline_d01.png'],
+    ['Abdeckkappe Rinne Ultraline', '/materials/abdeckkappe_rinne_ultraline.png'],
+    ['Abdeckkappe Rinne Set Orangeline+', '/materials/abdeckkappe_rinne_set_orangeline+.png'],
+    ['Abdeckkappe Rinne Set Orangeline', '/materials/abdeckkappe_rinne_set_orangeline.png'],
+    ['Abdeckkappe Wandanschluss Designline', '/materials/abdeckkappe_wandanschluss_designline_d02.png'],
+    ['Abdeckkappe Wandanschluss Ultraline', '/materials/abdeckkappe_wandanschluss_ultraline.png'],
+    ['Abdeckkappe Wandanschluss XL', '/materials/abdeckkappe_wandanschluss_xl_set.png'],
+    ['Abdeckkappe Wandanschluss', '/materials/abdeckkappe_wandanschluss_set.png'],
+    ['Abdeckkappe Frontleiste', '/materials/abdeckkappe_frontleiste_ultraline.png'],
+    ['Abdeckkappe Sparren mittig Rinne', '/materials/abdeckkappe_sparren_mittig_rinne_designline_d04.png'],
+    ['Abdeckkappe Sparren mittig Wand', '/materials/abdeckkappe_sparren_mittig_wand_designline_d03.png'],
+    ['Abdeckkappe Seite Sparren Wand', '/materials/abdeckkappe_seite_sparren_wand_designline_d08.png'],
+    ['Abdeckkappe seite Sparren Rinne', '/materials/abdeckkappe_seite_sparren_rinne_designline_d09.png'],
+    ['Abdeckkappe Flach', '/materials/abdeckkappe_flach.png'],
+    ['Abdeckkappe Rund', '/materials/abdeckkappe_rund.png'],
+    ['Abdeckkappe Klassik', '/materials/abdeckkappe_klassik.png'],
+    // === MISC PROFILES (from Loses Material allgemein) ===
+    ['Rahmenprofil für Fenster', '/materials/rahmenprofil_fuer_fenster_al8002.png'],
+    ['Rahmenabdeckprofil für Fenster', '/materials/rahmenabdeckprofil_fuer_fenster_al8003.png'],
+    ['T-Rahmenprofil für Fenster', '/materials/t-rahmenprofil_fuer_fenster_al8001.png'],
+    ['T-Abdeckprofil für Fenster', '/materials/t-abdeckprofil_fuer_fenster_al8000.png'],
+    ['Winkelverbinder', '/materials/winkelverbinder.png'],
+    ['Ausgleichspfosten', '/materials/ausgleichspfosten_110x60mm.png'],
+    ['Koppelprofil', '/materials/koppelprofil_glas_8mm.png'],
+    ['Anti-Kondensat', '/materials/anti-kondensat-profil_16mm.png'],
+    ['Konstruktions Profil', '/materials/konstruktions_profil_190x117_mm.png'],
+    ['Klickleiste f. Konstruktions', '/materials/klickleiste_f_konstruktions-_u_designlinepfosten.png'],
+    ['Leiste Woodline', '/materials/leiste_woodline.png'],
+    ['Rinne Woodline', '/materials/rinne_woodline.png'],
+    ['Wandprofil Woodline', '/materials/wandprofil_woodline.png'],
+    ['Abdichtprofil', '/materials/abdichtprofil.png'],
+    ['Steel-Look-I-Profil', '/materials/steel-look-i-profil.png'],
+    ['U-Profil Kopplung', '/materials/u-profil_kopplung.png'],
+
+    // === VERSTÄRKUNGEN (Steel reinforcements) ===
+    ['Sparrenverstärkung', '/materials/sparrenverstaerkung_xl_stahl.png'],
+    ['Rinnenverstärkung', '/materials/rinnenverstaerkung_stahl.png'],
+
+    // === HEIZSTRAHLER ===
+    ['Heizstrahler', '/materials/heizstrahler_model_type_4_inkl_fernbedienung.png'],
+
+    // === BELEUCHTUNG (LED lighting) ===
+    ['LED Set IP65 6 Spots', '/materials/led_6er_set.png'],
+    ['LED Set IP65', '/materials/led_6er_set.png'],
+    ['LED 6er Set', '/materials/led_6er_set.png'],
+    ['10er led set', '/materials/10er_led_set_ip65_erweiterbar_bis_max_13_spots.png'],
+    ['LED 10er Set', '/materials/10er_led_set_ip65_erweiterbar_bis_max_13_spots.png'],
+    ['LED Erweiterung 2er', '/materials/led_erweiterung_2er_set.png'],
+    ['1er led erweiterung', '/materials/1er_led_erweiterung_ip65.png'],
+    ['LED Erweiterung 1er', '/materials/1er_led_erweiterung_ip65.png'],
+    ['LED Stripe', '/materials/led_stripe_5m.png'],
+    ['LED Spot', '/materials/led_spot.png'],
+    ['LED Silikon Diffusor', '/materials/silikon-diffusor.png'],
+    ['Silikon-Diffusor', '/materials/silikon-diffusor.png'],
+    ['Trafo 150W', '/materials/trafo_150w.png'],
+    ['Trafo 60W', '/materials/trafo_60w.png'],
+    ['Trafo', '/materials/trafo_150w.png'],
+    ['Verbindungsmuffe Buchse', '/materials/verbindungsmuffe_buchse.png'],
+    ['Anschlussbox Somfy', '/materials/anschlussbox_somfy.png'],
+    ['Somfy Steuerung', '/materials/somfy_steuerung.png'],
+    ['Somfy', '/materials/somfy_steuerung.png'],
+    ['Dimm-Controller', '/materials/dimm-controller.png'],
+    ['Fernbedienung', '/materials/fernbedienung.png'],
+    ['Y-Kabel', '/materials/y-kabel_4er_set.png'],
+    ['Verlängerungskabel', '/materials/verlaengerungskabel_1m_4er_set.png'],
+
+    // === VERGLASUNG & POLYCARBONAT ===
+    ['Glas klar 8 mm VSG', '/materials/glas_klar_8_mm_vsg.png'],
+    ['Glas klar', '/materials/glas_klar_8_mm_vsg.png'],
+    ['Iso Glas', '/materials/iso_glas_331-10-331.png'],
+    ['Polycarbonat opal', '/materials/polycarbonat_opal_5x_16_mm.png'],
+    ['Polycarbonat', '/materials/polycarbonat_opal_5x_16_mm.png'],
+    ['Antistaubband', '/materials/antistaubband.png'],
+    ['Dichtungsband', '/materials/dichtungsband.png'],
+
+    // === FUNDAMENTE (Foundations) ===
+    ['Betonfundament', '/materials/betonfundament_mit_auslauf.png'],
+    ['Stahlfundament zum Einbetonieren', '/materials/stahlfundament_zum_einbetonieren.png'],
+    ['Stahlfundament zum Aufdübeln asymetrisch', '/materials/stahlfundament_zum_aufduebeln_asymetrisch.png'],
+    ['Stahlfundament zum Aufdübeln symetrisch', '/materials/stahlfundament_zum_aufduebeln_symetrisch.png'],
+    ['Stahlfundament zum Aufdübeln', '/materials/stahlfundament_zum_aufduebeln_asymetrisch.png'],
+    ['Stahlfundament mit Montageplatte', '/materials/stahlfundament_mit_montageplatte.png'],
+    ['Stahlfundament', '/materials/stahlfundament.png'],
+    ['Grundbügel', '/materials/grundbuegel.png'],
+    ['Stahlmauerschuh', '/materials/stahlmauerschuh.png'],
+
+    // === ENTWÄSSERUNG (Drainage PVC) ===
+    ['PVC Rohr', '/materials/pvc_rohr.png'],
+    ['Verbindungsmuffe', '/materials/verbindungsmuffe.png'],
+    ['PVC Reduzierung', '/materials/pvc_reduzierung.png'],
+    ['PVC 90°', '/materials/pvc_90°_bogen.png'],
+    ['PVC 45°', '/materials/pvc_45°_bogen.png'],
+    ['PVC T-Stück', '/materials/pvc_t-stueck.png'],
+    ['Laubfänger', '/materials/laubfaenger.png'],
+    ['Clean Box', '/materials/clean_box.png'],
+    ['Deep Clean Box', '/materials/deep_clean_box.png'],
+
+    // === WINKEL (Angle brackets with RAL) ===
+    ['RAL 7016', '/materials/ral_7016_feinstruktur__matt.png'],
+    ['RAL 9010', '/materials/ral_7016_feinstruktur__matt.png'],
+    ['RAL 9007', '/materials/ral_7016_feinstruktur__matt.png'],
+
+    // Generic fallbacks
+    ['LED', '/materials/led_6er_set.png'],
+    ['Niederhalter', '/materials/pfosten.png'],
+];
+
+// Helper: find best matching image for a material name (first match wins — order matters)
+function getMaterialImage(materialName: string): string | null {
+    for (const [keyword, imgPath] of MATERIAL_IMAGES) {
+        if (materialName.includes(keyword)) return imgPath;
+    }
+    return null;
+}
 
 // ======= MATERIAL BOM COSTS (Aluxe Loses Material Preisliste 2025/2026) =======
 // Prices verified 1:1 against "Loses Material allgemein" sheet in AluxePreisliste.xlsx
@@ -375,27 +626,35 @@ function modelToDbName(model: string): string {
         'Ultraline': 'Ultrastyle',
         'Skyline': 'Skystyle',
         'Carport': 'Carport',
+        'TR10': 'TR10',
+        'TR15': 'TR15',
+        'TR20': 'TR20',
     };
     return mapping[model] || model;
+}
+
+// ======= HELPER: Brand detection =======
+const TERANDA_MODELS = ['TR10', 'TR15', 'TR20'];
+function isTerandaModel(model: string): boolean {
+    return TERANDA_MODELS.includes(model);
 }
 
 // ======= HELPER: Build table name =======
 // LEGACY format: Aluxe V2 - {Model} {Cover} (Zone {X})
 // NEW format (from migration): {DbModel} - Zone {X} - {subtype}
+// TERANDA format: Teranda - {Model} {Cover} (Zone 1)
 function buildTableName(model: string, cover: CoverType, zone: number, construction: ConstructionType): string {
+    if (isTerandaModel(model)) {
+        const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
+        return `Teranda - ${model} ${coverName} (Zone 2)`;
+    }
     const prefix = 'Aluxe V2 - ';
-
     if (model === 'Skyline' || model === 'Carport') {
-        if (construction === 'freestanding') {
-            return `${prefix}${model} Freestanding (Zone ${zone})`;
-        }
+        if (construction === 'freestanding') return `${prefix}${model} Freestanding (Zone ${zone})`;
         return `${prefix}${model} (Zone ${zone})`;
     }
-
     const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
-    if (construction === 'freestanding') {
-        return `${prefix}${model} Freestanding ${coverName} (Zone ${zone})`;
-    }
+    if (construction === 'freestanding') return `${prefix}${model} Freestanding ${coverName} (Zone ${zone})`;
     return `${prefix}${model} ${coverName} (Zone ${zone})`;
 }
 
@@ -408,6 +667,12 @@ function buildDbTableName(model: string, cover: CoverType, zone: number): string
 
 // ======= HELPER: Build surcharge table name =======
 function buildSurchargeTableName(model: string, cover: CoverType, zone: number, variant: string): string {
+    if (isTerandaModel(model)) {
+        // Teranda: each variant is stored as a full-price table (not surcharge delta)
+        const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
+        const vMap: Record<string, string> = { matt: 'Matt', 'reflex-pearl': 'Reflex Pearl', stopsol: 'Reflex Pearl' };
+        return `Teranda - ${model} ${coverName} ${vMap[variant] || variant} (Zone 2)`;
+    }
     const dbModel = modelToDbName(model);
     const subtype = cover === 'Poly' ? 'polycarbonate' : 'glass';
     return `${dbModel} - Zone ${zone} - ${subtype} - surcharge_${variant}`;
@@ -415,19 +680,16 @@ function buildSurchargeTableName(model: string, cover: CoverType, zone: number, 
 
 // ======= HELPER: Try multiple table name formats =======
 async function findPriceTable(supabase: any, model: string, cover: CoverType, zone: number, construction: ConstructionType): Promise<{ id: string; name: string } | null> {
-    // Skyline/Carport don't have cover type - use special handling
     const isNoCoverModel = model === 'Skyline' || model === 'Carport';
-
-    // Try formats in order of preference
     const formats: string[] = [];
 
-    if (isNoCoverModel) {
-        // For Skyline/Carport: only try the legacy format (no cover type)
-        formats.push(buildTableName(model, cover, zone, construction)); // Aluxe V2 - Skyline (Zone 1)
+    if (isTerandaModel(model)) {
+        formats.push(buildTableName(model, cover, zone, construction));
+    } else if (isNoCoverModel) {
+        formats.push(buildTableName(model, cover, zone, construction));
     } else {
-        // Standard models: try new format first, then legacy
-        formats.push(buildDbTableName(model, cover, zone)); // Trendstyle - Zone 1 - glass
-        formats.push(buildTableName(model, cover, zone, construction)); // Aluxe V2 - Trendline Glass (Zone 1)
+        formats.push(buildDbTableName(model, cover, zone));
+        formats.push(buildTableName(model, cover, zone, construction));
     }
 
     for (const name of formats) {
@@ -437,39 +699,25 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
             .eq('name', name)
             .eq('is_active', true)
             .limit(1);
-
-        if (data && data.length > 0) {
-            return data[0];
-        }
+        if (data && data.length > 0) return data[0];
     }
 
-    // Fallback: try partial match
-    if (isNoCoverModel) {
-        // For Skyline/Carport: fuzzy search without cover type
-        const { data: fuzzy } = await supabase
-            .from('price_tables')
-            .select('id, name')
-            .ilike('name', `%${model}%Zone ${zone}%`)
-            .eq('is_active', true)
-            .limit(1);
-
-        if (fuzzy && fuzzy.length > 0) {
-            return fuzzy[0];
-        }
+    // Fallback: fuzzy match
+    if (isTerandaModel(model)) {
+        const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
+        const { data: fuzzy } = await supabase.from('price_tables').select('id, name')
+            .ilike('name', `%Teranda%${model}%${coverName}%`).eq('is_active', true).limit(1);
+        if (fuzzy && fuzzy.length > 0) return fuzzy[0];
+    } else if (isNoCoverModel) {
+        const { data: fuzzy } = await supabase.from('price_tables').select('id, name')
+            .ilike('name', `%${model}%Zone ${zone}%`).eq('is_active', true).limit(1);
+        if (fuzzy && fuzzy.length > 0) return fuzzy[0];
     } else {
-        // Standard models: fuzzy search with cover type
         const dbModel = modelToDbName(model);
         const subtype = cover === 'Poly' ? 'polycarbonate' : 'glass';
-        const { data: fuzzy } = await supabase
-            .from('price_tables')
-            .select('id, name')
-            .ilike('name', `%${dbModel}%Zone ${zone}%${subtype}%`)
-            .eq('is_active', true)
-            .limit(1);
-
-        if (fuzzy && fuzzy.length > 0) {
-            return fuzzy[0];
-        }
+        const { data: fuzzy } = await supabase.from('price_tables').select('id, name')
+            .ilike('name', `%${dbModel}%Zone ${zone}%${subtype}%`).eq('is_active', true).limit(1);
+        if (fuzzy && fuzzy.length > 0) return fuzzy[0];
     }
 
     return null;
@@ -515,6 +763,18 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [polyVariant, setPolyVariant] = useState<string>('opal');
     const [sonderfarben, setSonderfarben] = useState<boolean>(false); // Special color +20% surcharge
 
+    // Reset variant to valid options when switching between Aluxe ↔ Teranda
+    useEffect(() => {
+        if (isTerandaModel(model)) {
+            // Teranda only has klar/matt (glass) and klar/reflex-pearl (poly)
+            if (!TERANDA_GLASS_VARIANTS.find(v => v.id === glassVariant)) setGlassVariant('klar');
+            if (!TERANDA_POLY_VARIANTS.find(v => v.id === polyVariant)) setPolyVariant('klar');
+        } else {
+            // Aluxe: if coming from Teranda reflex-pearl, reset to opal
+            if (polyVariant === 'reflex-pearl') setPolyVariant('opal');
+        }
+    }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // === DESIGNLINE SCHIEBEEINHEIT (Sliding Roof Glass) ===
     const [schiebeeinheitCount, setSchiebeeinheitCount] = useState<number>(0); // Number of sliding roof fields
     const [schiebeeinheitUnitPrice, setSchiebeeinheitUnitPrice] = useState<number>(0); // Price per field
@@ -538,6 +798,10 @@ export const ProductConfiguratorV2: React.FC = () => {
         'Ultraline': { defaultH3: 2200, defaultH1: 2796, defaultOverhang: 300, needsH1: true, needsH3: false, needsOverhang: true, postWidth: 196, label: 'Ultrastyle', hint: 'Kein H3 erforderlich — Überstand + H1 + Tiefe' },
         'Skyline': { defaultH3: 2400, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, postWidth: 160, label: 'Skystyle', hint: 'Flachdach, Glashöhe 95mm, nur H3 + Tiefe' },
         'Carport': { defaultH3: 2400, defaultH1: 2796, needsH1: false, needsH3: true, needsOverhang: false, postWidth: 160, label: 'Carport', hint: 'Flachdach, Glashöhe 28mm, nur H3 + Tiefe' },
+        // Teranda models — use simplified calculation (H3 + Tiefe only)
+        'TR10': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 100, label: 'Orangestyle 10', hint: 'Einstiegsprofil, VSG 44.2' },
+        'TR15': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 120, label: 'Trendstyle 15', hint: 'Standard Profil, VSG 44.2' },
+        'TR20': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 140, label: 'Topstyle 20', hint: 'Premium Profil, VSG 55.2' },
     };
     const modelDrConfig = MODEL_DACHRECHNER_CONFIG[model] || MODEL_DACHRECHNER_CONFIG['Topline'];
 
@@ -555,7 +819,8 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [wallTab, setWallTab] = useState<'walls' | 'awnings' | 'led' | 'materials' | 'wpc' | 'aluminum'>('walls');
     const [wallPrice, setWallPrice] = useState<number | null>(null);
     const [wallPriceLoading, setWallPriceLoading] = useState(false);
-    const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama'>('fixed');
+    const [materialLightbox, setMaterialLightbox] = useState<{ src: string; name: string } | null>(null);
+    const [wallCategory, setWallCategory] = useState<'fixed' | 'sliding' | 'panorama' | 'keilfenster'>('fixed');
     const [wallGlassType, setWallGlassType] = useState<'klar' | 'matt' | 'iso'>('klar');
     const [structuralMetadata, setStructuralMetadata] = useState<{
         posts_count: number;
@@ -699,6 +964,10 @@ export const ProductConfiguratorV2: React.FC = () => {
             'Topline XL': 'topline_xl',
             'Designline': 'designline',
             'Ultraline': 'ultraline_classic',
+            // Teranda models use Trendline calculation (similar sloped roof geometry)
+            'TR10': 'trendline',
+            'TR15': 'trendline',
+            'TR20': 'trendline',
         };
         return map[v2ModelId] || null;
     };
@@ -1191,6 +1460,25 @@ export const ProductConfiguratorV2: React.FC = () => {
     useEffect(() => {
         const fetchStructural = async () => {
             try {
+                // Teranda models: posts are determined by width thresholds (not from DB)
+                if (isTerandaModel(model)) {
+                    const terandaPostThresholds: Record<string, number> = {
+                        'TR10': 4500,  // ≤4500mm → 2 Pfosten
+                        'TR15': 4520,  // ≤4520mm → 2 Pfosten
+                        'TR20': 7000,  // ≤7000mm → 2 Pfosten
+                    };
+                    const threshold = terandaPostThresholds[model] || 4500;
+                    const postsCount = width <= threshold ? 2 : Math.ceil(width / threshold) + 1;
+                    // Fields = posts + 1 (each segment between posts)
+                    const fieldsCount = postsCount + 1;
+                    setStructuralMetadata({
+                        posts_count: postsCount,
+                        fields_count: fieldsCount,
+                        rafter_type: null,
+                    });
+                    return;
+                }
+
                 const table = await findPriceTable(supabase, model, cover, zone, construction);
 
                 if (table) {
@@ -1461,14 +1749,36 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                 // 3. Fetch VARIANT SURCHARGE from database (Glass Matt/Stopsol or Poly IR Gold)
                 // Surcharge tables exist in format: "Aluxe V2 - {Model} {Poly/Glass} {Variant} Surcharge (Zone {N})"
+                // For Teranda: variant is a separate full-price table (not surcharge delta)
                 setVariantSurchargePrice(0); // Reset
 
                 // Only apply surcharge for non-default variants
                 const needsSurcharge = (cover === 'Glass' && glassVariant !== 'klar') ||
-                    (cover === 'Poly' && polyVariant === 'ir-gold');
+                    (cover === 'Poly' && (isTerandaModel(model) ? polyVariant === 'reflex-pearl' : polyVariant === 'ir-gold'));
 
-
-                if (needsSurcharge && combinedResult?.totalPrice) {
+                // TERANDA: variant = separate full-price table, replace base price
+                if (isTerandaModel(model) && needsSurcharge && combinedResult?.totalPrice) {
+                    const variantKey = cover === 'Glass' ? glassVariant : polyVariant;
+                    const variantTableName = buildSurchargeTableName(model, cover, zone, variantKey);
+                    
+                    const { data: vtData } = await supabase
+                        .from('price_tables')
+                        .select('id, name')
+                        .eq('name', variantTableName)
+                        .eq('is_active', true)
+                        .limit(1);
+                    
+                    if (vtData && vtData.length > 0) {
+                        const variantFullPrice = await PricingService.calculateMatrixPrice(
+                            vtData[0].id, width, projection
+                        );
+                        if (variantFullPrice !== null && variantFullPrice > 0) {
+                            // Calculate delta from base price and set as surcharge
+                            const delta = variantFullPrice - combinedResult.totalPrice;
+                            setVariantSurchargePrice(delta);
+                        }
+                    }
+                } else if (needsSurcharge && combinedResult?.totalPrice) {
                     // Map model name to DB format (e.g., "Trendline" stays as "Trendline")
                     const dbModel = model.charAt(0).toUpperCase() + model.slice(1).toLowerCase();
 
@@ -1647,8 +1957,10 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === MATERIAL BOM (physical materials: glass/poly panels, rafters, accessories) ===
     const materialBOM = useMemo(() => {
         if (!price || !structuralMetadata?.fields_count) return null;
-        // Skyline/Carport/Pergola don't have standard BOM logic
+        // Skyline/Carport/Pergola/Teranda don't have standard BOM logic
+        // Teranda prices from Excel are complete (includes materials)
         if (['Skyline', 'Carport', 'Pergola', 'Pergola Deluxe'].includes(model)) return null;
+        if (isTerandaModel(model)) return null;
         return calculateRoofMaterialCost(
             model, cover, width, projection,
             structuralMetadata.fields_count,
@@ -1680,10 +1992,13 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const handleAddRoofToBasket = () => {
         if (!totalPrice) return;
+        const glassVarList = isTerandaModel(model) ? TERANDA_GLASS_VARIANTS : GLASS_VARIANTS;
+        const polyVarList = isTerandaModel(model) ? TERANDA_POLY_VARIANTS : POLY_VARIANTS;
         const variantName = cover === 'Glass'
-            ? GLASS_VARIANTS.find(v => v.id === glassVariant)?.name || glassVariant
-            : POLY_VARIANTS.find(v => v.id === polyVariant)?.name || polyVariant;
-        const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${zone}, ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}` +
+            ? glassVarList.find(v => v.id === glassVariant)?.name || glassVariant
+            : polyVarList.find(v => v.id === polyVariant)?.name || polyVariant;
+        const displayZone = isTerandaModel(model) ? 2 : zone;
+        const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${displayZone}, ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}` +
             (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
             (construction === 'freestanding' && includeFoundations ? ' + Fundamente' : '') +
             (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
@@ -1773,7 +2088,13 @@ export const ProductConfiguratorV2: React.FC = () => {
     const purchasePrice = subtotal - purchaseDiscountValue;
 
     // Internal costs (not shown to customer, but factored into true purchase cost)
-    const internalCosts = pfandTotal + TRANSPORT_COST;
+    // Teranda: transport and pfand are free (included in Excel price)
+    const terandaDisplayNames = ROOF_MODELS.filter(m => isTerandaModel(m.id)).map(m => m.name);
+    const hasTerandaInBasket = basket.some(item => terandaDisplayNames.includes(item.name));
+    const isTerandaOnlyBasket = basket.length > 0 && basket.every(item => terandaDisplayNames.includes(item.name));
+    const effectiveTransport = isTerandaOnlyBasket ? 0 : TRANSPORT_COST;
+    const effectivePfand = isTerandaOnlyBasket ? 0 : pfandTotal;
+    const internalCosts = effectivePfand + effectiveTransport;
     const totalPurchaseCostInternal = purchasePrice + internalCosts; // True cost to company
 
     // Step 2: Apply margin on top of purchase price (margin covers product + pfand + transport)
@@ -2340,11 +2661,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-center text-sm text-amber-800">
                                             <span>Pfand (Verpackungspfand):</span>
-                                            <span className="font-bold">{formatCurrency(pfandTotal)}</span>
+                                            <span className="font-bold">{formatCurrency(effectivePfand)}{isTerandaOnlyBasket ? ' (inkl.)' : ''}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm text-amber-800">
-                                            <span>Transport (Aluxe → Lager):</span>
-                                            <span className="font-bold">{formatCurrency(TRANSPORT_COST)}</span>
+                                            <span>Transport:</span>
+                                            <span className="font-bold">{formatCurrency(effectiveTransport)}{isTerandaOnlyBasket ? ' (inkl.)' : ''}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm font-bold text-amber-900 pt-1 border-t border-amber-200">
                                             <span>Gesamte Einkaufskosten:</span>
@@ -2861,11 +3182,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <div className="space-y-1">
                                     <div className="flex justify-between items-center text-sm text-amber-800">
                                         <span>Pfand:</span>
-                                        <span className="font-bold">{formatCurrency(pfandTotal)}</span>
+                                        <span className="font-bold">{formatCurrency(effectivePfand)}{isTerandaOnlyBasket ? ' (inkl.)' : ''}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm text-amber-800">
                                         <span>Transport:</span>
-                                        <span className="font-bold">{formatCurrency(TRANSPORT_COST)}</span>
+                                        <span className="font-bold">{formatCurrency(effectiveTransport)}{isTerandaOnlyBasket ? ' (inkl.)' : ''}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm font-bold text-amber-900 pt-1 border-t border-amber-200">
                                         <span>Einkaufskosten gesamt:</span>
@@ -3148,28 +3469,38 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     <span className="text-2xl">{IC.roof('w-7 h-7')}</span> Wybierz Model
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {ROOF_MODELS.map(m => (
-                                        <button
-                                            key={m.id}
-                                            onClick={() => setModel(m.id)}
-                                            className={`relative p-5 rounded-xl border-2 text-left transition-all hover:shadow-md ${model === m.id
-                                                ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
-                                                : 'border-slate-100 hover:border-indigo-200 bg-white'
-                                                }`}
-                                        >
-                                            <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
-                                            <p className="text-xs text-slate-500 mt-1 mb-3">{m.description}</p>
-                                            <div className="flex gap-1 flex-wrap">
-                                                {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
-                                                {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
-                                                {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Freistehend</span>}
-                                            </div>
-                                            {model === m.id && (
-                                                <div className="absolute top-3 right-3 text-indigo-600">
-                                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                    {ROOF_MODELS.map((m, idx) => (
+                                        <React.Fragment key={m.id}>
+                                            {/* Visual separator before extended model line */}
+                                            {isTerandaModel(m.id) && !isTerandaModel(ROOF_MODELS[idx - 1]?.id) && (
+                                                <div className="col-span-full my-2">
+                                                    <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
                                                 </div>
                                             )}
-                                        </button>
+                                            <button
+                                                onClick={() => setModel(m.id)}
+                                                className={`relative p-5 rounded-xl border-2 text-left transition-all hover:shadow-md ${model === m.id
+                                                    ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
+                                                    : isTerandaModel(m.id)
+                                                        ? 'border-orange-100 hover:border-orange-300 bg-orange-50/30'
+                                                        : 'border-slate-100 hover:border-indigo-200 bg-white'
+                                                    }`}
+                                            >
+                                                {/* badge removed */}
+                                                <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
+                                                <p className="text-xs text-slate-500 mt-1 mb-3">{m.description}</p>
+                                                <div className="flex gap-1 flex-wrap">
+                                                    {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
+                                                    {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
+                                                    {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Freistehend</span>}
+                                                </div>
+                                                {model === m.id && (
+                                                    <div className="absolute top-3 right-3 text-indigo-600">
+                                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                    </div>
+                                                )}
+                                            </button>
+                                        </React.Fragment>
                                     ))}
                                 </div>
                             </div>
@@ -3396,8 +3727,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             )}
                                         </div>
 
-                                        {/* Zusatzpfosten control */}
-                                        <div className="bg-white/80 rounded-xl p-3 border border-amber-200">
+                                        {/* Zusatzpfosten control — Aluxe only (Teranda prices are all-inclusive) */}
+                                        {!isTerandaModel(model) && <div className="bg-white/80 rounded-xl p-3 border border-amber-200">
                                             <div className="flex items-center justify-between flex-wrap gap-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-bold text-slate-700 inline-flex items-center gap-1">{IC.build('w-4 h-4')} Zusatzpfosten</span>
@@ -3465,7 +3796,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     )}
                                                 </div>
                                             )}
-                                        </div>
+                                        </div>}
                                     </div>
                                 )}
                                 <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3517,6 +3848,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {/* Zone */}
                                     <div>
                                         <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
+                                        {isTerandaModel(model) ? (
+                                            <p className="text-xs text-slate-400 italic">Ohne Schneelaststufe (Zone 2 Standard)</p>
+                                        ) : (
+                                            <>
                                         {plzZoneResult && (
                                             <p className="mb-2 text-xs text-green-600 font-medium flex items-center gap-1">
                                                 <span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} {plzZoneResult}</span>
@@ -3539,6 +3874,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </button>
                                             ))}
                                         </div>
+                                        </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -3593,8 +3930,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             {cover === 'Glass' && currentModel?.hasGlass && (
                                                 <div className="mt-4 p-4 bg-cyan-50 rounded-xl border border-cyan-200">
                                                     <h4 className="text-sm font-bold text-cyan-800 mb-3">Glasart</h4>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        {GLASS_VARIANTS.map(v => (
+                                                    <div className={`grid ${isTerandaModel(model) ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+                                                        {(isTerandaModel(model) ? TERANDA_GLASS_VARIANTS : GLASS_VARIANTS).map(v => (
                                                             <button
                                                                 key={v.id}
                                                                 onClick={() => setGlassVariant(v.id)}
@@ -3614,8 +3951,8 @@ export const ProductConfiguratorV2: React.FC = () => {
                                             {cover === 'Poly' && currentModel?.hasPoly && (
                                                 <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
                                                     <h4 className="text-sm font-bold text-blue-800 mb-3">Polycarbonat-Typ</h4>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {POLY_VARIANTS.map(v => (
+                                                    <div className={`grid ${isTerandaModel(model) ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
+                                                        {(isTerandaModel(model) ? TERANDA_POLY_VARIANTS : POLY_VARIANTS).map(v => (
                                                             <button
                                                                 key={v.id}
                                                                 onClick={() => setPolyVariant(v.id)}
@@ -3760,7 +4097,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <div className="flex border-b border-slate-200 bg-slate-50">
                                     {[
                                         { id: 'walls', label: 'Verglasung', icon: 'wall', desc: 'Wände & Glas' },
-                                        { id: 'awnings', label: 'Komfort', icon: 'sun', desc: 'Markisen, LED' },
+                                        { id: 'awnings', label: 'Markisen', icon: 'sun', desc: 'Markisen' },
                                         { id: 'wpc', label: 'WPC-Boden', icon: 'wood', desc: 'Terrassen' },
                                         { id: 'aluminum', label: 'Alu-Wände', icon: 'square', desc: 'Voll, Lamellen' },
                                         { id: 'materials', label: 'Material', icon: 'wrench', desc: 'Komponenten' },
@@ -3784,11 +4121,12 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {/* ====== ZABUDOWA TAB ====== */}
                                     {/* ====== WALLS TAB ====== */}
                                     {wallTab === 'walls' && (
-                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                            {/* LEFT COLUMN - CONTROLS */}
-                                            <div className="lg:col-span-2 space-y-6">
+                                        <div className="space-y-6">
+                                            {/* CONTROLS */}
+                                            <div className="space-y-6">
 
-                                                {/* 0. Wall Placement Selector */}
+                                                {/* 0. Wall Placement Selector - hidden for Keilfenster (has its own side selector) */}
+                                                {wallCategory !== 'keilfenster' && (
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                                                     <h5 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">{IC.measure('w-4 h-4')} Platzierung</h5>
                                                     <div className="grid grid-cols-3 gap-2">
@@ -3851,6 +4189,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                         );
                                                     })()}
                                                 </div>
+                                                )}
 
                                                 {/* 1. Category Selector */}
                                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -3859,6 +4198,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                             { id: 'fixed', label: 'Festverglasung', icon: 'square' },
                                                             { id: 'sliding', label: 'Schiebetür', icon: 'square' },
                                                             { id: 'panorama', label: 'Panorama', icon: 'sun' },
+                                                            { id: 'keilfenster', label: 'Keilfenster', icon: 'measure' },
                                                         ].map(cat => (
                                                             <button
                                                                 key={cat.id}
@@ -3868,6 +4208,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     if (cat.id === 'fixed') setWallProduct(WALL_PRODUCTS[0].id);
                                                                     if (cat.id === 'sliding') setWallProduct(SCHIEBETUR_PRODUCTS[0].id);
                                                                     if (cat.id === 'panorama') setWallProduct(PANORAMA_PRODUCTS[0].id);
+                                                                    if (cat.id === 'keilfenster') setWallProduct('Wedge (Glass)');
                                                                 }}
                                                                 className={`flex-1 py-4 text-center transition-colors font-bold text-sm flex items-center justify-center gap-2 ${wallCategory === cat.id
                                                                     ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-500'
@@ -3924,85 +4265,90 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                     </div>
                                                                 )}
 
-                                                                {/* WEDGE GLASS OPTIONS */}
-                                                                {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
-                                                                    <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
-                                                                        {/* Keilfenster Side Selector */}
-                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-1.5">{IC.measure('w-4 h-4')} Seite Keilfenster</h4>
-                                                                        <div className="grid grid-cols-2 gap-2 mb-4">
-                                                                            {([
-                                                                                { id: 'left' as const, label: 'Lewy', icon: '◀', desc: 'Keilfenster po lewej' },
-                                                                                { id: 'right' as const, label: 'Prawy', icon: '▶', desc: 'Keilfenster po prawej' },
-                                                                            ]).map(s => (
-                                                                                <button
-                                                                                    key={s.id}
-                                                                                    onClick={() => setKeilfensterSide(s.id)}
-                                                                                    className={`p-3 rounded-lg border-2 text-center transition-all ${keilfensterSide === s.id
-                                                                                        ? 'border-orange-500 bg-white shadow-sm ring-1 ring-orange-300'
-                                                                                        : 'border-orange-100 bg-white/50 hover:border-orange-300'}`}
-                                                                                >
-                                                                                    <div className="text-xl mb-0.5">{s.icon}</div>
-                                                                                    <div className="font-bold text-xs text-slate-800">{s.label}</div>
-                                                                                    <div className="text-[9px] text-slate-400">{s.desc}</div>
-                                                                                </button>
-                                                                            ))}
+                                                                {/* Keilfenster content is now in its own tab below */}
+                                                            </>
+                                                        )}
+
+                                                        {/* KEILFENSTER TAB */}
+                                                        {wallCategory === 'keilfenster' && (
+                                                            <>
+                                                                {/* Side Selector */}
+                                                                <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 mb-4">
+                                                                    <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-1.5">{IC.measure('w-4 h-4')} Seite</h4>
+                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                        {([
+                                                                            { id: 'left' as const, label: 'Links', icon: '◀', desc: 'Keilfenster linke Seite' },
+                                                                            { id: 'right' as const, label: 'Rechts', icon: '▶', desc: 'Keilfenster rechte Seite' },
+                                                                        ]).map(s => (
+                                                                            <button
+                                                                                key={s.id}
+                                                                                onClick={() => setKeilfensterSide(s.id)}
+                                                                                className={`p-4 rounded-xl border-2 text-center transition-all ${keilfensterSide === s.id
+                                                                                    ? 'border-orange-500 bg-white shadow-sm ring-1 ring-orange-300'
+                                                                                    : 'border-orange-100 bg-white/50 hover:border-orange-300'}`}
+                                                                            >
+                                                                                <div className="text-2xl mb-1">{s.icon}</div>
+                                                                                <div className="font-bold text-sm text-slate-800">{s.label}</div>
+                                                                                <div className="text-[10px] text-slate-400">{s.desc}</div>
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* K1/K2 Dimensions */}
+                                                                {dachrechnerResults && (dachrechnerResults.keilhoeheK1 || dachrechnerResults.keilhoeheK2) && (
+                                                                    <div className="grid grid-cols-3 gap-3 mb-4">
+                                                                        <div className="bg-orange-50 rounded-xl p-3 text-center border border-orange-200">
+                                                                            <span className="block text-orange-500 uppercase text-[9px] font-bold">K1 (Rinne)</span>
+                                                                            <span className="font-bold text-lg text-orange-900">{dachrechnerResults.keilhoeheK1 ? Math.round(dachrechnerResults.keilhoeheK1) : '–'} mm</span>
                                                                         </div>
-
-                                                                        {/* K1/K2 Dimension Preview */}
-                                                                        {dachrechnerResults && (dachrechnerResults.keilhoeheK1 || dachrechnerResults.keilhoeheK2) && (
-                                                                            <div className="grid grid-cols-3 gap-2 mb-4 text-xs">
-                                                                                <div className="bg-white rounded-lg p-2 text-center border border-orange-200">
-                                                                                    <span className="block text-orange-500 uppercase text-[9px] font-bold">K1 (Rinne)</span>
-                                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.keilhoeheK1 ? Math.round(dachrechnerResults.keilhoeheK1) : '–'} mm</span>
-                                                                                </div>
-                                                                                <div className="bg-white rounded-lg p-2 text-center border border-orange-200">
-                                                                                    <span className="block text-orange-500 uppercase text-[9px] font-bold">K2 (Wand)</span>
-                                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.keilhoeheK2 ? Math.round(dachrechnerResults.keilhoeheK2) : '–'} mm</span>
-                                                                                </div>
-                                                                                <div className="bg-white rounded-lg p-2 text-center border border-orange-200">
-                                                                                    <span className="block text-orange-500 uppercase text-[9px] font-bold">Breite (F2)</span>
-                                                                                    <span className="font-bold text-orange-900">{dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : '–'} mm</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-
-                                                                        <h4 className="text-sm font-bold text-orange-800 mb-3">Glasart (Keilfenster)</h4>
-                                                                        <div className="grid grid-cols-3 gap-2">
-                                                                            {[
-                                                                                { id: 'clear', name: 'Klar (VSG 44.2)', color: '#22c55e', price: 'Standard' },
-                                                                                { id: 'matt', name: 'Matt (VSG 44.2)', color: '#e5e7eb', price: '+ Aufpreis' },
-                                                                                { id: 'iso', name: 'Isolierglas', color: '#ef4444', price: '+ Aufpreis' }
-                                                                            ].map(v => (
-                                                                                <button
-                                                                                    key={v.id}
-                                                                                    onClick={() => setWedgeGlassType(v.id)}
-                                                                                    className={`p-3 rounded-lg border-2 text-center transition-all ${wedgeGlassType === v.id
-                                                                                        ? 'border-orange-500 bg-white shadow-sm ring-1 ring-orange-300'
-                                                                                        : 'border-orange-100 bg-white/50 hover:border-orange-300'
-                                                                                        }`}
-                                                                                >
-                                                                                    <div className="flex items-center justify-center mb-1"><span className="w-4 h-4 rounded-full border border-slate-200" style={{ background: (v as any).color || '#ccc' }} /></div>
-                                                                                    <div className="font-bold text-xs text-slate-800">{v.name}</div>
-                                                                                    <div className="text-[9px] text-slate-500 leading-tight">{v.price}</div>
-                                                                                </button>
-                                                                            ))}
+                                                                        <div className="bg-orange-50 rounded-xl p-3 text-center border border-orange-200">
+                                                                            <span className="block text-orange-500 uppercase text-[9px] font-bold">K2 (Wand)</span>
+                                                                            <span className="font-bold text-lg text-orange-900">{dachrechnerResults.keilhoeheK2 ? Math.round(dachrechnerResults.keilhoeheK2) : '–'} mm</span>
+                                                                        </div>
+                                                                        <div className="bg-orange-50 rounded-xl p-3 text-center border border-orange-200">
+                                                                            <span className="block text-orange-500 uppercase text-[9px] font-bold">Breite (F2)</span>
+                                                                            <span className="font-bold text-lg text-orange-900">{dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : '–'} mm</span>
                                                                         </div>
                                                                     </div>
                                                                 )}
 
-                                                                {/* KEILFENSTER ACCESSORIES */}
-                                                                {(wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster')) && (
-                                                                    <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                                                        <h4 className="text-sm font-bold text-blue-800 mb-3">Opcje dodatkowe (Keilfenster)</h4>
-                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                            {KEILFENSTER_ACCESSORIES.map(acc => (
-                                                                                <label
-                                                                                    key={acc.id}
-                                                                                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${wedgeAccessories[acc.id]
-                                                                                        ? 'border-blue-500 bg-white shadow-sm ring-1 ring-blue-300'
-                                                                                        : 'border-blue-100 bg-white/50 hover:border-blue-300'
-                                                                                        }`}
-                                                                                >
+                                                                {/* Glass Type */}
+                                                                <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 mb-4">
+                                                                    <h4 className="text-sm font-bold text-orange-800 mb-3">Glasart</h4>
+                                                                    <div className="grid grid-cols-3 gap-2">
+                                                                        {[
+                                                                            { id: 'clear', name: 'Klar (VSG 44.2)', color: '#22c55e', price: 'Standard' },
+                                                                            { id: 'matt', name: 'Matt (VSG 44.2)', color: '#e5e7eb', price: '+ Aufpreis' },
+                                                                            { id: 'iso', name: 'Isolierglas', color: '#ef4444', price: '+ Aufpreis' }
+                                                                        ].map(v => (
+                                                                            <button
+                                                                                key={v.id}
+                                                                                onClick={() => setWedgeGlassType(v.id)}
+                                                                                className={`p-3 rounded-lg border-2 text-center transition-all ${wedgeGlassType === v.id
+                                                                                    ? 'border-orange-500 bg-white shadow-sm ring-1 ring-orange-300'
+                                                                                    : 'border-orange-100 bg-white/50 hover:border-orange-300'}`}
+                                                                            >
+                                                                                <div className="flex items-center justify-center mb-1"><span className="w-4 h-4 rounded-full border border-slate-200" style={{ background: v.color }} /></div>
+                                                                                <div className="font-bold text-xs text-slate-800">{v.name}</div>
+                                                                                <div className="text-[9px] text-slate-500">{v.price}</div>
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Accessories */}
+                                                                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                                                    <h4 className="text-sm font-bold text-blue-800 mb-3">Zubehör (Keilfenster)</h4>
+                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                        {KEILFENSTER_ACCESSORIES.map(acc => (
+                                                                            <label
+                                                                                key={acc.id}
+                                                                                className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${wedgeAccessories[acc.id]
+                                                                                    ? 'border-blue-500 bg-white shadow-sm ring-1 ring-blue-300'
+                                                                                    : 'border-blue-100 bg-white/50 hover:border-blue-300'}`}
+                                                                            >
+                                                                                <div className="flex items-start gap-3">
                                                                                     <input
                                                                                         type="checkbox"
                                                                                         checked={wedgeAccessories[acc.id] || false}
@@ -4010,21 +4356,28 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                                             ...prev,
                                                                                             [acc.id]: e.target.checked
                                                                                         }))}
-                                                                                        className="w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                                                                                        className="w-4 h-4 mt-0.5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
                                                                                     />
                                                                                     <div className="flex-1 min-w-0">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="flex items-center justify-center">{(IC as any)[acc.icon]?.('w-5 h-5') || acc.icon}</span>
-                                                                                            <span className="font-bold text-xs text-slate-800 truncate">{acc.name}</span>
-                                                                                        </div>
+                                                                                        <span className="font-bold text-xs text-slate-800">{acc.name}</span>
                                                                                         <div className="text-[10px] text-slate-500">{acc.description}</div>
                                                                                         <div className="text-xs font-bold text-blue-600 mt-1">€{acc.price.toFixed(2)}</div>
                                                                                     </div>
-                                                                                </label>
-                                                                            ))}
-                                                                        </div>
+                                                                                </div>
+                                                                                {acc.image && (
+                                                                                    <div className="mt-2 flex justify-center">
+                                                                                        <img
+                                                                                            src={acc.image}
+                                                                                            alt={acc.name}
+                                                                                            className="max-h-16 object-contain rounded opacity-80 hover:opacity-100 transition-opacity"
+                                                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                                        />
+                                                                                    </div>
+                                                                                )}
+                                                                            </label>
+                                                                        ))}
                                                                     </div>
-                                                                )}
+                                                                </div>
                                                             </>
                                                         )}
 
@@ -4358,154 +4711,133 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            {/* RIGHT COLUMN - VISUALIZER & PRICE */}
-                                            <div className="space-y-6 lg:sticky lg:top-6">
-                                                {/* Visualizer Card - ENLARGED */}
-                                                <div className="h-[450px] w-full">
-                                                    <WallVisualizer
-                                                        wallProduct={wallProduct}
-                                                        width={wallWidth}
-                                                        projection={projection}
-                                                        height={wallHeight}
-                                                        modelName={model}
-                                                        postsCount={structuralMetadata?.posts_count}
-                                                    />
-                                                    {/* Structure Info Overlay */}
-                                                    {structuralMetadata && (
-                                                        <div className="flex justify-center mt-2 gap-4 text-xs font-bold text-slate-500">
-                                                            <span className="bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
-                                                                Pfosten: {structuralMetadata.posts_count}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </div>
 
-                                                {/* Price & Action Card */}
-                                                <div className="bg-slate-800 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
-                                                    {/* Background decoration */}
-                                                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
+                                            {/* Price & Action Card */}
+                                            <div className="bg-slate-800 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
+                                                {/* Background decoration */}
+                                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
 
-                                                    <div className="relative z-10 text-center space-y-4">
-                                                        {(() => {
+                                                <div className="relative z-10 text-center space-y-4">
+                                                    {(() => {
+                                                        const postsCount = structuralMetadata?.posts_count || 2;
+                                                        const frontSegments = postsCount - 1;
+                                                        const isFrontPlacement = wallPlacement === 'front';
+                                                        const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
+                                                        return (
+                                                            <div>
+                                                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                                                    {isFrontPlacement ? `Preis pro Element (×${segmentMultiplier})` : 'Elementpreis'}
+                                                                </div>
+                                                                {wallPriceLoading ? (
+                                                                    <div className="text-2xl font-bold text-white/50 animate-pulse">Berechnung...</div>
+                                                                ) : wallPrice !== null ? (
+                                                                    <>
+                                                                        <div className="text-4xl font-black text-emerald-400 tracking-tight">
+                                                                            {formatCurrency(wallPrice)}
+                                                                        </div>
+                                                                        {isFrontPlacement && segmentMultiplier > 1 && (
+                                                                            <div className="mt-1 text-sm font-bold text-amber-400">
+                                                                                × {segmentMultiplier} = <span className="text-emerald-300 text-lg">{formatCurrency(wallPrice * segmentMultiplier)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                ) : (
+                                                                    <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Nicht verfügbar für dieses Maß</div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+
+                                                    <div className="h-px bg-white/10 w-full"></div>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!wallPrice) return;
+                                                            const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
+                                                            const isSchiebetur = wallProduct.includes('Schiebetür');
+
+                                                            // Calculate accessories total for Keilfenster
+                                                            let accessoriesTotal = 0;
+                                                            let accessoriesNames: string[] = [];
+                                                            if (isWedge) {
+                                                                KEILFENSTER_ACCESSORIES.forEach(acc => {
+                                                                    if (wedgeAccessories[acc.id]) {
+                                                                        accessoriesTotal += acc.price;
+                                                                        accessoriesNames.push(acc.name);
+                                                                    }
+                                                                });
+                                                            }
+
+                                                            const totalWithAccessories = wallPrice + accessoriesTotal;
+
+                                                            // Build display-friendly name
+                                                            let displayName = WALL_PRODUCTS.find(p => p.id === wallProduct)?.name || wallProduct;
+                                                            // Keilfenster: use proper display name with side
+                                                            if (isWedge) {
+                                                                const sideLabel = keilfensterSide === 'left' ? 'Links' : 'Rechts';
+                                                                displayName = `Keilfenster ${sideLabel}`;
+                                                            }
+                                                            let configStr = '';
+                                                            if (isSchiebetur) {
+                                                                const schiebaturProduct = SCHIEBETUR_PRODUCTS.find(p => p.id === wallProduct);
+                                                                const handleInfo = SCHIEBETUR_HANDLES.find(h => h.id === schiebetuerHandle);
+                                                                const openingInfo = SCHIEBETUR_OPENING.find(o => o.id === schiebetuerOpening);
+                                                                const panelInfo = getSchiebetuerPanelCount(wallWidth);
+                                                                displayName = schiebaturProduct ? `Schiebetür – ${schiebaturProduct.name}` : wallProduct;
+                                                                configStr = `${displayName} | ${panelInfo.count} | ${openingInfo?.name || ''} | ${handleInfo?.name || ''} (${schiebetuerHandle})`;
+                                                            } else {
+                                                                configStr = isWedge && accessoriesNames.length > 0
+                                                                    ? `${displayName} + ${accessoriesNames.join(', ')}`
+                                                                    : displayName;
+                                                            }
+
                                                             const postsCount = structuralMetadata?.posts_count || 2;
                                                             const frontSegments = postsCount - 1;
                                                             const isFrontPlacement = wallPlacement === 'front';
                                                             const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
-                                                            return (
-                                                                <div>
-                                                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                                                        {isFrontPlacement ? `Preis pro Element (×${segmentMultiplier})` : 'Elementpreis'}
-                                                                    </div>
-                                                                    {wallPriceLoading ? (
-                                                                        <div className="text-2xl font-bold text-white/50 animate-pulse">Obliczam...</div>
-                                                                    ) : wallPrice !== null ? (
-                                                                        <>
-                                                                            <div className="text-4xl font-black text-emerald-400 tracking-tight">
-                                                                                {formatCurrency(wallPrice)}
-                                                                            </div>
-                                                                            {isFrontPlacement && segmentMultiplier > 1 && (
-                                                                                <div className="mt-1 text-sm font-bold text-amber-400">
-                                                                                    × {segmentMultiplier} = <span className="text-emerald-300 text-lg">{formatCurrency(wallPrice * segmentMultiplier)}</span>
-                                                                                </div>
-                                                                            )}
-                                                                        </>
-                                                                    ) : (
-                                                                        <div className="text-red-300 text-sm font-medium bg-red-500/10 py-1 px-3 rounded-full inline-block">Nicht verfügbar für dieses Maß</div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })()}
 
-                                                        <div className="h-px bg-white/10 w-full"></div>
+                                                            // Build rich dimensions string for client visibility
+                                                            let techDims = `${wallWidth} × ${wallHeight} mm`;
+                                                            if (isWedge && dachrechnerResults) {
+                                                                const k1 = dachrechnerResults.keilhoeheK1 ? Math.round(dachrechnerResults.keilhoeheK1) : null;
+                                                                const k2 = dachrechnerResults.keilhoeheK2 ? Math.round(dachrechnerResults.keilhoeheK2) : null;
+                                                                const f2 = dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null;
+                                                                techDims = `F2: ${f2 || wallWidth} mm`;
+                                                                if (k1) techDims += ` | K1 (Rinne): ${k1} mm`;
+                                                                if (k2) techDims += ` | K2 (Wand): ${k2} mm`;
+                                                            }
+                                                            if (isFrontPlacement && segmentMultiplier > 1) {
+                                                                techDims = `${segmentMultiplier}× ${wallWidth} × ${wallHeight} mm`;
+                                                            }
 
-                                                        <button
-                                                            onClick={() => {
-                                                                if (!wallPrice) return;
-                                                                const isWedge = wallProduct.includes('Wedge') || wallProduct.includes('Keilfenster');
-                                                                const isSchiebetur = wallProduct.includes('Schiebetür');
+                                                            // For front: add all segments at once with placement info
+                                                            const placementLabel = isWedge
+                                                                ? (keilfensterSide === 'left' ? 'Links' : 'Rechts')
+                                                                : (wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Links' : 'Rechts');
+                                                            const finalPrice = totalWithAccessories * segmentMultiplier;
+                                                            const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× Segment)` : '';
+                                                            configStr = `${placementLabel}: ${configStr}${qtyNote}`;
+                                                            addToBasket(displayName, finalPrice, configStr, techDims, 'wall');
 
-                                                                // Calculate accessories total for Keilfenster
-                                                                let accessoriesTotal = 0;
-                                                                let accessoriesNames: string[] = [];
-                                                                if (isWedge) {
-                                                                    KEILFENSTER_ACCESSORIES.forEach(acc => {
-                                                                        if (wedgeAccessories[acc.id]) {
-                                                                            accessoriesTotal += acc.price;
-                                                                            accessoriesNames.push(acc.name);
-                                                                        }
-                                                                    });
-                                                                }
-
-                                                                const totalWithAccessories = wallPrice + accessoriesTotal;
-
-                                                                // Build display-friendly name
-                                                                let displayName = WALL_PRODUCTS.find(p => p.id === wallProduct)?.name || wallProduct;
-                                                                let configStr = '';
-                                                                if (isSchiebetur) {
-                                                                    const schiebaturProduct = SCHIEBETUR_PRODUCTS.find(p => p.id === wallProduct);
-                                                                    const handleInfo = SCHIEBETUR_HANDLES.find(h => h.id === schiebetuerHandle);
-                                                                    const openingInfo = SCHIEBETUR_OPENING.find(o => o.id === schiebetuerOpening);
-                                                                    const panelInfo = getSchiebetuerPanelCount(wallWidth);
-                                                                    displayName = schiebaturProduct ? `Schiebetür – ${schiebaturProduct.name}` : wallProduct;
-                                                                    configStr = `${displayName} | ${panelInfo.count} | ${openingInfo?.name || ''} | ${handleInfo?.name || ''} (${schiebetuerHandle})`;
-                                                                } else {
-                                                                    configStr = isWedge && accessoriesNames.length > 0
-                                                                        ? `${displayName} + ${accessoriesNames.join(', ')}`
-                                                                        : displayName;
-                                                                }
-
-                                                                const postsCount = structuralMetadata?.posts_count || 2;
-                                                                const frontSegments = postsCount - 1;
-                                                                const isFrontPlacement = wallPlacement === 'front';
-                                                                const segmentMultiplier = isFrontPlacement ? frontSegments : 1;
-
-                                                                // Build rich dimensions string for client visibility
-                                                                let techDims = `${wallWidth} × ${wallHeight} mm`;
-                                                                if (isWedge && dachrechnerResults) {
-                                                                    const k1 = dachrechnerResults.keilhoeheK1 ? Math.round(dachrechnerResults.keilhoeheK1) : null;
-                                                                    const k2 = dachrechnerResults.keilhoeheK2 ? Math.round(dachrechnerResults.keilhoeheK2) : null;
-                                                                    const f2 = dachrechnerResults.fensterF2 ? Math.round(dachrechnerResults.fensterF2) : null;
-                                                                    techDims = `F2: ${f2 || wallWidth} mm`;
-                                                                    if (k1) techDims += ` | K1 (Rinne): ${k1} mm`;
-                                                                    if (k2) techDims += ` | K2 (Wand): ${k2} mm`;
-                                                                }
-                                                                if (isFrontPlacement && segmentMultiplier > 1) {
-                                                                    techDims = `${segmentMultiplier}× ${wallWidth} × ${wallHeight} mm`;
-                                                                }
-
-                                                                // For front: add all segments at once with placement info
-                                                                const placementLabel = wallPlacement === 'front' ? 'Front' : wallPlacement === 'left' ? 'Links' : 'Rechts';
-                                                                const finalPrice = totalWithAccessories * segmentMultiplier;
-                                                                const qtyNote = isFrontPlacement && segmentMultiplier > 1 ? ` (${segmentMultiplier}× Segment)` : '';
-                                                                configStr = `${placementLabel}: ${configStr}${qtyNote}`;
-                                                                addToBasket(displayName, finalPrice, configStr, techDims, 'wall');
-
-                                                                // Reset accessories after adding
-                                                                if (isWedge) {
-                                                                    setWedgeAccessories({
-                                                                        uProfil: false,
-                                                                        schraubenSet: false,
-                                                                        kippFenster: false,
-                                                                        abdeckungEL891: false
-                                                                    });
-                                                                }
-                                                            }}
-                                                            disabled={!wallPrice}
-                                                            className={`w-full py-4 px-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 ${wallPrice
-                                                                ? 'bg-emerald-500 hover:bg-emerald-400 text-white hover:scale-[1.02] active:scale-[0.98]'
-                                                                : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-70'
-                                                                }`}
-                                                        >
-                                                            <span>Hinzufügen</span>
-                                                            <span>{IC.build('w-4 h-4')}</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Helper Text */}
-                                                <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-700 leading-relaxed">
-                                                    <strong className="block mb-1 inline-flex items-center gap-1">{IC.sun('w-3.5 h-3.5')} Hinweis:</strong>
-                                                    Wählen Sie den Verglasungstyp aus der Liste links. Die Vorschau zeigt die gewählte Lösung im Kontext der Konstruktion.
+                                                            // Reset accessories after adding
+                                                            if (isWedge) {
+                                                                setWedgeAccessories({
+                                                                    uProfil: false,
+                                                                    schraubenSet: false,
+                                                                    kippFenster: false,
+                                                                    abdeckungEL891: false
+                                                                });
+                                                            }
+                                                        }}
+                                                        disabled={!wallPrice}
+                                                        className={`w-full py-4 px-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 ${wallPrice
+                                                            ? 'bg-emerald-500 hover:bg-emerald-400 text-white hover:scale-[1.02] active:scale-[0.98]'
+                                                            : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-70'
+                                                            }`}
+                                                    >
+                                                        <span>Hinzufügen</span>
+                                                        <span>{IC.build('w-4 h-4')}</span>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -4523,9 +4855,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 {/* Type Selector with Images */}
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                                                     {[
-                                                        { id: 'aufdach', label: 'Aufdachmarkise', desc: 'Markiza na dachu', icon: 'sun', color: 'bg-orange-50' },
-                                                        { id: 'unterdach', label: 'Unterdachmarkise', desc: 'Markiza pod dachem', icon: 'roof', color: 'bg-amber-50' },
-                                                        { id: 'zip', label: 'ZIP Screen', desc: 'Ekran pionowy', icon: 'square', color: 'bg-slate-50' },
+                                                        { id: 'aufdach', label: 'Aufdachmarkise', desc: 'Markise auf dem Dach' },
+                                                        { id: 'unterdach', label: 'Unterdachmarkise', desc: 'Markise unter dem Dach' },
+                                                        { id: 'zip', label: 'ZIP Screen', desc: 'Senkrechtmarkise' },
                                                     ].map(type => (
                                                         <button
                                                             key={type.id}
@@ -4534,7 +4866,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                                 ? 'border-orange-500 bg-orange-50/50 ring-1 ring-orange-200'
                                                                 : 'border-slate-100 hover:border-orange-200 bg-white'}`}
                                                         >
-                                                            <div className="flex items-center justify-center mb-2">{(IC as any)[type.icon]?.('w-7 h-7') || type.icon}</div>
+
                                                             <div className="font-bold text-sm text-slate-800">{type.label}</div>
                                                             <div className="text-[10px] text-slate-500">{type.desc}</div>
                                                             {awningType === type.id && (
@@ -4640,56 +4972,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* LED & Accessories Section */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                <h4 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                                    <span className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">{IC.sun('w-4 h-4')}</span>
-                                                    LED & Akcesoria
-                                                </h4>
-
-                                                <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                                    {loadingAccessories ? (
-                                                        <div className="text-center py-8 text-slate-400">Preisliste wird geladen...</div>
-                                                    ) : (
-                                                        accessories.filter(a => a.category === 'led' || a.category === 'other').map(acc => {
-                                                            const qty = accessoryQuantities[acc.id] || 0;
-                                                            return (
-                                                                <div key={acc.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${qty > 0 ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-                                                                    <div className="flex items-center gap-4">
-                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${qty > 0 ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                                            {acc.category === 'led' ? IC.sun('w-4 h-4') : IC.wrench('w-4 h-4')}
-                                                                        </div>
-                                                                        <div>
-                                                                            <div className="font-bold text-slate-700">{acc.name}</div>
-                                                                            <div className="text-xs text-slate-500 font-medium">{formatCurrency(acc.price)} / {acc.unit}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-3 bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm">
-                                                                        <button
-                                                                            onClick={() => setAccessoryQuantities(prev => ({ ...prev, [acc.id]: Math.max(0, (prev[acc.id] || 0) - 1) }))}
-                                                                            className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-500 font-bold transition-colors"
-                                                                        >−</button>
-                                                                        <span className={`w-6 text-center font-bold ${qty > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{qty}</span>
-                                                                        <button
-                                                                            onClick={() => setAccessoryQuantities(prev => ({ ...prev, [acc.id]: (prev[acc.id] || 0) + 1 }))}
-                                                                            className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 hover:bg-indigo-500 hover:text-white transition-all font-bold"
-                                                                        >+</button>
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        })
-                                                    )}
-                                                </div>
-
-                                                <div className="mt-6 pt-6 border-t border-slate-100 flex justify-end">
-                                                    <button
-                                                        onClick={handleAddAccessoryBatch}
-                                                        className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all transform hover:-translate-y-0.5"
-                                                    >
-                                                        <span className="inline-flex items-center gap-1">Zubehör hinzufügen {IC.build('w-4 h-4')}</span>
-                                                    </button>
-                                                </div>
-                                            </div>
                                         </div>
                                     )}
 
@@ -4702,28 +4984,78 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 <span className="font-bold text-indigo-700 bg-white px-4 py-1.5 rounded-lg text-sm border border-indigo-200 shadow-sm">{ROOF_MODELS.find(m => m.id === model)?.name || model}</span>
                                             </div>
 
+                                            {/* Selected Materials Summary Bar */}
+                                            {Object.values(materialQuantities).some(q => q > 0) && (
+                                                <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white p-4 rounded-xl flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        {IC.cart('w-5 h-5')}
+                                                        <div>
+                                                            <div className="font-bold text-sm">
+                                                                {Object.values(materialQuantities).filter(q => q > 0).length} Positionen ausgewählt
+                                                            </div>
+                                                            <div className="text-xs text-slate-300">
+                                                                Gesamt: {formatCurrency(Object.entries(materialQuantities).reduce((sum, [id, qty]) => {
+                                                                    const mat = materials.find(m => m.id === id);
+                                                                    return sum + (mat ? mat.base_price * qty : 0);
+                                                                }, 0))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            Object.entries(materialQuantities).forEach(([id, qty]) => {
+                                                                if (qty > 0) {
+                                                                    const mat = materials.find(m => m.id === id);
+                                                                    if (mat) {
+                                                                        addToBasket(mat.name, mat.base_price * qty, mat.dimension || '', `${qty}x`, 'accessory');
+                                                                    }
+                                                                }
+                                                            });
+                                                            setMaterialQuantities({});
+                                                        }}
+                                                        className="px-6 py-2.5 bg-white text-slate-800 font-bold rounded-xl hover:bg-slate-100 transition-all transform hover:-translate-y-0.5 shadow-lg text-sm flex items-center gap-2"
+                                                    >
+                                                        {IC.build('w-4 h-4')} In den Warenkorb
+                                                    </button>
+                                                </div>
+                                            )}
+
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 {/* Profile Column */}
-                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                    <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                                                    <h5 className="font-bold text-slate-800 text-base mb-4 flex items-center gap-2">
                                                         <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">{IC.ruler('w-4 h-4')}</span>
-                                                        Profile
+                                                        Profile & Sparren
                                                     </h5>
-                                                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                                    <div className="space-y-1.5 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
                                                         {loadingMaterials ? (
                                                             <div className="text-center py-8 text-slate-400">Laden...</div>
                                                         ) : materials.filter(m => m.category === 'profile').map(mat => {
                                                             const qty = materialQuantities[mat.id] || 0;
+                                                            const imgSrc = getMaterialImage(mat.name);
                                                             return (
-                                                                <div key={mat.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${qty > 0 ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-                                                                    <div className="flex-1 min-w-0 pr-3">
-                                                                        <div className="font-bold text-slate-700 truncate text-sm">{mat.name}</div>
-                                                                        <div className="text-xs text-slate-400 mt-0.5">{mat.dimension} • {formatCurrency(mat.base_price)}/{mat.unit}</div>
+                                                                <div key={mat.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${qty > 0 ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                                                                    {/* Thumbnail — click to enlarge */}
+                                                                    <div
+                                                                        className={`w-12 h-12 rounded-lg bg-white border border-slate-200 flex-shrink-0 overflow-hidden flex items-center justify-center p-0.5 ${imgSrc ? 'cursor-zoom-in hover:border-indigo-300 hover:shadow-md' : ''} transition-all`}
+                                                                        onClick={() => imgSrc && setMaterialLightbox({ src: imgSrc, name: mat.name })}
+                                                                    >
+                                                                        {imgSrc ? (
+                                                                            <img src={imgSrc} alt={mat.name} className="w-full h-full object-contain" loading="lazy" />
+                                                                        ) : (
+                                                                            <span className="text-slate-300">{IC.square('w-6 h-6')}</span>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: Math.max(0, (prev[mat.id] || 0) - 1) }))} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-red-500 transition-colors">−</button>
-                                                                        <span className="w-6 text-center text-sm font-bold text-slate-700">{qty}</span>
-                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: (prev[mat.id] || 0) + 1 }))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-indigo-500 hover:text-white transition-colors font-bold">+</button>
+                                                                    {/* Info */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="font-bold text-slate-700 text-sm leading-tight truncate">{mat.name}</div>
+                                                                        <div className="text-[11px] text-slate-400 mt-0.5">{mat.dimension} · {formatCurrency(mat.base_price)}/{mat.unit}</div>
+                                                                    </div>
+                                                                    {/* Qty controls */}
+                                                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: Math.max(0, (prev[mat.id] || 0) - 1) }))} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-red-500 transition-colors text-sm">−</button>
+                                                                        <span className={`w-7 text-center text-sm font-bold ${qty > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>{qty}</span>
+                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: (prev[mat.id] || 0) + 1 }))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-indigo-500 hover:text-white transition-colors font-bold text-sm">+</button>
                                                                     </div>
                                                                 </div>
                                                             );
@@ -4732,24 +5064,41 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </div>
 
                                                 {/* Other Materials Column */}
-                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                    <h5 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                                                    <h5 className="font-bold text-slate-800 text-base mb-4 flex items-center gap-2">
                                                         <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">{IC.wrench('w-4 h-4')}</span>
                                                         Sonstige Materialien
                                                     </h5>
-                                                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                                    <div className="space-y-1.5 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
                                                         {materials.filter(m => m.category !== 'profile').map(mat => {
                                                             const qty = materialQuantities[mat.id] || 0;
+                                                            const imgSrc = getMaterialImage(mat.name);
                                                             return (
-                                                                <div key={mat.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${qty > 0 ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-                                                                    <div className="flex-1 min-w-0 pr-3">
-                                                                        <div className="font-bold text-slate-700 truncate text-sm">{mat.name}</div>
-                                                                        <div className="text-xs text-slate-400 mt-0.5">{formatCurrency(mat.base_price)}/{mat.unit} <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] uppercase tracking-wide ml-1 font-bold text-slate-500">{mat.category}</span></div>
+                                                                <div key={mat.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${qty > 0 ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                                                                    {/* Thumbnail — click to enlarge */}
+                                                                    <div
+                                                                        className={`w-12 h-12 rounded-lg bg-white border border-slate-200 flex-shrink-0 overflow-hidden flex items-center justify-center p-0.5 ${imgSrc ? 'cursor-zoom-in hover:border-emerald-300 hover:shadow-md' : ''} transition-all`}
+                                                                        onClick={() => imgSrc && setMaterialLightbox({ src: imgSrc, name: mat.name })}
+                                                                    >
+                                                                        {imgSrc ? (
+                                                                            <img src={imgSrc} alt={mat.name} className="w-full h-full object-contain" loading="lazy" />
+                                                                        ) : (
+                                                                            <span className="text-slate-300">{IC.wrench('w-6 h-6')}</span>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: Math.max(0, (prev[mat.id] || 0) - 1) }))} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-red-500 transition-colors">−</button>
-                                                                        <span className="w-6 text-center text-sm font-bold text-slate-700">{qty}</span>
-                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: (prev[mat.id] || 0) + 1 }))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-emerald-500 hover:text-white transition-colors font-bold">+</button>
+                                                                    {/* Info */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="font-bold text-slate-700 text-sm leading-tight truncate">{mat.name}</div>
+                                                                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+                                                                            {formatCurrency(mat.base_price)}/{mat.unit}
+                                                                            <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] uppercase tracking-wide font-bold text-slate-500">{mat.category}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Qty controls */}
+                                                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: Math.max(0, (prev[mat.id] || 0) - 1) }))} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-red-500 transition-colors text-sm">−</button>
+                                                                        <span className={`w-7 text-center text-sm font-bold ${qty > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>{qty}</span>
+                                                                        <button onClick={() => setMaterialQuantities(prev => ({ ...prev, [mat.id]: (prev[mat.id] || 0) + 1 }))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-emerald-500 hover:text-white transition-colors font-bold text-sm">+</button>
                                                                     </div>
                                                                 </div>
                                                             );
@@ -4758,24 +5107,49 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="flex justify-end pt-4">
-                                                <button
-                                                    onClick={() => {
-                                                        Object.entries(materialQuantities).forEach(([id, qty]) => {
-                                                            if (qty > 0) {
-                                                                const mat = materials.find(m => m.id === id);
-                                                                if (mat) {
-                                                                    addToBasket(mat.name, mat.base_price * qty, mat.dimension || '', `${qty}x`, 'accessory');
-                                                                }
-                                                            }
-                                                        });
-                                                        setMaterialQuantities({});
-                                                    }}
-                                                    className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-700 transition-all transform hover:-translate-y-0.5"
+                                            {/* Bottom action (fallback if summary bar not visible) */}
+                                            {!Object.values(materialQuantities).some(q => q > 0) && (
+                                                <div className="text-center py-3 text-xs text-slate-400">
+                                                    Wählen Sie Materialien aus und klicken Sie +, um sie zur Kalkulation hinzuzufügen
+                                                </div>
+                                            )}
+
+                                            {/* ====== MATERIAL IMAGE LIGHTBOX MODAL ====== */}
+                                            {materialLightbox && (
+                                                <div
+                                                    className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-8 backdrop-blur-sm"
+                                                    onClick={() => setMaterialLightbox(null)}
                                                 >
-                                                    <span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Material hinzufügen</span>
-                                                </button>
-                                            </div>
+                                                    <div
+                                                        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden"
+                                                        onClick={e => e.stopPropagation()}
+                                                    >
+                                                        {/* Header */}
+                                                        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                                                            <h4 className="font-bold text-slate-800 text-base">{materialLightbox.name}</h4>
+                                                            <button
+                                                                onClick={() => setMaterialLightbox(null)}
+                                                                className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                        {/* Image */}
+                                                        <div className="p-6 flex items-center justify-center bg-slate-50" style={{ minHeight: '300px' }}>
+                                                            <img
+                                                                src={materialLightbox.src}
+                                                                alt={materialLightbox.name}
+                                                                className="max-w-full max-h-[60vh] object-contain"
+                                                                style={{ imageRendering: 'auto' }}
+                                                            />
+                                                        </div>
+                                                        {/* Footer info */}
+                                                        <div className="p-3 border-t border-slate-200 text-center text-xs text-slate-400">
+                                                            Technischer Profilquerschnitt · Quelle: Aluxe Preisliste
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -5064,7 +5438,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Pokrycie</span>
                                             <span className="font-bold text-slate-800">
-                                                {cover === 'Glass' ? `Glas VSG (${glassVariant === 'klar' ? 'Klar' : glassVariant === 'matt' ? 'Matt' : glassVariant === 'stopsol' ? 'Stopsol' : glassVariant})` : `Polycarbonat (${polyVariant === 'opal' ? 'Opal' : polyVariant === 'klar' ? 'Klar' : polyVariant})`}
+                                                {cover === 'Glass'
+                                                    ? `Glas VSG${isTerandaModel(model) ? (model === 'TR20' ? ' 55.2' : ' 44.2') : ''} (${glassVariant === 'klar' ? 'Klar' : glassVariant === 'matt' ? 'Matt' : glassVariant === 'stopsol' ? 'Stopsol' : glassVariant})`
+                                                    : `Polycarbonat${isTerandaModel(model) ? ' 16mm' : ''} (${polyVariant === 'opal' ? 'Opal' : polyVariant === 'klar' ? 'Klar' : polyVariant === 'reflex-pearl' ? 'Reflex Pearl' : polyVariant})`
+                                                }
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
@@ -5076,7 +5453,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Strefa śniegowa</span>
-                                            <span className="font-bold text-slate-800">Zone {zone}</span>
+                                            <span className="font-bold text-slate-800">Zone {isTerandaModel(model) ? 2 : zone}</span>
                                         </div>
                                         {model === 'Designline' && schiebeeinheitCount > 0 && (
                                             <div className="flex justify-between items-center text-sm">
