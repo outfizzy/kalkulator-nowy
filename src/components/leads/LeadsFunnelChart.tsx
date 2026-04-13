@@ -19,27 +19,27 @@ export const LeadsFunnelChart: React.FC<LeadsFunnelChartProps> = ({ leads }) => 
     // 1. Aggregate Data
     const stats = {
         total: leads.length,
-        new: leads.filter(l => l.status === 'new').length,
+        newAll: leads.filter(l => ['new', 'formularz'].includes(l.status)).length,
         contacted: leads.filter(l => l.status === 'contacted').length,
+        measurement: leads.filter(l => ['measurement_scheduled', 'measurement_completed'].includes(l.status)).length,
         offer_sent: leads.filter(l => l.status === 'offer_sent').length,
         negotiation: leads.filter(l => l.status === 'negotiation').length,
         won: leads.filter(l => l.status === 'won').length,
         lost: leads.filter(l => l.status === 'lost').length,
     };
 
-    // 2. Prepare Funnel Stages
-    // Funnel Logic: "Contacted" effectively includes "Offer Sent", "Negotiation", "Won" etc. for a true funnel?
-    // Or just distribution? A classic sales funnel usually implies count of opportunities that reached AT LEAST that stage.
-    // Let's stick to Distribution first, it's easier to verify. Or specialized Funnel Calculation.
+    const totalClosed = stats.won + stats.lost;
+    const winRate = totalClosed > 0 ? ((stats.won / totalClosed) * 100).toFixed(1) : '—';
 
     // Simple Distribution visualization
     const data = [
-        { name: 'Nowe', count: stats.new, color: '#93c5fd' }, // blue-300
-        { name: 'Kontakt', count: stats.contacted, color: '#fcd34d' }, // yellow-300
-        { name: 'Oferta', count: stats.offer_sent, color: '#a5b4fc' }, // indigo-300
-        { name: 'Negocjacje', count: stats.negotiation, color: '#fdba74' }, // orange-300
-        { name: 'Wygrane', count: stats.won, color: '#86efac' }, // green-300
-        { name: 'Utracone', count: stats.lost, color: '#fca5a5' }, // red-300
+        { name: 'Nowe', count: stats.newAll, color: '#93c5fd' },
+        { name: 'Kontakt', count: stats.contacted, color: '#a5b4fc' },
+        { name: 'Pomiar', count: stats.measurement, color: '#67e8f9' },
+        { name: 'Oferta', count: stats.offer_sent, color: '#fcd34d' },
+        { name: 'Negocjacje', count: stats.negotiation, color: '#fdba74' },
+        { name: 'Wygrane', count: stats.won, color: '#86efac' },
+        { name: 'Utracone', count: stats.lost, color: '#fca5a5' },
     ];
 
     return (
@@ -85,15 +85,25 @@ export const LeadsFunnelChart: React.FC<LeadsFunnelChartProps> = ({ leads }) => 
                 </div>
                 <div className="w-px bg-slate-200 h-8 self-center"></div>
                 <div className="flex flex-col items-center">
+                    <span className="font-bold text-lg text-blue-600">{stats.newAll}</span>
+                    <span className="text-xs">Nowe</span>
+                </div>
+                <div className="w-px bg-slate-200 h-8 self-center"></div>
+                <div className="flex flex-col items-center">
                     <span className="font-bold text-lg text-green-600">{stats.won}</span>
                     <span className="text-xs">Wygrane</span>
                 </div>
                 <div className="w-px bg-slate-200 h-8 self-center"></div>
                 <div className="flex flex-col items-center">
-                    <span className="font-bold text-lg text-slate-800">
-                        {stats.total > 0 ? ((stats.won / stats.total) * 100).toFixed(1) : 0}%
+                    <span className="font-bold text-lg text-red-500">{stats.lost}</span>
+                    <span className="text-xs">Utracone</span>
+                </div>
+                <div className="w-px bg-slate-200 h-8 self-center"></div>
+                <div className="flex flex-col items-center">
+                    <span className="font-bold text-lg text-emerald-700">
+                        {winRate === '—' ? '—' : `${winRate}%`}
                     </span>
-                    <span className="text-xs">Konwersja</span>
+                    <span className="text-xs">Win Rate</span>
                 </div>
             </div>
         </div>
