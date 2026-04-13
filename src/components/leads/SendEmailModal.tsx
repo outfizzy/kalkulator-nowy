@@ -271,10 +271,18 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                     to,
                     subject: finalSubject,
                     body: finalBody,
-                    config: sendConfig,
+                    config: {
+                        ...sendConfig,
+                        // Ensure IMAP credentials are passed for save-to-sent
+                        imapHost: (sendConfig as any).imapHost || sendConfig.smtpHost,
+                        imapPort: (sendConfig as any).imapPort || 993,
+                        imapUser: (sendConfig as any).imapUser || sendConfig.smtpUser,
+                        imapPassword: (sendConfig as any).imapPassword || (sendConfig as any).smtpPassword || (sendConfig as any).smtpPass,
+                    },
                     leadId,     // Pass for logging
                     customerId, // Pass for logging
-                    attachments // Pass attachments
+                    attachments, // Pass attachments
+                    saveToSent: true, // Save copy to IMAP Sent folder
                 }),
             });
 
