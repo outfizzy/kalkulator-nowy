@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { LeadForm } from './leads/LeadForm';
 import { RefreshCw } from 'lucide-react';
 import { MailboxManager } from './admin/MailboxManager';
+import { NotificationService } from '../services/database/notification.service';
 
 import type { Lead, Offer, EmailConfig, MailboxConfig } from '../types';
 
@@ -83,6 +84,8 @@ export const MailPage: React.FC = () => {
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const lastEmailCountRef = useRef<number>(0);
+    const knownEmailIdsRef = useRef<Set<number>>(new Set());
+    const notifiedEmailIdsRef = useRef<Set<number>>(new Set());
 
     // Feature 3: Smart Reply
     const [smartReplies, setSmartReplies] = useState<string[]>([]);
@@ -311,6 +314,9 @@ export const MailPage: React.FC = () => {
                 const data = await response.json();
                 const newEmails = data.messages || [];
                 setEmails(newEmails);
+                // Seed known IDs so polling won't fire notifications for existing emails
+                knownEmailIdsRef.current = new Set(newEmails.map((e: any) => e.id));
+                lastEmailCountRef.current = newEmails.length;
                 localStorage.setItem(CACHE_KEY, JSON.stringify(newEmails));
             } catch (error) {
                 console.error('Error fetching emails:', error);
@@ -351,11 +357,44 @@ export const MailPage: React.FC = () => {
             const data = await response.json();
             const newEmails = data.messages || [];
 
-            // Detect new emails
-            if (lastEmailCountRef.current > 0 && newEmails.length > lastEmailCountRef.current) {
-                const diff = newEmails.length - lastEmailCountRef.current;
-                toast(`📬 ${diff} ${diff === 1 ? 'nowa wiadomość' : 'nowe wiadomości'}`, { icon: '✉️', duration: 4000 });
+            // ── Detect genuinely new emails by UID comparison ──
+            if (knownEmailIdsRef.current.size > 0 && activeTab === 'inbox') {
+                const brandNewEmails = newEmails.filter(
+                    (e: any) => !knownEmailIdsRef.current.has(e.id) && !notifiedEmailIdsRef.current.has(e.id)
+                );
+
+                if (brandNewEmails.length > 0 && currentUser?.id) {
+                    // Create a notification for each new email (max 5 to avoid spam)
+                    const toNotify = brandNewEmails.slice(0, 5);
+                    for (const email of toNotify) {
+                        const senderName = (email.from || '').replace(/<.*>/, '').trim() || email.from;
+                        try {
+                            await NotificationService.createNotification(
+                                currentUser.id,
+                                'info',
+                                `Nowa wiadomość od ${senderName}`,
+                                email.subject || '(Brak tematu)',
+                                '/mail'
+                            );
+                            notifiedEmailIdsRef.current.add(email.id);
+                        } catch (e) {
+                            console.error('[MailNotif] Failed to create notification:', e);
+                        }
+                    }
+
+                    // Summary toast for the user currently viewing mail
+                    const total = brandNewEmails.length;
+                    if (total === 1) {
+                        const s = (brandNewEmails[0].from || '').replace(/<.*>/, '').trim();
+                        toast(`Nowa wiadomość od ${s}`, { icon: '📬', duration: 4000 });
+                    } else {
+                        toast(`${total} ${total < 5 ? 'nowe wiadomości' : 'nowych wiadomości'}`, { icon: '📬', duration: 4000 });
+                    }
+                }
             }
+
+            // Update known IDs set
+            knownEmailIdsRef.current = new Set(newEmails.map((e: any) => e.id));
             lastEmailCountRef.current = newEmails.length;
             setEmails(newEmails);
             localStorage.setItem(CACHE_KEY, JSON.stringify(newEmails));
