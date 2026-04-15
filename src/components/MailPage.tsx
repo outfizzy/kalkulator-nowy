@@ -72,6 +72,7 @@ export const MailPage: React.FC = () => {
 
     const [emails, setEmails] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [loadingBody, setLoadingBody] = useState(false);
     const [selectedEmail, setSelectedEmail] = useState<EmailDetails | null>(null);
 
@@ -289,6 +290,7 @@ export const MailPage: React.FC = () => {
     const fetchEmailsFn = useCallback(async (silent = false) => {
         if (!activeConfig?.imapHost || (activeTab !== 'inbox' && activeTab !== 'sent')) return;
         if (!silent) setLoading(true);
+        if (silent) setIsRefreshing(true);
         try {
             const response = await fetch('/api/fetch-emails', {
                 method: 'POST',
@@ -332,6 +334,7 @@ export const MailPage: React.FC = () => {
             if (!silent) console.error('Error fetching emails:', error);
         } finally {
             if (!silent) setLoading(false);
+            setIsRefreshing(false);
         }
     }, [activeConfig, activeTab, boxName, CACHE_KEY, currentUser?.id]);
 
@@ -400,20 +403,19 @@ export const MailPage: React.FC = () => {
             if (replies.length === 0) {
                 // Fallback: generate simple replies
                 replies = [
-                    'Vielen Dank für Ihre Nachricht. Ich melde mich zeitnah bei Ihnen.',
-                    'Danke für Ihre Anfrage. Könnten Sie mir bitte weitere Details mitteilen?',
-                    'Vielen Dank! Ich werde das intern prüfen und mich bei Ihnen zurückmelden.'
+                    'Dziękuję za wiadomość. Odezwę się w najbliższym czasie.',
+                    'Dziękuję za zapytanie. Czy mógłby/mogłaby Pan/Pani przesłać więcej szczegółów?',
+                    'Dziękuję! Sprawdzę to wewnętrznie i wrócę z odpowiedzią.'
                 ];
             }
 
             setSmartReplies(replies.slice(0, 3));
         } catch (err) {
             console.error('Smart Reply Error:', err);
-            // Fallback replies
             setSmartReplies([
-                'Vielen Dank für Ihre Nachricht. Ich melde mich zeitnah bei Ihnen.',
-                'Danke für Ihre Anfrage. Könnten Sie mir bitte weitere Details mitteilen?',
-                'Vielen Dank! Ich werde das intern prüfen und mich bei Ihnen zurückmelden.'
+                'Dziękuję za wiadomość. Odezwę się w najbliższym czasie.',
+                'Dziękuję za zapytanie. Czy mógłby/mogłaby Pan/Pani przesłać więcej szczegółów?',
+                'Dziękuję! Sprawdzę to wewnętrznie i wrócę z odpowiedzią.'
             ]);
         } finally {
             setSmartReplyLoading(false);
@@ -425,11 +427,44 @@ export const MailPage: React.FC = () => {
         const replyTo = selectedEmail?.from.includes('<') ? selectedEmail?.from.match(/<(.+?)>/)?.[1] || selectedEmail?.from : selectedEmail?.from || '';
         setComposeData({
             to: replyTo,
+            cc: '', bcc: '',
             subject: selectedEmail?.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail?.subject || ''}`,
             body: reply
         });
         setSmartReplies([]);
     };
+
+    // ── Keyboard Shortcuts ──
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger in inputs/textareas
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+            if (e.key === 'Escape') {
+                if (showLeadForm) { setShowLeadForm(false); return; }
+                if (activeTab === 'compose') { setActiveTab('inbox'); return; }
+                if (selectedEmail) { setSelectedEmail(null); setShowLeadForm(false); return; }
+            }
+            if (selectedEmail && !showLeadForm && activeTab !== 'compose') {
+                if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleReply(); }
+                if (e.key === 'f' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); handleForward(); }
+            }
+            // Arrow navigation in email list
+            if (!selectedEmail && (activeTab === 'inbox' || activeTab === 'sent') && filteredEmails.length > 0) {
+                if (e.key === 'ArrowDown' || e.key === 'j') {
+                    e.preventDefault();
+                    handleSelectEmail(filteredEmails[0].id);
+                }
+            }
+            // Refresh with 'R' when no email selected
+            if (!selectedEmail && activeTab !== 'compose' && (e.key === 'r' || e.key === 'R')) {
+                setRefreshTrigger(p => p + 1);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedEmail, activeTab, showLeadForm, filteredEmails]);
 
     // Debounced search effect
     useEffect(() => {
@@ -1596,8 +1631,8 @@ export const MailPage: React.FC = () => {
                                         )}
                                     </div>
                                     <button onClick={() => setRefreshTrigger(prev => prev + 1)}
-                                        className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all" title="Odśwież">
-                                        <svg className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        className={`p-1.5 rounded-lg transition-all ${loading || isRefreshing ? 'text-blue-500 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`} title="Odśwież (R)">
+                                        <svg className={`w-4 h-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8 0 01-15.357-2m15.357 2H15" />
                                         </svg>
                                     </button>
@@ -1639,14 +1674,11 @@ export const MailPage: React.FC = () => {
                                 <p className="text-sm">Brak wiadomości</p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-slate-100">
-                                {loading && emails.length > 0 && (
-                                    <div className="px-3 py-1.5 bg-blue-50 flex items-center gap-2 text-xs text-blue-600">
-                                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                        </svg>
-                                        Aktualizowanie...
+                            <div className="divide-y divide-slate-100 relative">
+                                {/* Sleek top refresh indicator */}
+                                {(isRefreshing || (loading && emails.length > 0)) && (
+                                    <div className="absolute top-0 left-0 right-0 h-0.5 z-10 overflow-hidden">
+                                        <div className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 animate-pulse" style={{ animation: 'shimmer 1.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
                                     </div>
                                 )}
                                 {filteredEmails.map((email, idx) => {
