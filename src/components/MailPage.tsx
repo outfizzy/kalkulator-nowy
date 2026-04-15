@@ -434,7 +434,11 @@ export const MailPage: React.FC = () => {
         setSmartReplies([]);
     };
 
-    // ── Keyboard Shortcuts ──
+    // ── Keyboard Shortcuts (use refs to avoid temporal dead zone) ──
+    const handleReplyRef = useRef<() => void>();
+    const handleForwardRef = useRef<() => void>();
+    const handleSelectEmailRef = useRef<(uid: number | string) => void>();
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Don't trigger in inputs/textareas
@@ -447,14 +451,14 @@ export const MailPage: React.FC = () => {
                 if (selectedEmail) { setSelectedEmail(null); setShowLeadForm(false); return; }
             }
             if (selectedEmail && !showLeadForm && activeTab !== 'compose') {
-                if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleReply(); }
-                if (e.key === 'f' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); handleForward(); }
+                if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleReplyRef.current?.(); return; }
+                if (e.key === 'f' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); handleForwardRef.current?.(); return; }
             }
             // Arrow navigation in email list
             if (!selectedEmail && (activeTab === 'inbox' || activeTab === 'sent') && filteredEmails.length > 0) {
                 if (e.key === 'ArrowDown' || e.key === 'j') {
                     e.preventDefault();
-                    handleSelectEmail(filteredEmails[0].id);
+                    handleSelectEmailRef.current?.(filteredEmails[0].id);
                 }
             }
             // Refresh with 'R' when no email selected
@@ -569,6 +573,7 @@ export const MailPage: React.FC = () => {
             setLoadingBody(false);
         }
     };
+    handleSelectEmailRef.current = handleSelectEmail;
 
     const uploadAttachments = async (email: EmailDetails): Promise<any[]> => {
         if (!email.attachments || email.attachments.length === 0) return [];
@@ -1366,6 +1371,10 @@ export const MailPage: React.FC = () => {
             body: `\n\n--- Przekazana wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString('pl-PL')}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
         });
     };
+
+    // Keep refs in sync for keyboard shortcuts
+    handleReplyRef.current = handleReply;
+    handleForwardRef.current = handleForward;
 
     // Template Logic - Moved to top
     // const [showTemplateSelector, setShowTemplateSelector] = React.useState(false);
