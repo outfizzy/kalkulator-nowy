@@ -345,10 +345,13 @@ export const MailPage: React.FC = () => {
             const cached = localStorage.getItem(CACHE_KEY);
             if (cached) {
                 try { setEmails(JSON.parse(cached)); } catch { /* ignore */ }
+                // Cache exists → silent background fetch (no loading spinner)
+                fetchEmailsFn(true);
             } else {
                 setEmails([]);
+                // No cache → show loading spinner
+                fetchEmailsFn(false);
             }
-            fetchEmailsFn(false);
         }
     }, [activeConfig, activeTab, isConfigured, refreshTrigger, boxName, CACHE_KEY, fetchEmailsFn]);
 
@@ -1372,6 +1375,37 @@ export const MailPage: React.FC = () => {
         });
     };
 
+    // Delete handler
+    const handleDeleteEmail = async () => {
+        if (!selectedEmail) return;
+        const confirmed = window.confirm('Przenieść wiadomość do kosza?');
+        if (!confirmed) return;
+
+        const toastId = toast.loading('Usuwanie...');
+        try {
+            const response = await fetch('/api/delete-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    config: activeConfig,
+                    uid: selectedEmail.id || (selectedEmail as any).messageId,
+                    box: boxName,
+                })
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.details || err.error || 'Delete failed');
+            }
+            // Remove from local list
+            setEmails(prev => prev.filter(e => e.id !== (selectedEmail.id || (selectedEmail as any).messageId)));
+            setSelectedEmail(null);
+            toast.success('Przeniesiono do kosza', { id: toastId });
+        } catch (error: any) {
+            console.error('Delete error:', error);
+            toast.error(`Błąd: ${error.message}`, { id: toastId });
+        }
+    };
+
     // Keep refs in sync for keyboard shortcuts
     handleReplyRef.current = handleReply;
     handleForwardRef.current = handleForward;
@@ -2092,6 +2126,10 @@ export const MailPage: React.FC = () => {
                                                     </button>
                                                     <button onClick={handleCreateLead} className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Utwórz Lead (ręcznie)">
                                                         <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                                    </button>
+                                                    <div className="w-px h-5 bg-slate-200 mx-1" />
+                                                    <button onClick={handleDeleteEmail} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Usuń (kosz)">
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                     </button>
                                                 </>
                                             )}
