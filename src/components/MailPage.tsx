@@ -45,7 +45,13 @@ export const MailPage: React.FC = () => {
     const [selectedMailboxIdx, setSelectedMailboxIdx] = useState<number>(typeof savedPrimaryIdx === 'number' ? savedPrimaryIdx : 0);
 
     const [activeTab, setActiveTab] = useState<MailTab>('inbox');
-    const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '' });
+    const [composeData, setComposeData] = useState(() => {
+        try {
+            const draft = localStorage.getItem(`mail_draft_${currentUser?.id || 'anon'}`);
+            if (draft) return JSON.parse(draft);
+        } catch { /* ignore */ }
+        return { to: '', cc: '', bcc: '', subject: '', body: '' };
+    });
     const [convertedMessageIds, setConvertedMessageIds] = useState<Set<string>>(new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     // Scanning removed per user request
@@ -126,6 +132,8 @@ export const MailPage: React.FC = () => {
     const [useSignature, setUseSignature] = useState(true);
     const [scheduleDate, setScheduleDate] = useState('');
     const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const DRAFT_KEY = `mail_draft_${currentUser?.id || 'anon'}`;
     const [aiPrompt, setAiPrompt] = useState(''); // New AI Prompt State
     const [showAiPresets, setShowAiPresets] = useState(false);
     const [showOfferSelector, setShowOfferSelector] = useState(false);
@@ -790,6 +798,48 @@ export const MailPage: React.FC = () => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
 
+    // Drag & Drop files onto compose area
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) return;
+        const newAttachments: AttachmentFile[] = [];
+        for (const file of files) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error(`${file.name} za duży (max 5MB)`);
+                continue;
+            }
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve) => {
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+            newAttachments.push({ file, base64 });
+        }
+        if (newAttachments.length > 0) {
+            setAttachments(prev => [...prev, ...newAttachments]);
+            toast.success(`Dodano ${newAttachments.length} załącznik(ów)`);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+    const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
+
+    // Auto-save compose draft to localStorage
+    useEffect(() => {
+        const hasContent = composeData.to || composeData.subject || composeData.body;
+        if (hasContent) {
+            const timer = setTimeout(() => {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(composeData));
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else {
+            localStorage.removeItem(DRAFT_KEY);
+        }
+    }, [composeData, DRAFT_KEY]);
+
     const insertLink = () => {
         const url = prompt('Podaj adres URL:');
         if (!url) return;
@@ -888,10 +938,11 @@ export const MailPage: React.FC = () => {
 
             toast.success(scheduleDate ? 'Wiadomość zaplanowana' : `Wysłano do: ${composeData.to}`, { id: toastId });
 
-            // Reset form
+            // Reset form + clear saved draft
             setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '' });
             setAttachments([]);
             setScheduleDate('');
+            localStorage.removeItem(DRAFT_KEY);
             if (!scheduleDate) setActiveTab('sent');
 
         } catch (error: any) {
@@ -1423,6 +1474,35 @@ export const MailPage: React.FC = () => {
         } catch (error: any) {
             console.error('Delete error:', error);
             toast.error(`Błąd: ${error.message}`, { id: toastId });
+        }
+    };
+
+    // Toggle read/unread for currently open email
+    const handleToggleRead = async () => {
+        if (!selectedEmail) return;
+        const uid = selectedEmail.id || (selectedEmail as any).messageId;
+        const currentFlags: string[] = (selectedEmail as any).flags || [];
+        const isRead = currentFlags.includes('\\Seen');
+        const action = isRead ? 'markUnread' : 'markRead';
+
+        // Optimistic UI
+        const newFlags = isRead
+            ? currentFlags.filter(f => f !== '\\Seen')
+            : [...currentFlags, '\\Seen'];
+        setEmails(prev => prev.map(e =>
+            e.id === uid ? { ...e, flags: newFlags } : e
+        ));
+
+        try {
+            await fetch('/api/mark-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: activeConfig, uid, box: boxName, action })
+            });
+            toast.success(isRead ? 'Oznaczono jako nieprzeczytane' : 'Oznaczono jako przeczytane');
+        } catch {
+            toast.error('Nie udało się zmienić statusu');
+            setRefreshTrigger(p => p + 1);
         }
     };
 
@@ -1987,14 +2067,27 @@ export const MailPage: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="relative">
+                                    <div
+                                        className="relative"
+                                        onDrop={handleDrop}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                    >
                                         <textarea
                                             ref={textareaRef}
                                             placeholder="Treść wiadomości..."
                                             value={composeData.body}
                                             onChange={e => setComposeData({ ...composeData, body: e.target.value })}
-                                            className="w-full h-[400px] p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none resize-none font-sans text-slate-700 leading-relaxed"
+                                            className={`w-full h-[400px] p-4 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none resize-none font-sans text-slate-700 leading-relaxed transition-colors ${isDragging ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'}`}
                                         />
+                                        {isDragging && (
+                                            <div className="absolute inset-0 bg-blue-50/80 backdrop-blur-sm rounded-xl flex items-center justify-center border-2 border-dashed border-blue-400 pointer-events-none z-10">
+                                                <div className="flex flex-col items-center gap-2 text-blue-600">
+                                                    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                                                    <span className="font-semibold text-sm">Upuść pliki tutaj</span>
+                                                </div>
+                                            </div>
+                                        )}
                                         {/* Schedule & Attachments Toolbar */}
                                         <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
                                             <div className="flex gap-2">
@@ -2148,6 +2241,9 @@ export const MailPage: React.FC = () => {
                                                         <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                                                     </button>
                                                     <div className="w-px h-5 bg-slate-200 mx-1" />
+                                                    <button onClick={handleToggleRead} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title={((selectedEmail as any)?.flags || []).includes('\\Seen') ? 'Oznacz jako nieprzeczytane' : 'Oznacz jako przeczytane'}>
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" /></svg>
+                                                    </button>
                                                     <button onClick={handleDeleteEmail} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Usuń (kosz)">
                                                         <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                     </button>
