@@ -2052,85 +2052,46 @@ export const MailPage: React.FC = () => {
                                 </div>
                             ) : selectedEmail ? (
                                 <div className="flex-1 flex flex-col overflow-hidden">
-                                    <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white z-10 shadow-sm">
+                                    {/* ── Toolbar ── */}
+                                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white z-10">
                                         <div className="flex items-center gap-3 min-w-0 flex-1 pr-4">
                                             <button
                                                 onClick={() => { setSelectedEmail(null); setShowLeadForm(false); }}
-                                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0 lg:hidden"
+                                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
+                                                title="Wróć (Esc)"
                                             >
                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                                             </button>
-                                            <h2 className="text-lg font-bold text-slate-800 truncate">
-                                                {selectedEmail.subject}
+                                            <h2 className="text-base font-bold text-slate-800 truncate">
+                                                {selectedEmail.subject || '(Brak tematu)'}
                                             </h2>
                                         </div>
-                                        <div className="flex gap-2 flex-shrink-0">
+                                        <div className="flex items-center gap-1 flex-shrink-0">
                                             {!showLeadForm && (
                                                 <>
-                                                    <button
-                                                        onClick={handleAiExtract}
-                                                        className="px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                                        title="Automatycznie wyciągnij dane z treści"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                                        </svg>
-                                                        <span className="hidden sm:inline">Utwórz Lead (AI)</span>
+                                                    <button onClick={handleReply} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Odpowiedz (R)">
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
                                                     </button>
-                                                    <button
-                                                        onClick={handleReply}
-                                                        className="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                                        title="Odpowiedz"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <button onClick={handleReplyAll} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Odpowiedz wszystkim">
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l6 6m-6-6l6-6" opacity="0.4" />
                                                         </svg>
-                                                        <span className="hidden sm:inline">Odpowiedz</span>
                                                     </button>
-                                                    <button
-                                                        onClick={handleReplyAll}
-                                                        className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                                        title="Odpowiedz wszystkim"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l6 6m-6-6l6-6" opacity="0.5" />
-                                                        </svg>
-                                                        <span className="hidden lg:inline">Wszyscy</span>
+                                                    <button onClick={handleForward} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Przekaż dalej (F)">
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" /></svg>
                                                     </button>
-                                                    <button
-                                                        onClick={handleForward}
-                                                        className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                                        title="Przekaż dalej"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-                                                        </svg>
-                                                        <span className="hidden sm:inline">Przekaż</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={handleSmartReply}
-                                                        disabled={smartReplyLoading}
-                                                        className="px-3 py-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                                        title="AI zaproponuje 3 szybkie odpowiedzi"
-                                                    >
-                                                        {smartReplyLoading ? (
-                                                            <RefreshCw className="w-4 h-4 animate-spin" />
-                                                        ) : (
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                                            </svg>
+                                                    <div className="w-px h-5 bg-slate-200 mx-1" />
+                                                    <button onClick={handleSmartReply} disabled={smartReplyLoading} className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Smart Reply (AI)">
+                                                        {smartReplyLoading ? <RefreshCw className="w-[18px] h-[18px] animate-spin" /> : (
+                                                            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                                                         )}
-                                                        <span className="hidden sm:inline">Smart Reply</span>
                                                     </button>
-                                                    <button
-                                                        onClick={handleCreateLead}
-                                                        className="px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                        </svg>
-                                                        <span className="hidden sm:inline">Utwórz Lead</span>
+                                                    <button onClick={handleAiExtract} className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Utwórz Lead (AI)">
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                                    </button>
+                                                    <button onClick={handleCreateLead} className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Utwórz Lead (ręcznie)">
+                                                        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                                                     </button>
                                                 </>
                                             )}
@@ -2139,10 +2100,10 @@ export const MailPage: React.FC = () => {
 
                                     <div className="flex-1 flex overflow-hidden relative">
                                         {/* Email Body & Details */}
-                                        <div className={`flex-1 overflow-y-auto p-6 bg-white transition-all duration-300 ${showLeadForm ? 'w-1/2 border-r border-slate-200 hidden lg:block' : 'w-full'}`}>
+                                        <div className={`flex-1 overflow-y-auto bg-white transition-all duration-300 ${showLeadForm ? 'w-1/2 border-r border-slate-200 hidden lg:block' : 'w-full'}`}>
 
-                                            {/* Header Info */}
-                                            <div className="mb-6">
+                                            {/* ── Sender Card ── */}
+                                            <div className="px-6 pt-5 pb-4 border-b border-slate-50">
                                                 {(() => {
                                                     const raw = isSentView ? (selectedEmail.to || '') : selectedEmail.from;
                                                     const parsedName = raw.includes('<') ? raw.split('<')[0].trim().replace(/^"|"$/g, '') : '';
@@ -2156,97 +2117,114 @@ export const MailPage: React.FC = () => {
                                                     ];
                                                     const gIdx = (initial.charCodeAt(0) || 0) % gradients.length;
                                                     return (
-                                                        <div className="flex items-start gap-3 mb-4">
-                                                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[gIdx]} flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm`}>
+                                                        <div className="flex items-start gap-3">
+                                                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[gIdx]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
                                                                 {initial}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="flex items-baseline gap-2 flex-wrap">
-                                                                    {isSentView && <span className="text-xs text-slate-400 font-medium">Do:</span>}
-                                                                    <span className="font-semibold text-slate-900">{parsedName || parsedEmail}</span>
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    {isSentView && <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Do:</span>}
+                                                                    <span className="font-semibold text-slate-900 text-sm">{parsedName || parsedEmail}</span>
                                                                     {parsedName && <span className="text-xs text-slate-400">&lt;{parsedEmail}&gt;</span>}
                                                                 </div>
-                                                                <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                                                                <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
                                                                     <span>{new Date(selectedEmail.date).toLocaleString('pl-PL', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    <span className="text-slate-200">•</span>
                                                                     {isSentView ? (
-                                                                        selectedEmail.from && <span className="truncate">Od: {selectedEmail.from.replace(/<.*>/, '').trim()}</span>
+                                                                        selectedEmail.from && <span className="truncate">od {selectedEmail.from.replace(/<.*>/, '').trim()}</span>
                                                                     ) : (
-                                                                        selectedEmail.to && <span className="truncate">Do: {selectedEmail.to}</span>
+                                                                        selectedEmail.to && <span className="truncate">do {selectedEmail.to.replace(/<.*>/, '').trim()}</span>
                                                                     )}
                                                                 </div>
+                                                                {(selectedEmail as any).cc && (
+                                                                    <div className="text-xs text-slate-400 mt-0.5 truncate">
+                                                                        CC: {(selectedEmail as any).cc}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );
                                                 })()}
                                             </div>
 
-                                            {/* Body */}
-                                            <div className="prose max-w-none text-slate-700">
-                                                {selectedEmail.html ? (
-                                                    <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
-                                                ) : (
-                                                    <pre className="whitespace-pre-wrap font-sans text-slate-700">{selectedEmail.text}</pre>
-                                                )}
+                                            {/* ── Email Body ── */}
+                                            <div className="px-6 py-5">
+                                                <div className="prose prose-sm prose-slate max-w-none [&_img]:max-w-full [&_img]:h-auto [&_table]:text-sm [&_a]:text-blue-600 [&_a]:underline">
+                                                    {selectedEmail.html ? (
+                                                        <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                                                    ) : (
+                                                        <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">{selectedEmail.text}</pre>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            {/* Attachments */}
+                                            {/* ── Attachments ── */}
                                             {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                                                <div className="mt-8 pt-6 border-t border-slate-100">
-                                                    <h3 className="text-sm font-medium text-slate-900 mb-3">Załączniki</h3>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                        {selectedEmail.attachments.map((att, index) => (
-                                                            <div
-                                                                key={index}
-                                                                onClick={() => downloadAttachment(att)}
-                                                                className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
-                                                            >
-                                                                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 flex-shrink-0">
-                                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                                    </svg>
-                                                                </div>
-                                                                <div className="overflow-hidden">
-                                                                    <p className="text-sm font-medium text-slate-700 truncate" title={att.filename}>{att.filename}</p>
-                                                                    <p className="text-xs text-slate-500">{Math.round(att.size / 1024)} KB</p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                <div className="mx-6 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                        Załączniki ({selectedEmail.attachments.length})
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        {selectedEmail.attachments.map((att, index) => {
+                                                            const ext = att.filename.split('.').pop()?.toLowerCase() || '';
+                                                            const isImage = ['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext);
+                                                            const isPdf = ext === 'pdf';
+                                                            const isDoc = ['doc','docx','xls','xlsx','ppt','pptx','odt','ods'].includes(ext);
+                                                            const iconColor = isImage ? 'text-pink-500 bg-pink-50' : isPdf ? 'text-red-500 bg-red-50' : isDoc ? 'text-blue-500 bg-blue-50' : 'text-slate-400 bg-slate-100';
+                                                            const sizeStr = att.size > 1048576 ? `${(att.size / 1048576).toFixed(1)} MB` : `${Math.round(att.size / 1024)} KB`;
+                                                            return (
+                                                                <button
+                                                                    key={index}
+                                                                    onClick={() => downloadAttachment(att)}
+                                                                    className="flex items-center gap-3 p-2.5 bg-white border border-slate-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all text-left group"
+                                                                >
+                                                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${iconColor}`}>
+                                                                        {isImage ? (
+                                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                                        ) : isPdf ? (
+                                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                        ) : (
+                                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="overflow-hidden flex-1">
+                                                                        <p className="text-sm font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">{att.filename}</p>
+                                                                        <p className="text-[11px] text-slate-400">{sizeStr} · {ext.toUpperCase()}</p>
+                                                                    </div>
+                                                                    <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                                </button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* Smart Reply Suggestions */}
+                                            {/* ── Smart Reply ── */}
                                             {smartReplies.length > 0 && (
-                                                <div className="mt-6 pt-4 border-t border-slate-100">
-                                                    <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                                        </svg>
-                                                        AI Smart Reply — kliknij aby użyć
-                                                    </h4>
+                                                <div className="mx-6 mb-6 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-2">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                                                            Smart Reply
+                                                        </h4>
+                                                        <button onClick={() => setSmartReplies([])} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">✕ zamknij</button>
+                                                    </div>
                                                     <div className="space-y-2">
                                                         {smartReplies.map((reply, i) => (
                                                             <button
                                                                 key={i}
                                                                 onClick={() => useSmartReply(reply)}
-                                                                className="w-full text-left p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-sm text-slate-700 transition-all hover:shadow-md hover:scale-[1.01] active:scale-[0.99] group"
+                                                                className="w-full text-left p-3 bg-white hover:bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-slate-700 transition-all hover:shadow-sm active:scale-[0.99] group"
                                                             >
                                                                 <div className="flex items-start gap-2">
-                                                                    <span className="text-emerald-500 font-bold text-xs mt-0.5">{i + 1}</span>
+                                                                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
                                                                     <span className="flex-1">{reply}</span>
-                                                                    <svg className="w-4 h-4 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                                                    </svg>
+                                                                    <svg className="w-4 h-4 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                                                 </div>
                                                             </button>
                                                         ))}
                                                     </div>
-                                                    <button
-                                                        onClick={() => setSmartReplies([])}
-                                                        className="mt-2 text-xs text-slate-400 hover:text-slate-600 transition-colors"
-                                                    >
-                                                        Zamknij sugestie
-                                                    </button>
                                                 </div>
                                             )}
                                         </div>
