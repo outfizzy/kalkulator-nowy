@@ -2167,7 +2167,7 @@ export const MailPage: React.FC = () => {
                                                     </h3>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                         {selectedEmail.attachments.map((att, index) => {
-                                                            const ext = att.filename.split('.').pop()?.toLowerCase() || '';
+                                                            const ext = (att.filename || 'file').split('.').pop()?.toLowerCase() || '';
                                                             const isImage = ['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext);
                                                             const isPdf = ext === 'pdf';
                                                             const isDoc = ['doc','docx','xls','xlsx','ppt','pptx','odt','ods'].includes(ext);
@@ -2189,7 +2189,7 @@ export const MailPage: React.FC = () => {
                                                                         )}
                                                                     </div>
                                                                     <div className="overflow-hidden flex-1">
-                                                                        <p className="text-sm font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">{att.filename}</p>
+                                                                        <p className="text-sm font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">{att.filename || 'Załącznik'}</p>
                                                                         <p className="text-[11px] text-slate-400">{sizeStr} · {ext.toUpperCase()}</p>
                                                                     </div>
                                                                     <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
