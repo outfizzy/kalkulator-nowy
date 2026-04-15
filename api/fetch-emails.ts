@@ -14,9 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const imapConfig = {
         imap: {
-            user: config.imapUser,
+            user: config.imapUser.trim(),
             password: config.imapPassword,
-            host: config.imapHost,
+            host: config.imapHost.trim(),
             port: Number(config.imapPort),
             tls: Number(config.imapPort) === 993,
             authTimeout: 5000,
@@ -119,13 +119,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dateStr = headerPart?.body.date?.[0];
             const date = dateStr ? new Date(dateStr) : new Date();
 
+            // Detect attachments from IMAP struct
+            let hasAttachments = false;
+            try {
+                const struct = msg.attributes.struct;
+                if (struct) {
+                    hasAttachments = checkForAttachments(struct);
+                }
+            } catch { /* ignore */ }
+
             return {
                 id: msg.attributes.uid,
-                subject: headerPart?.body.subject?.[0] || '(No Subject)',
-                from: headerPart?.body.from?.[0] || 'Unknown',
-                to: headerPart?.body.to?.[0] || 'Unknown',
+                subject: headerPart?.body.subject?.[0] || '(Brak tematu)',
+                from: headerPart?.body.from?.[0] || 'Nieznany',
+                to: headerPart?.body.to?.[0] || '',
+                cc: headerPart?.body.cc?.[0] || '',
+                replyTo: headerPart?.body['reply-to']?.[0] || '',
                 date: date.toISOString(),
-                hasAttachment: false,
+                hasAttachments,
                 flags: msg.attributes.flags || [],
                 timestamp: date.getTime()
             };
@@ -182,4 +193,35 @@ function findSentFolder(boxes: any, prefix = ''): string | null {
     }
 
     return null;
+}
+
+/**
+ * Recursively check IMAP struct for attachment parts.
+ * IMAP struct is nested arrays: [{type, subtype, disposition, ...}, [...children]]
+ */
+function checkForAttachments(struct: any): boolean {
+    if (!struct) return false;
+    if (Array.isArray(struct)) {
+        for (const part of struct) {
+            if (Array.isArray(part)) {
+                if (checkForAttachments(part)) return true;
+            } else if (part && typeof part === 'object') {
+                // Check disposition for 'attachment' or 'inline' with a filename
+                const disp = part.disposition;
+                if (disp) {
+                    const dispType = disp.type?.toLowerCase?.() || (typeof disp === 'string' ? disp.toLowerCase() : '');
+                    if (dispType === 'attachment') return true;
+                    if (dispType === 'inline' && disp.params?.filename) return true;
+                }
+                // Also check if it's a non-text, non-multipart part (binary attachment)
+                const type = part.type?.toLowerCase?.();
+                const subtype = part.subtype?.toLowerCase?.();
+                if (type && type !== 'text' && type !== 'multipart') {
+                    // Application, image, audio, video = likely attachment
+                    if (['application', 'image', 'audio', 'video'].includes(type)) return true;
+                }
+            }
+        }
+    }
+    return false;
 }

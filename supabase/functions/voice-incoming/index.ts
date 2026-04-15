@@ -109,9 +109,9 @@ Deno.serve(async (req) => {
                 console.error('[v11] Lead lookup failed:', dbErr);
             }
 
-            // 2. Log the inbound call
+            // 2. Log the inbound call (upsert to prevent duplicates with status callback)
             try {
-                await supabaseClient.from('call_logs').insert({
+                await supabaseClient.from('call_logs').upsert({
                     direction: 'inbound',
                     from_number: from,
                     to_number: to,
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
                     user_id: assignedRepId,
                     started_at: new Date().toISOString(),
                     metadata: { leadStatus, assignedRepName },
-                });
+                }, { onConflict: 'twilio_call_sid', ignoreDuplicates: false });
                 console.log(`[v11] Call logged for lead ${leadId}`);
             } catch (logErr) {
                 console.error('[v11] Call logging failed:', logErr);

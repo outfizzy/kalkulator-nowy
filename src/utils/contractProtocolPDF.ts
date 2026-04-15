@@ -541,10 +541,255 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
 
     y += sigH + 5;
 
-    // Footer
+    // Footer for installation protocol page
     doc.setFontSize(7);
     setColor([180, 180, 180]);
     txt(`Wygenerowano: ${new Date().toLocaleString('pl-PL')}  |  Polendach24`, W / 2, H - 8, { align: 'center' });
+
+    // ════════════════════════════════════════════════════
+    // PAGE: ABNAHMEPROTOKOLL / PROTOKÓŁ ODBIORU  (Page 1 of 2)
+    // Everything on ONE page: header, info, checklist, declaration, signatures
+    // ════════════════════════════════════════════════════
+    doc.addPage();
+    y = M;
+
+    const contractNr = contract.contractNumber || '-';
+
+    // ── Header — identical to page 1 of the protocol ──
+    try { doc.addImage('/logo.png', 'PNG', M, y, 35, 13); } catch { /* */ }
+    doc.setFontSize(16); doc.setFont(F, 'bold'); setColor(darkSlate);
+    txt('ABNAHMEPROTOKOLL', W - M, y + 7, { align: 'right' });
+    doc.setFontSize(9); doc.setFont(F, 'normal'); setColor(midSlate);
+    txt(`Vertrag / Umowa Nr: ${contractNr}`, W - M, y + 13, { align: 'right' });
+    y += 18;
+    hr();
+    y += 2;
+
+    // ── Client + Product — compact two-column ──
+    const colL = M;
+    const colR = M + contentW / 2 + 2;
+
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(midSlate);
+    txt('Auftraggeber / Zleceniodawca', colL, y);
+    doc.setFontSize(10); doc.setFont(F, 'bold'); setColor(darkSlate);
+    txt(`${client.firstName} ${client.lastName}`, colL, y + 5);
+    doc.setFontSize(7.5); doc.setFont(F, 'normal'); setColor(midSlate);
+    const addr = `${client.street || ''} ${client.houseNumber || ''}, ${client.postalCode || ''} ${client.city || ''}`.trim().replace(/^,\s*|,\s*$/g, '');
+    txt(addr, colL, y + 10);
+
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(midSlate);
+    txt('Produkt / Objekt', colR, y);
+    const mdlName = (product?.modelId || '-').toUpperCase();
+    doc.setFontSize(10); doc.setFont(F, 'bold'); setColor(darkSlate);
+    txt(mdlName === 'MANUAL' ? 'Zlecenie manualne' : mdlName, colR, y + 5);
+    doc.setFontSize(7.5); doc.setFont(F, 'normal'); setColor(midSlate);
+    const dimLine = (product?.width && product?.projection) ? `${product.width} x ${product.projection} mm` : '';
+    if (dimLine) txt(dimLine, colR, y + 10);
+    txt(`Datum / Data: ___.___.______`, colR, y + 15);
+
+    y += 19;
+    hr();
+    y += 2;
+
+    // ── Checklist — compact, one-line per item ──
+    sectionHeader('CHECKLISTE / LISTA KONTROLNA');
+
+    const abnahmeChecks = [
+        'Montage vertragskonform / Montaz zgodny z umowa',
+        'Alle Teile montiert / Wszystkie elementy zamontowane',
+        'Konstruktion standfest / Konstrukcja stabilna',
+        'Entwasserung geprueft / Odprowadzenie wody sprawdzone',
+        'Elektrik funktionsfaehig / Elektryka sprawna',
+        'Kunde eingewiesen / Klient poinstruowany',
+        'Montagebereich aufgeraeumt / Teren posprzatany',
+        'Keine sichtbaren Schaeden / Brak uszkodzen',
+    ];
+
+    abnahmeChecks.forEach((label, i) => {
+        if (i % 2 === 0) { setFill(lightBg); doc.rect(M, y - 2, contentW, 6.5, 'F'); }
+        doc.setDrawColor(160, 160, 160);
+        doc.rect(M + 2, y - 1, 3, 3);
+        doc.setFontSize(7.5); doc.setFont(F, 'normal'); setColor(darkSlate);
+        txt(label, M + 8, y + 1);
+        y += 6.5;
+    });
+    y += 3;
+
+    // ── Uwagi montażysty — 2 dotted lines ──
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(midSlate);
+    txt('Bemerkungen / Uwagi:', M, y);
+    y += 4;
+    doc.setDrawColor(200, 200, 200);
+    for (let i = 0; i < 2; i++) {
+        doc.setLineDash([1, 1], 0);
+        doc.line(M, y + 3, W - M, y + 3);
+        y += 6;
+    }
+    doc.setLineDash([], 0);
+    y += 2;
+
+    // ── Declaration — compact bilingual ──
+    setFill(lightBg);
+    doc.roundedRect(M, y, contentW, 18, 1, 1, 'F');
+
+    doc.setFontSize(6); doc.setFont(F, 'normal'); setColor(darkSlate);
+    const deText = 'Der Auftraggeber bestaetigt die ordnungsgemaesse Ausfuehrung der vereinbarten Leistungen. Evtl. Maengel sind im Anhang aufgefuehrt. Die Abnahme erfolgt ggf. unter Vorbehalt der fristgerechten Maengelbeseitigung. Gewaehrleistungsansprueche bleiben unberuehrt.';
+    doc.text(doc.splitTextToSize(t(deText), contentW - 6), M + 3, y + 4);
+
+    doc.setFontSize(6); setColor(midSlate);
+    const plText = 'Zleceniodawca potwierdza prawidlowe wykonanie uzgodnionych prac. Ewent. usterki wymieniono w zalaczniku. Odbior nastepuje z zastrzezeniem terminowego usuniecia usterek. Roszczenia gwarancyjne pozostaja nienaruszone.';
+    doc.text(doc.splitTextToSize(t(plText), contentW - 6), M + 3, y + 11);
+
+    y += 21;
+
+    // ── Signatures — two boxes side by side ──
+    const sW = (contentW - 6) / 2;
+    const sH = 28;
+
+    // Left: Monteur
+    doc.setDrawColor(190, 190, 190);
+    doc.rect(M, y, sW, sH);
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(darkSlate);
+    txt('Auftragnehmer / Wykonawca', M + 3, y + 5);
+    doc.setFontSize(6.5); doc.setFont(F, 'normal'); setColor(midSlate);
+    txt('Name / Nazwisko: ______________________', M + 3, y + 11);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(M + 3, y + sH - 5, M + sW - 3, y + sH - 5);
+    doc.setFontSize(5.5);
+    txt('Unterschrift / Podpis', M + 3, y + sH - 2);
+
+    // Right: Kunde
+    const rX = M + sW + 6;
+    doc.setDrawColor(190, 190, 190);
+    doc.rect(rX, y, sW, sH);
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(darkSlate);
+    txt('Auftraggeber / Zleceniodawca', rX + 3, y + 5);
+    doc.setFontSize(6.5); doc.setFont(F, 'normal'); setColor(midSlate);
+    txt('Name / Nazwisko: ______________________', rX + 3, y + 11);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(rX + 3, y + sH - 5, rX + sW - 3, y + sH - 5);
+    doc.setFontSize(5.5);
+    txt('Unterschrift / Podpis klienta', rX + 3, y + sH - 2);
+
+    y += sH + 3;
+
+    // Legal footnote + footer
+    doc.setFontSize(5); setColor([170, 170, 170]); doc.setFont(F, 'normal');
+    txt('Bestandteil des Vertrages. Beide Parteien erhalten je ein Exemplar. / Integralna czesc umowy. Obie strony otrzymuja po jednym egzemplarzu.', M, y);
+    doc.setFontSize(7); setColor([180, 180, 180]);
+    txt(`Abnahmeprotokoll | ${contractNr} | ${new Date().toLocaleDateString('pl-PL')} | Polendach24`, W / 2, H - 8, { align: 'center' });
+
+    // ════════════════════════════════════════════════════
+    // PAGE: ANLAGE / ZAŁĄCZNIK — NACHMASS & MÄNGEL  (Page 2 of 2)
+    // ════════════════════════════════════════════════════
+    doc.addPage();
+    y = M;
+
+    // Header — lightweight, references main protocol
+    try { doc.addImage('/logo.png', 'PNG', M, y, 35, 13); } catch { /* */ }
+    doc.setFontSize(14); doc.setFont(F, 'bold'); setColor(darkSlate);
+    txt('ANLAGE ZUM ABNAHMEPROTOKOLL', W - M, y + 7, { align: 'right' });
+    doc.setFontSize(8); doc.setFont(F, 'normal'); setColor(midSlate);
+    txt(`Zalacznik do protokolu odbioru | ${contractNr}`, W - M, y + 13, { align: 'right' });
+    y += 18;
+    hr();
+    y += 3;
+
+    // ── A. NACHMASS / DOMIAR ──
+    sectionHeader('A. NACHMASS / DOMIAR');
+
+    doc.setFontSize(7); setColor(midSlate); doc.setFont(F, 'normal');
+    txt('Abweichungen der tatsaechlichen Masse vom Vertrag / Odchylenia wymiarow rzeczywistych od umowy', M, y);
+    y += 5;
+
+    // Table
+    const cN = M;
+    const cD = M + 8;
+    const cS = M + contentW * 0.50;
+    const cI = M + contentW * 0.68;
+    const cDf = M + contentW * 0.86;
+
+    setFill([241, 245, 249]);
+    doc.rect(M, y, contentW, 7, 'F');
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(midSlate);
+    txt('Nr', cN + 2, y + 5);
+    txt('Beschreibung / Opis', cD, y + 5);
+    txt('Soll / Umowa', cS, y + 5);
+    txt('Ist / Rzeczyw.', cI, y + 5);
+    txt('Differenz', cDf, y + 5);
+    y += 8;
+
+    doc.setDrawColor(210, 210, 210);
+    for (let i = 0; i < 6; i++) {
+        if (i % 2 === 0) { setFill([252, 253, 254]); doc.rect(M, y, contentW, 8, 'F'); }
+        doc.rect(M, y, contentW, 8);
+        doc.setFontSize(7); setColor(midSlate); doc.setFont(F, 'normal');
+        txt(`${i + 1}.`, cN + 2, y + 5.5);
+        doc.line(cD - 2, y, cD - 2, y + 8);
+        doc.line(cS - 2, y, cS - 2, y + 8);
+        doc.line(cI - 2, y, cI - 2, y + 8);
+        doc.line(cDf - 2, y, cDf - 2, y + 8);
+        y += 8;
+    }
+    y += 5;
+
+    // ── B. MAENGELLISTE / USTERKI ──
+    sectionHeader('B. MAENGELLISTE / USTERKI');
+
+    doc.setFontSize(7); setColor(midSlate); doc.setFont(F, 'normal');
+    txt('Festgestellte Maengel mit Nachbesserungsfrist / Stwierdzone usterki z terminem naprawy', M, y);
+    y += 5;
+
+    setFill([254, 242, 242]);
+    doc.rect(M, y, contentW, 7, 'F');
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor([153, 27, 27]);
+    txt('Nr', M + 2, y + 5);
+    txt('Beschreibung / Opis usterki', M + 10, y + 5);
+    txt('Frist / Termin', W - M - 32, y + 5);
+    txt('Erl.', W - M - 8, y + 5);
+    y += 8;
+
+    doc.setDrawColor(210, 210, 210);
+    for (let i = 0; i < 5; i++) {
+        doc.rect(M, y, contentW, 10);
+        doc.setFontSize(7); setColor(midSlate); doc.setFont(F, 'normal');
+        txt(`${i + 1}.`, M + 2, y + 6.5);
+        doc.line(M + 8, y, M + 8, y + 10);
+        doc.line(W - M - 36, y, W - M - 36, y + 10);
+        doc.line(W - M - 13, y, W - M - 13, y + 10);
+        doc.rect(W - M - 10, y + 3, 3, 3);
+        y += 10;
+    }
+    y += 5;
+
+    // ── C. ZUSAETZLICHE BEMERKUNGEN / UWAGI ──
+    sectionHeader('C. BEMERKUNGEN / UWAGI DODATKOWE');
+
+    doc.setDrawColor(200, 200, 200);
+    for (let i = 0; i < 5; i++) {
+        doc.setLineDash([1, 1], 0);
+        doc.line(M, y + 3, W - M, y + 3);
+        y += 7;
+    }
+    doc.setLineDash([], 0);
+    y += 3;
+
+    // Signature for addendum
+    doc.setFontSize(7); doc.setFont(F, 'bold'); setColor(midSlate);
+    txt('Unterschriften / Podpisy (Anlage):', M, y);
+    y += 6;
+
+    const addSigW = (contentW - 6) / 2;
+    doc.setDrawColor(190, 190, 190);
+    doc.line(M, y + 14, M + addSigW, y + 14);
+    doc.line(M + addSigW + 6, y + 14, W - M, y + 14);
+    doc.setFontSize(6); doc.setFont(F, 'normal'); setColor(midSlate);
+    txt('Auftragnehmer / Wykonawca', M, y + 18);
+    txt('Auftraggeber / Zleceniodawca', M + addSigW + 6, y + 18);
+
+    // Footer
+    doc.setFontSize(7); setColor([180, 180, 180]);
+    txt(`Anlage zum Abnahmeprotokoll | ${contractNr} | ${new Date().toLocaleDateString('pl-PL')} | Polendach24`, W / 2, H - 8, { align: 'center' });
 
     // ════════════════════════════════════════════════════
     // PAGES 2+: ZDJĘCIA

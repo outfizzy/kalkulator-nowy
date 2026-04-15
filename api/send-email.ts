@@ -16,15 +16,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
         userId,
         to,
+        cc,
+        bcc,
         subject,
         body,
         config,
         attachments,
         scheduledAt,
-        useSharedConfig, // Flag to use shared inbox
-        saveToSent,      // Flag to save to IMAP Sent folder
-        leadId,          // For logging
-        customerId       // For logging
+        useSharedConfig,
+        saveToSent,
+        leadId,
+        customerId
     } = req.body;
 
     if (!to || !subject || !body) {
@@ -96,22 +98,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'Missing SMTP configuration' });
         }
         smtpConfig = {
-            host: config.smtpHost,
+            host: config.smtpHost.trim(),
             port: Number(config.smtpPort),
             secure: Number(config.smtpPort) === 465,
             auth: {
-                user: config.smtpUser,
+                user: config.smtpUser.trim(),
                 pass: config.smtpPassword,
             },
-            from: config.smtpUser // Sender is Personal Address
+            from: config.smtpUser.trim() // Sender is Personal Address
         };
 
         // IMAP config from personal config (for save-to-sent)
         if (saveToSent && config.imapHost) {
             imapConfig = {
-                host: config.imapHost,
+                host: config.imapHost.trim(),
                 port: Number(config.imapPort) || 993,
-                user: config.imapUser || config.smtpUser,
+                user: (config.imapUser || config.smtpUser).trim(),
                 password: config.imapPassword || config.smtpPassword,
             };
         }
@@ -132,6 +134,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             html: body,
         };
 
+        if (cc) mailOptions.cc = cc;
+        if (bcc) mailOptions.bcc = bcc;
+
         // Handle Attachments
         if (attachments && Array.isArray(attachments)) {
             mailOptions.attachments = attachments.map((att: any) => ({
@@ -147,9 +152,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // --- SAVE TO IMAP SENT FOLDER ---
         if (saveToSent && imapConfig) {
             try {
-                const rawMessage = [
+                console.log(`[IMAP-SAVE] Connecting to ${imapConfig.host}:${imapConfig.port} as ${imapConfig.user}`);
+                const rawHeaders = [
                     `From: "Polendach24" <${smtpConfig.from}>`,
                     `To: ${to}`,
+                ];
+                if (cc) rawHeaders.push(`Cc: ${cc}`);
+                rawHeaders.push(
                     `Subject: ${subject}`,
                     `Date: ${new Date().toUTCString()}`,
                     `Message-ID: ${info.messageId}`,
@@ -157,48 +166,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     `Content-Type: text/html; charset=utf-8`,
                     '',
                     body
-                ].join('\r\n');
+                );
+                const rawMessage = rawHeaders.join('\r\n');
 
                 const connection = await imaps.connect({
                     imap: {
-                        host: imapConfig.host,
+                        host: imapConfig.host.trim(),
                         port: imapConfig.port,
                         tls: true,
-                        user: imapConfig.user,
+                        user: imapConfig.user.trim(),
                         password: imapConfig.password,
                         authTimeout: 10000,
                         tlsOptions: { rejectUnauthorized: false },
                     }
                 });
 
-                // Try common Sent folder names
-                const sentFolderNames = ['Sent', 'INBOX.Sent', 'Sent Messages', 'Gesendet', 'INBOX.Gesendet'];
+                // Use the same discovery logic as fetch-emails.ts
                 let sentFolder = 'Sent';
                 try {
                     const boxes = await connection.getBoxes();
-                    for (const name of sentFolderNames) {
-                        const parts = name.split('.');
-                        let current: any = boxes;
-                        let found = true;
-                        for (const part of parts) {
-                            if (current[part]) {
-                                current = current[part].children || {};
-                            } else {
-                                found = false;
+                    console.log('[IMAP-SAVE] Available folders:', JSON.stringify(Object.keys(boxes)));
+                    const discovered = findSentFolderForSave(boxes);
+                    if (discovered) {
+                        sentFolder = discovered;
+                        console.log(`[IMAP-SAVE] Discovered sent folder: "${sentFolder}"`);
+                    } else {
+                        console.log(`[IMAP-SAVE] No sent folder discovered, trying brute-force...`);
+                        // Brute-force fallback
+                        const candidates = ['Sent', 'INBOX.Sent', 'Sent Items', 'Sent Messages', 'Gesendet', 'INBOX.Gesendet', 'Wysłane', 'INBOX.Wysłane'];
+                        for (const candidate of candidates) {
+                            try {
+                                await connection.openBox(candidate);
+                                sentFolder = candidate;
+                                console.log(`[IMAP-SAVE] Brute-force found: "${candidate}"`);
                                 break;
-                            }
+                            } catch { continue; }
                         }
-                        if (found) { sentFolder = name; break; }
                     }
                 } catch (boxErr) {
-                    console.warn('[IMAP] Could not list boxes, using default Sent:', boxErr);
+                    console.warn('[IMAP-SAVE] Could not list boxes:', boxErr);
                 }
 
                 await connection.append(rawMessage, { mailbox: sentFolder, flags: ['\\Seen'] });
                 connection.end();
-                console.log(`[IMAP] Saved to ${sentFolder}`);
-            } catch (imapErr) {
-                console.error('[IMAP] Failed to save to Sent:', imapErr);
+                console.log(`[IMAP-SAVE] ✅ Saved to "${sentFolder}" for ${to}`);
+            } catch (imapErr: any) {
+                console.error(`[IMAP-SAVE] ❌ Failed to save to Sent (host: ${imapConfig.host}):`, imapErr.message);
                 // Don't fail the request — email was sent successfully
             }
         }
@@ -234,4 +247,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             details: error.message
         });
     }
+}
+
+/**
+ * Recursively search IMAP folder tree for a "Sent" folder.
+ * Uses same logic as fetch-emails.ts to ensure consistency.
+ */
+function findSentFolderForSave(boxes: any, prefix = ''): string | null {
+    const sentKeywords = ['sent', 'gesendet', 'wysłane', 'sent items', 'sent messages', 'envoyé'];
+
+    for (const [name, box] of Object.entries(boxes as Record<string, any>)) {
+        const fullPath = prefix ? `${prefix}${(box as any).delimiter || '.'}${name}` : name;
+
+        if (sentKeywords.some(kw => name.toLowerCase().includes(kw))) {
+            return fullPath;
+        }
+
+        if ((box as any).attribs && (
+            (box as any).attribs.includes('\\Sent') ||
+            (box as any).attribs.includes('\\sent') ||
+            (box as any).special_use_attrib === '\\Sent'
+        )) {
+            return fullPath;
+        }
+
+        if ((box as any).children) {
+            const found = findSentFolderForSave((box as any).children, fullPath);
+            if (found) return found;
+        }
+    }
+
+    return null;
 }

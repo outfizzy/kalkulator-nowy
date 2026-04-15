@@ -818,6 +818,91 @@ export const TelephonyService = {
         };
     },
 
+    /**
+     * Get today's call statistics for the dashboard badge
+     */
+    async getTodayCallStats(): Promise<{
+        total: number;
+        inbound: number;
+        outbound: number;
+        missed: number;
+        completed: number;
+    }> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const { data, error } = await supabase
+            .from('call_logs')
+            .select('direction, status')
+            .gte('started_at', today.toISOString());
+
+        if (error) throw error;
+        const logs = data || [];
+
+        return {
+            total: logs.length,
+            inbound: logs.filter(l => l.direction === 'inbound').length,
+            outbound: logs.filter(l => l.direction === 'outbound').length,
+            missed: logs.filter(l => l.status === 'missed' || l.status === 'no-answer').length,
+            completed: logs.filter(l => l.status === 'completed').length,
+        };
+    },
+
+    /**
+     * Remove duplicate call entries based on twilio_call_sid.
+     * Keeps the entry with the most complete data (recording > longer duration > newer).
+     * Returns the count of removed duplicates.
+     */
+    async removeDuplicateCalls(): Promise<{ removed: number; total: number }> {
+        // Fetch all calls with a twilio_call_sid
+        const { data, error } = await supabase
+            .from('call_logs')
+            .select('id, twilio_call_sid, recording_url, duration_seconds, created_at')
+            .not('twilio_call_sid', 'is', null)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        const logs = data || [];
+
+        // Group by twilio_call_sid
+        const groups: Record<string, typeof logs> = {};
+        for (const log of logs) {
+            if (!log.twilio_call_sid) continue;
+            if (!groups[log.twilio_call_sid]) groups[log.twilio_call_sid] = [];
+            groups[log.twilio_call_sid].push(log);
+        }
+
+        const toDelete: string[] = [];
+        for (const [_sid, group] of Object.entries(groups)) {
+            if (group.length <= 1) continue;
+
+            // Sort: prefer recording > longer duration > newer
+            group.sort((a, b) => {
+                if (a.recording_url && !b.recording_url) return -1;
+                if (!a.recording_url && b.recording_url) return 1;
+                if ((a.duration_seconds || 0) !== (b.duration_seconds || 0)) {
+                    return (b.duration_seconds || 0) - (a.duration_seconds || 0);
+                }
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
+
+            // Keep the first (best), delete the rest
+            for (let i = 1; i < group.length; i++) {
+                toDelete.push(group[i].id);
+            }
+        }
+
+        if (toDelete.length > 0) {
+            // Delete in batches of 50
+            for (let i = 0; i < toDelete.length; i += 50) {
+                const batch = toDelete.slice(i, i + 50);
+                await supabase.from('call_logs').delete().in('id', batch);
+            }
+        }
+
+        return { removed: toDelete.length, total: logs.length };
+    },
+
     // ─── HELPERS ───
 
     async _enrichCallLogs(logs: any[]): Promise<CallLog[]> {

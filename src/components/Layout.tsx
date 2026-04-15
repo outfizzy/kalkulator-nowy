@@ -6,6 +6,9 @@ import { useRealtimeNotifications } from './notifications/useRealtimeNotificatio
 import { GlobalSearch } from './GlobalSearch';
 import { AIAssistantSidebar } from './AIAssistantSidebar';
 import { TaskSidebar } from './tasks/TaskSidebar';
+import { supabase } from '../lib/supabase';
+import { useActivityTracker } from '../hooks/useActivityTracker';
+import { useIdleTimer } from '../hooks/useIdleTimer';
 
 export const Layout: React.FC = () => {
     const { currentUser, logout, isAdmin, hasPermission } = useAuth();
@@ -15,8 +18,20 @@ export const Layout: React.FC = () => {
     const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [waUnread, setWaUnread] = useState(0);
+    const [missedCalls, setMissedCalls] = useState(0);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ crm: true });
     const toggleSection = (key: string) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+    // Activity tracking (heartbeat + page views)
+    useActivityTracker();
+
+    // Auto-logout after 15 min inactivity
+    const handleIdleLogout = useCallback(async () => {
+        await logout();
+        navigate('/login');
+    }, [logout, navigate]);
+    const { showWarning: showIdleWarning, remainingSeconds, stayActive } = useIdleTimer(handleIdleLogout);
 
     // Real-time push notifications from Supabase (offer views, messages, acceptances)
     useRealtimeNotifications();
@@ -45,6 +60,77 @@ export const Layout: React.FC = () => {
         const interval = setInterval(checkUnread, 3 * 60 * 1000); // every 3 min
         return () => clearInterval(interval);
     }, [checkUnread]);
+
+    // Real-time WhatsApp & missed calls badges
+    const location = useLocation();
+
+    // Reset badge when user visits the page
+    useEffect(() => {
+        if (location.pathname.startsWith('/telephony/whatsapp')) setWaUnread(0);
+        if (location.pathname === '/telephony/calls') setMissedCalls(0);
+    }, [location.pathname]);
+
+    // Fetch initial missed calls count from DB
+    useEffect(() => {
+        const fetchMissedCount = async () => {
+            try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const { count } = await supabase
+                    .from('call_logs')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('status', 'missed')
+                    .eq('direction', 'inbound')
+                    .gte('started_at', today.toISOString());
+                if (count && count > 0) setMissedCalls(count);
+            } catch { /* silent */ }
+        };
+        fetchMissedCount();
+    }, []);
+
+    // Supabase realtime: WhatsApp inbound messages + missed calls
+    useEffect(() => {
+        const waCh = supabase
+            .channel('layout-wa-badge')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'sms_logs',
+                filter: 'channel=eq.whatsapp',
+            }, (payload: any) => {
+                if (payload.new?.direction === 'inbound' && !location.pathname.startsWith('/telephony/whatsapp')) {
+                    setWaUnread(prev => prev + 1);
+                }
+            })
+            .subscribe();
+
+        const callCh = supabase
+            .channel('layout-call-badge')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'call_logs',
+            }, (payload: any) => {
+                if (payload.new?.status === 'missed' && payload.new?.direction === 'inbound' && location.pathname !== '/telephony/calls') {
+                    setMissedCalls(prev => prev + 1);
+                }
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'call_logs',
+            }, (payload: any) => {
+                if (payload.new?.status === 'missed' && payload.new?.direction === 'inbound' && payload.old?.status !== 'missed' && location.pathname !== '/telephony/calls') {
+                    setMissedCalls(prev => prev + 1);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(waCh);
+            supabase.removeChannel(callCh);
+        };
+    }, [location.pathname]);
 
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,7 +201,7 @@ export const Layout: React.FC = () => {
                                 {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
                                 {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
                                 <NavLink to="/dachrechner" label="Kalkulator dachowy" icon="clipboard" />
-                                <NavLink to="/admin/aliplast-configurator" label="Konfigurator Aliplast" icon="clipboard" />
+
                                 <NavLink to="/admin/fairs" label="Targi i eventy" icon="calendar" />
                             </>)}
                         </div>
@@ -128,9 +214,9 @@ export const Layout: React.FC = () => {
                             <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandedSections.komunikacja ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                         </button>
                         {expandedSections.komunikacja && (<>
-                            <NavLink to="/telephony/calls" label="Połączenia" icon="phone" />
+                            <NavLink to="/telephony/calls" label="Połączenia" icon="phone" badge={missedCalls} />
                             <NavLink to="/telephony/sms" label="Wiadomości SMS" icon="chat" />
-                            <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" />
+                            <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" badge={waUnread} />
                             <NavLink to="/telephony/whatsapp/campaigns" label="Kampanie WhatsApp" icon="mail" />
                             <NavLink to="/telephony/voicemail" label="Poczta głosowa" icon="bell" />
                             {isAdmin() && <NavLink to="/telephony/numbers" label="Zarządzanie numerami" icon="settings" />}
@@ -207,6 +293,7 @@ export const Layout: React.FC = () => {
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/installers" label="Ekipy montażowe" icon="users" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="Dziennik paliwa" icon="clipboard" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/failures" label="Zgłoszenia usterek" icon="tools" />}
+                                {isAdmin() && <NavLink to="/admin/pulse" label="Puls Firmy" icon="dashboard" />}
                             </>)}
                         </div>
                     )}
@@ -322,16 +409,16 @@ export const Layout: React.FC = () => {
                                     {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" onClick={() => setMobileMenuOpen(false)} />}
                                     <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
-                                    <NavLink to="/admin/aliplast-configurator" label="Aliplast" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
+
                                 </div>
                             )}
 
                             {/* TELEFONIA */}
                             <div className="space-y-1">
                                 <div className="px-4 text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-2">📞 Telefonia</div>
-                                <NavLink to="/telephony/calls" label="Połączenia" icon="phone" onClick={() => setMobileMenuOpen(false)} />
+                                <NavLink to="/telephony/calls" label="Połączenia" icon="phone" badge={missedCalls} onClick={() => setMobileMenuOpen(false)} />
                                 <NavLink to="/telephony/sms" label="SMS" icon="chat" onClick={() => setMobileMenuOpen(false)} />
-                                <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" onClick={() => setMobileMenuOpen(false)} />
+                                <NavLink to="/telephony/whatsapp" label="WhatsApp" icon="chat" badge={waUnread} onClick={() => setMobileMenuOpen(false)} />
                                 <NavLink to="/telephony/whatsapp/campaigns" label="Kampanie WA" icon="mail" onClick={() => setMobileMenuOpen(false)} />
                                 <NavLink to="/telephony/voicemail" label="Poczta Głosowa" icon="bell" onClick={() => setMobileMenuOpen(false)} />
                                 {isAdmin() && <NavLink to="/telephony/numbers" label="Numery Tel." icon="settings" onClick={() => setMobileMenuOpen(false)} />}
@@ -469,6 +556,30 @@ export const Layout: React.FC = () => {
 
             {/* Global Search Modal */}
             <GlobalSearch isOpen={globalSearchOpen} setIsOpen={setGlobalSearchOpen} />
+
+            {/* Idle Warning Modal */}
+            {showIdleWarning && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center animate-in">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">Brak aktywności</h3>
+                        <p className="text-sm text-slate-500 mb-1">Zostaniesz automatycznie wylogowany za</p>
+                        <p className="text-4xl font-bold text-amber-600 mb-4">
+                            {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}
+                        </p>
+                        <button
+                            onClick={stayActive}
+                            className="w-full py-3 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-700 transition-colors text-sm"
+                        >
+                            Zostań zalogowany
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

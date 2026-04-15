@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
-import { supabase } from '../lib/supabase'; // Use shared client to avoid multiple GoTrueClient instances
+import { supabase } from '../lib/supabase';
+import { PulseService } from '../services/database/pulse.service';
 
 interface AuthContextType {
     currentUser: User | null;
@@ -160,6 +161,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     companyName: data.company_name || undefined,
                     nip: data.nip || undefined,
                     partnerMargin: typeof data.partner_margin === 'number' ? data.partner_margin : undefined,
+                    preferredLanguage: data.preferred_language || undefined,
                     emailConfig: (() => {
                         const raw = data.email_config || {};
                         const { __mailboxes, ...cleanConfig } = raw;
@@ -275,6 +277,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const logout = async () => {
+        // End active session before signing out
+        if (currentUser?.id) {
+            await PulseService.endSession(currentUser.id);
+        }
         await supabase.auth.signOut();
         setCurrentUser(null);
         setPermissions(new Set());

@@ -27,7 +27,7 @@ const TranslationContext = createContext<TranslationContextType | undefined>(und
 export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { currentUser } = useAuth();
 
-    // Default language logic: User Profile -> Browser -> Fallback (PL)
+    // Default language logic: User Profile -> Role-based -> Browser -> Fallback (PL)
     const language = ((): TranslationLanguage => {
         if (currentUser?.preferredLanguage) {
             // Handle case where user DB language might be unsupported
@@ -36,6 +36,9 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
                 return userLang as TranslationLanguage;
             }
         }
+
+        // Role-based fallback: Polish sales reps always get Polish
+        if (currentUser?.role === 'sales_rep_pl') return 'pl';
 
         // Browser detection
         const browserLang = navigator.language.split('-')[0];

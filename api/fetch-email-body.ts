@@ -17,9 +17,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const imapConfig = {
         imap: {
-            user: imapUser,
+            user: imapUser.trim(),
             password: imapPassword,
-            host: imapHost,
+            host: imapHost.trim(),
             port: Number(imapPort),
             tls: Number(imapPort) === 993,
             authTimeout: 10000,

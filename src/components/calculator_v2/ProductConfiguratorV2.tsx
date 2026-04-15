@@ -97,6 +97,9 @@ const TECH_SPECS: Record<string, {
     'TR10':         { minWidth: 2000, maxWidth: 7000, minDepth: 1000, maxDepth: 3500, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
     'TR15':         { minWidth: 2060, maxWidth: 12060, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
     'TR20':         { minWidth: 3060, maxWidth: 12060, minDepth: 1000, maxDepth: 6000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
+    // Pergola Luxe (Mirpol) — Bioclimatic louvered pergola
+    'Pergola Luxe':         { minWidth: 3000, maxWidth: 7800, minDepth: 3000, maxDepth: 4000, maxHeight: 2300, glassFall: '—', keilmassMin: null, options: ['LED-Beleuchtung', 'Vertikalmarkise', 'Lamellenwand', 'Glasschiebetür'] },
+    'Pergola Luxe Electric': { minWidth: 3000, maxWidth: 4000, minDepth: 3000, maxDepth: 4000, maxHeight: 2300, glassFall: '—', keilmassMin: null, options: ['LED-Beleuchtung (integriert)', 'Vertikalmarkise', 'Lamellenwand', 'Glasschiebetür'] },
 };
 
 // ======= PROFILE SPECIFICATIONS (from Excel "Materialien" sheets per model) =======
@@ -120,6 +123,9 @@ const PROFILE_SPECS: Record<string, {
     'TR10':        { pfosten: '—', sparrenTypes: [{ type: 'Standard', dim: '—' }], rinne: '—' },
     'TR15':        { pfosten: '—', sparrenTypes: [{ type: 'Standard', dim: '—' }], rinne: '—' },
     'TR20':        { pfosten: '—', sparrenTypes: [{ type: 'Standard', dim: '—' }], rinne: '—' },
+    // Pergola Luxe (Mirpol)
+    'Pergola Luxe':         { pfosten: '100×100×1,6mm', sparrenTypes: [{ type: 'Lamellen', dim: '145×23×1,4mm' }], rinne: 'WaterSpill (integriert)' },
+    'Pergola Luxe Electric': { pfosten: '100×100×1,6mm', sparrenTypes: [{ type: 'Lamellen (motorisiert)', dim: '145×23×1,4mm' }], rinne: 'WaterSpill (integriert)' },
 };
 
 // ======= PRODUCT CATALOG =======
@@ -138,6 +144,9 @@ const ROOF_MODELS: RoofModel[] = [
     { id: 'TR10', name: 'Orangestyle 10', description: 'Einstiegsprofil • max. 7.000mm • VSG 44.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr10.jpg' },
     { id: 'TR15', name: 'Trendstyle 15', description: 'Standard Profil • max. 12.060mm • VSG 44.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr15.jpg' },
     { id: 'TR20', name: 'Topstyle 20', description: 'Premium Profil • max. 12.060mm • VSG 55.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr20.jpg' },
+    // --- Pergola Luxe (Mirpol) ---
+    { id: 'Pergola Luxe', name: 'Pergola Luxe (Manuell)', description: 'Bioklimatisch - Manuell drehbare Alu-Lamellen - Freistehend', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
+    { id: 'Pergola Luxe Electric', name: 'Pergola Luxe (Elektrisch)', description: 'Bioklimatisch - Somfy Motor + LED - Fernbedienung - Freistehend', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
 ];
 
 // Glass variant options
@@ -629,6 +638,8 @@ function modelToDbName(model: string): string {
         'TR10': 'TR10',
         'TR15': 'TR15',
         'TR20': 'TR20',
+        'Pergola Luxe': 'Pergola Luxe',
+        'Pergola Luxe Electric': 'Pergola Luxe Electric',
     };
     return mapping[model] || model;
 }
@@ -639,11 +650,106 @@ function isTerandaModel(model: string): boolean {
     return TERANDA_MODELS.includes(model);
 }
 
+// ======= HELPER: Pergola Luxe detection =======
+const PERGOLA_LUXE_MODELS = ['Pergola Luxe', 'Pergola Luxe Electric'];
+function isPergolaLuxeModel(model: string): boolean {
+    return PERGOLA_LUXE_MODELS.includes(model);
+}
+
+// Pergola Luxe color options (per Mirpol catalog)
+const PERGOLA_LUXE_COLORS = [
+    { id: 'anthracite', name: 'Anthrazit', color: '#3a3a3a', image: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
+    { id: 'white', name: 'Weiß', color: '#f5f5f5', image: '/images/models/pergola-luxe/pergola-luxe-white.jpg' },
+    { id: 'wood', name: 'Holzoptik', color: '#8B6914', image: '/images/models/pergola-luxe/pergola-luxe-wood.jpg' },
+];
+
+// Pergola Luxe available sizes — fixed-size products matching Mirpol catalog exactly
+const PERGOLA_LUXE_SIZES: Record<string, { width: number; depth: number; label: string }[]> = {
+    'Pergola Luxe': [
+        { width: 3000, depth: 3000, label: '3,0 x 3,0 m' },
+        { width: 3000, depth: 4000, label: '3,0 x 4,0 m' },
+        { width: 4000, depth: 4000, label: '4,0 x 4,0 m' },
+        { width: 5800, depth: 3000, label: '5,8 x 3,0 m' },
+        { width: 5800, depth: 4000, label: '5,8 x 4,0 m' },
+        { width: 7800, depth: 3000, label: '7,8 x 3,0 m' },
+        { width: 7800, depth: 4000, label: '7,8 x 4,0 m' },
+    ],
+    'Pergola Luxe Electric': [
+        { width: 3000, depth: 3000, label: '3,0 x 3,0 m' },
+        { width: 3500, depth: 3500, label: '3,5 x 3,5 m' },
+        { width: 3000, depth: 4000, label: '3,0 x 4,0 m' },
+        { width: 4000, depth: 4000, label: '4,0 x 4,0 m' },
+    ],
+};
+
+// ======= PERGOLA LUXE ACCESSORIES =======
+// All prices are Mirpol B2B netto PLN + 10% markup, converted to EUR at /4.1
+type PergolaLuxeAccessoryType = 'markiza_elektryczna' | 'markiza_manualna' | 'panel_nieruchomy' | 'panel_ruchomy' | 'drzwi_szklane' | 'drzwi_zaluzjowe';
+
+interface PergolaLuxeAccessory {
+    id: string;
+    type: PergolaLuxeAccessoryType;
+    namePL: string;
+    nameDE: string;
+    size: '3M' | '4M' | 'other';
+    colors: string[];   // available colors
+    pricePLN: number;   // Mirpol netto + 10%
+    priceEUR: number;   // pricePLN / 4.1 rounded
+    image: string;
+    description: string;
+}
+
+const PERGOLA_LUXE_ACCESSORIES: PergolaLuxeAccessory[] = [
+    // === MARKIZY ELEKTRYCZNE (Vertikalmarkise elektrisch) ===
+    // 2189.47 PLN * 1.1 = 2408 PLN / 4.1 = 587 EUR
+    { id: 'markiza-el-3m', type: 'markiza_elektryczna', namePL: 'Markiza elektryczna 3M', nameDE: 'Vertikalmarkise elektrisch 3M', size: '3M', colors: ['anthracite', 'white'], pricePLN: 2408, priceEUR: 587, image: '/images/models/pergola-luxe/markiza-manual.jpg', description: 'Elektrische Seitenmarkise mit Motor' },
+    // 2684.21 PLN * 1.1 = 2953 PLN / 4.1 = 720 EUR
+    { id: 'markiza-el-4m', type: 'markiza_elektryczna', namePL: 'Markiza elektryczna 4M', nameDE: 'Vertikalmarkise elektrisch 4M', size: '4M', colors: ['anthracite', 'white'], pricePLN: 2953, priceEUR: 720, image: '/images/models/pergola-luxe/markiza-manual.jpg', description: 'Elektrische Seitenmarkise mit Motor' },
+
+    // === MARKIZY MANUALNE (Vertikalmarkise manuell) ===
+    // 1800 PLN * 1.1 = 1980 PLN / 4.1 = 483 EUR
+    { id: 'markiza-man-3m', type: 'markiza_manualna', namePL: 'Markiza manualna 3M', nameDE: 'Vertikalmarkise manuell 3M', size: '3M', colors: ['anthracite', 'white'], pricePLN: 1980, priceEUR: 483, image: '/images/models/pergola-luxe/markiza-manual.jpg', description: 'Manuelle Seitenmarkise mit Handkurbel' },
+    // 2100 PLN * 1.1 = 2310 PLN / 4.1 = 563 EUR
+    { id: 'markiza-man-4m', type: 'markiza_manualna', namePL: 'Markiza manualna 4M', nameDE: 'Vertikalmarkise manuell 4M', size: '4M', colors: ['anthracite', 'white'], pricePLN: 2310, priceEUR: 563, image: '/images/models/pergola-luxe/markiza-manual.jpg', description: 'Manuelle Seitenmarkise mit Handkurbel' },
+
+    // === PANELE ZALUZJOWE NIERUCHOME (Feste Lamellenwand) ===
+    // 862.80 PLN * 1.1 = 949 PLN / 4.1 = 231 EUR
+    { id: 'panel-fix-3m', type: 'panel_nieruchomy', namePL: 'Panel zaluzjowy nieruchomy 3M', nameDE: 'Feste Lamellenwand 3M', size: '3M', colors: ['anthracite', 'white', 'wood'], pricePLN: 949, priceEUR: 231, image: '/images/models/pergola-luxe/panel-louver.jpg', description: 'Feststehende Aluminium-Lamellenwand' },
+    // 1236.48 PLN * 1.1 = 1360 PLN / 4.1 = 332 EUR
+    { id: 'panel-fix-4m', type: 'panel_nieruchomy', namePL: 'Panel zaluzjowy nieruchomy 4M', nameDE: 'Feste Lamellenwand 4M', size: '4M', colors: ['anthracite', 'white', 'wood'], pricePLN: 1360, priceEUR: 332, image: '/images/models/pergola-luxe/panel-louver.jpg', description: 'Feststehende Aluminium-Lamellenwand' },
+
+    // === PANELE ZALUZJOWE RUCHOME (Bewegliche Lamellenwand) ===
+    // 1126.32 PLN * 1.1 = 1239 PLN / 4.1 = 302 EUR
+    { id: 'panel-mov-3m', type: 'panel_ruchomy', namePL: 'Panel zaluzjowy ruchomy 3M', nameDE: 'Bewegliche Lamellenwand 3M', size: '3M', colors: ['anthracite', 'white', 'wood'], pricePLN: 1239, priceEUR: 302, image: '/images/models/pergola-luxe/panel-louver.jpg', description: 'Verschiebbare Lamellenwand mit Laufschiene' },
+    // 1421.05 PLN * 1.1 = 1563 PLN / 4.1 = 381 EUR
+    { id: 'panel-mov-4m', type: 'panel_ruchomy', namePL: 'Panel zaluzjowy ruchomy 4M', nameDE: 'Bewegliche Lamellenwand 4M', size: '4M', colors: ['anthracite', 'white', 'wood'], pricePLN: 1563, priceEUR: 381, image: '/images/models/pergola-luxe/panel-louver.jpg', description: 'Verschiebbare Lamellenwand mit Laufschiene' },
+
+    // === DRZWI PRZESUWNE SZKLANE (Glas-Schiebetueren) ===
+    // 3842.11 PLN * 1.1 = 4226 PLN / 4.1 = 1031 EUR
+    { id: 'glass-door-3m', type: 'drzwi_szklane', namePL: 'Drzwi szklane przesuwne 3M', nameDE: 'Glas-Schiebewand 3M', size: '3M', colors: ['anthracite', 'white', 'wood'], pricePLN: 4226, priceEUR: 1031, image: '/images/models/pergola-luxe/glass-doors.jpg', description: 'Schiebbare Glaswand, gehaertetes Sicherheitsglas' },
+    // 4736.84 PLN * 1.1 = 5211 PLN / 4.1 = 1271 EUR
+    { id: 'glass-door-4m', type: 'drzwi_szklane', namePL: 'Drzwi szklane przesuwne 4M', nameDE: 'Glas-Schiebewand 4M', size: '4M', colors: ['anthracite', 'white', 'wood'], pricePLN: 5211, priceEUR: 1271, image: '/images/models/pergola-luxe/glass-doors.jpg', description: 'Schiebbare Glaswand, gehaertetes Sicherheitsglas' },
+
+    // === DRZWI PRZESUWNE ZALUZJOWE (Lamellen-Schiebetueren) ===
+    // 4421.05 PLN * 1.1 = 4863 PLN / 4.1 = 1186 EUR
+    { id: 'louver-door-3m', type: 'drzwi_zaluzjowe', namePL: 'Drzwi przesuwne zaluzjowe 270x238', nameDE: 'Lamellen-Schiebetuer 270x238', size: '3M', colors: ['anthracite'], pricePLN: 4863, priceEUR: 1186, image: '/images/models/pergola-luxe/panel-louver.jpg', description: 'Verschiebbare Lamellentuer aus Aluminium' },
+];
+
 // ======= HELPER: Build table name =======
 // LEGACY format: Aluxe V2 - {Model} {Cover} (Zone {X})
 // NEW format (from migration): {DbModel} - Zone {X} - {subtype}
 // TERANDA format: Teranda - {Model} {Cover} (Zone 1)
-function buildTableName(model: string, cover: CoverType, zone: number, construction: ConstructionType): string {
+function buildTableName(model: string, cover: CoverType, zone: number, construction: ConstructionType, pergolaLuxeVariant?: string): string {
+    if (isPergolaLuxeModel(model)) {
+        // Pergola Luxe uses dedicated table names per variant
+        if (model === 'Pergola Luxe Electric') {
+            return pergolaLuxeVariant === 'wood' ? 'Pergola Luxe - Electric Wood' : 'Pergola Luxe - Electric';
+        }
+        // Manual variants
+        if (pergolaLuxeVariant === 'wood') return 'Pergola Luxe - Manual Wood LED';
+        if (pergolaLuxeVariant === 'led') return 'Pergola Luxe - Manual LED';
+        return 'Pergola Luxe - Manual Standard';
+    }
     if (isTerandaModel(model)) {
         const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
         return `Teranda - ${model} ${coverName} (Zone 2)`;
@@ -679,11 +785,13 @@ function buildSurchargeTableName(model: string, cover: CoverType, zone: number, 
 }
 
 // ======= HELPER: Try multiple table name formats =======
-async function findPriceTable(supabase: any, model: string, cover: CoverType, zone: number, construction: ConstructionType): Promise<{ id: string; name: string } | null> {
+async function findPriceTable(supabase: any, model: string, cover: CoverType, zone: number, construction: ConstructionType, pergolaLuxeVariant?: string): Promise<{ id: string; name: string } | null> {
     const isNoCoverModel = model === 'Skyline' || model === 'Carport';
     const formats: string[] = [];
 
-    if (isTerandaModel(model)) {
+    if (isPergolaLuxeModel(model)) {
+        formats.push(buildTableName(model, cover, zone, construction, pergolaLuxeVariant));
+    } else if (isTerandaModel(model)) {
         formats.push(buildTableName(model, cover, zone, construction));
     } else if (isNoCoverModel) {
         formats.push(buildTableName(model, cover, zone, construction));
@@ -703,7 +811,11 @@ async function findPriceTable(supabase: any, model: string, cover: CoverType, zo
     }
 
     // Fallback: fuzzy match
-    if (isTerandaModel(model)) {
+    if (isPergolaLuxeModel(model)) {
+        const { data: fuzzy } = await supabase.from('price_tables').select('id, name')
+            .ilike('name', `%Pergola Luxe%`).eq('is_active', true).limit(1);
+        if (fuzzy && fuzzy.length > 0) return fuzzy[0];
+    } else if (isTerandaModel(model)) {
         const coverName = cover === 'Poly' ? 'Poly' : 'Glass';
         const { data: fuzzy } = await supabase.from('price_tables').select('id, name')
             .ilike('name', `%Teranda%${model}%${coverName}%`).eq('is_active', true).limit(1);
@@ -763,6 +875,19 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [polyVariant, setPolyVariant] = useState<string>('opal');
     const [sonderfarben, setSonderfarben] = useState<boolean>(false); // Special color +20% surcharge
 
+    // === PERGOLA LUXE SPECIFIC ===
+    const [pergolaLuxeColor, setPergolaLuxeColor] = useState<string>('anthracite');
+    const [pergolaLuxeLed, setPergolaLuxeLed] = useState<boolean>(false);
+    // Pergola Luxe accessory quantities { [accessoryId]: qty }
+    const [pergolaLuxeAccQty, setPergolaLuxeAccQty] = useState<Record<string, number>>({});
+    // Pergola Luxe variant for price table lookup
+    const pergolaLuxeVariant = useMemo(() => {
+        if (!isPergolaLuxeModel(model)) return undefined;
+        if (pergolaLuxeColor === 'wood') return 'wood';
+        if (model === 'Pergola Luxe' && pergolaLuxeLed) return 'led';
+        return undefined; // standard
+    }, [model, pergolaLuxeColor, pergolaLuxeLed]);
+
     // Reset variant to valid options when switching between Aluxe ↔ Teranda
     useEffect(() => {
         if (isTerandaModel(model)) {
@@ -802,6 +927,9 @@ export const ProductConfiguratorV2: React.FC = () => {
         'TR10': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 100, label: 'Orangestyle 10', hint: 'Einstiegsprofil, VSG 44.2' },
         'TR15': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 120, label: 'Trendstyle 15', hint: 'Standard Profil, VSG 44.2' },
         'TR20': { defaultH3: 2200, defaultH1: 2650, needsH1: true, needsH3: true, needsOverhang: false, postWidth: 140, label: 'Topstyle 20', hint: 'Premium Profil, VSG 55.2' },
+        // Pergola Luxe — simplified (no slope, fixed height 230cm)
+        'Pergola Luxe': { defaultH3: 2300, defaultH1: 2300, needsH1: false, needsH3: false, needsOverhang: false, postWidth: 100, label: 'Pergola Luxe', hint: 'Bioklimatische Pergola, Lamellen drehbar' },
+        'Pergola Luxe Electric': { defaultH3: 2300, defaultH1: 2300, needsH1: false, needsH3: false, needsOverhang: false, postWidth: 100, label: 'Pergola Luxe Electric', hint: 'Bioklimatische Pergola, motorisiert + LED' },
     };
     const modelDrConfig = MODEL_DACHRECHNER_CONFIG[model] || MODEL_DACHRECHNER_CONFIG['Topline'];
 
@@ -1479,7 +1607,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     return;
                 }
 
-                const table = await findPriceTable(supabase, model, cover, zone, construction);
+                const table = await findPriceTable(supabase, model, cover, zone, construction, pergolaLuxeVariant);
 
                 if (table) {
                     // Posts count depends primarily on width — find nearest width ≤ user's width
@@ -1601,7 +1729,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
             try {
                 // 1. Fetch BASE Price
-                let tableName = buildTableName(model, cover, zone, construction);
+                let tableName = buildTableName(model, cover, zone, construction, pergolaLuxeVariant);
                 // IF Freestanding AND (Trendline OR Topline), we use the WALL table for base price
                 // and add surcharge separately.
                 // UNLESS logical "Freestanding" tables exist for other models (Skyline/Carport) which usually do.
@@ -1618,7 +1746,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                 const effectiveConstruction = (construction === 'freestanding' && isSurchargeModel) ? 'wall' : construction;
 
                 // Use the new findPriceTable helper that tries multiple naming formats
-                let table = await findPriceTable(supabase, model, cover, zone, effectiveConstruction);
+                let table = await findPriceTable(supabase, model, cover, zone, effectiveConstruction, pergolaLuxeVariant);
 
                 if (!table) {
                     // For Skyline/Carport: if freestanding table not found, DON'T fallback to wall
@@ -1626,7 +1754,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     const isNoCoverModel = model === 'Skyline' || model === 'Carport';
                     if (!isNoCoverModel && construction === 'freestanding' && !isSurchargeModel) {
                         // Only for regular models with surcharge approach, try wall table
-                        table = await findPriceTable(supabase, model, cover, zone, 'wall');
+                        table = await findPriceTable(supabase, model, cover, zone, 'wall', pergolaLuxeVariant);
                     }
                 }
 
@@ -1673,7 +1801,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                 const combinedResult = await PricingService.calculateCombinedPrice(table.id, width, projection);
 
                 if (combinedResult !== null) {
-                    setPrice(combinedResult.totalPrice);
+                    // Pergola Luxe prices are stored in PLN (from Mirpol) — convert to EUR
+                    const rawPrice = combinedResult.totalPrice;
+                    const finalPrice = isPergolaLuxeModel(model) ? Math.round(rawPrice / 4.1) : rawPrice;
+                    setPrice(finalPrice);
                     setStructureCount(combinedResult.structureCount);
                     setStructureNote(combinedResult.note);
                 } else {
@@ -1854,7 +1985,7 @@ export const ProductConfiguratorV2: React.FC = () => {
         };
         const t = setTimeout(fetchPrice, 300);
         return () => clearTimeout(t);
-    }, [model, cover, zone, construction, width, projection, includeFoundations, glassVariant, polyVariant, sonderfarben]);
+    }, [model, cover, zone, construction, width, projection, includeFoundations, glassVariant, polyVariant, sonderfarben, pergolaLuxeVariant]);
 
     // === FETCH WPC PRICE PER M² ===
     useEffect(() => {
@@ -1957,10 +2088,12 @@ export const ProductConfiguratorV2: React.FC = () => {
     // === MATERIAL BOM (physical materials: glass/poly panels, rafters, accessories) ===
     const materialBOM = useMemo(() => {
         if (!price || !structuralMetadata?.fields_count) return null;
-        // Skyline/Carport/Pergola/Teranda don't have standard BOM logic
+        // Skyline/Carport/Pergola/Teranda/Pergola Luxe don't have standard BOM logic
         // Teranda prices from Excel are complete (includes materials)
+        // Pergola Luxe prices from Mirpol are fixed per dimension (all-inclusive)
         if (['Skyline', 'Carport', 'Pergola', 'Pergola Deluxe'].includes(model)) return null;
         if (isTerandaModel(model)) return null;
+        if (isPergolaLuxeModel(model)) return null;
         return calculateRoofMaterialCost(
             model, cover, width, projection,
             structuralMetadata.fields_count,
@@ -1992,22 +2125,60 @@ export const ProductConfiguratorV2: React.FC = () => {
 
     const handleAddRoofToBasket = () => {
         if (!totalPrice) return;
-        const glassVarList = isTerandaModel(model) ? TERANDA_GLASS_VARIANTS : GLASS_VARIANTS;
-        const polyVarList = isTerandaModel(model) ? TERANDA_POLY_VARIANTS : POLY_VARIANTS;
-        const variantName = cover === 'Glass'
-            ? glassVarList.find(v => v.id === glassVariant)?.name || glassVariant
-            : polyVarList.find(v => v.id === polyVariant)?.name || polyVariant;
-        const displayZone = isTerandaModel(model) ? 2 : zone;
-        const configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${displayZone}, ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}` +
-            (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
-            (construction === 'freestanding' && includeFoundations ? ' + Fundamente' : '') +
-            (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
-            (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}× (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
-            (extraPosts > 0 ? ` | Zusatzpfosten: ${extraPosts}× ${extraPostHeight}mm (+${formatCurrency(extraPostTotalPrice)})` : '') +
-            (materialBOM ? ` | Material: +${formatCurrency(materialBOM.total)}` : '') +
-            (structureNote ? ` (${structureNote})` : '');
+
+        let configStr: string;
+        
+        if (isPergolaLuxeModel(model)) {
+            // Pergola Luxe detailed config string for German offer
+            const colorName = PERGOLA_LUXE_COLORS.find(c => c.id === pergolaLuxeColor)?.name || pergolaLuxeColor;
+            if (model === 'Pergola Luxe Electric') {
+                configStr = `Bioklimatische Pergola (elektrisch), Motorisierte Lamellen mit Fernbedienung (Somfy Motor), integrierte LED-Beleuchtung, Aluminium-Konstruktion 100x100mm, ${colorName}, Freistehend`;
+            } else {
+                const ledStr = pergolaLuxeLed ? ', LED-Beleuchtung integriert' : '';
+                configStr = `Bioklimatische Pergola (manuell), Manuell verstellbare Lamellen, Aluminium-Konstruktion 100x100mm${ledStr}, ${colorName}, Freistehend`;
+            }
+            if (structureNote) configStr += ` (${structureNote})`;
+        } else {
+            const glassVarList = isTerandaModel(model) ? TERANDA_GLASS_VARIANTS : GLASS_VARIANTS;
+            const polyVarList = isTerandaModel(model) ? TERANDA_POLY_VARIANTS : POLY_VARIANTS;
+            const variantName = cover === 'Glass'
+                ? glassVarList.find(v => v.id === glassVariant)?.name || glassVariant
+                : polyVarList.find(v => v.id === polyVariant)?.name || polyVariant;
+            const displayZone = isTerandaModel(model) ? 2 : zone;
+            configStr = `${cover} (${variantName})${variantSurchargePrice > 0 ? ` +${formatCurrency(variantSurchargePrice)}` : ''}, Zone ${displayZone}, ${construction === 'wall' ? 'Wandmontage' : 'Freistehend'}` +
+                (freestandingSurchargePrice > 0 ? ` (+${formatCurrency(freestandingSurchargePrice)})` : '') +
+                (construction === 'freestanding' && includeFoundations ? ' + Fundamente' : '') +
+                (sonderfarben ? ` | Sonderfarben +20% (+${formatCurrency(sonderfarbenSurcharge)})` : '') +
+                (schiebeeinheitCount > 0 ? ` | Schiebeeinheit: ${schiebeeinheitCount}x (+${formatCurrency(schiebeeinheitTotalPrice)})` : '') +
+                (extraPosts > 0 ? ` | Zusatzpfosten: ${extraPosts}x ${extraPostHeight}mm (+${formatCurrency(extraPostTotalPrice)})` : '') +
+                (materialBOM ? ` | Material: +${formatCurrency(materialBOM.total)}` : '') +
+                (structureNote ? ` (${structureNote})` : '');
+        }
         const roofDisplayName = ROOF_MODELS.find(m => m.id === model)?.name || model;
-        addToBasket(roofDisplayName, totalPrice, configStr, `${width}×${projection}mm`, 'roof');
+        addToBasket(roofDisplayName, totalPrice, configStr, `${width}x${projection}mm`, 'roof');
+
+        // Auto-add selected Pergola Luxe accessories as separate basket items
+        if (isPergolaLuxeModel(model)) {
+            const accItems = Object.entries(pergolaLuxeAccQty)
+                .filter(([_, qty]) => qty > 0)
+                .map(([accId, qty]) => {
+                    const acc = PERGOLA_LUXE_ACCESSORIES.find(a => a.id === accId)!;
+                    return {
+                        id: crypto.randomUUID(),
+                        category: 'accessory' as const,
+                        name: acc.nameDE,
+                        config: `${qty} x ${formatCurrency(acc.priceEUR)} (${acc.description})`,
+                        dimensions: acc.size,
+                        price: acc.priceEUR * qty,
+                        quantity: qty
+                    };
+                });
+            if (accItems.length > 0) {
+                setBasket(prev => [...prev, ...accItems]);
+            }
+            // Reset accessory quantities
+            setPergolaLuxeAccQty({});
+        }
     };
 
     const handleAddAccessoryBatch = () => {
@@ -2124,7 +2295,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             return null;
         }
         // Validation using customerState
-        if (!customerState || (!customerState.name && !customerState.lastName)) {
+        if (!customerState || (!customerState.name && !customerState.lastName && !customerState.firstName)) {
             toast.error('Kundendaten fehlen');
             return null;
         }
@@ -3464,44 +3635,85 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {/* STEP 0: MODEL */}
                         {activeStep === 0 && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">{IC.roof('w-7 h-7')}</span> Wybierz Model
-                                </h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {ROOF_MODELS.map((m, idx) => (
-                                        <React.Fragment key={m.id}>
-                                            {/* Visual separator before extended model line */}
-                                            {isTerandaModel(m.id) && !isTerandaModel(ROOF_MODELS[idx - 1]?.id) && (
-                                                <div className="col-span-full my-2">
-                                                    <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-                                                </div>
-                                            )}
+                            <div className="space-y-6">
+                                {/* Terrassenüberdachungen */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                    <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                        <span className="text-2xl">{IC.roof('w-7 h-7')}</span> Terrassenüberdachung
+                                    </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {ROOF_MODELS.filter(m => !isPergolaLuxeModel(m.id)).map((m, idx, filtered) => (
+                                            <React.Fragment key={m.id}>
+                                                {/* Visual separator before Teranda line */}
+                                                {isTerandaModel(m.id) && !isTerandaModel(filtered[idx - 1]?.id) && (
+                                                    <div className="col-span-full my-2">
+                                                        <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+                                                    </div>
+                                                )}
+                                                <button
+                                                    onClick={() => setModel(m.id)}
+                                                    className={`relative p-5 rounded-xl border-2 text-left transition-all hover:shadow-md ${model === m.id
+                                                        ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
+                                                        : isTerandaModel(m.id)
+                                                            ? 'border-orange-100 hover:border-orange-300 bg-orange-50/30'
+                                                            : 'border-slate-100 hover:border-indigo-200 bg-white'
+                                                        }`}
+                                                >
+                                                    <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
+                                                    <p className="text-xs text-slate-500 mt-1 mb-3">{m.description}</p>
+                                                    <div className="flex gap-1 flex-wrap">
+                                                        {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
+                                                        {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
+                                                        {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Freistehend</span>}
+                                                    </div>
+                                                    {model === m.id && (
+                                                        <div className="absolute top-3 right-3 text-indigo-600">
+                                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Pergola Luxe — separate section */}
+                                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl shadow-sm border border-emerald-200 p-6">
+                                    <h2 className="text-xl font-bold text-emerald-900 mb-2 flex items-center gap-2">
+                                        <span className="text-2xl">🌿</span> Pergola Luxe
+                                    </h2>
+                                    <p className="text-sm text-emerald-700 mb-5">Bioklimatische Pergola mit drehbaren Lamellen • Komplettsystem</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {ROOF_MODELS.filter(m => isPergolaLuxeModel(m.id)).map(m => (
                                             <button
+                                                key={m.id}
                                                 onClick={() => setModel(m.id)}
                                                 className={`relative p-5 rounded-xl border-2 text-left transition-all hover:shadow-md ${model === m.id
-                                                    ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
-                                                    : isTerandaModel(m.id)
-                                                        ? 'border-orange-100 hover:border-orange-300 bg-orange-50/30'
-                                                        : 'border-slate-100 hover:border-indigo-200 bg-white'
+                                                    ? 'border-emerald-600 bg-emerald-100 ring-2 ring-emerald-300'
+                                                    : 'border-emerald-100 hover:border-emerald-300 bg-white'
                                                     }`}
                                             >
-                                                {/* badge removed */}
-                                                <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
-                                                <p className="text-xs text-slate-500 mt-1 mb-3">{m.description}</p>
-                                                <div className="flex gap-1 flex-wrap">
-                                                    {m.hasPoly && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Poly</span>}
-                                                    {m.hasGlass && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-[10px] font-bold rounded-full">Glass</span>}
-                                                    {m.hasFreestanding && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Freistehend</span>}
+                                                <div className="flex gap-4 items-center">
+                                                    <img src={m.image_url} alt={m.name} className="w-20 h-20 rounded-xl object-cover border border-emerald-200 shadow-sm" />
+                                                    <div className="flex-1">
+                                                        <h3 className="text-lg font-bold text-slate-900">{m.name}</h3>
+                                                        <p className="text-xs text-slate-500 mt-1 mb-2">{m.description}</p>
+                                                        <div className="flex gap-1 flex-wrap">
+                                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">Freistehend</span>
+                                                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-[10px] font-bold rounded-full">Lamellen</span>
+                                                            {m.id === 'Pergola Luxe Electric' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full">Motor + LED</span>}
+                                                            {m.id === 'Pergola Luxe' && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full">Manuell</span>}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 {model === m.id && (
-                                                    <div className="absolute top-3 right-3 text-indigo-600">
+                                                    <div className="absolute top-3 right-3 text-emerald-600">
                                                         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                                                     </div>
                                                 )}
                                             </button>
-                                        </React.Fragment>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -3510,9 +3722,60 @@ export const ProductConfiguratorV2: React.FC = () => {
                         {activeStep === 1 && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">{IC.ruler('w-7 h-7')}</span> Wymiary i Konstrukcja
+                                    <span className="text-2xl">{IC.ruler('w-7 h-7')}</span> {isPergolaLuxeModel(model) ? 'Größe wählen' : 'Wymiary i Konstrukcja'}
                                 </h2>
 
+                                {/* PERGOLA LUXE: Fixed-size tile selector */}
+                                {isPergolaLuxeModel(model) ? (
+                                    <div>
+                                        <p className="text-sm text-slate-500 mb-4">
+                                            Wählen Sie die gewünschte Größe — Pergola Luxe ist ein Komplettsystem mit festen Abmessungen.
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                            {(PERGOLA_LUXE_SIZES[model] || []).map(size => {
+                                                const isSelected = width === size.width && projection === size.depth;
+                                                const area = ((size.width / 1000) * (size.depth / 1000)).toFixed(1);
+                                                return (
+                                                    <button
+                                                        key={`${size.width}x${size.depth}`}
+                                                        onClick={() => { setWidth(size.width); setProjection(size.depth); }}
+                                                        className={`relative p-4 rounded-xl border-2 text-center transition-all hover:shadow-md ${isSelected
+                                                            ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200 shadow-md'
+                                                            : 'border-slate-200 bg-white hover:border-emerald-300'
+                                                            }`}
+                                                    >
+                                                        <div className={`text-lg font-black ${isSelected ? 'text-emerald-700' : 'text-slate-800'}`}>
+                                                            {size.label}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-400 mt-1">
+                                                            {size.width} × {size.depth} mm
+                                                        </div>
+                                                        <div className={`text-xs font-bold mt-1.5 ${isSelected ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                                            {area} m²
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="absolute top-2 right-2 text-emerald-600">
+                                                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Selected size summary */}
+                                        {width > 0 && projection > 0 && (
+                                            <div className="mt-5 bg-emerald-50 rounded-xl border border-emerald-200 p-4 flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 text-xl font-bold">📐</div>
+                                                <div>
+                                                    <p className="font-bold text-emerald-800">Ausgewählt: {(width / 1000).toFixed(1)} × {(projection / 1000).toFixed(1)} m</p>
+                                                    <p className="text-xs text-emerald-600">Fläche: {((width / 1000) * (projection / 1000)).toFixed(1)} m² • Höhe: 2.300 mm (Standard)</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                /* STANDARD: Slider-based dimension selection */
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                                     {/* Width */}
                                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
@@ -3620,264 +3883,205 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+                                )}
 
-                                {/* Model Info Badge + Dachrechner Results */}
-                                <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">{IC.compass('w-4 h-4')} {modelDrConfig.label} – Dachrechner</h5>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">Pfosten: {modelDrConfig.postWidth}mm</span>
-                                            {modelDrConfig.fixedAngle && (
-                                                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">α = {modelDrConfig.fixedAngle}° (fest)</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <p className="text-[11px] text-blue-600 mb-3 italic">{modelDrConfig.hint}</p>
-
-                                    {dachrechnerResults ? (
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                                            {dachrechnerResults.angleAlpha != null && (
-                                                <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">α Neigung</span>
-                                                    <span className="font-bold text-blue-900 text-sm">{dachrechnerResults.angleAlpha.toFixed(1)}°</span>
-                                                </div>
-                                            )}
-                                            {dachrechnerResults.inclinationMmM != null && (
-                                                <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">Gefälle</span>
-                                                    <span className="font-bold text-blue-900 text-sm">{dachrechnerResults.inclinationMmM.toFixed(0)} mm/m</span>
-                                                </div>
-                                            )}
-                                            {dachrechnerResults.heightH2 != null && (
-                                                <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">H2 Oberkante</span>
-                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.heightH2)} mm</span>
-                                                </div>
-                                            )}
-                                            {dachrechnerResults.fensterF2 != null && (
-                                                <div className="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-200">
-                                                    <span className="block text-emerald-600 uppercase text-[9px] font-bold">Fensterbreite</span>
-                                                    <span className="font-bold text-emerald-900">{Math.round(dachrechnerResults.fensterF2)} mm</span>
-                                                </div>
-                                            )}
-                                            {dachrechnerResults.depthD2 != null && (
-                                                <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">D2 + Rinne</span>
-                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.depthD2)} mm</span>
-                                                </div>
-                                            )}
-                                            {dachrechnerResults.sparrenMitte != null && (
-                                                <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">Sparren Mitte</span>
-                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.sparrenMitte)} mm</span>
-                                                </div>
-                                            )}
-                                            {dachrechnerResults.sparrenAussen != null && (
-                                                <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                    <span className="block text-blue-500 uppercase text-[9px] font-bold">Sparren Außen</span>
-                                                    <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.sparrenAussen)} mm</span>
-                                                </div>
-                                            )}
-                                            <div className="bg-white/60 rounded-lg p-2 text-center">
-                                                <span className="block text-blue-500 uppercase text-[9px] font-bold">Pfostenbreite</span>
-                                                <span className="font-bold text-blue-900">{modelDrConfig.postWidth} mm</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-xs text-blue-400 py-4">
-                                            Bitte Maße eingeben um Berechnung zu starten...
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Structural Info Panel + Zusatzpfosten */}
-                                {structuralMetadata && (
-                                    <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4">
-                                        <h5 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-3">
-                                            <span className="inline-flex items-center gap-1.5">{IC.build('w-4 h-4')} Konstruktionsdaten</span>
-                                        </h5>
-
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
-                                            {/* Posts in price */}
-                                            <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
-                                                <span className="block text-amber-600 uppercase text-[9px] font-bold">Pfosten (im Preis)</span>
-                                                <span className="font-black text-amber-900 text-lg">{structuralMetadata.posts_count}</span>
-                                            </div>
-                                            {/* Fields */}
-                                            {structuralMetadata.fields_count > 0 && (
-                                                <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
-                                                    <span className="block text-amber-600 uppercase text-[9px] font-bold">Felder</span>
-                                                    <span className="font-black text-amber-900 text-lg">{structuralMetadata.fields_count}</span>
-                                                </div>
-                                            )}
-                                            {/* Rafter type */}
-                                            {structuralMetadata.rafter_type && (
-                                                <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
-                                                    <span className="block text-amber-600 uppercase text-[9px] font-bold">Sparrentyp</span>
-                                                    <span className="font-bold text-amber-900 text-sm">{structuralMetadata.rafter_type}</span>
-                                                </div>
-                                            )}
-                                            {/* Inner width per segment */}
-                                            {dachrechnerResults?.innerWidth != null && (
-                                                <div className="bg-emerald-50 rounded-lg p-2.5 text-center border border-emerald-200">
-                                                    <span className="block text-emerald-600 uppercase text-[9px] font-bold">Breite/Segment</span>
-                                                    <span className="font-black text-emerald-900 text-lg">{Math.round(dachrechnerResults.innerWidth)}</span>
-                                                    <span className="text-emerald-600 text-[10px] ml-0.5">mm</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Zusatzpfosten control — Aluxe only (Teranda prices are all-inclusive) */}
-                                        {!isTerandaModel(model) && <div className="bg-white/80 rounded-xl p-3 border border-amber-200">
-                                            <div className="flex items-center justify-between flex-wrap gap-3">
+                                {/* Dachrechner, Construction -- NOT for Pergola Luxe (fixed-size products) */}
+                                {!isPergolaLuxeModel(model) && (
+                                    <>
+                                        {/* Model Info Badge + Dachrechner Results */}
+                                        <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-sm font-bold text-blue-800 flex items-center gap-2">{IC.compass('w-4 h-4')} {modelDrConfig.label} – Dachrechner</h5>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold text-slate-700 inline-flex items-center gap-1">{IC.build('w-4 h-4')} Zusatzpfosten</span>
-                                                    <span className="text-[10px] text-slate-400">(zusätzliche Pfosten)</span>
-                                                </div>
-
-                                                <div className="flex items-center gap-3">
-                                                    {/* Height selector */}
-                                                    <div className="flex gap-1">
-                                                        {([2400, 3000] as const).map(h => (
-                                                            <button
-                                                                key={h}
-                                                                onClick={() => setExtraPostHeight(h)}
-                                                                className={`px-2 py-1 text-xs rounded-lg border font-bold transition-all ${extraPostHeight === h
-                                                                    ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
-                                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
-                                                                    }`}
-                                                            >
-                                                                {h}mm
-                                                            </button>
-                                                        ))}
-                                                    </div>
-
-                                                    {/* +/- control */}
-                                                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
-                                                        <button
-                                                            onClick={() => setExtraPosts(p => Math.max(0, p - 1))}
-                                                            disabled={extraPosts === 0}
-                                                            className="w-8 h-8 rounded-lg bg-white shadow-sm font-bold text-lg text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-30"
-                                                        >−</button>
-                                                        <span className="w-8 text-center font-black text-lg text-slate-800">{extraPosts}</span>
-                                                        <button
-                                                            onClick={() => setExtraPosts(p => p + 1)}
-                                                            className="w-8 h-8 rounded-lg bg-white shadow-sm font-bold text-lg text-slate-600 hover:bg-green-50 hover:text-green-600 transition-colors"
-                                                        >+</button>
-                                                    </div>
+                                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">Pfosten: {modelDrConfig.postWidth}mm</span>
+                                                    {modelDrConfig.fixedAngle && (
+                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">α = {modelDrConfig.fixedAngle}° (fest)</span>
+                                                    )}
                                                 </div>
                                             </div>
+                                            <p className="text-[11px] text-blue-600 mb-3 italic">{modelDrConfig.hint}</p>
 
-                                            {/* Price info */}
-                                            <div className="mt-2 flex items-center justify-between text-xs flex-wrap gap-1">
-                                                <span className="text-slate-500">
-                                                    {extraPosts > 0 && <>{formatCurrency(EXTRA_POST_BASE_PRICE)} / Zusatzpfosten</>}
-                                                    {extraPostHeight === 3000 && (
-                                                        <span className="text-amber-600 ml-1">
-                                                            {extraPosts > 0 && ' + '}+{formatCurrency(EXTRA_POST_3000_SURCHARGE)}/Pfosten für 3000mm ({totalPostCount} Pfosten × {formatCurrency(EXTRA_POST_3000_SURCHARGE)} = {formatCurrency(heightSurcharge)})
-                                                        </span>
+                                            {dachrechnerResults ? (
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                                    {dachrechnerResults.angleAlpha != null && (
+                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">α Neigung</span>
+                                                            <span className="font-bold text-blue-900 text-sm">{dachrechnerResults.angleAlpha.toFixed(1)}°</span>
+                                                        </div>
                                                     )}
-                                                </span>
-                                                {extraPostTotalPrice > 0 && (
-                                                    <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                                                        Σ {formatCurrency(extraPostTotalPrice)}
-                                                    </span>
+                                                    {dachrechnerResults.inclinationMmM != null && (
+                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">Gefälle</span>
+                                                            <span className="font-bold text-blue-900 text-sm">{dachrechnerResults.inclinationMmM.toFixed(0)} mm/m</span>
+                                                        </div>
+                                                    )}
+                                                    {dachrechnerResults.heightH2 != null && (
+                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">H2 Oberkante</span>
+                                                            <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.heightH2)} mm</span>
+                                                        </div>
+                                                    )}
+                                                    {dachrechnerResults.fensterF2 != null && (
+                                                        <div className="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-200">
+                                                            <span className="block text-emerald-600 uppercase text-[9px] font-bold">Fensterbreite</span>
+                                                            <span className="font-bold text-emerald-900">{Math.round(dachrechnerResults.fensterF2)} mm</span>
+                                                        </div>
+                                                    )}
+                                                    {dachrechnerResults.depthD2 != null && (
+                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">D2 + Rinne</span>
+                                                            <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.depthD2)} mm</span>
+                                                        </div>
+                                                    )}
+                                                    {dachrechnerResults.sparrenMitte != null && (
+                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">Sparren Mitte</span>
+                                                            <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.sparrenMitte)} mm</span>
+                                                        </div>
+                                                    )}
+                                                    {dachrechnerResults.sparrenAussen != null && (
+                                                        <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                            <span className="block text-blue-500 uppercase text-[9px] font-bold">Sparren Außen</span>
+                                                            <span className="font-bold text-blue-900">{Math.round(dachrechnerResults.sparrenAussen)} mm</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="bg-white/60 rounded-lg p-2 text-center">
+                                                        <span className="block text-blue-500 uppercase text-[9px] font-bold">Pfostenbreite</span>
+                                                        <span className="font-bold text-blue-900">{modelDrConfig.postWidth} mm</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center text-xs text-blue-400 py-4">
+                                                    Bitte Maße eingeben um Berechnung zu starten...
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Structural Info Panel + Zusatzpfosten */}
+                                        {structuralMetadata && (
+                                            <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4">
+                                                <h5 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-3">
+                                                    <span className="inline-flex items-center gap-1.5">{IC.build('w-4 h-4')} Konstruktionsdaten</span>
+                                                </h5>
+
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
+                                                    {/* Posts in price */}
+                                                    <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
+                                                        <span className="block text-amber-600 uppercase text-[9px] font-bold">Pfosten (im Preis)</span>
+                                                        <span className="font-black text-amber-900 text-lg">{structuralMetadata.posts_count}</span>
+                                                    </div>
+                                                    {/* Fields */}
+                                                    {structuralMetadata.fields_count > 0 && (
+                                                        <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
+                                                            <span className="block text-amber-600 uppercase text-[9px] font-bold">Felder</span>
+                                                            <span className="font-black text-amber-900 text-lg">{structuralMetadata.fields_count}</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Rafter type */}
+                                                    {structuralMetadata.rafter_type && (
+                                                        <div className="bg-white/70 rounded-lg p-2.5 text-center border border-amber-100">
+                                                            <span className="block text-amber-600 uppercase text-[9px] font-bold">Sparrentyp</span>
+                                                            <span className="font-bold text-amber-900 text-sm">{structuralMetadata.rafter_type}</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Inner width per segment */}
+                                                    {dachrechnerResults?.innerWidth != null && (
+                                                        <div className="bg-emerald-50 rounded-lg p-2.5 text-center border border-emerald-200">
+                                                            <span className="block text-emerald-600 uppercase text-[9px] font-bold">Breite/Segment</span>
+                                                            <span className="font-black text-emerald-900 text-lg">{Math.round(dachrechnerResults.innerWidth)}</span>
+                                                            <span className="text-emerald-600 text-[10px] ml-0.5">mm</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Zusatzpfosten control — Aluxe only */}
+                                                {!isTerandaModel(model) && <div className="bg-white/80 rounded-xl p-3 border border-amber-200">
+                                                    <div className="flex items-center justify-between flex-wrap gap-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-slate-700 inline-flex items-center gap-1">{IC.build('w-4 h-4')} Zusatzpfosten</span>
+                                                            <span className="text-[10px] text-slate-400">(zusätzliche Pfosten)</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex gap-1">
+                                                                {([2400, 3000] as const).map(h => (
+                                                                    <button key={h} onClick={() => setExtraPostHeight(h)} className={`px-2 py-1 text-xs rounded-lg border font-bold transition-all ${extraPostHeight === h ? 'bg-amber-500 text-white border-amber-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'}`}>{h}mm</button>
+                                                                ))}
+                                                            </div>
+                                                            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                                                                <button onClick={() => setExtraPosts(p => Math.max(0, p - 1))} disabled={extraPosts === 0} className="w-8 h-8 rounded-lg bg-white shadow-sm font-bold text-lg text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-30">−</button>
+                                                                <span className="w-8 text-center font-black text-lg text-slate-800">{extraPosts}</span>
+                                                                <button onClick={() => setExtraPosts(p => p + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm font-bold text-lg text-slate-600 hover:bg-green-50 hover:text-green-600 transition-colors">+</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-2 flex items-center justify-between text-xs flex-wrap gap-1">
+                                                        <span className="text-slate-500">
+                                                            {extraPosts > 0 && <>{formatCurrency(EXTRA_POST_BASE_PRICE)} / Zusatzpfosten</>}
+                                                            {extraPostHeight === 3000 && (
+                                                                <span className="text-amber-600 ml-1">
+                                                                    {extraPosts > 0 && ' + '}+{formatCurrency(EXTRA_POST_3000_SURCHARGE)}/Pfosten für 3000mm ({totalPostCount} Pfosten × {formatCurrency(EXTRA_POST_3000_SURCHARGE)} = {formatCurrency(heightSurcharge)})
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        {extraPostTotalPrice > 0 && (
+                                                            <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Σ {formatCurrency(extraPostTotalPrice)}</span>
+                                                        )}
+                                                    </div>
+                                                    {(extraPosts > 0 || extraPostHeight === 3000) && (
+                                                        <div className="mt-2 text-xs bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-emerald-800">
+                                                            <span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} Gesamt: <strong>{totalPostCount} Pfosten</strong></span>
+                                                            {extraPosts > 0 && <> ({structuralMetadata.posts_count} im Preis + {extraPosts} extra)</>}
+                                                            {extraPostHeight === 3000 && <>, Höhe 3000mm</>}
+                                                            {dachrechnerResults?.innerWidth != null && (
+                                                                <span className="ml-2">→ <strong>{Math.round(dachrechnerResults.innerWidth)} mm</strong> pro Segment</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>}
+                                            </div>
+                                        )}
+
+                                        {/* Construction/Zone */}
+                                        <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-bold text-slate-600 mb-3">Montagetyp</label>
+                                                <div className="flex gap-3">
+                                                    {[{ id: 'wall', label: 'Wandmontage', icon: 'wall' }, { id: 'freestanding', label: 'Freistehend', icon: 'freestand' }].map(t => (
+                                                        <button key={t.id} onClick={() => setConstruction(t.id as any)} className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${construction === t.id ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}>
+                                                            {(IC as any)[t.icon]?.('w-5 h-5')} {t.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                {construction === 'freestanding' && (
+                                                    <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                                        <label className="flex items-center gap-3 cursor-pointer">
+                                                            <div className="relative">
+                                                                <input type="checkbox" className="sr-only peer" checked={includeFoundations} onChange={e => setIncludeFoundations(e.target.checked)} />
+                                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                            </div>
+                                                            <span className="text-sm font-medium text-slate-700">Fundamente berücksichtigen</span>
+                                                        </label>
+                                                    </div>
                                                 )}
                                             </div>
-
-                                            {/* Total posts summary */}
-                                            {(extraPosts > 0 || extraPostHeight === 3000) && (
-                                                <div className="mt-2 text-xs bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-emerald-800">
-                                                    <span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} Gesamt: <strong>{totalPostCount} Pfosten</strong></span>
-                                                    {extraPosts > 0 && <> ({structuralMetadata.posts_count} im Preis + {extraPosts} extra)</>}
-                                                    {extraPostHeight === 3000 && <>, Höhe 3000mm</>}
-                                                    {dachrechnerResults?.innerWidth != null && (
-                                                        <span className="ml-2">→ <strong>{Math.round(dachrechnerResults.innerWidth)} mm</strong> pro Segment</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>}
-                                    </div>
-                                )}
-                                <div className="border-t border-slate-100 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Construction Type */}
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-600 mb-3">Montagetyp</label>
-                                        <div className="flex gap-3">
-                                            {[
-                                                { id: 'wall', label: 'Wandmontage', icon: 'wall' },
-                                                { id: 'freestanding', label: 'Freistehend', icon: 'freestand' }
-                                            ].map(t => (
-                                                <button
-                                                    key={t.id}
-                                                    onClick={() => setConstruction(t.id as any)}
-                                                    className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${construction === t.id
-                                                        ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold'
-                                                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                                                        }`}
-                                                >
-                                                    {(IC as any)[t.icon]?.('w-5 h-5')} {t.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {construction === 'freestanding' && (
-                                            <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                                                <label className="flex items-center gap-3 cursor-pointer">
-                                                    <div className="relative">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="sr-only peer"
-                                                            checked={includeFoundations}
-                                                            onChange={e => setIncludeFoundations(e.target.checked)}
-                                                        />
-                                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                                                    </div>
-                                                    <span className="text-sm font-medium text-slate-700">
-                                                        Fundamente berücksichtigen
-                                                        {['Orangeline', 'Orangeline+', 'Trendline', 'Trendline+', 'Topline', 'Topline XL', 'Designline'].includes(model) && (
-                                                            <span className="text-xs text-indigo-600 block font-normal">
-                                                                (Automatischer Aufpreis lt. Preisliste)
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                </label>
+                                            <div>
+                                                <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
+                                                {isTerandaModel(model) ? (
+                                                    <p className="text-xs text-slate-400 italic">Ohne Schneelaststufe (Zone 2 Standard)</p>
+                                                ) : (
+                                                    <>
+                                                        {plzZoneResult && <p className="mb-2 text-xs text-green-600 font-medium flex items-center gap-1"><span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} {plzZoneResult}</span></p>}
+                                                        <div className="flex gap-2">
+                                                            {[1, 2, 3].map(z => (
+                                                                <button key={z} onClick={() => { setZone(z); setPlzZoneResult(null); }} className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${zone === z ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-500'}`}>{z}</button>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-
-                                    {/* Zone */}
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-600 mb-3">Schneelastzone</label>
-                                        {isTerandaModel(model) ? (
-                                            <p className="text-xs text-slate-400 italic">Ohne Schneelaststufe (Zone 2 Standard)</p>
-                                        ) : (
-                                            <>
-                                        {plzZoneResult && (
-                                            <p className="mb-2 text-xs text-green-600 font-medium flex items-center gap-1">
-                                                <span className="inline-flex items-center gap-1">{IC.check('w-4 h-4')} {plzZoneResult}</span>
-                                            </p>
-                                        )}
-                                        <div className="flex gap-2">
-                                            {[1, 2, 3].map(z => (
-                                                <button
-                                                    key={z}
-                                                    onClick={() => {
-                                                        setZone(z);
-                                                        setPlzZoneResult(null);
-                                                    }}
-                                                    className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${zone === z
-                                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                                        : 'border-slate-200 hover:border-slate-300 text-slate-500'
-                                                        }`}
-                                                >
-                                                    {z}
-                                                </button>
-                                            ))}
                                         </div>
-                                        </>
-                                        )}
-                                    </div>
-                                </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -3975,6 +4179,169 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {/* Color */}
                                     <div>
                                         <h3 className="font-bold text-slate-700 mb-4">Farbe</h3>
+
+                                        {/* PERGOLA LUXE COLOR SELECTOR */}
+                                        {isPergolaLuxeModel(model) ? (
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    {PERGOLA_LUXE_COLORS.map(c => (
+                                                        <button
+                                                            key={c.id}
+                                                            onClick={() => setPergolaLuxeColor(c.id)}
+                                                            className={`p-3 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${pergolaLuxeColor === c.id ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'}`}
+                                                        >
+                                                            <img src={c.image} alt={c.name} className="w-full h-20 object-cover rounded-lg" />
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-4 h-4 rounded-full border border-slate-300" style={{ backgroundColor: c.color }} />
+                                                                <span className="text-sm font-bold text-slate-700">{c.name}</span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* LED Toggle (only for manual version) */}
+                                                {model === 'Pergola Luxe' && (
+                                                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                                                        <label className="flex items-center gap-3 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={pergolaLuxeLed}
+                                                                onChange={(e) => setPergolaLuxeLed(e.target.checked)}
+                                                                className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                                                            />
+                                                            <div className="flex-1">
+                                                                <span className="font-bold text-amber-800">💡 LED-Beleuchtung</span>
+                                                                <span className="ml-2 text-sm text-amber-600">(integrierte LED-Spots)</span>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                )}
+                                                {model === 'Pergola Luxe Electric' && (
+                                                    <div className="p-3 bg-green-50 rounded-xl border border-green-200 flex items-center gap-2 text-sm text-green-700">
+                                                        <span>✅</span>
+                                                        <span className="font-bold">LED-Beleuchtung ist bei der Electric-Version inklusive</span>
+                                                    </div>
+                                                )}
+
+                                                {/* ═══ PERGOLA LUXE ACCESSORIES ═══ */}
+                                                {(() => {
+                                                    // Determine which accessory sizes match selected pergola
+                                                    const wM = width >= 1000 ? Math.round(width / 1000) : width;
+                                                    const dM = projection >= 1000 ? Math.round(projection / 1000) : projection;
+                                                    // Sides of pergola: width = front/back, depth = left/right sides
+                                                    // Accessories 3M = fits 3m wall, 4M = fits 4m wall
+                                                    const wallSizes: { size: '3M' | '4M'; label: string }[] = [];
+                                                    // Left/Right sides = depth
+                                                    if (dM === 3) wallSizes.push({ size: '3M', label: 'Seite (3m)' });
+                                                    if (dM === 4) wallSizes.push({ size: '4M', label: 'Seite (4m)' });
+                                                    if (dM === 3.5 || dM === 35) wallSizes.push({ size: '3M', label: 'Seite (~3,5m)' });
+                                                    // Front/Back = width
+                                                    if (wM === 3 && !wallSizes.find(w => w.size === '3M')) wallSizes.push({ size: '3M', label: 'Front/Rueckseite (3m)' });
+                                                    else if (wM === 3 && wallSizes.find(w => w.size === '3M')) { /* same size, already included */ }
+                                                    if (wM === 4 && !wallSizes.find(w => w.size === '4M')) wallSizes.push({ size: '4M', label: 'Front/Rueckseite (4m)' });
+                                                    else if (wM === 4 && wallSizes.find(w => w.size === '4M')) { /* same size, already included */ }
+                                                    // For larger pergolas (5.8m, 7.8m) show 4M as closest fit
+                                                    if (wM >= 5 && !wallSizes.find(w => w.size === '4M')) wallSizes.push({ size: '4M', label: `Front (${(width/1000).toFixed(1)}m)` });
+                                                    // Fallback: if nothing matches, show all
+                                                    const availableSizes = wallSizes.length > 0 ? wallSizes.map(w => w.size) : ['3M' as const, '4M' as const];
+                                                    // Filter by size AND by selected pergola color
+                                                    const selectedColor = pergolaLuxeColor; // 'anthracite' | 'white' | 'wood'
+                                                    const filteredAcc = PERGOLA_LUXE_ACCESSORIES.filter(a => 
+                                                        availableSizes.includes(a.size) && a.colors.includes(selectedColor)
+                                                    );
+                                                    const colorLabel = PERGOLA_LUXE_COLORS.find(c => c.id === selectedColor)?.name || selectedColor;
+
+                                                    const sizeLabel = (size: '3M' | '4M' | 'other') => {
+                                                        const ws = wallSizes.find(w => w.size === size);
+                                                        return ws ? ws.label : size;
+                                                    };
+
+                                                    // Group accessories
+                                                    const groups: { key: string; label: string; icon: string; headingClass: string; priceClass: string; badgeClass: string; borderActive: string; bgActive: string; types: PergolaLuxeAccessoryType[] }[] = [
+                                                        { key: 'markisen', label: 'Markisen (Sonnenschutz)', icon: '🪟', headingClass: 'text-orange-700', priceClass: 'text-orange-600', badgeClass: 'bg-orange-100 text-orange-700', borderActive: 'border-orange-400 bg-orange-50', bgActive: 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100', types: ['markiza_elektryczna', 'markiza_manualna'] },
+                                                        { key: 'lamellen', label: 'Lamellenwande (Sichtschutz)', icon: '🏗️', headingClass: 'text-teal-700', priceClass: 'text-teal-600', badgeClass: 'bg-teal-100 text-teal-700', borderActive: 'border-teal-400 bg-teal-50', bgActive: 'border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100', types: ['panel_nieruchomy', 'panel_ruchomy'] },
+                                                        { key: 'tueren', label: 'Glas- und Lamellentueren', icon: '🚪', headingClass: 'text-blue-700', priceClass: 'text-blue-600', badgeClass: 'bg-blue-100 text-blue-700', borderActive: 'border-blue-400 bg-blue-50', bgActive: 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100', types: ['drzwi_szklane', 'drzwi_zaluzjowe'] },
+                                                    ];
+
+                                                    return (
+                                                        <div className="mt-6 border-t border-emerald-200 pt-6">
+                                                            <h5 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-1">
+                                                                <span className="text-lg">🧩</span> Seitenwande und Zubehoer
+                                                            </h5>
+                                                            <p className="text-xs text-slate-500 mb-4">
+                                                                Passend zu Ihrer Pergola <strong>{(width/1000).toFixed(1)} x {(projection/1000).toFixed(1)} m</strong> in <strong>{colorLabel}</strong> — waehlen Sie Seitenelemente pro Wand.
+                                                            </p>
+
+                                                            {groups.map(group => {
+                                                                const groupItems = filteredAcc.filter(a => group.types.includes(a.type));
+                                                                if (groupItems.length === 0) return null;
+                                                                return (
+                                                                    <div key={group.key} className="mb-5">
+                                                                        <h6 className={`text-sm font-bold ${group.headingClass} flex items-center gap-1.5 mb-2`}>
+                                                                            <span>{group.icon}</span> {group.label}
+                                                                        </h6>
+                                                                        <div className="grid grid-cols-1 gap-2">
+                                                                            {groupItems.map(acc => {
+                                                                                const qty = pergolaLuxeAccQty[acc.id] || 0;
+                                                                                const isActive = qty > 0;
+                                                                                return (
+                                                                                    <div key={acc.id} className={`p-3 rounded-xl border-2 transition-all ${isActive ? group.borderActive : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                                                                                        <div className="flex gap-3 items-center">
+                                                                                            <img src={acc.image} alt={acc.nameDE} className="w-20 h-14 object-cover rounded-lg flex-shrink-0 border border-slate-200" />
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                                                    <p className="text-sm font-bold text-slate-800">{acc.nameDE}</p>
+                                                                                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${group.badgeClass}`}>{sizeLabel(acc.size)}</span>
+                                                                                                </div>
+                                                                                                <p className="text-xs text-slate-500 mt-0.5">{acc.description}</p>
+                                                                                                <p className={`text-sm font-black ${group.priceClass} mt-1`}>{formatCurrency(acc.priceEUR)} / Stueck</p>
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                                                                <button onClick={() => setPergolaLuxeAccQty(prev => ({ ...prev, [acc.id]: Math.max((prev[acc.id] || 0) - 1, 0) }))} className="w-8 h-8 rounded-lg border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-lg font-bold">-</button>
+                                                                                                <span className="w-7 text-center text-sm font-black">{qty}</span>
+                                                                                                <button onClick={() => setPergolaLuxeAccQty(prev => ({ ...prev, [acc.id]: (prev[acc.id] || 0) + 1 }))} className={`w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold ${group.bgActive}`}>+</button>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+
+                                                            {/* Accessories total summary */}
+                                                            {Object.values(pergolaLuxeAccQty).some(q => q > 0) && (
+                                                                <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 mt-3">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="text-sm font-bold text-emerald-800">Zubehoer gesamt:</span>
+                                                                        <span className="text-lg font-black text-emerald-700">
+                                                                            {formatCurrency(Object.entries(pergolaLuxeAccQty).reduce((sum, [accId, qty]) => {
+                                                                                const acc = PERGOLA_LUXE_ACCESSORIES.find(a => a.id === accId);
+                                                                                return sum + (acc ? acc.priceEUR * qty : 0);
+                                                                            }, 0))}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-2 space-y-1">
+                                                                        {Object.entries(pergolaLuxeAccQty).filter(([_, q]) => q > 0).map(([accId, qty]) => {
+                                                                            const acc = PERGOLA_LUXE_ACCESSORIES.find(a => a.id === accId);
+                                                                            if (!acc) return null;
+                                                                            return (
+                                                                                <div key={accId} className="flex justify-between text-xs text-emerald-700">
+                                                                                    <span>{qty}x {acc.nameDE}</span>
+                                                                                    <span className="font-bold">{formatCurrency(acc.priceEUR * qty)}</span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        ) : (
+                                        /* STANDARD RAL COLOR SELECTOR */
                                         <div className="grid grid-cols-2 gap-3">
                                             {['RAL 7016', 'RAL 9016', 'RAL 9005', 'RAL 9007'].map(c => (
                                                 <button
@@ -3990,8 +4357,10 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 </button>
                                             ))}
                                         </div>
+                                        )}
 
-                                        {/* Sonderfarben Option */}
+                                        {/* Sonderfarben Option (not for Pergola Luxe) */}
+                                        {!isPergolaLuxeModel(model) && (
                                         <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
                                             <label className="flex items-center gap-3 cursor-pointer">
                                                 <input
@@ -4014,6 +4383,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 Sonderfarbe RAL auf Anfrage - Lieferzeit +3 Wochen
                                             </p>
                                         </div>
+                                        )}
 
                                         {/* Schiebeeinheit (Sliding Roof) - Designline Only */}
                                         {model === 'Designline' && (

@@ -144,6 +144,14 @@ export const ROOF_MODELS = {
         postWidth: 160,
         inputs: ['h3', 'depth'],
     },
+    'trendline_freistand': {
+        id: 'trendline_freistand',
+        name: 'Trendstyle Freistand',
+        category: 'calculated_angle_freestanding',
+        constants: { profileHeight: 47.5, keilhoehe: 39 },
+        postWidth: 110,
+        inputs: ['h3', 'depth', 'h1'],
+    },
 } as const;
 
 export type RoofModelId = keyof typeof ROOF_MODELS;
@@ -272,6 +280,9 @@ export function calculateDachrechner(
             break;
         case 'carport_freestanding':
             calcCarportFreistand(inputs, results);
+            break;
+        case 'calculated_angle_freestanding':
+            calcTrendlineFamily(modelId, inputs, results);
             break;
     }
 
@@ -425,7 +436,7 @@ function calcTrendlineFamily(modelId: RoofModelId, inputs: DachrechnerInputs, r:
         const cosF = Math.cos(radF);
 
         // Model-specific calculations
-        if (modelId === 'trendline') {
+        if (modelId === 'trendline' || modelId === 'trendline_freistand') {
             // I = COS(F)*J + 78.4 + 20.4 + 33.1
             r.depthD1 = cosF * J + 78.4 + 20.4 + 33.1;
             // L = I + 112
@@ -559,44 +570,62 @@ function calcUltraline(modelId: RoofModelId, inputs: DachrechnerInputs, r: Dachr
     r.overhang = E;
     r.h1 = h1;
 
-    // B = D - 218.5
-    r.h3 = h1 - 218.5;
+    // B = D - 215.8 (Excel exact)
+    r.h3 = h1 - 215.8;
 
     if (modelId === 'ultraline_classic') {
-        // L = C - E
-        r.depthD2 = depth - E;
-        // I = L - 100
-        r.depthD1 = r.depthD2 - 100;
         // J = C - 120
         r.sparrenMitte = depth - 120;
+        const J = r.sparrenMitte;
+
+        // L = J + 100 + 23
+        r.depthD2 = J + 100 + 23;
+
+        // I = L - E - 98
+        r.depthD1 = r.depthD2 - E - 98;
+
+        // O = L - 196
+        r.depthD2alt = r.depthD2 - 196;
+
+        // H = DEGREES(ATAN(155.2 / (J - 66.7)))
+        if (J - 66.7 > 0) {
+            r.angleBeta = toDegrees(Math.atan(155.2 / (J - 66.7)));
+        }
+
+        // Q = L - E
+        r.depthD4post = r.depthD2 - E;
+
+        // R = Q + 200
+        r.depthD5 = r.depthD4post + 200;
     } else {
-        // Style: J = C, L = J
-        r.sparrenMitte = depth;
-        r.depthD2 = depth;
-        // I = J - 100
-        r.depthD1 = depth - 100;
-    }
+        // Ultrastyle Style
+        // J = C - 3
+        r.sparrenMitte = depth - 3;
+        const J = r.sparrenMitte;
 
-    // O = I - 98
-    r.depthD2alt = r.depthD1 - 98;
+        // I = J - 120 + 23
+        r.depthD1 = J - 120 + 23;
 
-    // H = DEGREES(ATAN(155.2 / (O + 60)))
-    if (r.depthD2alt !== null && r.depthD2alt + 60 > 0) {
-        r.angleBeta = toDegrees(Math.atan(155.2 / (r.depthD2alt + 60)));
+        // L = J - 120 + 23 + 100
+        r.depthD2 = J - 120 + 23 + 100;
+
+        // O = J - 120 + 23 - 98
+        r.depthD2alt = J - 120 + 23 - 98;
+
+        // H = DEGREES(ATAN(155.2 / (J - 66.7)))
+        if (J - 66.7 > 0) {
+            r.angleBeta = toDegrees(Math.atan(155.2 / (J - 66.7)));
+        }
+
+        // Q = L - 2
+        r.depthD4post = r.depthD2 - 2;
+
+        // R = Q + 200
+        r.depthD5 = r.depthD4post + 200;
     }
 
     // P = D + 239.5
     r.heightH2 = h1 + 239.5;
-
-    // Q = L - 2 (Classic) or O + 196 (Style)
-    if (modelId === 'ultraline_classic') {
-        r.depthD4post = r.depthD2 - 2;
-    } else {
-        r.depthD4post = r.depthD2alt! + 196;
-    }
-
-    // R = Q + 196
-    r.depthD5 = r.depthD4post + 196;
 
     // S = B + 220
     r.fensterF1 = r.h3! + 220;
@@ -615,32 +644,30 @@ function calcUltralineCompact(inputs: DachrechnerInputs, r: DachrechnerResults):
     const { depth, h1 = 0 } = inputs;
     r.h1 = h1;
 
-    // B = D - 218.5
-    r.h3 = h1 - 218.5;
+    // B = D - 215.8 (Excel exact)
+    r.h3 = h1 - 215.8;
 
-    // I = C - 100
-    r.depthD1 = depth - 100;
-    // J = C - 120
-    r.sparrenMitte = depth - 120;
-    // K = C
-    r.sparrenAussen = depth;
-    // L = C
-    r.depthD2 = depth;
-    // O = I - 98
-    r.depthD2alt = r.depthD1 - 98;
+    // J = C - 144
+    r.sparrenMitte = depth - 144;
+    // K = C - 24
+    r.sparrenAussen = depth - 24;
+    // L = K + 23
+    r.depthD2 = r.sparrenAussen + 23;
+    // I = L - 100
+    r.depthD1 = r.depthD2 - 100;
+    // O = L - 196 - 2
+    r.depthD2alt = r.depthD2 - 196 - 2;
 
-    // H = DEGREES(ATAN(155.2 / (O + 60)))
-    if (r.depthD2alt !== null && r.depthD2alt + 60 > 0) {
-        r.angleBeta = toDegrees(Math.atan(155.2 / (r.depthD2alt + 60)));
-    }
+    // H = '-' (no beta angle for Compact in Excel)
+    // r.angleBeta stays null
 
     // P = D + 239.5
     r.heightH2 = h1 + 239.5;
 
     // Q = I + 98
     r.depthD4post = r.depthD1 + 98;
-    // R = Q + 196
-    r.depthD5 = r.depthD4post + 196;
+    // R = Q + 200
+    r.depthD5 = r.depthD4post + 200;
 
     // S = B + 220
     r.fensterF1 = r.h3 + 220;

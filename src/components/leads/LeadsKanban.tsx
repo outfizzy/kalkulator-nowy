@@ -128,7 +128,7 @@ type OfferCardInfo = {
     interactionCount: number;
 };
 
-const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo }) => {
+const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo, offerValue }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo; offerValue?: { total: number; count: number; lastNet: number } }) => {
     const navigate = useNavigate();
     const {
         attributes,
@@ -409,6 +409,21 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 </div>
             )}
 
+            {/* Offer value badge — for leads in offer_sent/negotiation */}
+            {['offer_sent', 'negotiation'].includes(lead.status) && (offerValue || (lead as any).wonValue) && (() => {
+                const val = offerValue?.lastNet || offerValue?.total || (lead as any).wonValue || 0;
+                const count = offerValue?.count || 0;
+                if (val <= 0) return null;
+                return (
+                    <div className="mb-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                        <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="text-xs font-bold text-emerald-700">€{val.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                        {count > 1 && <span className="text-[9px] text-emerald-500">(ost. z {count})</span>}
+                        {count === 0 && <span className="text-[9px] text-emerald-400">(ręczna)</span>}
+                    </div>
+                );
+            })()}
+
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                     {lead.assignee ? (
@@ -637,7 +652,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
 };
 
 // Extracted Column Component with useDroppable
-const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; completedFormLeadIds: Set<string>; onAutoAssign?: () => void; onBulkEmail?: () => void; offerViewMap: Record<string, OfferCardInfo> }) => {
+const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; completedFormLeadIds: Set<string>; onAutoAssign?: () => void; onBulkEmail?: () => void; offerViewMap: Record<string, OfferCardInfo>; leadOfferValues: Record<string, { total: number; count: number; lastNet: number }> }) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
@@ -671,6 +686,18 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                         {column.title}
                     </h3>
                     <div className="flex items-center gap-1.5">
+                        {/* Pipeline value for offer stages */}
+                        {['offer_sent', 'negotiation'].includes(column.id) && (() => {
+                            const totalVal = leads.reduce((sum, l) => {
+                                const val = leadOfferValues[l.id]?.lastNet || (l as any).wonValue || 0;
+                                return sum + val;
+                            }, 0);
+                            return totalVal > 0 ? (
+                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200" title={`Łączna wartość ofert: €${totalVal.toLocaleString()}`}>
+                                    €{totalVal >= 1000 ? `${(totalVal / 1000).toFixed(0)}k` : totalVal.toLocaleString()}
+                                </span>
+                            ) : null;
+                        })()}
                         {/* Completed forms count badge — Formularz column only */}
                         {column.id === 'formularz' && completedFormLeadIds.size > 0 && (() => {
                             const completedCount = leads.filter(l => completedFormLeadIds.has(l.id)).length;
@@ -747,6 +774,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                                         isAdmin={isAdmin}
                                         formCompleted={isCompleted}
                                         offerViewInfo={offerViewMap[lead.id]}
+                                        offerValue={leadOfferValues[lead.id]}
                                     />
                                 </React.Fragment>
                             );
@@ -772,6 +800,47 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const [autoAssignLeads, setAutoAssignLeads] = useState<Lead[]>([]);
     const [pendingLostLeadId, setPendingLostLeadId] = useState<string | null>(null);
     const [measurementLead, setMeasurementLead] = useState<Lead | null>(null);
+
+    // Offer Value modal (for manual entry when moving to offer_sent+)
+    const [offerValueModalOpen, setOfferValueModalOpen] = useState(false);
+    const [pendingOfferValueLeadId, setPendingOfferValueLeadId] = useState<string | null>(null);
+    const [pendingOfferValueStatus, setPendingOfferValueStatus] = useState<LeadStatus>('offer_sent');
+    const [offerValueInput, setOfferValueInput] = useState('');
+
+    // Cache of lead -> total offer values from system
+    const [leadOfferValues, setLeadOfferValues] = useState<Record<string, { total: number; count: number; lastNet: number }>>({});
+    useEffect(() => {
+        const relevantLeads = leads.filter(l => ['offer_sent', 'negotiation', 'measurement_scheduled', 'measurement_completed'].includes(l.status));
+        if (relevantLeads.length === 0) return;
+        const fetchValues = async () => {
+            const ids = relevantLeads.map(l => l.id);
+            const { data } = await supabase
+                .from('offers')
+                .select('lead_id, pricing')
+                .in('lead_id', ids)
+                .order('created_at', { ascending: false });
+            if (!data) return;
+            const map: Record<string, { total: number; count: number; lastNet: number }> = {};
+            for (const o of data) {
+                const net = (o.pricing as any)?.sellingPriceNet || 0;
+                if (!map[o.lead_id]) {
+                    // First result = latest offer (ordered by created_at desc)
+                    map[o.lead_id] = { total: net, count: 1, lastNet: net };
+                } else {
+                    // Only count, don't add to total — we show last offer only
+                    map[o.lead_id].count += 1;
+                }
+            }
+            // Also include wonValue from leads that have it manually set
+            for (const l of relevantLeads) {
+                if ((l as any).wonValue && !map[l.id]) {
+                    map[l.id] = { total: (l as any).wonValue, count: 0, lastNet: (l as any).wonValue };
+                }
+            }
+            setLeadOfferValues(map);
+        };
+        fetchValues();
+    }, [leads]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -950,6 +1019,35 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                     setPendingLostLeadId(activeId);
                     setLostModalOpen(true);
                     return; // Stop default Update, wait for modal confirm
+                }
+
+                // Moving to offer_sent or negotiation -> auto-fill offer value or ask
+                const offerStages: LeadStatus[] = ['offer_sent', 'negotiation'];
+                if (offerStages.includes(newStatus) && !offerStages.includes(lead.status)) {
+                    // Check if lead already has system offers
+                    const { data: offers } = await supabase
+                        .from('offers')
+                        .select('pricing')
+                        .eq('lead_id', activeId)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (offers && offers.length > 0) {
+                        const lastNet = (offers[0].pricing as any)?.sellingPriceNet || 0;
+                        if (lastNet > 0) {
+                            // Auto-fill from system offer
+                            await updateLeadStatus(activeId, newStatus, { wonValue: lastNet } as any);
+                            toast.success(`Kwota oferty: €${lastNet.toLocaleString('de-DE', { minimumFractionDigits: 2 })} (z kalkulatora)`);
+                            return;
+                        }
+                    }
+
+                    // No system offer — ask for manual value
+                    setPendingOfferValueLeadId(activeId);
+                    setPendingOfferValueStatus(newStatus);
+                    setOfferValueInput('');
+                    setOfferValueModalOpen(true);
+                    return;
                 }
 
                 await updateLeadStatus(activeId, newStatus);
@@ -1167,6 +1265,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             isAdmin={isAdmin()}
                             completedFormLeadIds={completedFormLeadIds}
                             offerViewMap={offerViewMap}
+                            leadOfferValues={leadOfferValues}
                             onBulkEmail={column.id === 'new' ? () => setBulkEmailOpen(true) : undefined}
                             onAutoAssign={['new', 'formularz', 'contacted'].includes(column.id) ? () => {
                                 const columnLeads = columns[column.id] || [];
@@ -1240,6 +1339,71 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 onComplete={onLeadUpdate}
                 unassignedLeads={autoAssignLeads}
             />
+
+            {/* Offer Value Modal — when moving to offer_sent without system offer */}
+            {offerValueModalOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                        <div className="px-6 py-4 bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-amber-100">
+                            <h3 className="text-lg font-bold text-amber-800 flex items-center gap-2">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Kwota oferty netto
+                            </h3>
+                            <p className="text-sm text-amber-600 mt-1">Brak ofert w systemie — podaj kwotę netto oferty (EUR)</p>
+                        </div>
+                        <div className="px-6 py-5">
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                                <input
+                                    type="number"
+                                    value={offerValueInput}
+                                    onChange={e => setOfferValueInput(e.target.value)}
+                                    placeholder="np. 12500"
+                                    className="w-full pl-8 pr-4 py-3 border-2 border-amber-200 rounded-xl text-lg font-bold text-slate-800 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none"
+                                    autoFocus
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && offerValueInput) {
+                                            const val = parseFloat(offerValueInput);
+                                            if (val > 0 && pendingOfferValueLeadId) {
+                                                updateLeadStatus(pendingOfferValueLeadId, pendingOfferValueStatus, { wonValue: val } as any);
+                                                toast.success(`Kwota oferty: €${val.toLocaleString('de-DE', { minimumFractionDigits: 2 })}`);
+                                                setOfferValueModalOpen(false);
+                                                setPendingOfferValueLeadId(null);
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 border-t flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    // Allow skip — just move without value
+                                    if (pendingOfferValueLeadId) {
+                                        updateLeadStatus(pendingOfferValueLeadId, pendingOfferValueStatus);
+                                    }
+                                    setOfferValueModalOpen(false);
+                                    setPendingOfferValueLeadId(null);
+                                }}
+                                className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 font-medium"
+                            >Pomiń</button>
+                            <button
+                                onClick={() => {
+                                    const val = parseFloat(offerValueInput);
+                                    if (val > 0 && pendingOfferValueLeadId) {
+                                        updateLeadStatus(pendingOfferValueLeadId, pendingOfferValueStatus, { wonValue: val } as any);
+                                        toast.success(`Kwota oferty: €${val.toLocaleString('de-DE', { minimumFractionDigits: 2 })}`);
+                                    }
+                                    setOfferValueModalOpen(false);
+                                    setPendingOfferValueLeadId(null);
+                                }}
+                                disabled={!offerValueInput || parseFloat(offerValueInput) <= 0}
+                                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >Zapisz kwotę</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

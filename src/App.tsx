@@ -19,6 +19,7 @@ import { TeamsDashboard } from './components/admin/TeamsDashboard';
 import { FuelLogManager } from './components/admin/FuelLogManager';
 import { FuelPriceManager } from './components/admin/FuelPriceManager';
 import { FailureReportManager } from './components/admin/FailureReportManager';
+import { PulseDashboard } from './components/admin/PulseDashboard';
 import { PricingPage } from './components/admin/PricingPage';
 import { InstallationProfitability } from './components/admin/InstallationProfitability';
 import { InstallationRoutingOptimizer } from './components/admin/InstallationRoutingOptimizer';
@@ -122,7 +123,7 @@ import FacebookAdsPage from './pages/admin/FacebookAdsPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
-import { AliplastConfiguratorPage } from './pages/admin/AliplastConfiguratorPage';
+
 import { BlogPLPage } from './pages/BlogPLPage';
 import AdsManagerPage from './pages/AdsManagerPage';
 
@@ -235,11 +236,12 @@ function App() {
               <Route path="/contracts/:id" element={<ContractDetails />} />
               <Route path="/advance-payments" element={<AdvancePaymentsList />} />
               <Route path="/dachrechner" element={<DachrechnerPage />} />
-              <Route path="/admin/aliplast-configurator" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AliplastConfiguratorPage /></ProtectedRoute>} />
+
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />
               <Route path="/admin/fuel-prices" element={<FuelPriceManager />} />
               <Route path="/admin/failures" element={<FailureReportManager />} />
+              <Route path="/admin/pulse" element={<ProtectedRoute allowedRoles={['admin']}><PulseDashboard /></ProtectedRoute>} />
               <Route path="admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PriceTableBrowserPage /></ProtectedRoute>} />
               {/* Legacy pricing pages - kept for backwards compatibility */}
               <Route path="admin/pricing-old" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />

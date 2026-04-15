@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { ROOF_MODELS, type RoofModelId, type DachrechnerInputs, type DachrechnerResults } from '../../services/dachrechner.service';
 
 // ============================================================================
-// DACHRECHNER DIAGRAM - Model-specific structural visualizations
+// DACHRECHNER DIAGRAM — Professional aluminum profile visualizations
+// Matching Excel reference: POST on LEFT, WALL on RIGHT
+// Profiles with internal chambers, foundation dashes, proper gutter
 // ============================================================================
 
 export interface DimensionOptions {
@@ -23,301 +25,254 @@ interface DachrechnerDiagramProps {
     view?: 'side' | 'front';
 }
 
-// ---- MODEL THEME COLORS ----
-const MODEL_THEMES: Record<string, { primary: string; secondary: string; accent: string; roofGrad: [string, string]; label: string }> = {
-    orangeline: { primary: '#f97316', secondary: '#fed7aa', accent: '#ea580c', roofGrad: ['#fdba74', '#f97316'], label: 'Orangeline' },
-    'orangeline+': { primary: '#f97316', secondary: '#fed7aa', accent: '#ea580c', roofGrad: ['#fdba74', '#f97316'], label: 'Orangeline+' },
-    trendline: { primary: '#3b82f6', secondary: '#bfdbfe', accent: '#2563eb', roofGrad: ['#93c5fd', '#3b82f6'], label: 'Trendline' },
-    'trendline+': { primary: '#3b82f6', secondary: '#bfdbfe', accent: '#2563eb', roofGrad: ['#93c5fd', '#3b82f6'], label: 'Trendline+' },
-    topline: { primary: '#8b5cf6', secondary: '#ddd6fe', accent: '#7c3aed', roofGrad: ['#c4b5fd', '#8b5cf6'], label: 'Topline' },
-    topline_xl: { primary: '#7c3aed', secondary: '#c4b5fd', accent: '#6d28d9', roofGrad: ['#a78bfa', '#7c3aed'], label: 'Topline XL' },
-    designline: { primary: '#06b6d4', secondary: '#a5f3fc', accent: '#0891b2', roofGrad: ['#67e8f9', '#06b6d4'], label: 'Designline' },
-    ultraline_classic: { primary: '#10b981', secondary: '#a7f3d0', accent: '#059669', roofGrad: ['#6ee7b7', '#10b981'], label: 'Ultraline Classic' },
-    ultraline_style: { primary: '#10b981', secondary: '#a7f3d0', accent: '#059669', roofGrad: ['#6ee7b7', '#10b981'], label: 'Ultraline Style' },
-    ultraline_compact: { primary: '#059669', secondary: '#a7f3d0', accent: '#047857', roofGrad: ['#34d399', '#059669'], label: 'Ultraline Compact' },
-    skyline: { primary: '#64748b', secondary: '#e2e8f0', accent: '#475569', roofGrad: ['#cbd5e1', '#94a3b8'], label: 'Skyline' },
-    skyline_freistand: { primary: '#64748b', secondary: '#e2e8f0', accent: '#475569', roofGrad: ['#cbd5e1', '#94a3b8'], label: 'Skyline Freistand' },
-    carport: { primary: '#78716c', secondary: '#e7e5e4', accent: '#57534e', roofGrad: ['#d6d3d1', '#a8a29e'], label: 'Carport' },
-    carport_freistand: { primary: '#78716c', secondary: '#e7e5e4', accent: '#57534e', roofGrad: ['#d6d3d1', '#a8a29e'], label: 'Carport Freistand' },
+// ---- THEMES per model ID ----
+const TH: Record<string, { pri: string; sec: string; acc: string; label: string }> = {
+    orangeline: { pri: '#f97316', sec: '#fed7aa', acc: '#ea580c', label: 'Ecoline' },
+    'orangeline+': { pri: '#f97316', sec: '#fed7aa', acc: '#ea580c', label: 'Ecoline+' },
+    trendline: { pri: '#3b82f6', sec: '#bfdbfe', acc: '#2563eb', label: 'Trendstyle' },
+    'trendline+': { pri: '#3b82f6', sec: '#bfdbfe', acc: '#2563eb', label: 'Trendstyle+' },
+    trendline_freistand: { pri: '#3b82f6', sec: '#bfdbfe', acc: '#2563eb', label: 'Trendstyle Freistand' },
+    topline: { pri: '#8b5cf6', sec: '#ddd6fe', acc: '#7c3aed', label: 'Topstyle' },
+    topline_xl: { pri: '#7c3aed', sec: '#c4b5fd', acc: '#6d28d9', label: 'Topstyle XL' },
+    designline: { pri: '#06b6d4', sec: '#a5f3fc', acc: '#0891b2', label: 'Designstyle' },
+    ultraline_classic: { pri: '#10b981', sec: '#a7f3d0', acc: '#059669', label: 'Ultrastyle Classic' },
+    ultraline_style: { pri: '#10b981', sec: '#a7f3d0', acc: '#059669', label: 'Ultrastyle Style' },
+    ultraline_compact: { pri: '#059669', sec: '#a7f3d0', acc: '#047857', label: 'Ultrastyle Compact' },
+    skyline: { pri: '#64748b', sec: '#e2e8f0', acc: '#475569', label: 'Skystyle' },
+    skyline_freistand: { pri: '#64748b', sec: '#e2e8f0', acc: '#475569', label: 'Skystyle Freistand' },
+    carport: { pri: '#78716c', sec: '#e7e5e4', acc: '#57534e', label: 'Carport' },
+    carport_freistand: { pri: '#78716c', sec: '#e7e5e4', acc: '#57534e', label: 'Carport Freistand' },
 };
 
-// ---- DIMENSION COLORS ----
-const DIM_COL = {
-    height: '#7c3aed',
-    depth: '#0891b2',
-    post: '#2563eb',
-    rafter: '#f97316',
-    angle: '#dc2626',
-    window: '#0d9488',
-    wedge: '#d97706',
-    struct: '#334155',
-    glass: '#7dd3fc',
-};
+// Dimension colors matching Excel: H=orange, D=cyan, S=green, α=purple, P=blue
+const DC = { h: '#f97316', d: '#0ea5e9', p: '#2563eb', s: '#16a34a', a: '#7c3aed', w: '#0d9488', k: '#d97706', st: '#1e293b' };
+
+interface Pt { x: number; y: number }
+type PtFn = (x: number, y: number) => Pt;
 
 // ============================================================================
-// SHARED DIMENSION PRIMITIVES
+// DIMENSION LINES — with colored label + numeric value
 // ============================================================================
-
-interface PtFn { (x: number, y: number): { x: number; y: number }; }
-
-const DimVertical = ({ pt, baseX, y1, y2, label, value, offsetX, color = DIM_COL.height }: {
-    pt: PtFn; baseX: number; y1: number; y2: number; label: string; value: number; offsetX: number; color?: string;
+const DimV = ({ pt, bx, y1, y2, label, val, ox, color = DC.h }: {
+    pt: PtFn; bx: number; y1: number; y2: number; label: string; val: number; ox: number; color?: string;
 }) => {
-    const p1 = pt(baseX, y1);
-    const p2 = pt(baseX, y2);
-    const lx = p1.x + offsetX;
-    const ty = (p1.y + p2.y) / 2;
-    const isLeft = offsetX < 0;
+    const p1 = pt(bx, y1), p2 = pt(bx, y2);
+    const lx = p1.x + ox, my = (p1.y + p2.y) / 2;
+    const left = ox < 0;
+    const bw = 48, bh = 26, rx = left ? lx - bw - 4 : lx + 4;
     return (
         <g>
-            <line x1={p1.x} y1={p1.y} x2={lx} y2={p1.y} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.3" />
-            <line x1={p2.x} y1={p2.y} x2={lx} y2={p2.y} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.3" />
-            <line x1={lx} y1={p1.y} x2={lx} y2={p2.y} stroke={color} strokeWidth="1.5" />
-            <polygon points={`${lx - 3},${p1.y + 6} ${lx},${p1.y} ${lx + 3},${p1.y + 6}`} fill={color} />
-            <polygon points={`${lx - 3},${p2.y - 6} ${lx},${p2.y} ${lx + 3},${p2.y - 6}`} fill={color} />
-            <rect x={isLeft ? lx - 55 : lx + 2} y={ty - 17} width="52" height="34" fill="white" stroke={color} strokeWidth="0.7" rx="5" filter="url(#dimShadow)" />
-            <text x={isLeft ? lx - 29 : lx + 28} y={ty - 3} textAnchor="middle" fontSize="10" fontWeight="800" fill={color}>{label}</text>
-            <text x={isLeft ? lx - 29 : lx + 28} y={ty + 12} textAnchor="middle" fontSize="10" fill={color} fontWeight="600">{Math.round(value)}</text>
+            <line x1={p1.x} y1={p1.y} x2={lx} y2={p1.y} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.35" />
+            <line x1={p2.x} y1={p2.y} x2={lx} y2={p2.y} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.35" />
+            <line x1={lx} y1={p1.y + 5} x2={lx} y2={p2.y - 5} stroke={color} strokeWidth="1.5" />
+            <path d={`M${lx},${p1.y} l-3,6 6,0Z`} fill={color} />
+            <path d={`M${lx},${p2.y} l-3,-6 6,0Z`} fill={color} />
+            <rect x={rx} y={my - bh / 2} width={bw} height={bh} fill="white" stroke={color} strokeWidth="0.7" rx="4" />
+            <text x={rx + bw / 2} y={my - 3} textAnchor="middle" fontSize="10" fontWeight="800" fill={color}>{label}</text>
+            <text x={rx + bw / 2} y={my + 10} textAnchor="middle" fontSize="9" fontWeight="600" fill={color} fontFamily="monospace">{Math.round(val)}</text>
         </g>
     );
 };
 
-const DimHorizontal = ({ pt, baseY, x1, x2, label, value, offsetY, color = DIM_COL.depth }: {
-    pt: PtFn; baseY: number; x1: number; x2: number; label: string; value: number; offsetY: number; color?: string;
+const DimH = ({ pt, by, x1, x2, label, val, oy, color = DC.d }: {
+    pt: PtFn; by: number; x1: number; x2: number; label: string; val: number; oy: number; color?: string;
 }) => {
-    const p1 = pt(x1, baseY);
-    const p2 = pt(x2, baseY);
-    const ly = p1.y + offsetY;
-    const tx = (p1.x + p2.x) / 2;
-    const w = Math.max(label.length * 6 + 50, 70);
+    const p1 = pt(x1, by), p2 = pt(x2, by);
+    const ly = p1.y + oy, mx = (p1.x + p2.x) / 2;
+    const txt = `${label}: ${Math.round(val)}`;
+    const bw = Math.max(txt.length * 6.5 + 10, 56);
     return (
         <g>
-            <line x1={p1.x} y1={p1.y} x2={p1.x} y2={ly} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.3" />
-            <line x1={p2.x} y1={p2.y} x2={p2.x} y2={ly} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.3" />
-            <line x1={p1.x} y1={ly} x2={p2.x} y2={ly} stroke={color} strokeWidth="1.5" />
-            <polygon points={`${p1.x + 6},${ly - 3} ${p1.x},${ly} ${p1.x + 6},${ly + 3}`} fill={color} />
-            <polygon points={`${p2.x - 6},${ly - 3} ${p2.x},${ly} ${p2.x - 6},${ly + 3}`} fill={color} />
-            <rect x={tx - w / 2} y={ly - 11} width={w} height="22" fill="white" stroke={color} strokeWidth="0.7" rx="5" filter="url(#dimShadow)" />
-            <text x={tx} y={ly + 4} textAnchor="middle" fontSize="10" fontWeight="700" fill={color}>{label}: {Math.round(value)}</text>
+            <line x1={p1.x} y1={p1.y + 2} x2={p1.x} y2={ly} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.25" />
+            <line x1={p2.x} y1={p2.y + 2} x2={p2.x} y2={ly} stroke={color} strokeWidth="0.5" strokeDasharray="3 2" opacity="0.25" />
+            <line x1={p1.x + 5} y1={ly} x2={p2.x - 5} y2={ly} stroke={color} strokeWidth="1.5" />
+            <path d={`M${p1.x},${ly} l6,-3 0,6Z`} fill={color} />
+            <path d={`M${p2.x},${ly} l-6,-3 0,6Z`} fill={color} />
+            <rect x={mx - bw / 2} y={ly - 9} width={bw} height="18" fill="white" stroke={color} strokeWidth="0.6" rx="3" />
+            <text x={mx} y={ly + 3.5} textAnchor="middle" fontSize="9" fontWeight="700" fill={color} fontFamily="monospace">{txt}</text>
         </g>
     );
 };
 
 // ============================================================================
-// SVG DEFS shared by all models
+// SVG DEFS
 // ============================================================================
-const SharedDefs = ({ theme }: { theme: typeof MODEL_THEMES[string] }) => (
+const Defs = () => (
     <defs>
-        <filter id="dimShadow" x="-10%" y="-10%" width="120%" height="130%">
-            <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#00000015" />
+        <filter id="ds" x="-15%" y="-15%" width="130%" height="140%">
+            <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#00000008" />
         </filter>
-        <filter id="structShadow" x="-2%" y="-2%" width="104%" height="108%">
-            <feDropShadow dx="1" dy="2" stdDeviation="2" floodColor="#00000020" />
-        </filter>
-        <pattern id="groundHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="10" stroke="#94a3b8" strokeWidth="0.8" />
+        <pattern id="wallH" width="8" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="12" stroke="#64748b" strokeWidth="0.8" />
         </pattern>
-        <pattern id="wallHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#94a3b8" strokeWidth="0.6" />
+        <pattern id="gndH" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#475569" strokeWidth="0.6" />
         </pattern>
-        <linearGradient id="roofGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={theme.roofGrad[0]} />
-            <stop offset="100%" stopColor={theme.roofGrad[1]} />
-        </linearGradient>
-        <linearGradient id="postGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id="profG" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#e2e8f0" />
             <stop offset="40%" stopColor="#f8fafc" />
             <stop offset="100%" stopColor="#cbd5e1" />
-        </linearGradient>
-        <linearGradient id="glassGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#7dd3fc" stopOpacity="0.15" />
-        </linearGradient>
-        <linearGradient id="gutterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#94a3b8" />
-            <stop offset="100%" stopColor="#64748b" />
-        </linearGradient>
-        <linearGradient id="profileGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={theme.primary} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={theme.accent} />
         </linearGradient>
     </defs>
 );
 
 // ============================================================================
-// STRUCTURAL ELEMENTS
+// STRUCTURAL ELEMENTS — aluminum profile style matching Excel
 // ============================================================================
 
-// Wall (house side)
-const Wall = ({ pt, h1, extraHeight = 400 }: { pt: PtFn; h1: number; extraHeight?: number }) => {
-    const p0 = pt(0, 0);
-    const pH = pt(0, h1 + extraHeight);
-    return (
-        <g>
-            <rect x={pH.x - 25} y={pH.y} width="25" height={p0.y - pH.y} fill="url(#wallHatch)" opacity="0.4" />
-            <line x1={p0.x} y1={p0.y} x2={pH.x} y2={pH.y} stroke={DIM_COL.struct} strokeWidth="4" />
-        </g>
-    );
-};
-
-// Ground
-const Ground = ({ ox, dw, oy }: { ox: number; dw: number; oy: number }) => (
+// WALL — hatched rectangle, right side
+const Wall = ({ x, yBot, yTop, w = 24 }: { x: number; yBot: number; yTop: number; w?: number }) => (
     <g>
-        <rect x={ox - 40} y={oy} width={dw + 80} height="12" fill="url(#groundHatch)" opacity="0.5" />
-        <line x1={ox - 40} y1={oy} x2={ox + dw + 40} y2={oy} stroke={DIM_COL.struct} strokeWidth="3" />
+        <rect x={x} y={yTop} width={w} height={yBot - yTop} fill="url(#wallH)" opacity="0.5" />
+        <line x1={x} y1={yTop} x2={x} y2={yBot} stroke={DC.st} strokeWidth="2.5" />
+        <line x1={x + w} y1={yTop} x2={x + w} y2={yBot} stroke={DC.st} strokeWidth="0.8" opacity="0.5" />
+        <line x1={x} y1={yTop} x2={x + w} y2={yTop} stroke={DC.st} strokeWidth="1" />
     </g>
 );
 
-// Post with correct width
-const Post = ({ pt, x, h, width, side = 'right' }: { pt: PtFn; x: number; h: number; width: number; side?: 'left' | 'right' }) => {
-    const pBot = pt(x, 0);
-    const pTop = pt(x, h);
-    // Scale post width relative to structure
-    const pW = Math.max(8, (pt(width, 0).x - pt(0, 0).x));
-    const xStart = side === 'right' ? pBot.x - pW : pBot.x;
+// GROUND — thick line with hatch below
+const Ground = ({ x1, x2, y }: { x1: number; x2: number; y: number }) => (
+    <g>
+        <rect x={x1} y={y} width={x2 - x1} height="14" fill="url(#gndH)" opacity="0.35" />
+        <line x1={x1} y1={y} x2={x2} y2={y} stroke={DC.st} strokeWidth="3" />
+    </g>
+);
+
+// POST — aluminum square profile with center dashed line + cap + foundation below ground
+const Post = ({ x, yBot, yTop, w }: { x: number; yBot: number; yTop: number; w: number }) => {
+    const mx = x + w / 2, h = yBot - yTop;
     return (
-        <g filter="url(#structShadow)">
-            <rect x={xStart} y={pTop.y} width={pW} height={pBot.y - pTop.y} fill="url(#postGrad)" stroke={DIM_COL.struct} strokeWidth="1.5" rx="1" />
-            {/* Base plate */}
-            <rect x={xStart - 3} y={pBot.y - 6} width={pW + 6} height="6" fill="#94a3b8" stroke={DIM_COL.struct} strokeWidth="1" rx="1" />
-            {/* Post width label */}
-            <text x={xStart + pW / 2} y={pBot.y - 12} textAnchor="middle" fontSize="8" fill="#64748b">{Math.round(width)}</text>
+        <g>
+            {/* Main profile body */}
+            <rect x={x} y={yTop} width={w} height={h} fill="url(#profG)" stroke={DC.st} strokeWidth="2" />
+            {/* Internal chamber — dashed center axis */}
+            <line x1={mx} y1={yTop + 8} x2={mx} y2={yBot - 8} stroke={DC.st} strokeWidth="1" strokeDasharray="6 4" opacity="0.45" />
+            {/* Top cap plate */}
+            <rect x={x - 2} y={yTop - 3} width={w + 4} height="4" fill="#94a3b8" stroke={DC.st} strokeWidth="1" rx="0.5" />
+            {/* Foundation below ground — dashed rectangle */}
+            <rect x={x - 3} y={yBot} width={w + 6} height="18" fill="none" stroke={DC.st} strokeWidth="1.5" strokeDasharray="5 3" opacity="0.45" />
         </g>
     );
 };
 
-// Sloped roof panel
-const SlopedRoof = ({ pt, x1, y1, x2, y2, profileH = 25 }: { pt: PtFn; x1: number; y1: number; x2: number; y2: number; profileH?: number }) => {
-    const p1 = pt(x1, y1);
-    const p2 = pt(x2, y2);
-    const p1b = pt(x1, y1 + profileH);
-    const p2b = pt(x2, y2 + profileH);
+// GUTTER — U-channel profile at low end of sloped roof
+const Gutter = ({ x, y }: { x: number; y: number }) => (
+    <g>
+        <path d={`M${x},${y - 2} l-14,0 l0,14 q0,4 4,4 l6,0 q4,0 4,-4Z`}
+            fill="#d1d5db" stroke={DC.st} strokeWidth="1.5" strokeLinejoin="round" />
+        {/* Drain dot */}
+        <circle cx={x - 7} cy={y + 14} r="2" fill="#64748b" opacity="0.3" />
+    </g>
+);
+
+// WALL BRACKET — L-profile connecting roof to wall (Wandprofil)
+const WallBracket = ({ x, y, h, color }: { x: number; y: number; h: number; color: string }) => (
+    <g>
+        <rect x={x} y={y} width="8" height={h} fill={color} stroke={DC.st} strokeWidth="1" rx="0.5" opacity="0.85" />
+        <rect x={x} y={y} width="20" height="5" fill={color} stroke={DC.st} strokeWidth="0.8" rx="0.5" opacity="0.8" />
+        {/* Mounting screws */}
+        <circle cx={x + 4} cy={y + h * 0.33} r="2" fill="none" stroke={DC.st} strokeWidth="0.7" opacity="0.4" />
+        <circle cx={x + 4} cy={y + h * 0.66} r="2" fill="none" stroke={DC.st} strokeWidth="0.7" opacity="0.4" />
+    </g>
+);
+
+// SLOPED PROFILE — thick parallelogram with 3 internal chamber dashed lines
+const SlopedProfile = ({ x1, y1, x2, y2, t }: {
+    x1: number; y1: number; x2: number; y2: number; t: number;
+}) => {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return null;
+    const nx = -dy / len * t, ny = dx / len * t;
     return (
-        <g filter="url(#structShadow)">
-            {/* Main roof panel */}
+        <g>
             <polygon
-                points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p2b.x},${p2b.y} ${p1b.x},${p1b.y}`}
-                fill="url(#roofGrad)" stroke={DIM_COL.struct} strokeWidth="2"
+                points={`${x1},${y1} ${x2},${y2} ${x2 + nx},${y2 + ny} ${x1 + nx},${y1 + ny}`}
+                fill="#e2e8f0" stroke={DC.st} strokeWidth="2" strokeLinejoin="round"
             />
-            {/* Top surface highlight */}
-            <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="white" strokeWidth="1" opacity="0.4" />
+            {/* 3 internal chamber lines */}
+            {[0.25, 0.5, 0.75].map(f => (
+                <line key={f} x1={x1 + nx * f} y1={y1 + ny * f} x2={x2 + nx * f} y2={y2 + ny * f}
+                    stroke={DC.st} strokeWidth={f === 0.5 ? "0.8" : "0.5"} strokeDasharray={f === 0.5 ? "6 4" : "4 4"} opacity={f === 0.5 ? "0.4" : "0.25"} />
+            ))}
         </g>
     );
 };
 
-// Flat roof panel
-const FlatRoof = ({ pt, x1, x2, y, height = 130 }: { pt: PtFn; x1: number; x2: number; y: number; height?: number }) => {
-    const p1 = pt(x1, y);
-    const p2 = pt(x2, y);
-    const p1b = pt(x1, y + height);
-    const p2b = pt(x2, y + height);
-    return (
-        <g filter="url(#structShadow)">
-            <rect x={p1.x} y={p1b.y} width={p2.x - p1.x} height={p1.y - p1b.y} fill="url(#roofGrad)" stroke={DIM_COL.struct} strokeWidth="2" rx="2" />
-            <line x1={p1.x} y1={p1b.y} x2={p2.x} y2={p2b.y} stroke="white" strokeWidth="1" opacity="0.3" />
-        </g>
-    );
-};
+// FLAT PROFILE — horizontal thick bar with internal chamber lines
+const FlatProfile = ({ x1, x2, y, t }: { x1: number; x2: number; y: number; t: number }) => (
+    <g>
+        <rect x={x1} y={y} width={x2 - x1} height={t} fill="#e2e8f0" stroke={DC.st} strokeWidth="2" />
+        {[0.25, 0.5, 0.75].map(f => (
+            <line key={f} x1={x1 + 5} y1={y + t * f} x2={x2 - 5} y2={y + t * f}
+                stroke={DC.st} strokeWidth={f === 0.5 ? "0.8" : "0.5"} strokeDasharray={f === 0.5 ? "6 4" : "4 4"} opacity={f === 0.5 ? "0.4" : "0.25"} />
+        ))}
+    </g>
+);
 
-// Standard gutter (trapezoid)
-const GutterStandard = ({ pt, x, y, size = 60 }: { pt: PtFn; x: number; y: number; size?: number }) => {
-    const p = pt(x, y);
-    const s = Math.max(15, size * 0.15);
+// GLASS PANEL — thin blue fill between structural points
+const GlassPanel = ({ x1, y1, x2, y2, thick = 3 }: { x1: number; y1: number; x2: number; y2: number; thick?: number }) => {
+    const dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return null;
+    const nx = -dy / len * thick, ny = dx / len * thick;
     return (
-        <g>
-            <polygon points={`${p.x - s * 0.8},${p.y} ${p.x + s},${p.y} ${p.x + s * 0.7},${p.y + s * 0.8} ${p.x - s * 0.4},${p.y + s * 0.8}`}
-                fill="url(#gutterGrad)" stroke={DIM_COL.struct} strokeWidth="1.5" />
-        </g>
-    );
-};
-
-// Round gutter
-const GutterRound = ({ pt, x, y }: { pt: PtFn; x: number; y: number }) => {
-    const p = pt(x, y);
-    return (
-        <g>
-            <path d={`M ${p.x - 12} ${p.y} Q ${p.x} ${p.y + 18} ${p.x + 18} ${p.y}`}
-                fill="none" stroke="#64748b" strokeWidth="2.5" />
-            <circle cx={p.x + 3} cy={p.y + 12} r="3" fill="#64748b" />
-        </g>
-    );
-};
-
-// Wall connection profile
-const WallProfile = ({ pt, y, profileH, color }: { pt: PtFn; y: number; profileH: number; color: string }) => {
-    const p = pt(0, y);
-    const pb = pt(0, y + profileH);
-    return (
-        <g>
-            <rect x={p.x - 4} y={pb.y} width="12" height={p.y - pb.y} fill={color} stroke={DIM_COL.struct} strokeWidth="1" rx="1" opacity="0.8" />
-        </g>
-    );
-};
-
-// Glass panel (for Ultraline/Skyline)
-const GlassPanel = ({ pt, x1, y1, x2, y2 }: { pt: PtFn; x1: number; y1: number; x2: number; y2: number }) => {
-    const p1 = pt(x1, y1);
-    const p2 = pt(x2, y2);
-    return (
-        <g>
-            <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={DIM_COL.glass} strokeWidth="3" opacity="0.6" />
-            <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="white" strokeWidth="1" opacity="0.4" />
-        </g>
-    );
-};
-
-// Keil (wedge) indicator
-const WedgeIndicator = ({ pt, x, yBase, height, side, color = DIM_COL.wedge }: { pt: PtFn; x: number; yBase: number; height: number; side: 'left' | 'right'; color?: string }) => {
-    const p1 = pt(x, yBase);
-    const p2 = pt(x, yBase + height);
-    const dir = side === 'left' ? -1 : 1;
-    return (
-        <g opacity="0.6">
-            <polygon
-                points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p2.x + dir * 10},${p2.y}`}
-                fill={color} opacity="0.2" stroke={color} strokeWidth="1" strokeDasharray="3 2"
-            />
-        </g>
+        <polygon points={`${x1 - nx},${y1 - ny} ${x2 - nx},${y2 - ny} ${x2 + nx},${y2 + ny} ${x1 + nx},${y1 + ny}`}
+            fill="#bae6fd" fillOpacity="0.3" stroke="#7dd3fc" strokeWidth="1" />
     );
 };
 
 // ============================================================================
-// INFO PANEL (window/wedge dimensions)
+// PROFILE DETAILS TABLE
 // ============================================================================
-const InfoPanel = ({ results, opts, panelX, panelY }: { results: DachrechnerResults; opts: DimensionOptions; panelX: number; panelY: number }) => {
-    const items: Array<{ label: string; value: number; color: string; unit?: string }> = [];
+const PROF: Record<string, { ph: number; led: boolean; desc: string }> = {
+    orangeline: { ph: 30, led: false, desc: '8° stały kąt nachylenia' },
+    'orangeline+': { ph: 35, led: false, desc: '8° stały kąt, profil rozszerzony' },
+    trendline: { ph: 35, led: false, desc: 'Kąt obliczany, 3 typy rynien' },
+    'trendline+': { ph: 42, led: false, desc: 'Profil wzmocniony' },
+    trendline_freistand: { ph: 35, led: false, desc: 'Wolnostojący, kąt obliczany' },
+    topline: { ph: 55, led: false, desc: 'Profil premium 93mm' },
+    topline_xl: { ph: 65, led: false, desc: 'Profil XL 117mm' },
+    designline: { ph: 50, led: true, desc: 'LED, zintegrowana rynna' },
+    ultraline_classic: { ph: 60, led: false, desc: 'Regulowane wysunięcie' },
+    ultraline_style: { ph: 60, led: false, desc: 'Stałe 120mm' },
+    ultraline_compact: { ph: 55, led: false, desc: 'Kompaktowa' },
+    skyline: { ph: 50, led: false, desc: 'Dach płaski' },
+    skyline_freistand: { ph: 50, led: false, desc: 'Płaski wolnostojący' },
+    carport: { ph: 45, led: false, desc: 'Wiata' },
+    carport_freistand: { ph: 45, led: false, desc: 'Wiata wolnostojąca' },
+};
 
+// ============================================================================
+// INFO CARD — additional calculated values
+// ============================================================================
+const InfoCard = ({ results, opts, px, py }: { results: DachrechnerResults; opts: DimensionOptions; px: number; py: number }) => {
+    const items: Array<{ l: string; v: number; c: string; u?: string }> = [];
     if (opts.showWindows) {
-        if (results.fensterF1) items.push({ label: 'F1 Okno rynna', value: results.fensterF1, color: DIM_COL.window });
-        if (results.fensterF2) items.push({ label: 'F2 Szer. okna', value: results.fensterF2, color: DIM_COL.window });
-        if (results.fensterF3) items.push({ label: 'F3 Okno ściana', value: results.fensterF3, color: DIM_COL.window });
+        if (results.fensterF1) items.push({ l: 'F1 Rinne', v: results.fensterF1, c: DC.w });
+        if (results.fensterF2) items.push({ l: 'F2 Breite', v: results.fensterF2, c: DC.w });
+        if (results.fensterF3) items.push({ l: 'F3 Haus', v: results.fensterF3, c: DC.w });
     }
     if (opts.showWedges) {
-        if (results.keilhoeheK1) items.push({ label: 'K1 Klin rynna', value: results.keilhoeheK1, color: DIM_COL.wedge });
-        if (results.keilhoeheK2) items.push({ label: 'K2 Klin ściana', value: results.keilhoeheK2, color: DIM_COL.wedge });
+        if (results.keilhoeheK1) items.push({ l: 'K1 Rinne', v: results.keilhoeheK1, c: DC.k });
+        if (results.keilhoeheK2) items.push({ l: 'K2 Haus', v: results.keilhoeheK2, c: DC.k });
     }
     if (opts.showAngles) {
-        if (results.angleAlpha) items.push({ label: 'α Nachylenie', value: results.angleAlpha, color: DIM_COL.angle, unit: '°' });
-        if (results.angleBeta) items.push({ label: 'β Szkło', value: results.angleBeta, color: DIM_COL.angle, unit: '°' });
-        if (results.inclinationMmM) items.push({ label: 'Nachylenie', value: results.inclinationMmM, color: DIM_COL.angle, unit: 'mm/m' });
+        if (results.angleAlpha) items.push({ l: 'α', v: results.angleAlpha, c: DC.a, u: '°' });
+        if (results.angleBeta) items.push({ l: 'β', v: results.angleBeta, c: DC.a, u: '°' });
+        if (results.inclinationMmM) items.push({ l: 'Spadek', v: results.inclinationMmM, c: DC.a, u: 'mm/m' });
     }
-
     if (items.length === 0) return null;
-
-    const pw = 155;
-    const rh = 22;
-    const ph = items.length * rh + 26;
-
+    const w = 130, rh = 17, h = items.length * rh + 20;
     return (
-        <g transform={`translate(${panelX}, ${panelY})`}>
-            <rect x="0" y="0" width={pw} height={ph} fill="white" stroke="#e2e8f0" strokeWidth="1" rx="8" filter="url(#dimShadow)" />
-            <text x={pw / 2} y="16" textAnchor="middle" fontSize="9" fontWeight="800" fill="#64748b" letterSpacing="1">WYMIARY DODATKOWE</text>
-            {items.map((item, i) => (
-                <g key={i} transform={`translate(10, ${i * rh + 32})`}>
-                    <circle cx="0" cy="-3" r="4" fill={item.color} />
-                    <text x="12" y="0" fontSize="10" fill="#334155" fontWeight="500">{item.label}</text>
-                    <text x={pw - 18} y="0" textAnchor="end" fontSize="10" fontWeight="bold" fill={item.color}>
-                        {item.unit === '°' || item.unit === 'mm/m' ? item.value.toFixed(1) : Math.round(item.value)}{item.unit || ''}
+        <g transform={`translate(${px},${py})`}>
+            <rect x="0" y="0" width={w} height={h} fill="white" fillOpacity="0.95" stroke="#e2e8f0" strokeWidth="0.8" rx="6" filter="url(#ds)" />
+            <text x={w / 2} y="13" textAnchor="middle" fontSize="7" fontWeight="800" fill="#94a3b8" letterSpacing="1">DODATKOWE</text>
+            {items.map((it, i) => (
+                <g key={i} transform={`translate(6,${i * rh + 24})`}>
+                    <circle cx="0" cy="-3" r="2.5" fill={it.c} />
+                    <text x="8" y="0" fontSize="8" fill="#475569" fontWeight="500">{it.l}</text>
+                    <text x={w - 12} y="0" textAnchor="end" fontSize="8.5" fontWeight="bold" fill={it.c}>
+                        {it.u === '°' || it.u === 'mm/m' ? it.v.toFixed(1) : Math.round(it.v)}{it.u || ''}
                     </text>
                 </g>
             ))}
@@ -326,35 +281,12 @@ const InfoPanel = ({ results, opts, panelX, panelY }: { results: DachrechnerResu
 };
 
 // ============================================================================
-// MODEL-SPECIFIC DETAILS
+// MAIN COMPONENT — SIDE VIEW
 // ============================================================================
-
-// Profile thickness per model (visual mm scale)
-const PROFILE_DETAILS: Record<string, { profileH: number; hasLED: boolean; gutterType: 'standard' | 'round' | 'klassiek' | 'integrated'; desc: string }> = {
-    orangeline: { profileH: 30, hasLED: false, gutterType: 'standard', desc: '8° stały kąt, profil standardowy' },
-    'orangeline+': { profileH: 35, hasLED: false, gutterType: 'standard', desc: '8° stały kąt, profil rozszerzony' },
-    trendline: { profileH: 35, hasLED: false, gutterType: 'standard', desc: 'Kąt obliczany, 3 typy rynien' },
-    'trendline+': { profileH: 42, hasLED: false, gutterType: 'standard', desc: 'Kąt obliczany, profil wzmocniony' },
-    topline: { profileH: 55, hasLED: false, gutterType: 'standard', desc: 'Profil premium 93mm, offset 155mm' },
-    topline_xl: { profileH: 65, hasLED: false, gutterType: 'standard', desc: 'Profil XL 117mm, słupek 196mm' },
-    designline: { profileH: 50, hasLED: true, gutterType: 'integrated', desc: 'Profil LED, zintegrowana rynna' },
-    ultraline_classic: { profileH: 60, hasLED: false, gutterType: 'integrated', desc: 'Spadek wewnętrzny, dowolny wysunięcie' },
-    ultraline_style: { profileH: 60, hasLED: false, gutterType: 'integrated', desc: 'Spadek wewnętrzny, stałe 120mm' },
-    ultraline_compact: { profileH: 55, hasLED: false, gutterType: 'integrated', desc: 'Kompaktowa wersja, bez wysunięcia' },
-    skyline: { profileH: 50, hasLED: false, gutterType: 'integrated', desc: 'Dach płaski, kąt szkła 95mm' },
-    skyline_freistand: { profileH: 50, hasLED: false, gutterType: 'integrated', desc: 'Płaski wolnostojący' },
-    carport: { profileH: 45, hasLED: false, gutterType: 'integrated', desc: 'Wiata, kąt szkła 28mm' },
-    carport_freistand: { profileH: 45, hasLED: false, gutterType: 'integrated', desc: 'Wiata wolnostojąca' },
-};
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export const DachrechnerDiagram: React.FC<DachrechnerDiagramProps> = ({ modelId, inputs, results, options, view = 'side' }) => {
     const model = ROOF_MODELS[modelId];
-    const theme = MODEL_THEMES[modelId] || MODEL_THEMES.orangeline;
-    const details = PROFILE_DETAILS[modelId] || PROFILE_DETAILS.orangeline;
+    const theme = TH[modelId] || TH.orangeline;
+    const prof = PROF[modelId] || PROF.orangeline;
 
     const opts: DimensionOptions = options || {
         showHeights: true, showDepths: true, showRafters: true,
@@ -362,409 +294,323 @@ export const DachrechnerDiagram: React.FC<DachrechnerDiagramProps> = ({ modelId,
     };
 
     const cat = model.category;
-    const isFreestanding = cat === 'flat_freestanding' || cat === 'carport_freestanding';
+    const isFree = cat === 'flat_freestanding' || cat === 'carport_freestanding' || cat === 'calculated_angle_freestanding';
     const isFlat = cat === 'flat' || cat === 'flat_freestanding' || cat === 'carport' || cat === 'carport_freestanding';
-    const isUltraline = cat === 'ultraline' || cat === 'ultraline_compact';
-    const isSloped = !isFlat && !isUltraline;
+    const isUltra = cat === 'ultraline' || cat === 'ultraline_compact';
+    const isSloped = !isFlat && !isUltra;
 
     const h3 = inputs.h3 || results?.h3 || 2250;
     const depth = inputs.depth || 5000;
     const h1 = inputs.h1 || results?.h1 || (isFlat ? h3 : 2800);
     const overhang = inputs.overhang || results?.overhang || 0;
-    const postWidth = model.postWidth;
+    const postW = model.postWidth;
 
-    // ---- FRONT VIEW ----
-    if (view === 'front') {
-        return <FrontView modelId={modelId} inputs={inputs} results={results} theme={theme} opts={opts} details={details} />;
+    if (view === 'front') return <FrontView modelId={modelId} inputs={inputs} results={results} theme={theme} opts={opts} prof={prof} />;
+
+    // ---- SIDE VIEW LAYOUT ----
+    const W = 1000, H = 720;
+    let dimCount = 0;
+    if (opts.showDepths) { dimCount++; if (results?.depthD1) dimCount++; if (results?.depthD2) dimCount++; }
+    if (opts.showPostDimensions) { if (results?.depthD4post) dimCount++; if (results?.depthD5) dimCount++; }
+
+    const PAD = { l: opts.showHeights ? 110 : 60, r: opts.showHeights ? 130 : 60, t: 56, b: Math.max(65, 38 + dimCount * 24) };
+    const DW = W - PAD.l - PAD.r, DH = H - PAD.t - PAD.b;
+    const maxH = Math.max(h1, h3) * 1.25, maxW = depth * 1.12;
+    const sc = Math.min(DH / maxH, DW / maxW);
+    const OX = PAD.l, OY = H - PAD.b;
+    const pt: PtFn = (x, y) => ({ x: OX + x * sc, y: OY - y * sc });
+
+    const psw = Math.max(10, postW * sc); // post screen width
+    const pth = Math.max(12, prof.ph * sc * 0.65); // profile screen thickness
+
+    // Key screen coords
+    const gndY = pt(0, 0).y;
+    const gutX = pt(0, 0).x;
+    const walX = pt(depth, 0).x;
+    const h3Y = pt(0, h3).y;
+    const h1Y = pt(0, h1).y;
+
+    // Profile endpoints
+    const profL = { x: gutX + psw, y: h3Y };        // Left = on top of post (gutter side)
+    const profR = { x: isFree ? walX - psw : walX, y: h1Y }; // Right = wall side
+
+    // Bottom dims
+    const bdims: Array<{ x1: number; x2: number; l: string; v: number; c: string }> = [];
+    if (opts.showDepths) {
+        if (results?.depthD1) bdims.push({ x1: 0, x2: results.depthD1, l: 'D1', v: results.depthD1, c: DC.d });
+        if (results?.depthD2) bdims.push({ x1: 0, x2: results.depthD2, l: 'D2', v: results.depthD2, c: DC.d });
+        bdims.push({ x1: 0, x2: depth, l: 'Tiefe', v: depth, c: DC.d });
     }
-
-    // ---- SIDE VIEW ----
-    const W = 1000, H = 780;
-    const PAD = { left: 180, right: 140, top: 95, bottom: 155 };
-    const DW = W - PAD.left - PAD.right;
-    const DH = H - PAD.top - PAD.bottom;
-
-    const maxH = Math.max(h1, h3) * 1.25;
-    const maxW = depth * 1.15;
-    const scale = Math.min(DH / maxH, DW / maxW);
-
-    const OX = PAD.left;
-    const OY = H - PAD.bottom;
-    const pt: PtFn = (x, y) => ({ x: OX + x * scale, y: OY - y * scale });
-
-    const legX = depth - overhang;
-    const endX = depth;
+    if (opts.showPostDimensions) {
+        if (results?.depthD4post) bdims.push({ x1: 0, x2: results.depthD4post, l: 'D4', v: results.depthD4post, c: DC.p });
+        if (results?.depthD5) bdims.push({ x1: 0, x2: results.depthD5, l: 'D5', v: results.depthD5, c: DC.p });
+    }
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full select-none" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-            <SharedDefs theme={theme} />
+            <Defs />
+            <rect x="0" y="0" width={W} height={H} fill="white" rx="8" />
 
-            {/* Background */}
-            <rect x="0" y="0" width={W} height={H} fill="#fafbfc" rx="12" />
-
-            {/* Title bar */}
-            <rect x="0" y="0" width={W} height="75" fill="white" stroke="#e2e8f0" strokeWidth="1" />
-            <circle cx="30" cy="38" r="16" fill={theme.primary} opacity="0.15" />
-            <circle cx="30" cy="38" r="8" fill={theme.primary} />
-            <text x="55" y="32" fontSize="17" fontWeight="800" fill="#1e293b">{theme.label}</text>
-            <text x="55" y="50" fontSize="11" fill="#64748b">{details.desc}</text>
-            {/* Post width badge */}
-            <rect x={W - 140} y="20" width="120" height="36" fill={theme.secondary} stroke={theme.primary} strokeWidth="0.5" rx="8" />
-            <text x={W - 80} y="35" textAnchor="middle" fontSize="9" fill={theme.accent} fontWeight="700">SŁUPEK</text>
-            <text x={W - 80} y="49" textAnchor="middle" fontSize="12" fill={theme.accent} fontWeight="800">{postWidth} mm</text>
-
-            {/* Freestanding badge */}
-            {isFreestanding && (
+            {/* ── TITLE BAR ── */}
+            <rect x="0" y="0" width={W} height="48" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="0.6" rx="8" />
+            <circle cx="20" cy="24" r="8" fill={theme.pri} opacity="0.15" />
+            <circle cx="20" cy="24" r="4" fill={theme.pri} />
+            <text x="36" y="20" fontSize="12" fontWeight="800" fill="#0f172a">{theme.label}</text>
+            <text x="36" y="34" fontSize="8.5" fill="#94a3b8">{prof.desc}</text>
+            <rect x={W - 100} y="10" width="85" height="28" fill={theme.sec} stroke={theme.pri} strokeWidth="0.4" rx="5" />
+            <text x={W - 57} y="21" textAnchor="middle" fontSize="7" fill={theme.acc} fontWeight="700">PFOSTEN</text>
+            <text x={W - 57} y="32" textAnchor="middle" fontSize="10" fill={theme.acc} fontWeight="800">{postW}mm</text>
+            {isFree && (
                 <g>
-                    <rect x={W - 280} y="22" width="125" height="32" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" rx="8" />
-                    <circle cx={W - 265} cy="38" r="4" fill="#f59e0b" />
-                    <text x={W - 255} y="42" fontSize="11" fontWeight="800" fill="#b45309">WOLNOSTOJĄCY</text>
+                    <rect x={W - 198} y="13" width="88" height="22" fill="#fef3c7" stroke="#f59e0b" strokeWidth="0.6" rx="5" />
+                    <text x={W - 154} y="28" textAnchor="middle" fontSize="8" fontWeight="800" fill="#b45309">FREISTAND</text>
                 </g>
             )}
 
-            {/* Ground */}
-            <Ground ox={OX} dw={DW} oy={OY} />
+            {/* ── GROUND ── */}
+            <Ground x1={gutX - 50} x2={walX + 50} y={gndY} />
 
-            {/* ---- STRUCTURAL RENDERING PER MODEL CATEGORY ---- */}
+            {/* ── WALL (right side, non-freestanding) ── */}
+            {!isFree && <Wall x={walX} yBot={gndY} yTop={Math.min(h1Y, h3Y) - 80} />}
 
-            {/* WALL (not freestanding) */}
-            {!isFreestanding && <Wall pt={pt} h1={h1} />}
+            {/* ── LEFT POST (gutter side) ── */}
+            <Post x={gutX} yBot={gndY} yTop={h3Y} w={psw} />
 
-            {/* Left post (freestanding) — taller side */}
-            {isFreestanding && (
-                <g>
-                    <Post pt={pt} x={postWidth} h={h1} width={postWidth} side="left" />
-                    {/* Foundation L */}
-                    {(() => {
-                        const p = pt(0, 0); return (
-                            <g>
-                                <rect x={p.x - 5} y={p.y} width={Math.max(12, postWidth * scale) + 16} height="4" fill="#f59e0b" rx="2" />
-                                <rect x={p.x - 8} y={p.y + 4} width={Math.max(12, postWidth * scale) + 22} height="8" fill="#fef3c7" stroke="#f59e0b" strokeWidth="0.8" rx="2" />
-                            </g>
-                        );
-                    })()}
-                </g>
-            )}
+            {/* ── RIGHT POST (freestanding only) ── */}
+            {isFree && <Post x={walX - psw} yBot={gndY} yTop={h1Y} w={psw} />}
 
-            {/* Right post */}
-            <Post pt={pt} x={legX} h={h3} width={postWidth} side="right" />
+            {/* ═══════ ROOF STRUCTURES ═══════ */}
 
-            {/* Foundation R (freestanding) */}
-            {isFreestanding && (() => {
-                const p = pt(legX, 0); const pW = Math.max(10, postWidth * scale); return (
-                    <g>
-                        <rect x={p.x - pW - 5} y={p.y} width={pW + 16} height="4" fill="#f59e0b" rx="2" />
-                        <rect x={p.x - pW - 8} y={p.y + 4} width={pW + 22} height="8" fill="#fef3c7" stroke="#f59e0b" strokeWidth="0.8" rx="2" />
-                    </g>
-                );
-            })()}
-
-            {/* Passage label between posts (freestanding) */}
-            {isFreestanding && opts.showDepths && (() => {
-                const p1 = pt(postWidth + 50, h3 * 0.4);
-                const p2 = pt(legX - postWidth - 50, h3 * 0.4);
-                const mx = (p1.x + p2.x) / 2;
-                const my = (p1.y + p2.y) / 2;
-                return (
-                    <g opacity="0.5">
-                        <line x1={p1.x} y1={my} x2={p2.x} y2={my} stroke="#f59e0b" strokeWidth="1" strokeDasharray="8 4" />
-                        <rect x={mx - 50} y={my - 12} width="100" height="24" fill="#fffbeb" stroke="#f59e0b" strokeWidth="0.8" rx="6" />
-                        <text x={mx} y={my + 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="#b45309">⟷  PRZEJAZD</text>
-                    </g>
-                );
-            })()}
-
-            {/* ROOF PANEL */}
+            {/* SLOPED: Ecoline, Trendstyle, Topstyle, Designstyle */}
             {isSloped && (
                 <g>
-                    <SlopedRoof pt={pt} x1={0} y1={h1} x2={endX} y2={h3} profileH={details.profileH} />
-                    {/* Wall profile connection */}
-                    <WallProfile pt={pt} y={h1 - 5} profileH={details.profileH + 10} color={theme.primary} />
-                    {/* Gutter */}
-                    <GutterStandard pt={pt} x={endX} y={h3} />
-                    {/* LED strip for Designline */}
-                    {details.hasLED && (
-                        <g>
-                            <line x1={pt(50, h1 - 2).x} y1={pt(50, h1 - 2).y} x2={pt(endX - 50, h3 - 2).x} y2={pt(endX - 50, h3 - 2).y}
-                                stroke="#fbbf24" strokeWidth="3" opacity="0.7" />
-                            <line x1={pt(50, h1 - 2).x} y1={pt(50, h1 - 2).y} x2={pt(endX - 50, h3 - 2).x} y2={pt(endX - 50, h3 - 2).y}
-                                stroke="white" strokeWidth="1" opacity="0.5" />
-                        </g>
-                    )}
-                    {/* Wedge indicators */}
-                    {opts.showWedges && results?.keilhoeheK1 && (
-                        <WedgeIndicator pt={pt} x={legX} yBase={h3} height={results.keilhoeheK1} side="right" />
-                    )}
-                    {opts.showWedges && results?.keilhoeheK2 && !isFreestanding && (
-                        <WedgeIndicator pt={pt} x={0} yBase={h1 - results.keilhoeheK2} height={results.keilhoeheK2} side="left" />
+                    {/* Roof profile — sits ON post cap, goes up to wall */}
+                    <SlopedProfile x1={profL.x} y1={profL.y} x2={profR.x} y2={profR.y} t={pth} />
+
+                    {/* Gutter at gutter end (left) */}
+                    <Gutter x={gutX} y={profL.y} />
+
+                    {/* Wall bracket at wall end (right, non-freestanding) */}
+                    {!isFree && <WallBracket x={walX - 8} y={profR.y} h={pth + 10} color={theme.pri} />}
+
+                    {/* Glass panel under roof */}
+                    <GlassPanel x1={profL.x + 15} y1={profL.y + pth + 3} x2={profR.x - 15} y2={profR.y + pth + 3} />
+
+                    {/* LED strip for Designstyle */}
+                    {prof.led && (
+                        <line x1={profL.x + 20} y1={profL.y + pth + 1}
+                            x2={profR.x - 20} y2={profR.y + pth + 1}
+                            stroke="#fbbf24" strokeWidth="2.5" opacity="0.45" />
                     )}
                 </g>
             )}
 
-            {isUltraline && (
+            {/* ULTRALINE: flat roof */}
+            {isUltra && (
                 <g>
-                    <FlatRoof pt={pt} x1={0} x2={endX} y={h1} height={details.profileH * 2} />
-                    {/* Internal glass pitch line */}
-                    <GlassPanel pt={pt} x1={80} y1={h1 + 15} x2={endX - 120} y2={h1 - 60} />
-                    {/* Wall profile */}
-                    <WallProfile pt={pt} y={h1 - 5} profileH={details.profileH * 2 + 10} color={theme.primary} />
-                    {/* Overhang indicator */}
+                    {/* Flat profile from post to wall, at h1 height */}
+                    <FlatProfile x1={gutX} x2={walX} y={h1Y - pth} t={pth} />
+                    <WallBracket x={walX - 8} y={h1Y - pth} h={pth + 10} color={theme.pri} />
+                    {/* Glass panel underneath with angle */}
+                    <GlassPanel x1={gutX + psw + 10} y1={h1Y} x2={walX - 12} y2={h1Y + pth * 1.2} />
+                    {/* Overhang extension (dashed, extends left beyond post) */}
                     {overhang > 0 && (
                         <g>
-                            <line x1={pt(legX, h1 + details.profileH).x} y1={pt(legX, h1 + details.profileH).y}
-                                x2={pt(endX, h1 + details.profileH).x} y2={pt(endX, h1 + details.profileH).y}
-                                stroke={theme.accent} strokeWidth="2" strokeDasharray="6 3" />
+                            <line x1={gutX - overhang * sc} y1={h1Y - pth / 2} x2={gutX} y2={h1Y - pth / 2}
+                                stroke={theme.acc} strokeWidth="1.5" strokeDasharray="5 3" />
+                            <rect x={gutX - overhang * sc} y={h1Y - pth} width={overhang * sc} height={pth}
+                                fill="#e2e8f0" stroke={DC.st} strokeWidth="1" strokeDasharray="4 3" opacity="0.4" />
                         </g>
                     )}
                 </g>
             )}
 
+            {/* FLAT: Skystyle, Carport */}
             {isFlat && (
                 <g>
-                    <FlatRoof pt={pt} x1={isFreestanding ? 0 : 0} x2={endX} y={h1} height={details.profileH * 2} />
-                    {!isFreestanding && <WallProfile pt={pt} y={h1 - 5} profileH={details.profileH * 2 + 10} color={theme.primary} />}
-                    {/* Glass angle for Skyline/Carport */}
+                    <FlatProfile x1={gutX} x2={walX} y={h1Y - pth} t={pth} />
+                    {!isFree && <WallBracket x={walX - 8} y={h1Y - pth} h={pth + 10} color={theme.pri} />}
                     {results?.angleBeta && (
-                        <GlassPanel pt={pt} x1={80} y1={h1 + 10} x2={endX - 100} y2={h1 - 40} />
+                        <GlassPanel x1={gutX + psw + 10} y1={h1Y} x2={walX - 12} y2={h1Y + pth} />
                     )}
                 </g>
             )}
 
-            {/* ---- DIMENSIONS ---- */}
+            {/* ═══════ DIMENSIONS ═══════ */}
 
-            {/* Heights LEFT */}
-            {opts.showHeights && isSloped && !isFreestanding && (
-                <DimVertical pt={pt} baseX={0} y1={0} y2={h1} label="H1" value={h1} offsetX={-65} />
-            )}
-            {/* H1 for freestanding (left post height) */}
-            {opts.showHeights && isFreestanding && (
-                <DimVertical pt={pt} baseX={0} y1={0} y2={h1} label="H1" value={h1} offsetX={-65} />
-            )}
-            {opts.showHeights && results?.heightH2 && !isFlat && (
-                <DimVertical pt={pt} baseX={0} y1={0} y2={results.heightH2} label="H2" value={results.heightH2} offsetX={-125} />
-            )}
-
-            {/* H3 RIGHT */}
+            {/* LEFT: H3 (gutter/post height) */}
             {opts.showHeights && (
-                <DimVertical pt={pt} baseX={legX} y1={0} y2={h3} label="H3" value={h3} offsetX={65} />
+                <DimV pt={pt} bx={0} y1={0} y2={h3} label="H3" val={h3} ox={-50} color={DC.h} />
             )}
 
-            {/* Depths BOTTOM */}
-            {opts.showDepths && (
-                <DimHorizontal pt={pt} baseY={0} x1={0} x2={endX} label="Tiefe (C)" value={depth} offsetY={35} />
-            )}
-            {opts.showDepths && results?.depthD1 && (
-                <DimHorizontal pt={pt} baseY={0} x1={0} x2={results.depthD1} label="D1" value={results.depthD1} offsetY={60} />
-            )}
-            {opts.showDepths && results?.depthD2 && (
-                <DimHorizontal pt={pt} baseY={0} x1={0} x2={results.depthD2} label="D2 Rynna" value={results.depthD2} offsetY={85} />
+            {/* RIGHT: H1 (wall height) — sloped + freestanding */}
+            {opts.showHeights && (isSloped || isFree) && (
+                <DimV pt={pt} bx={depth} y1={0} y2={h1} label="H1" val={h1} ox={40} color={DC.h} />
             )}
 
-            {/* Post dimensions */}
-            {opts.showPostDimensions && results?.depthD4post && (
-                <DimHorizontal pt={pt} baseY={0} x1={0} x2={results.depthD4post} label="D4 Słup" value={results.depthD4post} offsetY={110} color={DIM_COL.post} />
-            )}
-            {opts.showPostDimensions && results?.depthD5 && (
-                <DimHorizontal pt={pt} baseY={0} x1={0} x2={results.depthD5} label="D5 Wolny" value={results.depthD5} offsetY={135} color={DIM_COL.post} />
+            {/* RIGHT: H2 (total height including profile) */}
+            {opts.showHeights && results?.heightH2 && !isFlat && (
+                <DimV pt={pt} bx={depth} y1={0} y2={results.heightH2} label="H2" val={results.heightH2} ox={90} color={DC.h} />
             )}
 
-            {/* Overhang */}
-            {isUltraline && overhang > 0 && opts.showDepths && (
-                <DimHorizontal pt={pt} baseY={h1 + 80} x1={legX} x2={endX} label="U1" value={overhang} offsetY={-25} color={theme.primary} />
-            )}
+            {/* BOTTOM: D1, D2, Tiefe, D4, D5 */}
+            {bdims.map((d, i) => (
+                <DimH key={d.l} pt={pt} by={0} x1={d.x1} x2={d.x2} label={d.l} val={d.v} oy={24 + i * 24} color={d.c} />
+            ))}
 
-            {/* Rafter (Sparren) - diagonal */}
+            {/* TOP: S1 rafter diagonal */}
             {opts.showRafters && results?.sparrenMitte && isSloped && (() => {
-                const p1 = pt(0, h1);
-                const p2 = pt(endX, h3);
-                const dx = p2.x - p1.x, dy = p2.y - p1.y;
-                const len = Math.sqrt(dx * dx + dy * dy);
-                if (len === 0) return null;
-                const nx = -dy / len * 30, ny = dx / len * 30;
-                const mx = (p1.x + p2.x) / 2 + nx, my = (p1.y + p2.y) / 2 + ny;
+                const mx = (profL.x + profR.x) / 2;
+                const my = (profL.y + profR.y) / 2 - 18;
                 return (
                     <g>
-                        <line x1={p1.x + nx} y1={p1.y + ny} x2={p2.x + nx} y2={p2.y + ny} stroke={DIM_COL.rafter} strokeWidth="1.5" strokeDasharray="6 3" />
-                        <rect x={mx - 38} y={my - 13} width="76" height="26" fill="white" stroke={DIM_COL.rafter} strokeWidth="0.7" rx="6" filter="url(#dimShadow)" />
-                        <text x={mx} y={my + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill={DIM_COL.rafter}>S1: {Math.round(results.sparrenMitte!)}</text>
+                        <line x1={profL.x + 10} y1={profL.y - 6} x2={profR.x - 10} y2={profR.y - 6}
+                            stroke={DC.s} strokeWidth="1.2" />
+                        <path d={`M${profL.x + 10},${profL.y - 6} l5,-3 0,6Z`} fill={DC.s} />
+                        <path d={`M${profR.x - 10},${profR.y - 6} l-5,-3 0,6Z`} fill={DC.s} />
+                        <rect x={mx - 34} y={my - 10} width="68" height="20" fill="white" stroke={DC.s} strokeWidth="0.6" rx="4" />
+                        <text x={mx} y={my + 3} textAnchor="middle" fontSize="9.5" fontWeight="800" fill={DC.s} fontFamily="monospace">
+                            S1: {Math.round(results.sparrenMitte!)}
+                        </text>
                     </g>
                 );
             })()}
 
-            {/* Angle α arc */}
+            {/* α angle at gutter/post end */}
             {opts.showAngles && results?.angleAlpha && isSloped && (() => {
-                const c = pt(0, h1);
-                const r = 45;
-                const rad = results.angleAlpha * Math.PI / 180;
-                const ex = r * Math.cos(-rad);
-                const ey = r * Math.sin(-rad);
+                const cx = profL.x + 20;
+                const cy = profL.y + pth + 15;
+                const r = 30, rad = results.angleAlpha * Math.PI / 180;
                 return (
-                    <g transform={`translate(${c.x + 40}, ${c.y + 30})`}>
-                        <path d={`M ${r} 0 A ${r} ${r} 0 0 0 ${ex} ${ey}`} fill="none" stroke={DIM_COL.angle} strokeWidth="2" strokeDasharray="4 2" />
-                        <rect x={r + 8} y="-15" width="65" height="22" fill="white" stroke={DIM_COL.angle} strokeWidth="0.7" rx="5" filter="url(#dimShadow)" />
-                        <text x={r + 40} y="1" textAnchor="middle" fontSize="12" fontWeight="800" fill={DIM_COL.angle}>α = {results.angleAlpha.toFixed(1)}°</text>
+                    <g>
+                        <line x1={cx} y1={cy} x2={cx + 45} y2={cy} stroke={DC.a} strokeWidth="0.7" opacity="0.4" />
+                        <path d={`M${cx + r},${cy} A${r},${r} 0 0 0 ${cx + r * Math.cos(-rad)},${cy + r * Math.sin(-rad)}`}
+                            fill="none" stroke={DC.a} strokeWidth="1.5" />
+                        <rect x={cx + r + 4} y={cy - 10} width="54" height="16" fill="white" stroke={DC.a} strokeWidth="0.5" rx="3" />
+                        <text x={cx + r + 31} y={cy + 1} textAnchor="middle" fontSize="9" fontWeight="800" fill={DC.a}>
+                            α = {results.angleAlpha.toFixed(1)}°
+                        </text>
                     </g>
                 );
             })()}
 
-            {/* β angle for flat/ultraline */}
-            {opts.showAngles && (isUltraline || isFlat) && results?.angleBeta && (
-                <g transform={`translate(${PAD.left + 25}, ${PAD.top + 25})`}>
-                    <rect x="0" y="-14" width="90" height="24" fill="white" stroke={DIM_COL.angle} strokeWidth="0.7" rx="6" filter="url(#dimShadow)" />
-                    <text x="45" y="2" textAnchor="middle" fontSize="12" fontWeight="800" fill={DIM_COL.angle}>β = {results.angleBeta.toFixed(1)}°</text>
-                </g>
-            )}
-
-            {/* Info Panel */}
-            {results && (
-                <InfoPanel results={results} opts={opts} panelX={W - PAD.right - 150} panelY={PAD.top + 5} />
-            )}
-
-            {/* Legend */}
-            <g transform={`translate(${PAD.left - 20}, ${H - 38})`}>
-                <rect x="0" y="-12" width="420" height="30" fill="white" fillOpacity="0.95" stroke="#e2e8f0" rx="8" />
-                {[
-                    { c: DIM_COL.height, l: 'Wysokości' },
-                    { c: DIM_COL.depth, l: 'Głębokości' },
-                    { c: DIM_COL.post, l: 'Słupy' },
-                    { c: DIM_COL.rafter, l: 'Krokwie' },
-                    { c: theme.primary, l: theme.label },
-                ].map((item, i) => (
-                    <g key={i} transform={`translate(${i * 84 + 12}, 0)`}>
-                        <circle cx="0" cy="3" r="5" fill={item.c} />
-                        <text x="10" y="7" fontSize="10" fill="#334155" fontWeight="500">{item.l}</text>
+            {/* β angle for ultraline/flat */}
+            {opts.showAngles && (isUltra || isFlat) && results?.angleBeta && (() => {
+                const bx = walX - psw - 50;
+                const by = h1Y - pth - 14;
+                return (
+                    <g>
+                        <rect x={bx - 4} y={by - 10} width="54" height="16" fill="white" stroke={DC.a} strokeWidth="0.5" rx="3" />
+                        <text x={bx + 23} y={by + 1} textAnchor="middle" fontSize="9" fontWeight="800" fill={DC.a}>
+                            β = {results.angleBeta.toFixed(1)}°
+                        </text>
                     </g>
-                ))}
-            </g>
+                );
+            })()}
+
+            {/* U1 overhang for ultraline */}
+            {isUltra && overhang > 0 && opts.showDepths && (() => {
+                const ox1 = gutX - overhang * sc;
+                const uy = h1Y - pth - 12;
+                return (
+                    <g>
+                        <line x1={ox1} y1={uy} x2={gutX} y2={uy} stroke="#e11d48" strokeWidth="1.5" />
+                        <path d={`M${ox1},${uy} l5,-3 0,6Z`} fill="#e11d48" />
+                        <path d={`M${gutX},${uy} l-5,-3 0,6Z`} fill="#e11d48" />
+                        <rect x={(ox1 + gutX) / 2 - 26} y={uy - 12} width="52" height="16" fill="white" stroke="#e11d48" strokeWidth="0.5" rx="3" />
+                        <text x={(ox1 + gutX) / 2} y={uy - 2} textAnchor="middle" fontSize="9" fontWeight="800" fill="#e11d48" fontFamily="monospace">
+                            U1: {Math.round(overhang)}
+                        </text>
+                    </g>
+                );
+            })()}
+
+            {/* Info card — positioned lower right to avoid overlaps */}
+            {results && <InfoCard results={results} opts={opts} px={W - PAD.r - 125} py={PAD.t + 6} />}
+
+            <text x={W - 8} y={H - 6} textAnchor="end" fontSize="6" fill="#cbd5e1">mm</text>
         </svg>
     );
 };
 
 // ============================================================================
-// FRONT VIEW COMPONENT
+// FRONT VIEW
 // ============================================================================
-
 const FrontView: React.FC<{
-    modelId: RoofModelId;
-    inputs: DachrechnerInputs;
-    results: DachrechnerResults | null;
-    theme: typeof MODEL_THEMES[string];
-    opts: DimensionOptions;
-    details: typeof PROFILE_DETAILS[string];
-}> = ({ modelId, inputs, results, theme, opts, details }) => {
+    modelId: RoofModelId; inputs: DachrechnerInputs; results: DachrechnerResults | null;
+    theme: typeof TH[string]; opts: DimensionOptions; prof: typeof PROF[string];
+}> = ({ modelId, inputs, results, theme, opts, prof }) => {
     const model = ROOF_MODELS[modelId];
-    const width = inputs.width || 5000;
-    const posts = inputs.postCount || 2;
+    const width = inputs.width || 5000, posts = inputs.postCount || 2;
     const h3 = inputs.h3 || results?.h3 || 2250;
-    const postWidth = model.postWidth;
+    const pw = model.postWidth;
+    const totalPw = posts * pw;
+    const iw = posts > 1 ? (width - totalPw) / (posts - 1) : 0;
 
-    const totalPostWidth = posts * postWidth;
-    const innerWidth = posts > 1 ? (width - totalPostWidth) / (posts - 1) : 0;
+    const W = 1000, H = 700;
+    const PAD = { l: 90, r: 90, t: 60, b: 90 };
+    const DW = W - PAD.l - PAD.r, DH = H - PAD.t - PAD.b;
+    const sc = Math.min(DH / (h3 * 1.2), DW / (width * 1.1));
+    const OX = PAD.l + (DW - width * sc) / 2, OY = H - PAD.b;
+    const pt: PtFn = (x, y) => ({ x: OX + x * sc, y: OY - y * sc });
 
-    const W = 1000, H = 780;
-    const PAD = { left: 120, right: 120, top: 100, bottom: 160 };
-    const DW = W - PAD.left - PAD.right;
-    const DH = H - PAD.top - PAD.bottom;
-
-    const maxH = h3 * 1.3;
-    const maxW = width * 1.15;
-    const scale = Math.min(DH / maxH, DW / maxW);
-
-    const OX = PAD.left + (DW - width * scale) / 2;
-    const OY = H - PAD.bottom;
-    const pt: PtFn = (x, y) => ({ x: OX + x * scale, y: OY - y * scale });
+    const psw = Math.max(8, pw * sc);
+    const beamH = Math.max(10, prof.ph * sc * 0.5);
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full select-none" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-            <SharedDefs theme={theme} />
+            <Defs />
+            <rect x="0" y="0" width={W} height={H} fill="white" rx="8" />
+            <rect x="0" y="0" width={W} height="48" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="0.6" rx="8" />
+            <circle cx="20" cy="24" r="8" fill={theme.pri} opacity="0.15" />
+            <circle cx="20" cy="24" r="4" fill={theme.pri} />
+            <text x="36" y="20" fontSize="12" fontWeight="800" fill="#0f172a">{theme.label} — Vorderansicht</text>
+            <text x="36" y="34" fontSize="8.5" fill="#94a3b8">{pw}mm × {posts} Stk. | Lichte Weite: {Math.round(iw)}mm</text>
 
-            <rect x="0" y="0" width={W} height={H} fill="#fafbfc" rx="12" />
-
-            {/* Title bar */}
-            <rect x="0" y="0" width={W} height="75" fill="white" stroke="#e2e8f0" strokeWidth="1" />
-            <circle cx="30" cy="38" r="16" fill={theme.primary} opacity="0.15" />
-            <circle cx="30" cy="38" r="8" fill={theme.primary} />
-            <text x="55" y="32" fontSize="17" fontWeight="800" fill="#1e293b">{theme.label} — Widok z frontu</text>
-            <text x="55" y="50" fontSize="11" fill="#64748b">Słupek: {postWidth}mm × {posts} szt. | Rozstaw wewnętrzny: {Math.round(innerWidth)}mm</text>
-
-            {/* Ground */}
-            <Ground ox={OX - 30} dw={width * scale + 60} oy={OY} />
+            <Ground x1={OX - 20} x2={OX + width * sc + 20} y={OY} />
 
             {/* Posts */}
             {Array.from({ length: posts }).map((_, i) => {
-                const x = i * (postWidth + innerWidth);
-                const pBot = pt(x, 0);
-                const pTop = pt(x, h3);
-                const pW = Math.max(10, postWidth * scale);
+                const x = i * (pw + iw);
+                const px = pt(x, 0).x;
+                const topY = pt(0, h3).y;
                 return (
                     <g key={i}>
-                        <rect x={pBot.x} y={pTop.y} width={pW} height={pBot.y - pTop.y}
-                            fill="url(#postGrad)" stroke={DIM_COL.struct} strokeWidth="1.5" rx="1" filter="url(#structShadow)" />
-                        <rect x={pBot.x - 3} y={pBot.y - 6} width={pW + 6} height="6" fill="#94a3b8" stroke={DIM_COL.struct} rx="1" />
-                        {/* Post width label */}
-                        <text x={pBot.x + pW / 2} y={pBot.y - 12} textAnchor="middle" fontSize="8" fill="#64748b">{postWidth}</text>
-
-                        {/* Inner width between posts */}
-                        {i < posts - 1 && opts.showPostDimensions && (
-                            <g>
-                                {(() => {
-                                    const p1 = pt(x + postWidth, h3 / 2);
-                                    const p2 = pt(x + postWidth + innerWidth, h3 / 2);
-                                    return (
-                                        <g>
-                                            <line x1={p1.x} y1={p1.y - 5} x2={p1.x} y2={p1.y + 5} stroke={DIM_COL.post} strokeWidth="1.5" />
-                                            <line x1={p2.x} y1={p2.y - 5} x2={p2.x} y2={p2.y + 5} stroke={DIM_COL.post} strokeWidth="1.5" />
-                                            <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={DIM_COL.post} strokeWidth="1.5" />
-                                            <rect x={(p1.x + p2.x) / 2 - 35} y={p1.y - 12} width="70" height="24" fill="white" stroke={DIM_COL.post} strokeWidth="0.7" rx="5" filter="url(#dimShadow)" />
-                                            <text x={(p1.x + p2.x) / 2} y={p1.y + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={DIM_COL.post}>
-                                                {Math.round(innerWidth)}
-                                            </text>
-                                        </g>
-                                    );
-                                })()}
-                            </g>
-                        )}
+                        <Post x={px} yBot={OY} yTop={topY} w={psw} />
+                        {/* Inner width dimension between posts */}
+                        {i < posts - 1 && opts.showPostDimensions && (() => {
+                            const p1x = px + psw;
+                            const p2x = pt(x + pw + iw, 0).x;
+                            const midY = (topY + OY) / 2;
+                            return (
+                                <g>
+                                    <line x1={p1x} y1={midY - 6} x2={p1x} y2={midY + 6} stroke={DC.p} strokeWidth="1.5" />
+                                    <line x1={p2x} y1={midY - 6} x2={p2x} y2={midY + 6} stroke={DC.p} strokeWidth="1.5" />
+                                    <line x1={p1x} y1={midY} x2={p2x} y2={midY} stroke={DC.p} strokeWidth="1.5" />
+                                    <rect x={(p1x + p2x) / 2 - 26} y={midY - 10} width="52" height="18" fill="white" stroke={DC.p} strokeWidth="0.5" rx="3" />
+                                    <text x={(p1x + p2x) / 2} y={midY + 3} textAnchor="middle" fontSize="9" fontWeight="700" fill={DC.p} fontFamily="monospace">
+                                        {Math.round(iw)}
+                                    </text>
+                                </g>
+                            );
+                        })()}
                     </g>
                 );
             })}
 
-            {/* Beam / Roof bar at top */}
+            {/* Top beam / profile */}
             {(() => {
-                const p1 = pt(0, h3);
-                const p2 = pt(width, h3);
-                const barH = 20;
-                return (
-                    <g filter="url(#structShadow)">
-                        <rect x={p1.x} y={p1.y - barH} width={p2.x - p1.x} height={barH}
-                            fill="url(#roofGrad)" stroke={DIM_COL.struct} strokeWidth="1.5" rx="2" />
-                    </g>
-                );
+                const bx1 = pt(0, 0).x;
+                const bx2 = pt(width, 0).x;
+                const by = pt(0, h3).y;
+                return <FlatProfile x1={bx1} x2={bx2} y={by - beamH} t={beamH} />;
             })()}
 
-            {/* Total width dimension */}
-            {opts.showPostDimensions && (
-                <DimHorizontal pt={pt} baseY={0} x1={0} x2={width} label="Szerokość" value={width} offsetY={35} color={DIM_COL.post} />
-            )}
-
-            {/* Height H3 */}
-            {opts.showHeights && (
-                <DimVertical pt={pt} baseX={-200 / scale} y1={0} y2={h3} label="H3" value={h3} offsetX={-30} />
-            )}
-
-            {/* Legend */}
-            <g transform={`translate(${PAD.left}, ${H - 38})`}>
-                <rect x="0" y="-12" width="320" height="30" fill="white" fillOpacity="0.95" stroke="#e2e8f0" rx="8" />
-                {[
-                    { c: DIM_COL.height, l: 'Wysokości' },
-                    { c: DIM_COL.post, l: 'Słupy / Szerokości' },
-                    { c: theme.primary, l: theme.label },
-                ].map((item, i) => (
-                    <g key={i} transform={`translate(${i * 108 + 12}, 0)`}>
-                        <circle cx="0" cy="3" r="5" fill={item.c} />
-                        <text x="10" y="7" fontSize="10" fill="#334155" fontWeight="500">{item.l}</text>
-                    </g>
-                ))}
-            </g>
+            {/* B (width) */}
+            {opts.showPostDimensions && <DimH pt={pt} by={0} x1={0} x2={width} label="B" val={width} oy={24} color={DC.p} />}
+            {/* H3 */}
+            {opts.showHeights && <DimV pt={pt} bx={-80 / sc} y1={0} y2={h3} label="H3" val={h3} ox={-30} color={DC.h} />}
+            <text x={W - 8} y={H - 6} textAnchor="end" fontSize="6" fill="#cbd5e1">mm</text>
         </svg>
     );
 };

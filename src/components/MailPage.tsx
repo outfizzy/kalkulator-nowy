@@ -45,7 +45,7 @@ export const MailPage: React.FC = () => {
     const [selectedMailboxIdx, setSelectedMailboxIdx] = useState<number>(typeof savedPrimaryIdx === 'number' ? savedPrimaryIdx : 0);
 
     const [activeTab, setActiveTab] = useState<MailTab>('inbox');
-    const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+    const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '' });
     const [convertedMessageIds, setConvertedMessageIds] = useState<Set<string>>(new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     // Scanning removed per user request
@@ -285,124 +285,72 @@ export const MailPage: React.FC = () => {
     const boxName = activeTab === 'sent' ? 'Sent' : 'INBOX';
     const CACHE_KEY = `cached_emails_${selectedMailboxIdx}_${currentUser?.id}_${boxName}`;
 
-    // Fetch Emails Effect
-    React.useEffect(() => {
-        const fetchEmails = async () => {
-            // Skip if no active config or logic
-            if (!activeConfig?.imapHost || (activeTab !== 'inbox' && activeTab !== 'sent')) return;
-
-            setLoading(true);
-            try {
-                const response = await fetch('/api/fetch-emails', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        config: activeConfig,
-                        limit: 100, // Increased from default
-                        box: boxName
-                    })
-                });
-
-                if (!response.ok) {
-                    const errInfo = await response.json();
-                    if (errInfo.details && errInfo.details.includes('authentication failed')) {
-                        toast.error('Błąd logowania IMAP. Sprawdź hasło.');
-                    }
-                    throw new Error(errInfo.error || 'Fetch failed');
-                }
-
-                const data = await response.json();
-                const newEmails = data.messages || [];
-                setEmails(newEmails);
-                // Seed known IDs so polling won't fire notifications for existing emails
-                knownEmailIdsRef.current = new Set(newEmails.map((e: any) => e.id));
-                lastEmailCountRef.current = newEmails.length;
-                localStorage.setItem(CACHE_KEY, JSON.stringify(newEmails));
-            } catch (error) {
-                console.error('Error fetching emails:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (isConfigured && (activeTab === 'inbox' || activeTab === 'sent')) {
-            // Load from cache first for instant render
-            const cached = localStorage.getItem(CACHE_KEY);
-            if (cached) {
-                try {
-                    setEmails(JSON.parse(cached));
-                } catch (e) {
-                    console.error('Cache parse error', e);
-                }
-            } else {
-                // Clear emails if no cache mismatch to avoid showing inbox in sent
-                setEmails([]);
-            }
-
-            fetchEmails();
-        }
-    }, [activeConfig, activeTab, isConfigured, refreshTrigger, boxName, CACHE_KEY]);
-
-    // ── Auto-Polling (every 30s, silent background fetch) ──
-    const silentFetchRef = useRef<() => Promise<void>>();
-    silentFetchRef.current = async () => {
-        if (!activeConfig?.imapHost || activeTab === 'compose') return;
+    // Stable fetch function
+    const fetchEmailsFn = useCallback(async (silent = false) => {
+        if (!activeConfig?.imapHost || (activeTab !== 'inbox' && activeTab !== 'sent')) return;
+        if (!silent) setLoading(true);
         try {
             const response = await fetch('/api/fetch-emails', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ config: activeConfig, limit: 100, box: boxName })
             });
-            if (!response.ok) return;
+            if (!response.ok) {
+                const errInfo = await response.json();
+                if (!silent && errInfo.details?.includes('authentication failed')) {
+                    toast.error('Błąd logowania IMAP. Sprawdź hasło.');
+                }
+                throw new Error(errInfo.error || 'Fetch failed');
+            }
             const data = await response.json();
             const newEmails = data.messages || [];
-
-            // ── Detect genuinely new emails by UID comparison ──
-            if (knownEmailIdsRef.current.size > 0 && activeTab === 'inbox') {
-                const brandNewEmails = newEmails.filter(
-                    (e: any) => !knownEmailIdsRef.current.has(e.id) && !notifiedEmailIdsRef.current.has(e.id)
-                );
-
-                if (brandNewEmails.length > 0 && currentUser?.id) {
-                    // Create a notification for each new email (max 5 to avoid spam)
-                    const toNotify = brandNewEmails.slice(0, 5);
-                    for (const email of toNotify) {
+            
+            // Detect new emails for notifications (only on silent/poll updates)
+            if (silent && knownEmailIdsRef.current.size > 0 && activeTab === 'inbox') {
+                const brandNew = newEmails.filter((e: any) => !knownEmailIdsRef.current.has(e.id) && !notifiedEmailIdsRef.current.has(e.id));
+                if (brandNew.length > 0 && currentUser?.id) {
+                    for (const email of brandNew.slice(0, 5)) {
                         const senderName = (email.from || '').replace(/<.*>/, '').trim() || email.from;
                         try {
-                            await NotificationService.createNotification(
-                                currentUser.id,
-                                'info',
-                                `Nowa wiadomość od ${senderName}`,
-                                email.subject || '(Brak tematu)',
-                                '/mail'
-                            );
+                            await NotificationService.createNotification(currentUser.id, 'info', `Nowa wiadomość od ${senderName}`, email.subject || '(Brak tematu)', '/mail');
                             notifiedEmailIdsRef.current.add(email.id);
-                        } catch (e) {
-                            console.error('[MailNotif] Failed to create notification:', e);
-                        }
+                        } catch { /* silent */ }
                     }
-
-                    // Summary toast for the user currently viewing mail
-                    const total = brandNewEmails.length;
-                    if (total === 1) {
-                        const s = (brandNewEmails[0].from || '').replace(/<.*>/, '').trim();
-                        toast(`Nowa wiadomość od ${s}`, { icon: '📬', duration: 4000 });
+                    if (brandNew.length === 1) {
+                        toast(`Nowa wiadomość od ${(brandNew[0].from || '').replace(/<.*>/, '').trim()}`, { icon: '📬', duration: 4000 });
                     } else {
-                        toast(`${total} ${total < 5 ? 'nowe wiadomości' : 'nowych wiadomości'}`, { icon: '📬', duration: 4000 });
+                        toast(`${brandNew.length} nowych wiadomości`, { icon: '📬', duration: 4000 });
                     }
                 }
             }
-
-            // Update known IDs set
+            
             knownEmailIdsRef.current = new Set(newEmails.map((e: any) => e.id));
             lastEmailCountRef.current = newEmails.length;
             setEmails(newEmails);
             localStorage.setItem(CACHE_KEY, JSON.stringify(newEmails));
-        } catch { /* silent fail */ }
-    };
+        } catch (error) {
+            if (!silent) console.error('Error fetching emails:', error);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, [activeConfig, activeTab, boxName, CACHE_KEY, currentUser?.id]);
 
+    // Fetch Emails Effect
+    React.useEffect(() => {
+        if (isConfigured && (activeTab === 'inbox' || activeTab === 'sent')) {
+            // Load from cache first for instant render
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                try { setEmails(JSON.parse(cached)); } catch { /* ignore */ }
+            } else {
+                setEmails([]);
+            }
+            fetchEmailsFn(false);
+        }
+    }, [activeConfig, activeTab, isConfigured, refreshTrigger, boxName, CACHE_KEY, fetchEmailsFn]);
+
+    // ── Auto-Polling (every 60s, silent background fetch) ──
     useEffect(() => {
-        // Track initial count
         lastEmailCountRef.current = emails.length;
     }, [activeConfig, activeTab]);
 
@@ -411,9 +359,9 @@ export const MailPage: React.FC = () => {
             if (pollingRef.current) clearInterval(pollingRef.current);
             return;
         }
-        pollingRef.current = setInterval(() => silentFetchRef.current?.(), 30000);
+        pollingRef.current = setInterval(() => fetchEmailsFn(true), 60000);
         return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-    }, [isConfigured, activeTab, activeConfig, boxName]);
+    }, [isConfigured, activeTab, fetchEmailsFn]);
 
     // ── Smart Reply Handler ──
     const handleSmartReply = useCallback(async () => {
@@ -807,7 +755,7 @@ export const MailPage: React.FC = () => {
         e.preventDefault();
 
         if (!composeData.to || !composeData.subject || !composeData.body) {
-            toast.error('Wypełnij wszystkie pola');
+            toast.error('Wypełnij pola: odbiorca, temat i treść');
             return;
         }
 
@@ -847,11 +795,20 @@ export const MailPage: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     to: composeData.to,
+                    cc: composeData.cc || undefined,
+                    bcc: composeData.bcc || undefined,
                     subject: composeData.subject,
                     body: finalBody,
-                    config: activeConfig,
+                    config: {
+                        ...activeConfig,
+                        imapHost: activeConfig?.imapHost || activeConfig?.smtpHost,
+                        imapPort: activeConfig?.imapPort || 993,
+                        imapUser: activeConfig?.imapUser || activeConfig?.smtpUser,
+                        imapPassword: activeConfig?.imapPassword || activeConfig?.smtpPassword,
+                    },
                     scheduledAt: scheduleDate ? new Date(scheduleDate).toISOString() : null,
                     userId: currentUser?.id,
+                    saveToSent: true,
                     attachments: attachments.map(a => ({
                         filename: a.file.name,
                         contentType: a.file.type,
@@ -869,7 +826,7 @@ export const MailPage: React.FC = () => {
             toast.success(scheduleDate ? 'Wiadomość zaplanowana' : `Wysłano do: ${composeData.to}`, { id: toastId });
 
             // Reset form
-            setComposeData({ to: '', subject: '', body: '' });
+            setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '' });
             setAttachments([]);
             setScheduleDate('');
             if (!scheduleDate) setActiveTab('sent');
@@ -1341,10 +1298,26 @@ export const MailPage: React.FC = () => {
     const handleReply = () => {
         if (!selectedEmail) return;
         setActiveTab('compose');
+        const replyTo = selectedEmail.from.includes('<') ? selectedEmail.from.match(/<(.+?)>/)?.[1] || selectedEmail.from : selectedEmail.from;
         setComposeData({
-            to: selectedEmail.from.includes('<') ? selectedEmail.from.match(/<(.+?)>/)?.[1] || selectedEmail.from : selectedEmail.from,
+            to: replyTo,
+            cc: '', bcc: '',
             subject: selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`,
-            body: `\n\n--- Oryginalna wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString()}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
+            body: `\n\n--- Oryginalna wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString('pl-PL')}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
+        });
+    };
+
+    // Reply All handler
+    const handleReplyAll = () => {
+        if (!selectedEmail) return;
+        setActiveTab('compose');
+        const replyTo = selectedEmail.from.includes('<') ? selectedEmail.from.match(/<(.+?)>/)?.[1] || selectedEmail.from : selectedEmail.from;
+        const ccAddress = selectedEmail.to?.includes('<') ? selectedEmail.to.match(/<(.+?)>/)?.[1] || '' : selectedEmail.to || '';
+        setComposeData({
+            to: replyTo,
+            cc: ccAddress !== replyTo ? ccAddress : '', bcc: '',
+            subject: selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`,
+            body: `\n\n--- Oryginalna wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString('pl-PL')}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
         });
     };
 
@@ -1353,9 +1326,9 @@ export const MailPage: React.FC = () => {
         if (!selectedEmail) return;
         setActiveTab('compose');
         setComposeData({
-            to: '',
+            to: '', cc: '', bcc: '',
             subject: selectedEmail.subject.startsWith('Fwd:') ? selectedEmail.subject : `Fwd: ${selectedEmail.subject}`,
-            body: `\n\n--- Przekazana wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString()}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
+            body: `\n\n--- Przekazana wiadomość ---\nOd: ${selectedEmail.from}\nData: ${new Date(selectedEmail.date).toLocaleString('pl-PL')}\nTemat: ${selectedEmail.subject}\n\n${selectedEmail.text || ''}`
         });
     };
 
@@ -1688,8 +1661,8 @@ export const MailPage: React.FC = () => {
                                     const emailDate = new Date(email.date);
                                     const isToday = emailDate.toDateString() === new Date().toDateString();
                                     const dateStr = isToday
-                                        ? emailDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-                                        : emailDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                                        ? emailDate.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+                                        : emailDate.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
 
                                     // Date separator
                                     const group = getDateGroup(email.date);
@@ -1754,7 +1727,7 @@ export const MailPage: React.FC = () => {
                                                             </span>
                                                         </div>
                                                         <h3 className={`text-[13px] truncate mb-0.5 ${isUnread ? 'text-slate-900 font-semibold' : 'text-slate-700'}`}>
-                                                            {email.subject || '(Kein Betreff)'}
+                                                            {email.subject || '(Brak tematu)'}
                                                         </h3>
                                                         {previewText && (
                                                             <p className="text-xs text-slate-400 truncate leading-relaxed">
@@ -1833,16 +1806,40 @@ export const MailPage: React.FC = () => {
                                     </div>
                                 </div>
                                 {/* Compose Form Inputs */}
-                                <div className="space-y-4">
-                                    <div>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
                                         <input
                                             type="email"
                                             placeholder="Do:"
                                             value={composeData.to}
                                             onChange={e => setComposeData({ ...composeData, to: e.target.value })}
-                                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
+                                            className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
                                         />
+                                        {!composeData.cc && !composeData.bcc && (
+                                            <button type="button" onClick={() => setComposeData(p => ({...p, cc: p.cc || ' '}))}
+                                                className="text-xs text-slate-400 hover:text-blue-600 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors whitespace-nowrap">
+                                                CC / BCC
+                                            </button>
+                                        )}
                                     </div>
+                                    {(composeData.cc || composeData.bcc) && (
+                                        <div className="space-y-2 animate-fade-in">
+                                            <input
+                                                type="text"
+                                                placeholder="CC: (opcjonalnie)"
+                                                value={composeData.cc.trim()}
+                                                onChange={e => setComposeData({ ...composeData, cc: e.target.value })}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="BCC: (opcjonalnie)"
+                                                value={composeData.bcc}
+                                                onChange={e => setComposeData({ ...composeData, bcc: e.target.value })}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm"
+                                            />
+                                        </div>
+                                    )}
                                     <div>
                                         <input
                                             type="text"
@@ -2050,6 +2047,17 @@ export const MailPage: React.FC = () => {
                                                         <span className="hidden sm:inline">Odpowiedz</span>
                                                     </button>
                                                     <button
+                                                        onClick={handleReplyAll}
+                                                        className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                        title="Odpowiedz wszystkim"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l6 6m-6-6l6-6" opacity="0.5" />
+                                                        </svg>
+                                                        <span className="hidden lg:inline">Wszyscy</span>
+                                                    </button>
+                                                    <button
                                                         onClick={handleForward}
                                                         className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                                                         title="Przekaż dalej"
@@ -2118,11 +2126,11 @@ export const MailPage: React.FC = () => {
                                                                     {parsedName && <span className="text-xs text-slate-400">&lt;{parsedEmail}&gt;</span>}
                                                                 </div>
                                                                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                                                                    <span>{new Date(selectedEmail.date).toLocaleString('de-DE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    <span>{new Date(selectedEmail.date).toLocaleString('pl-PL', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                                                     {isSentView ? (
                                                                         selectedEmail.from && <span className="truncate">Od: {selectedEmail.from.replace(/<.*>/, '').trim()}</span>
                                                                     ) : (
-                                                                        selectedEmail.to && <span className="truncate">An: {selectedEmail.to}</span>
+                                                                        selectedEmail.to && <span className="truncate">Do: {selectedEmail.to}</span>
                                                                     )}
                                                                 </div>
                                                             </div>
