@@ -455,10 +455,10 @@ export const MailPage: React.FC = () => {
                 if (e.key === 'f' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); handleForwardRef.current?.(); return; }
             }
             // Arrow navigation in email list
-            if (!selectedEmail && (activeTab === 'inbox' || activeTab === 'sent') && filteredEmails.length > 0) {
+            if (!selectedEmail && (activeTab === 'inbox' || activeTab === 'sent') && emails.length > 0) {
                 if (e.key === 'ArrowDown' || e.key === 'j') {
                     e.preventDefault();
-                    handleSelectEmailRef.current?.(filteredEmails[0].id);
+                    handleSelectEmailRef.current?.(emails[0].id);
                 }
             }
             // Refresh with 'R' when no email selected
@@ -468,7 +468,7 @@ export const MailPage: React.FC = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedEmail, activeTab, showLeadForm, filteredEmails]);
+    }, [selectedEmail, activeTab, showLeadForm, emails]);
 
     // Debounced search effect
     useEffect(() => {
