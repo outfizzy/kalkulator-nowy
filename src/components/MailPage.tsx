@@ -87,6 +87,7 @@ export const MailPage: React.FC = () => {
     const lastEmailCountRef = useRef<number>(0);
     const knownEmailIdsRef = useRef<Set<number>>(new Set());
     const notifiedEmailIdsRef = useRef<Set<number>>(new Set());
+    const fetchInProgressRef = useRef(false);
 
     // Feature 3: Smart Reply
     const [smartReplies, setSmartReplies] = useState<string[]>([]);
@@ -289,6 +290,9 @@ export const MailPage: React.FC = () => {
     // Stable fetch function
     const fetchEmailsFn = useCallback(async (silent = false) => {
         if (!activeConfig?.imapHost || (activeTab !== 'inbox' && activeTab !== 'sent')) return;
+        // Prevent concurrent fetches (causes duplicate notifications)
+        if (fetchInProgressRef.current && silent) return;
+        fetchInProgressRef.current = true;
         if (!silent) setLoading(true);
         if (silent) setIsRefreshing(true);
         try {
@@ -306,18 +310,26 @@ export const MailPage: React.FC = () => {
             }
             const data = await response.json();
             const newEmails = data.messages || [];
+            const newIds = new Set(newEmails.map((e: any) => e.id));
             
-            // Detect new emails for notifications (only on silent/poll updates)
+            // Detect new emails for notifications (only on poll updates when we already know existing emails)
             if (silent && knownEmailIdsRef.current.size > 0 && activeTab === 'inbox') {
-                const brandNew = newEmails.filter((e: any) => !knownEmailIdsRef.current.has(e.id) && !notifiedEmailIdsRef.current.has(e.id));
+                const brandNew = newEmails.filter((e: any) => 
+                    !knownEmailIdsRef.current.has(e.id) && !notifiedEmailIdsRef.current.has(e.id)
+                );
                 if (brandNew.length > 0 && currentUser?.id) {
-                    for (const email of brandNew.slice(0, 5)) {
+                    // Mark as notified FIRST to prevent duplicates from concurrent calls
+                    for (const email of brandNew) {
+                        notifiedEmailIdsRef.current.add(email.id);
+                    }
+                    // Then send notifications (max 3)
+                    for (const email of brandNew.slice(0, 3)) {
                         const senderName = (email.from || '').replace(/<.*>/, '').trim() || email.from;
                         try {
                             await NotificationService.createNotification(currentUser.id, 'info', `Nowa wiadomość od ${senderName}`, email.subject || '(Brak tematu)', '/mail');
-                            notifiedEmailIdsRef.current.add(email.id);
                         } catch { /* silent */ }
                     }
+                    // Single toast
                     if (brandNew.length === 1) {
                         toast(`Nowa wiadomość od ${(brandNew[0].from || '').replace(/<.*>/, '').trim()}`, { icon: '📬', duration: 4000 });
                     } else {
@@ -326,13 +338,14 @@ export const MailPage: React.FC = () => {
                 }
             }
             
-            knownEmailIdsRef.current = new Set(newEmails.map((e: any) => e.id));
+            knownEmailIdsRef.current = newIds;
             lastEmailCountRef.current = newEmails.length;
             setEmails(newEmails);
             localStorage.setItem(CACHE_KEY, JSON.stringify(newEmails));
         } catch (error) {
             if (!silent) console.error('Error fetching emails:', error);
         } finally {
+            fetchInProgressRef.current = false;
             if (!silent) setLoading(false);
             setIsRefreshing(false);
         }
@@ -344,7 +357,14 @@ export const MailPage: React.FC = () => {
             // Load from cache first for instant render
             const cached = localStorage.getItem(CACHE_KEY);
             if (cached) {
-                try { setEmails(JSON.parse(cached)); } catch { /* ignore */ }
+                try {
+                    const cachedEmails = JSON.parse(cached);
+                    setEmails(cachedEmails);
+                    // Seed knownEmailIdsRef from cache so first fetch doesn't trigger notifications
+                    if (knownEmailIdsRef.current.size === 0) {
+                        knownEmailIdsRef.current = new Set(cachedEmails.map((e: any) => e.id));
+                    }
+                } catch { /* ignore */ }
                 // Cache exists → silent background fetch (no loading spinner)
                 fetchEmailsFn(true);
             } else {
