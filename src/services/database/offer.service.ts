@@ -141,7 +141,8 @@ export const OfferService = {
         if (profile?.commission_rate) {
             const rate = Number(profile.commission_rate);
             if (rate > 0) {
-                const vatDiv = (offer.pricing as any)?.vatRate || ((offer.pricing as any)?.currency === 'PLN' ? 1.23 : 1.19);
+                const rawVat = (offer.pricing as any)?.vatRate;
+                const vatDiv = rawVat ? (rawVat < 1 ? 1 + rawVat : rawVat) : ((offer.pricing as any)?.currency === 'PLN' ? 1.23 : 1.19);
                 const netPrice = offer.pricing.sellingPriceNet || (offer.pricing.totalCost / vatDiv);
                 calculatedCommission = Math.round(netPrice * rate * 100) / 100;
             }
@@ -300,7 +301,8 @@ export const OfferService = {
                     if (profile.commission_rate) {
                         const rate = Number(profile.commission_rate);
                         if (rate > 0) {
-                            const vatDiv = (updates.pricing as any)?.vatRate || ((updates.pricing as any)?.currency === 'PLN' ? 1.23 : 1.19);
+                            const rawVat = (updates.pricing as any)?.vatRate;
+                            const vatDiv = rawVat ? (rawVat < 1 ? 1 + rawVat : rawVat) : ((updates.pricing as any)?.currency === 'PLN' ? 1.23 : 1.19);
                             const netPrice = updates.pricing.sellingPriceNet || (updates.pricing.totalCost / vatDiv);
                             updates.commission = Math.round(netPrice * rate * 100) / 100;
                         }

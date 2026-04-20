@@ -409,7 +409,10 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
     const isCash = paymentMethod === 'cash';
 
     const isPL = pricing?.currency === 'PLN';
-    const vatRate = pricing?.vatRate || (isPL ? 1.23 : 1.19);
+    const rawVatRate = pricing?.vatRate;
+    const vatRate = rawVatRate
+        ? (rawVatRate < 1 ? 1 + rawVatRate : rawVatRate)
+        : (isPL ? 1.23 : 1.19);
     const currSuffix = isPL ? ' PLN' : ' EUR';
 
     const netPrice = pricing?.finalPriceNet || pricing?.sellingPriceNet || 0;

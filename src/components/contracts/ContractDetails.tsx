@@ -283,7 +283,11 @@ export const ContractDetails: React.FC = () => {
 
     const netPrice = contract.pricing?.finalPriceNet || contract.pricing?.sellingPriceNet || 0;
     const isPLContract = (contract.pricing as any)?.currency === 'PLN';
-    const vatRate = (contract.pricing as any)?.vatRate || (isPLContract ? 1.23 : 1.19);
+    // Normalize vatRate: handle both 0.19 (percentage) and 1.19 (multiplier) formats for backward compatibility
+    const rawVatRate = (contract.pricing as any)?.vatRate;
+    const vatRate = rawVatRate
+        ? (rawVatRate < 1 ? 1 + rawVatRate : rawVatRate)
+        : (isPLContract ? 1.23 : 1.19);
     const vatLabel = isPLContract ? `${Math.round((vatRate - 1) * 100)}% VAT` : '19% MwSt';
     const grossPrice = netPrice * vatRate;
     const commissionRate = netPrice > 0 ? ((contract.commission || 0) / netPrice) * 100 : 0;

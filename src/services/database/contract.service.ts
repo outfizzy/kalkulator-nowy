@@ -1352,7 +1352,7 @@ export const ContractService = {
                 basePrice: totalPrice,
                 finalPriceNet: totalPrice,
                 sellingPriceNet: totalPrice,
-                vatRate: 0.19,
+                vatRate: 1.19,
                 advancePayment: contractDetails.advance || 0,
                 paymentMethod: contractDetails.paymentMethod || 'transfer',
                 installationCosts: contractDetails.installationPriceNet ? {
