@@ -653,7 +653,22 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
 };
 
 // Extracted Column Component with useDroppable
-const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: { column: typeof COLUMNS[0], leads: Lead[], onNavigate: (id: string) => void, onUpdate: () => void, onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; completedFormLeadIds: Set<string>; onAutoAssign?: () => void; onBulkEmail?: () => void; offerViewMap: Record<string, OfferCardInfo>; leadOfferValues: Record<string, { total: number; count: number; lastNet: number }> }) => {
+interface KanbanColumnProps {
+    column: typeof COLUMNS[0];
+    leads: Lead[];
+    onNavigate: (id: string) => void;
+    onUpdate: () => void;
+    onSchedule: (lead: Lead) => void;
+    onDelete: (id: string) => void;
+    isAdmin: boolean;
+    completedFormLeadIds: Set<string>;
+    onAutoAssign?: () => void;
+    onBulkEmail?: () => void;
+    offerViewMap: Record<string, OfferCardInfo>;
+    leadOfferValues: Record<string, { total: number; count: number; lastNet: number }>;
+}
+
+const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: KanbanColumnProps) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
