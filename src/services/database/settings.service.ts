@@ -151,33 +151,6 @@ export const SettingsService = {
         if (error) throw error;
     },
 
-    async getEurRate(): Promise<number | null> {
-        try {
-            const { data, error } = await supabase
-                .from('app_settings')
-                .select('value')
-                .eq('key', 'eur_rate')
-                .single();
-
-            if (error || !data) return null;
-            return (data.value as any)?.rate || null;
-        } catch (e) {
-            console.error('Error fetching EUR rate:', e);
-            return null;
-        }
-    },
-
-    async updateEurRate(rate: number): Promise<void> {
-        const { error } = await supabase
-            .from('app_settings')
-            .upsert({
-                key: 'eur_rate',
-                value: { rate },
-                updated_at: new Date().toISOString()
-            });
-
-        if (error) throw error;
-    },
 
     async getGlobalPricingPolicy(): Promise<GlobalPricingPolicy> {
         try {
