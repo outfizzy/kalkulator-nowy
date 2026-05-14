@@ -650,7 +650,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                     )}
                 </div>
             )}
-        </div >
+        </div>
     );
 };
 
