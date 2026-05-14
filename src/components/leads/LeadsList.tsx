@@ -13,6 +13,8 @@ import { LeadsFunnelChart } from './LeadsFunnelChart';
 import { LeadsStats } from './LeadsStats';
 import { LeadsMap } from './LeadsMap';
 import { ConfiguratorService } from '../../services/database/configurator.service';
+import { BarChart3, List, LayoutGrid, MapPin, Search, Trash2, Flame, ClipboardCheck, Building2, Globe, Calendar, Clock, User as UserIcon, Plus, ArrowDownUp, CheckCircle2, FileText, X, Loader2 } from 'lucide-react';
+
 
 export const LeadsList: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -157,17 +159,25 @@ export const LeadsList: React.FC = () => {
             const query = searchQuery.toLowerCase();
             const customer = lead.customerData;
 
+            // Normalize search digits for phone matching
+            const queryDigits = searchQuery.replace(/\D/g, '');
+
             // Basic Fields
             const matchesBasic = (
                 (customer.firstName || '').toLowerCase().includes(query) ||
                 (customer.lastName || '').toLowerCase().includes(query) ||
                 (customer.companyName || '').toLowerCase().includes(query) ||
                 (customer.city || '').toLowerCase().includes(query) ||
-                (customer.phone || '').includes(query) ||
                 (customer.email || '').toLowerCase().includes(query)
             );
 
             if (matchesBasic) return true;
+
+            // Phone number matching (normalized — strips all formatting)
+            if (queryDigits.length >= 3) {
+                const phoneDigits = (customer.phone || '').replace(/\D/g, '');
+                if (phoneDigits.includes(queryDigits)) return true;
+            }
 
             // Fair Name lookup
             if (lead.source === 'targi' && lead.fairId) {
@@ -341,13 +351,13 @@ export const LeadsList: React.FC = () => {
                                         </div>
                                         {leadActivity.get(lead.id)?.isHot && (
                                             <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700 animate-pulse flex items-center gap-1" title="Aktywność w ciągu 24h">
-                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" /></svg>
+                                                <Flame className="w-3 h-3" />
                                                 HOT
                                             </span>
                                         )}
                                         {completedFormLeadIds.has(lead.id) && (
                                             <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 inline-flex items-center gap-0.5" title="Formularz konfiguracji wypełniony">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                                                <ClipboardCheck className="w-3 h-3" />
                                             </span>
                                         )}
                                     </div>
@@ -360,12 +370,12 @@ export const LeadsList: React.FC = () => {
                                         {/* Source Badge */}
                                         {lead.source === 'targi' ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 self-start">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                                <Building2 className="w-3 h-3" />
                                                 {fair?.name || 'Targi'}
                                             </span>
                                         ) : lead.source === 'website' ? (
                                             <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                                                <Globe className="w-3 h-3" />
                                                 Strona WWW
                                             </span>
                                         ) : lead.source === 'website_pl' ? (
@@ -400,7 +410,7 @@ export const LeadsList: React.FC = () => {
                                         {lead.status === 'lost' && (lead.lostByName || lead.lostReason) && (
                                             <div className="text-[10px] mt-1 px-2 py-1.5 bg-red-50 rounded-md border border-red-100">
                                                 {lead.lostReason && <div className="text-red-600 font-medium max-w-[250px]" title={lead.lostReason}>{lead.lostReason}</div>}
-                                                {lead.lostByName && <div className="text-red-400 mt-0.5 flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> {lead.lostByName}</div>}
+                                                {lead.lostByName && <div className="text-red-400 mt-0.5 flex items-center gap-0.5"><UserIcon className="w-2.5 h-2.5" /> {lead.lostByName}</div>}
                                             </div>
                                         )}
                                     </div>
@@ -409,7 +419,7 @@ export const LeadsList: React.FC = () => {
                                     {scheduledMeasurement ? (
                                         <div className="flex flex-col gap-1">
                                             <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                <Calendar className="w-3 h-3" />
                                                 {new Date(scheduledMeasurement.scheduledDate).toLocaleDateString('pl-PL')}
                                             </span>
                                             {scheduledMeasurement.salesRepName && (
@@ -424,7 +434,7 @@ export const LeadsList: React.FC = () => {
                                     {completedMeasurement && !lead.status.includes('won') ? (
                                         <div className="flex flex-col gap-1">
                                             <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                <Clock className="w-3 h-3" />
                                                 Zastanawia się
                                             </span>
                                             <span className="text-xs text-slate-500">
@@ -473,7 +483,7 @@ export const LeadsList: React.FC = () => {
                                                 className="text-red-500 hover:text-red-700 ml-2 p-1 hover:bg-red-50 rounded"
                                                 title="Usuń Lead"
                                             >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         )}
                                     </div>
@@ -527,22 +537,22 @@ export const LeadsList: React.FC = () => {
                 <div className="flex gap-4">
                     <div className="bg-white p-1 rounded-lg border border-slate-200 flex items-center">
                         <button onClick={() => setShowStats(!showStats)} className={`p-2 rounded-md ${showStats ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400'}`}>
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                            <BarChart3 className="w-5 h-5" />
                         </button>
                         <div className="w-px h-6 bg-slate-200 mx-1"></div>
                         <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}>
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                            <List className="w-5 h-5" />
                         </button>
                         <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-md ${viewMode === 'kanban' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}>
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" /></svg>
+                            <LayoutGrid className="w-5 h-5" />
                         </button>
                         <button onClick={() => setViewMode('map')} className={`p-2 rounded-md ${viewMode === 'map' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`} title="Mapa">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            <MapPin className="w-5 h-5" />
                         </button>
                     </div>
 
                     <Link to="/leads/new" className="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
-                        + Dodaj Leada
+                        <Plus className="w-4 h-4" /> Dodaj Leada
                     </Link>
                 </div>
             </div>
@@ -561,14 +571,12 @@ export const LeadsList: React.FC = () => {
                     <div className="relative">
                         <input
                             type="text"
-                            placeholder="Szukaj (Klient, Miasto, Targi...)"
+                            placeholder="Szukaj (Klient, Telefon, Miasto, Targi...)"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-1.5 text-sm outline-none w-64 focus:border-accent focus:ring-1 focus:ring-accent"
                         />
-                        <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2" />
                     </div>
 
                     <div className="w-px h-8 bg-slate-100 mx-2"></div>
@@ -646,7 +654,8 @@ export const LeadsList: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button onClick={() => setSortOrder(p => p === 'desc' ? 'asc' : 'desc')} className="text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                    <button onClick={() => setSortOrder(p => p === 'desc' ? 'asc' : 'desc')} className="text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                        <ArrowDownUp className="w-3.5 h-3.5" />
                         {sortOrder === 'desc' ? 'Najnowsze' : 'Najstarsze'}
                     </button>
                     <button
@@ -664,7 +673,7 @@ export const LeadsList: React.FC = () => {
                                 : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
                         }`}
                     >
-                        {loadingClosed ? '⏳ Ładuję...' : showClosedLeads ? '✓ Won/Lost' : '📋 +Won/Lost'}
+                        {loadingClosed ? <><Loader2 className="w-3.5 h-3.5 inline animate-spin mr-1" />Ładuję...</> : showClosedLeads ? <><CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />Won/Lost</> : <><FileText className="w-3.5 h-3.5 inline mr-1" />+Won/Lost</>}
                     </button>
                 </div>
             </div>
@@ -724,9 +733,9 @@ export const LeadsList: React.FC = () => {
                             disabled={bulkProcessing || (!bulkAction || (bulkAction === 'assign' && !bulkAssignee) || (bulkAction === 'status' && !bulkStatus))}
                             className="text-sm px-4 py-1.5 rounded-lg font-bold text-white bg-accent hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
-                            {bulkProcessing ? '⏳ Przetwarzam...' : 'Wykonaj'}
+                            {bulkProcessing ? <><Loader2 className="w-3.5 h-3.5 inline animate-spin mr-1" />Przetwarzam...</> : 'Wykonaj'}
                         </button>
-                        <button onClick={() => { setSelectedLeads(new Set()); setBulkAction(''); }} className="text-sm text-slate-500 hover:text-slate-700 ml-auto">✕ Anuluj</button>
+                        <button onClick={() => { setSelectedLeads(new Set()); setBulkAction(''); }} className="text-sm text-slate-500 hover:text-slate-700 ml-auto flex items-center gap-1"><X className="w-3.5 h-3.5" /> Anuluj</button>
                     </div>
                 )}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

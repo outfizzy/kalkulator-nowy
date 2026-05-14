@@ -3,6 +3,7 @@ import type { Lead } from '../../types';
 import type { Fair } from '../../services/database/fair.service';
 import { format, startOfWeek, startOfMonth, subWeeks, subMonths, differenceInDays, differenceInHours } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { BarChart3, Users, UserPlus, Phone, FileText, Trophy, Clock, DollarSign, AlertTriangle, Calendar, Link2, ArrowUpDown, Star, User, Globe, Building2 } from 'lucide-react';
 
 interface LeadsStatsProps {
     leads: Lead[];
@@ -264,8 +265,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         <div className="space-y-6 mb-6">
             {/* ══════════ Time Range Filter ══════════ */}
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-indigo-500" />
                     Statystyki Leadów
                 </h2>
                 <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
@@ -293,29 +294,31 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             {/* ══════════ KPI Cards ══════════ */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                 {[
-                    { label: 'Wszystkie', value: stats.total, icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>, color: 'text-slate-900', iconColor: 'text-slate-400', sub: `${stats.uniqueAssignees} handlowców` },
-                    { label: 'Nowe', value: stats.newClients, icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>, color: 'text-blue-700', iconColor: 'text-blue-300', bg: 'from-blue-50 to-cyan-50', sub: 'Nowe + Formularz' },
-                    { label: 'Skontaktowano', value: stats.contacted, icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>, color: 'text-indigo-700', iconColor: 'text-indigo-300', sub: 'Przedstawiciel ruszył' },
-                    { label: 'Oferta / Pomiar', value: stats.inOffer + stats.inMeasurement, icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, color: 'text-amber-700', iconColor: 'text-amber-300', sub: `${stats.inOffer} ofert · ${stats.inMeasurement} pomiarów` },
-                    { label: 'Win Rate', value: stats.winRate === '—' ? '—' : `${stats.winRate}%`, icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>, color: 'text-emerald-700', iconColor: 'text-emerald-300', bg: 'from-emerald-50 to-green-50', sub: `${stats.won} wyg. / ${stats.lost} utr.` },
-                    { label: 'Czas Reakcji', value: formatResponseTime(stats.avgResponseHours), icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, color: stats.avgResponseHours && stats.avgResponseHours < 4 ? 'text-emerald-600' : stats.avgResponseHours && stats.avgResponseHours < 24 ? 'text-amber-600' : 'text-red-600', iconColor: 'text-amber-300', sub: 'Śr. do 1. kontaktu' },
-                    { label: 'Wartość', value: stats.totalWonValue > 0 ? `${formatValue(stats.totalWonValue)}€` : '—', icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, color: 'text-amber-700', iconColor: 'text-amber-300', bg: 'from-amber-50 to-yellow-50', sub: 'Wygrane umowy' },
-                    { label: 'Zagrożone', value: stats.staleCount, icon: <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>, color: stats.staleCount > 0 ? 'text-red-600' : 'text-emerald-600', iconColor: stats.staleCount > 0 ? 'text-red-300' : 'text-emerald-300', sub: 'Bez kontaktu' },
+                    { label: 'Wszystkie', value: stats.total, icon: <Users className="w-4 h-4" />, color: 'text-slate-900', iconBg: 'bg-slate-50 text-slate-500', sub: `${stats.uniqueAssignees} handlowców` },
+                    { label: 'Nowe', value: stats.newClients, icon: <UserPlus className="w-4 h-4" />, color: 'text-blue-700', iconBg: 'bg-blue-50 text-blue-500', sub: 'Nowe + Formularz' },
+                    { label: 'Skontaktowano', value: stats.contacted, icon: <Phone className="w-4 h-4" />, color: 'text-indigo-700', iconBg: 'bg-indigo-50 text-indigo-500', sub: 'Przedstawiciel ruszył' },
+                    { label: 'Oferta / Pomiar', value: stats.inOffer + stats.inMeasurement, icon: <FileText className="w-4 h-4" />, color: 'text-amber-700', iconBg: 'bg-amber-50 text-amber-500', sub: `${stats.inOffer} ofert · ${stats.inMeasurement} pom.` },
+                    { label: 'Win Rate', value: stats.winRate === '—' ? '—' : `${stats.winRate}%`, icon: <Trophy className="w-4 h-4" />, color: 'text-emerald-700', iconBg: 'bg-emerald-50 text-emerald-500', sub: `${stats.won} wyg. / ${stats.lost} utr.` },
+                    { label: 'Czas Reakcji', value: formatResponseTime(stats.avgResponseHours), icon: <Clock className="w-4 h-4" />, color: stats.avgResponseHours && stats.avgResponseHours < 4 ? 'text-emerald-600' : stats.avgResponseHours && stats.avgResponseHours < 24 ? 'text-amber-600' : 'text-red-600', iconBg: 'bg-amber-50 text-amber-500', sub: 'Śr. do 1. kontaktu' },
+                    { label: 'Wartość', value: stats.totalWonValue > 0 ? `${formatValue(stats.totalWonValue)}€` : '—', icon: <DollarSign className="w-4 h-4" />, color: 'text-amber-700', iconBg: 'bg-amber-50 text-amber-500', sub: 'Wygrane umowy' },
+                    { label: 'Zagrożone', value: stats.staleCount, icon: <AlertTriangle className="w-4 h-4" />, color: stats.staleCount > 0 ? 'text-red-600' : 'text-emerald-600', iconBg: stats.staleCount > 0 ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500', sub: 'Bez kontaktu' },
                 ].map((card, i) => (
-                    <div key={i} className={`bg-gradient-to-br ${card.bg || 'from-white to-slate-50'} p-3 rounded-xl border border-slate-200/60 shadow-sm relative overflow-hidden group hover:shadow-md transition-all`}>
-                        <div className={`absolute -top-2 -right-2 opacity-[0.06] group-hover:opacity-[0.1] transition-opacity ${card.iconColor}`}>{card.icon}</div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{card.label}</p>
-                        <div className={`text-xl font-black mt-0.5 ${card.color}`}>{card.value}</div>
-                        <p className={`text-[9px] mt-0.5 truncate ${(card as any).subColor || 'text-slate-400'}`}>{card.sub}</p>
+                    <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">{card.label}</p>
+                            <div className={`p-1.5 rounded-lg ${card.iconBg}`}>{card.icon}</div>
+                        </div>
+                        <div className={`text-xl font-bold ${card.color}`}>{card.value}</div>
+                        <p className="text-[9px] mt-0.5 truncate text-slate-400">{card.sub}</p>
                     </div>
                 ))}
             </div>
 
             {/* ══════════ Weekly Lead Intake Timeline ══════════ */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                        <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-indigo-500" />
                         Nowe Leady — Tygodniowo (12 tyg.)
                     </h3>
                     <div className="flex items-center gap-3 text-[10px]">
@@ -344,10 +347,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             {/* ══════════ Monthly Summary + Recent Leads ══════════ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Monthly Summary */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-                        <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-slate-100">
+                        <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-500" />
                             Miesięczne Podsumowanie
                         </h3>
                     </div>
@@ -376,10 +379,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                 </div>
 
                 {/* Recent Leads Added */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-                        <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-slate-100">
+                        <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-blue-500" />
                             Ostatnio Dodane Leady
                         </h3>
                     </div>
@@ -408,10 +411,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
 
             {/* ══════════ Pipeline Bar ══════════ */}
             {stats.pipelineTotal > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+                        <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                            <ArrowUpDown className="w-4 h-4 text-slate-500" />
                             Rozkład Pipeline
                         </h3>
                         <span className="text-xs text-slate-400 font-medium">{stats.pipelineTotal} aktywnych</span>
@@ -443,10 +446,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Team Performance */}
                 {stats.detailedStats.length > 0 && (
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-                            <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                                <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-100">
+                            <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-slate-500" />
                                 Efektywność Zespołu
                             </h3>
                         </div>
@@ -467,7 +470,7 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                         <tr key={rep.id} className="hover:bg-slate-50">
                                             <td className="px-4 py-2 font-medium text-slate-900">
                                                 <div className="flex items-center gap-1.5">
-                                                    {idx === 0 && rep.won > 0 && <span className="text-amber-400 text-xs">★</span>}
+                                                    {idx === 0 && rep.won > 0 && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
                                                     {rep.name}
                                                 </div>
                                             </td>
@@ -494,10 +497,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                 )}
 
                 {/* Sources */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-                        <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-slate-100">
+                        <h3 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                            <Link2 className="w-4 h-4 text-slate-500" />
                             Źródła Leadów
                         </h3>
                     </div>
@@ -516,10 +519,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                                     <tr key={source.id} className="hover:bg-slate-50">
                                         <td className="px-4 py-2 font-medium text-slate-900">
                                             <div className="flex items-center gap-1.5">
-                                                {source.isFair && <svg className="w-3.5 h-3.5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
-                                                {!source.isFair && source.name.includes('WWW') && <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>}
-                                                {!source.isFair && source.name.includes('Ręczne') && <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
-                                                {!source.isFair && source.name.includes('zadaszto') && <span className="text-sm">🇵🇱</span>}
+                                                {source.isFair && <Building2 className="w-3.5 h-3.5 text-purple-500" />}
+                                                {!source.isFair && source.name.includes('WWW') && <Globe className="w-3.5 h-3.5 text-blue-500" />}
+                                                {!source.isFair && source.name.includes('Ręczne') && <User className="w-3.5 h-3.5 text-slate-500" />}
+                                                {!source.isFair && source.name.includes('zadaszto') && <Globe className="w-3.5 h-3.5 text-emerald-500" />}
                                                 {source.name}
                                             </div>
                                         </td>
@@ -542,10 +545,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             {/* ══════════ Lost Analysis ══════════ */}
             {stats.lostReasonStats.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-                        <div className="px-5 py-3 border-b border-red-100 bg-red-50">
-                            <h3 className="font-bold text-sm text-red-800 flex items-center gap-2">
-                                <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-100">
+                            <h3 className="font-semibold text-sm text-red-700 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-red-500" />
                                 Utracone
                             </h3>
                         </div>
@@ -554,9 +557,9 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                             <div className="text-xs text-slate-500 mt-1">({stats.total > 0 ? ((stats.lost / stats.total) * 100).toFixed(1) : '0.0'}% wszystkich)</div>
                         </div>
                     </div>
-                    <div className="lg:col-span-2 bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-                        <div className="px-5 py-3 border-b border-red-100 bg-red-50">
-                            <h3 className="font-bold text-sm text-red-800">Powody Utraty</h3>
+                    <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-100">
+                            <h3 className="font-semibold text-sm text-red-700">Powody Utraty</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -592,10 +595,10 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
 
             {/* Who Lost Leads */}
             {stats.lostByStats.length > 0 && (
-                <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-amber-100 bg-amber-50">
-                        <h3 className="font-bold text-sm text-amber-800 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-slate-100">
+                        <h3 className="font-semibold text-sm text-amber-700 flex items-center gap-2">
+                            <User className="w-4 h-4 text-amber-500" />
                             Kto tracił leady?
                         </h3>
                     </div>

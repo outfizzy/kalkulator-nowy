@@ -1,4 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import {
+    Sparkles, ClipboardCheck, Phone, Mail, CalendarDays, CheckCircle2,
+    MessageCircle, Trophy, XCircle, Building2, Check, CalendarPlus,
+    Trash2, AlertTriangle, MapPin, Package, Info, User, Flame, Moon,
+    MoreHorizontal, Zap, Star, RefreshCw, Euro, Eye, EyeOff, FileText,
+    Inbox, TrendingUp, Target, Timer, Wallet, Send, Hourglass,
+    Ruler, Palette, Wrench, MessageSquare, Users
+} from 'lucide-react';
 import { normalizePhone } from '../../utils/phone';
 import {
     DndContext,
@@ -57,16 +65,16 @@ const COLUMNS: { id: LeadStatus; title: string; color: string }[] = [
 ];
 
 const COLUMN_ICONS: Record<LeadStatus, React.ReactNode> = {
-    new: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
-    formularz: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
-    contacted: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>,
-    offer_sent: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
-    measurement_scheduled: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-    measurement_completed: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    negotiation: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
-    won: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
-    lost: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    fair: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+    new: <Sparkles className="w-4 h-4" />,
+    formularz: <ClipboardCheck className="w-4 h-4" />,
+    contacted: <Phone className="w-4 h-4" />,
+    offer_sent: <Mail className="w-4 h-4" />,
+    measurement_scheduled: <CalendarDays className="w-4 h-4" />,
+    measurement_completed: <CheckCircle2 className="w-4 h-4" />,
+    negotiation: <MessageCircle className="w-4 h-4" />,
+    won: <Trophy className="w-4 h-4" />,
+    lost: <XCircle className="w-4 h-4" />,
+    fair: <Building2 className="w-4 h-4" />,
 };
 
 
@@ -221,9 +229,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             className="p-1 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
                             title="Oznacz jako skontaktowano"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                            <Check className="w-4 h-4" />
                         </button>
                     )}
                     <button
@@ -231,9 +237,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                         className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                         title="Umów pomiar"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                        <CalendarPlus className="w-4 h-4" />
                     </button>
                     {isAdmin && (
                         <button
@@ -241,18 +245,14 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                             title="Usuń Lead"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <Trash2 className="w-4 h-4" />
                         </button>
                     )}
                 </div>
 
                 {isStale && (
                     <div className="absolute top-2 right-16 flex items-center gap-1 bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px] font-bold" title="Brak kontaktu > 3 dni">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <AlertTriangle className="w-3 h-3" />
                         <span>!</span>
                     </div>
                 )}
@@ -261,10 +261,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
             <div className="text-xs text-slate-600 space-y-1 mb-3">
                 {(lead.customerData.address || (lead.customerData as any).street) && (
                     <div className="flex items-center gap-1.5">
-                        <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
                         <span className="truncate">{lead.customerData.address || (lead.customerData as any).street}</span>
                     </div>
                 )}
@@ -294,22 +291,22 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                         <div className="mb-2 px-2.5 py-2 rounded-lg bg-indigo-50 border border-indigo-100 text-[11px] text-indigo-800 space-y-0.5">
                             {modelMatch && (
                                 <div className="font-bold truncate flex items-center gap-1">
-                                    <svg className="w-3 h-3 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    <Package className="w-3 h-3 text-indigo-400 shrink-0" />
                                     {modelMatch[1].trim()}
                                 </div>
                             )}
                             {wymiarMatch && (
-                                <div className="text-indigo-600 truncate pl-4">📐 {wymiarMatch[1].trim()}</div>
+                                <div className="text-indigo-600 truncate pl-4 flex items-center gap-1"><Ruler className="w-3 h-3 shrink-0" /> {wymiarMatch[1].trim()}</div>
                             )}
                             {kolorMatch && (
-                                <div className="text-indigo-600 truncate pl-4">🎨 {kolorMatch[1].trim()}</div>
+                                <div className="text-indigo-600 truncate pl-4 flex items-center gap-1"><Palette className="w-3 h-3 shrink-0" /> {kolorMatch[1].trim()}</div>
                             )}
                             {montazMatch && (
-                                <div className="text-indigo-600 truncate pl-4">🔧 {montazMatch[1].trim()}</div>
+                                <div className="text-indigo-600 truncate pl-4 flex items-center gap-1"><Wrench className="w-3 h-3 shrink-0" /> {montazMatch[1].trim()}</div>
                             )}
                             {!hasCfg && isQuickContact && (
-                                <div className="text-indigo-600 truncate italic">
-                                    💬 {raw.replace('[Szybki kontakt] ', '').substring(0, 80)}{raw.length > 80 ? '…' : ''}
+                                <div className="text-indigo-600 truncate italic flex items-center gap-1">
+                                    <MessageSquare className="w-3 h-3 shrink-0" /> {raw.replace('[Szybki kontakt] ', '').substring(0, 80)}{raw.length > 80 ? '…' : ''}
                                 </div>
                             )}
                         </div>
@@ -323,14 +320,14 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 <div className="mb-2 px-2.5 py-2 rounded-lg bg-red-50 border border-red-100">
                     {lead.lostReason && (
                         <div className="flex items-start gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <Info className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                             <p className="text-xs text-red-700 font-medium leading-relaxed">{lead.lostReason}</p>
                         </div>
                     )}
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-red-400">
                         {lead.lostByName && (
                             <span className="flex items-center gap-0.5 font-semibold">
-                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                <User className="w-2.5 h-2.5" />
                                 {lead.lostByName}
                             </span>
                         )}
@@ -346,11 +343,11 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 {lead.aiScore !== undefined ? (
                     <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold border ${lead.aiScore > 70 ? 'bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 border-orange-200' : lead.aiScore < 30 ? 'bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`} title={lead.aiSummary}>
                         {lead.aiScore > 70 ? (
-                            <svg className="w-3.5 h-3.5 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" /></svg>
+                            <Flame className="w-3.5 h-3.5 text-orange-500" />
                         ) : lead.aiScore < 30 ? (
-                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                            <Moon className="w-3.5 h-3.5 text-blue-500" />
                         ) : (
-                            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <MoreHorizontal className="w-3.5 h-3.5 text-slate-400" />
                         )}
                         <span>{lead.aiScore}</span>
                     </div>
@@ -370,9 +367,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                         }}
                         className="flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-600 rounded-md text-[10px] font-bold border border-violet-100 hover:bg-violet-100 transition-colors"
                     >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+                        <Zap className="w-3 h-3" />
                         AI OCENA
                     </button>
                 )}
@@ -381,7 +376,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                     return stars > 0 ? (
                         <span className="flex items-center gap-px" title={`Priorytet: ${stars}/5`}>
                             {Array.from({ length: stars }, (_, i) => (
-                                <svg key={i} className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                <Star key={i} className="w-3 h-3 text-amber-400 fill-amber-400" />
                             ))}
                         </span>
                     ) : null;
@@ -391,7 +386,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
             {/* Formularz Completion Badge — visible on ALL statuses */}
             {formCompleted && lead.status !== 'formularz' && (
                 <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                    <ClipboardCheck className="w-4 h-4 text-emerald-500" />
                     <span>Formularz wypełniony</span>
                 </div>
             )}
@@ -401,9 +396,9 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                     : 'bg-teal-100 text-teal-700 border border-teal-200'
                     }`}>
                     {formCompleted ? (
-                        <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     ) : (
-                        <svg className="w-4 h-4 text-teal-500 animate-spin" style={{animationDuration: '3s'}} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        <RefreshCw className="w-4 h-4 text-teal-500 animate-spin" style={{animationDuration: '3s'}} />
                     )}
                     <span>{formCompleted ? 'Formularz wypełniony!' : 'Czeka na formularz...'}</span>
                 </div>
@@ -416,7 +411,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 if (val <= 0) return null;
                 return (
                     <div className="mb-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                        <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <Euro className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         <span className="text-xs font-bold text-emerald-700">€{val.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                         {count > 1 && <span className="text-[9px] text-emerald-500">(ost. z {count})</span>}
                         {count === 0 && <span className="text-[9px] text-emerald-400">(ręczna)</span>}
@@ -438,7 +433,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                     ) : (
                         <div className="flex items-center gap-2 text-slate-400 italic">
                             <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                                <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                <User className="w-3 h-3 text-slate-400" />
                             </div>
                             <span>Brak opiekuna</span>
                         </div>
@@ -475,19 +470,19 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-bold"
                                 title={offerViewInfo?.lastViewedAt ? `Ostatnio: ${new Date(offerViewInfo.lastViewedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} ${new Date(offerViewInfo.lastViewedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : lead.customerData?.offerViewedAt ? `Otwarto: ${new Date(lead.customerData.offerViewedAt).toLocaleString()}` : ''}
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                <Eye className="w-3 h-3" />
                                 Otwarta {offerViewInfo?.viewCount ? `${offerViewInfo.viewCount}×` : lead.customerData?.offerViewCount ? `${lead.customerData.offerViewCount}×` : ''}
                             </span>
                         )}
                         {(offerViewInfo?.offerAccepted || lead.customerData?.offerAcceptedAt) && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[9px] font-bold animate-pulse">
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <CheckCircle2 className="w-3 h-3" />
                                 Zaakceptowana!
                             </span>
                         )}
                         {(offerViewInfo?.measurementRequested || lead.customerData?.measurementRequestedAt) && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-50 text-violet-700 border border-violet-200 rounded text-[9px] font-bold">
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                                <Ruler className="w-3 h-3" />
                                 Pomiar proszony
                             </span>
                         )}
@@ -495,7 +490,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[9px] font-bold"
                                 title={offerViewInfo.messageText || ''}
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                <MessageCircle className="w-3 h-3" />
                                 Wiadomość
                             </span>
                         )}
@@ -520,7 +515,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 title={lead.customerData?.phone || 'Brak numeru'}
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                <Phone className="w-3 h-3" />
                                 Dzwonię
                             </button>
                             <button
@@ -528,7 +523,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
                                 title="Wysłałem mail"
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                <Mail className="w-3 h-3" />
                                 Mail
                             </button>
                             <button
@@ -536,7 +531,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-lg text-[10px] font-bold border border-violet-200 transition-all hover:shadow-sm"
                                 title="Umów pomiar"
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <CalendarPlus className="w-3 h-3" />
                                 Pomiar
                             </button>
                         </>
@@ -555,7 +550,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 title={lead.customerData?.phone || 'Brak numeru'}
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                <Phone className="w-3 h-3" />
                                 Dzwonię
                             </button>
                             <button
@@ -570,7 +565,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 }}
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold border border-amber-200 transition-all hover:shadow-sm"
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                <FileText className="w-3 h-3" />
                                 Nowa Oferta
                             </button>
                         </>
@@ -584,9 +579,9 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                     title={offerViewInfo.viewed ? `Otwarta ${offerViewInfo.viewCount}× ${offerViewInfo.lastViewedAt ? '| Ostatnio: ' + new Date(offerViewInfo.lastViewedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(offerViewInfo.lastViewedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Klient nie otworzył oferty'}
                                 >
                                     {offerViewInfo.viewed ? (
-                                        <><svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> Otwarta {offerViewInfo.viewCount}×</>
+                                        <><Eye className="w-3 h-3 inline" /> Otwarta {offerViewInfo.viewCount}×</>
                                     ) : (
-                                        <><svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg> Nieotwarta</>
+                                        <><EyeOff className="w-3 h-3 inline" /> Nieotwarta</>
                                     )}
                                 </div>
                             )}
@@ -598,7 +593,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                     }}
                                     className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 >
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                    <Phone className="w-3 h-3" />
                                     Zadzwoń
                                 </button>
                             )}
@@ -606,7 +601,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 onClick={handleQuickEmail}
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                <Mail className="w-3 h-3" />
                                 Przypomnij
                             </button>
                         </>
@@ -625,7 +620,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 title={lead.customerData?.phone || 'Brak numeru'}
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                <Phone className="w-3 h-3" />
                                 Dzwonię
                             </button>
                             <button
@@ -640,7 +635,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                 }}
                                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold border border-amber-200 transition-all hover:shadow-sm"
                             >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                <FileText className="w-3 h-3" />
                                 Oferta
                             </button>
                         </>
@@ -703,13 +698,13 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                             const completedCount = leads.filter(l => completedFormLeadIds.has(l.id)).length;
                             return completedCount > 0 ? (
                                 <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse border border-emerald-200" title={`${completedCount} formularzy wypełnionych!`}>
-                                    ✅ {completedCount}
+                                    <CheckCircle2 className="w-3 h-3 inline" /> {completedCount}
                                 </span>
                             ) : null;
                         })()}
                         {unassignedCount > 0 && ['new', 'formularz', 'contacted'].includes(column.id) && (
                             <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold" title={`${unassignedCount} bez opiekuna`}>
-                                {unassignedCount} ⚠️
+                                {unassignedCount} <AlertTriangle className="w-3 h-3 inline" />
                             </span>
                         )}
                         <span className="bg-white/60 px-2 py-0.5 rounded-full text-xs font-bold text-slate-600 shadow-sm">
@@ -723,7 +718,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                         onClick={onAutoAssign}
                         className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-200 transition-colors"
                     >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <Users className="w-3.5 h-3.5" />
                         Przydziel automatycznie ({unassignedCount})
                     </button>
                 )}
@@ -733,10 +728,8 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                         onClick={onBulkEmail}
                         className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
                     >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        📨 Wyślij powitalne ({leads.length})
+                        <Send className="w-3.5 h-3.5" />
+                        Wyślij powitalne ({leads.length})
                     </button>
                 )}
             </div>
@@ -760,7 +753,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                                         <div className="flex items-center gap-2 py-1.5 px-1">
                                             <div className="h-px flex-1 bg-slate-200" />
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                                                ⏳ Czekają ({sortedLeads.length - idx})
+                                                <Hourglass className="w-3 h-3 inline mr-0.5" /> Czekają ({sortedLeads.length - idx})
                                             </span>
                                             <div className="h-px flex-1 bg-slate-200" />
                                         </div>
@@ -1199,44 +1192,56 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             {/* Pipeline Mini-Dashboard */}
             <div className="mb-4 px-2">
                 <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-blue-200 rounded-lg px-3 py-2">
-                        <span className="text-lg">📥</span>
+                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-blue-200 rounded-lg px-3 py-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <Inbox className="w-4 h-4 text-blue-600" />
+                        </div>
                         <div>
                             <div className="text-[10px] text-blue-500 font-medium">Nowe leady</div>
                             <div className="text-sm font-bold text-blue-700">{pipelineStats.newCount}</div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-amber-200 rounded-lg px-3 py-2">
-                        <span className="text-lg">🔥</span>
+                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-amber-200 rounded-lg px-3 py-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-amber-600" />
+                        </div>
                         <div>
                             <div className="text-[10px] text-amber-600 font-medium">W procesie</div>
                             <div className="text-sm font-bold text-amber-700">{pipelineStats.advancedCount}</div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
-                        <span className="text-lg">🎯</span>
+                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                            <Target className="w-4 h-4 text-slate-600" />
+                        </div>
                         <div>
                             <div className="text-[10px] text-slate-500 font-medium">Oferta %</div>
                             <div className="text-sm font-bold text-slate-800">{pipelineStats.offerRate}%</div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
-                        <span className="text-lg">🏆</span>
+                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <Trophy className="w-4 h-4 text-emerald-600" />
+                        </div>
                         <div>
                             <div className="text-[10px] text-emerald-600 font-medium">Win Rate</div>
                             <div className="text-sm font-bold text-emerald-700">{pipelineStats.winRate}%</div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
-                        <span className="text-lg">⏱️</span>
+                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                            <Timer className="w-4 h-4 text-slate-600" />
+                        </div>
                         <div>
                             <div className="text-[10px] text-slate-500 font-medium">Śr. pipeline</div>
                             <div className="text-sm font-bold text-slate-800">{pipelineStats.avgDays}d</div>
                         </div>
                     </div>
                     {pipelineStats.monthWonValue > 0 && (
-                        <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
-                            <span className="text-lg">💰</span>
+                        <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                <Wallet className="w-4 h-4 text-emerald-600" />
+                            </div>
                             <div>
                                 <div className="text-[10px] text-emerald-600 font-medium">Wygrane (mies.)</div>
                                 <div className="text-sm font-bold text-emerald-700">€{pipelineStats.monthWonValue.toLocaleString()}</div>
@@ -1346,7 +1351,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
                         <div className="px-6 py-4 bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-amber-100">
                             <h3 className="text-lg font-bold text-amber-800 flex items-center gap-2">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <Euro className="w-5 h-5" />
                                 Kwota oferty netto
                             </h3>
                             <p className="text-sm text-amber-600 mt-1">Brak ofert w systemie — podaj kwotę netto oferty (EUR)</p>
