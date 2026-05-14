@@ -9,9 +9,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { originalText, intent, apiKey } = req.body;
     const userKey = apiKey || process.env.OPENAI_API_KEY;
 
-    if (!text || !intent) {
-        // Allow text to be named 'originalText' or 'text' for flexibility
-    }
 
     const textToAnalyze = originalText || req.body.text;
 

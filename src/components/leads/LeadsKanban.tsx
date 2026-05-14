@@ -203,19 +203,17 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
             {...attributes}
             {...listeners}
             onClick={() => onClick(lead.id)}
-            className={`p-3 rounded-xl border-l-[3px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group relative overflow-hidden min-w-0 ${formCompleted
-                ? 'bg-gradient-to-br from-emerald-50/80 to-white border-l-emerald-500 border-t border-r border-b border-emerald-200/60 ring-1 ring-emerald-100'
+            className={`p-3 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group relative overflow-hidden min-w-0 ${formCompleted
+                ? 'bg-emerald-50/50 border border-emerald-200 ring-1 ring-emerald-100'
                 : lead.status === 'formularz'
-                    ? 'bg-gradient-to-br from-teal-50/40 to-white border-l-teal-400 border-t border-r border-b border-teal-200/50'
+                    ? 'bg-teal-50/30 border border-teal-200'
                     : lead.status === 'won'
-                        ? 'bg-gradient-to-br from-amber-50/30 to-white border-l-amber-500 border-t border-r border-b border-amber-200/50'
+                        ? 'bg-amber-50/20 border border-amber-200'
                     : lead.status === 'lost'
-                        ? 'bg-white/80 border-l-red-400 border-t border-r border-b border-red-200/50 opacity-75 hover:opacity-100'
+                        ? 'bg-white opacity-75 hover:opacity-100 border border-red-200'
                     : isStale
-                        ? 'bg-white border-l-red-500 border-t border-r border-b border-red-200/60 ring-1 ring-red-50'
-                        : lead.status === 'offer_sent' || lead.status === 'negotiation'
-                            ? 'bg-white border-l-blue-500 border-t border-r border-b border-slate-200/60'
-                            : 'bg-white border-l-slate-300 border-t border-r border-b border-slate-200/60 hover:border-slate-300'
+                        ? 'bg-white border border-red-200 ring-1 ring-red-50'
+                        : 'bg-white border border-slate-200 hover:border-slate-300'
                 }`}
         >
             <div className="flex justify-between items-start mb-2">
