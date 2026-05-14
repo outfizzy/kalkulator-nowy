@@ -262,7 +262,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 {isStale && (
                     <div className="absolute top-2.5 right-16 flex items-center gap-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm" title="Brak kontaktu > 3 dni">
                         <AlertTriangle className="w-3 h-3" />
-                        STALE
+                        ZALEGŁY
                     </div>
                 )}
             </div>
@@ -681,7 +681,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
     }, [leads, column.id, completedFormLeadIds]);
 
     return (
-        <div ref={setNodeRef} className="flex-shrink-0 w-[280px] flex flex-col h-full rounded-2xl bg-slate-50/80 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+        <div ref={setNodeRef} className="flex-shrink-0 w-[260px] sm:w-[280px] flex flex-col h-full rounded-2xl bg-slate-50/80 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
             {/* Column Header */}
             <div className={`px-3.5 py-3 border-b border-slate-200/50 rounded-t-2xl bg-white/60 backdrop-blur-sm`}>
                 <div className="flex justify-between items-center">
@@ -1256,7 +1256,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
             >
-                <div className="flex h-full overflow-x-auto pb-4 gap-4 px-2">
+                <div className="flex h-full overflow-x-auto pb-4 gap-3 sm:gap-4 px-1 sm:px-2 snap-x snap-mandatory">
                     {COLUMNS.map(column => (
                         <KanbanColumn
                             key={column.id}
