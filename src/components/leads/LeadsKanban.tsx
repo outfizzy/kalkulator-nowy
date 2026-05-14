@@ -203,22 +203,31 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
             {...attributes}
             {...listeners}
             onClick={() => onClick(lead.id)}
-            className={`p-3.5 rounded-xl shadow-sm border hover:shadow-lg transition-all duration-200 cursor-pointer group relative ${formCompleted
-                ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-300 ring-2 ring-emerald-200/50 shadow-emerald-100'
+            className={`p-3.5 rounded-xl border-l-[3px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group relative ${formCompleted
+                ? 'bg-gradient-to-br from-emerald-50/80 to-white border-l-emerald-500 border-t border-r border-b border-emerald-200/60 ring-1 ring-emerald-100'
                 : lead.status === 'formularz'
-                    ? 'bg-gradient-to-br from-teal-50/80 to-cyan-50/30 border-teal-200'
+                    ? 'bg-gradient-to-br from-teal-50/40 to-white border-l-teal-400 border-t border-r border-b border-teal-200/50'
+                    : lead.status === 'won'
+                        ? 'bg-gradient-to-br from-amber-50/30 to-white border-l-amber-500 border-t border-r border-b border-amber-200/50'
+                    : lead.status === 'lost'
+                        ? 'bg-white/80 border-l-red-400 border-t border-r border-b border-red-200/50 opacity-75 hover:opacity-100'
                     : isStale
-                        ? 'bg-white border-red-200 ring-1 ring-red-50'
-                        : 'bg-white border-slate-200/80 hover:border-slate-300'
+                        ? 'bg-white border-l-red-500 border-t border-r border-b border-red-200/60 ring-1 ring-red-50'
+                        : lead.status === 'offer_sent' || lead.status === 'negotiation'
+                            ? 'bg-white border-l-blue-500 border-t border-r border-b border-slate-200/60'
+                            : 'bg-white border-l-slate-300 border-t border-r border-b border-slate-200/60 hover:border-slate-300'
                 }`}
         >
             <div className="flex justify-between items-start mb-2">
                 <div className="pr-6">
-                    <h4 className="font-bold text-slate-800 text-sm">
+                    <h4 className="font-semibold text-slate-900 text-[13px] leading-tight">
                         {lead.customerData.firstName} {lead.customerData.lastName}
                     </h4>
                     {lead.customerData.companyName && (
-                        <div className="text-xs text-slate-500 font-medium">{lead.customerData.companyName}</div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-1">
+                            <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate">{lead.customerData.companyName}</span>
+                        </div>
                     )}
                 </div>
 
@@ -251,23 +260,23 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 </div>
 
                 {isStale && (
-                    <div className="absolute top-2 right-16 flex items-center gap-1 bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px] font-bold" title="Brak kontaktu > 3 dni">
+                    <div className="absolute top-2.5 right-16 flex items-center gap-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm" title="Brak kontaktu > 3 dni">
                         <AlertTriangle className="w-3 h-3" />
-                        <span>!</span>
+                        STALE
                     </div>
                 )}
             </div>
 
-            <div className="text-xs text-slate-600 space-y-1 mb-3">
+            <div className="text-[11px] text-slate-500 space-y-0.5 mb-2.5">
                 {(lead.customerData.address || (lead.customerData as any).street) && (
                     <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate">{lead.customerData.address || (lead.customerData as any).street}</span>
                     </div>
                 )}
                 {(lead.customerData.city || lead.customerData.postalCode) && (
-                    <div className="flex items-center gap-1.5 pl-5">
-                        <span className="text-slate-500">{lead.customerData.postalCode}</span>
+                    <div className="flex items-center gap-1.5 pl-[18px]">
+                        <span className="text-slate-400 font-mono text-[10px]">{lead.customerData.postalCode}</span>
                         <span>{lead.customerData.city}</span>
                     </div>
                 )}
@@ -419,23 +428,23 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 );
             })()}
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+            <div className="pt-2.5 mt-1 border-t border-slate-100/80 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                     {lead.assignee ? (
                         <>
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-[9px] font-bold text-blue-700 border-2 border-white shadow-sm">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
                                 {lead.assignee.firstName[0]}{lead.assignee.lastName[0]}
                             </div>
-                            <span className="text-slate-600 font-medium truncate max-w-[100px]">
-                                {lead.assignee.firstName} {lead.assignee.lastName}
+                            <span className="text-slate-600 font-medium truncate max-w-[90px] text-[11px]">
+                                {lead.assignee.firstName} {lead.assignee.lastName[0]}.
                             </span>
                         </>
                     ) : (
-                        <div className="flex items-center gap-2 text-slate-400 italic">
-                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-dashed border-slate-300">
                                 <User className="w-3 h-3 text-slate-400" />
                             </div>
-                            <span>Brak opiekuna</span>
+                            <span className="text-[11px] italic">Nieprzydzielony</span>
                         </div>
                     )}
                 </div>
@@ -443,17 +452,17 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 <div className="flex items-center gap-1.5">
                     {/* SLA Timer Badge — inline next to date */}
                     {sla.label && (
-                        <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                            sla.level === 'green' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                            sla.level === 'yellow' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                            sla.level === 'red' ? 'bg-red-50 text-red-600 border-red-200' :
-                            'bg-red-100 text-red-700 border-red-300'
+                        <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                            sla.level === 'green' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+                            sla.level === 'yellow' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+                            sla.level === 'red' ? 'bg-red-50 text-red-600 border border-red-200' :
+                            'bg-red-100 text-red-700 border border-red-300'
                         } ${sla.pulse ? 'animate-pulse' : ''}`} title={`Czas od utworzenia leada: ${sla.label}`}>
-                            <span className={`w-2 h-2 rounded-full inline-block ${sla.level === 'green' ? 'bg-emerald-500' : sla.level === 'yellow' ? 'bg-amber-500' : sla.level === 'red' ? 'bg-red-500' : 'bg-red-700'}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full inline-block ${sla.level === 'green' ? 'bg-emerald-500' : sla.level === 'yellow' ? 'bg-amber-500' : sla.level === 'red' ? 'bg-red-500' : 'bg-red-700'}`} />
                             {sla.label}
                         </span>
                     )}
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-slate-400 font-mono">
                         {format(new Date(lead.createdAt), 'dd.MM', { locale: pl })}
                     </span>
                 </div>
@@ -500,7 +509,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
 
             {/* One-Click Pipeline Actions — stage-specific */}
             {!['won', 'lost', 'fair'].includes(lead.status) && (
-                <div className="mt-2 pt-2 border-t border-slate-100 flex gap-1">
+                <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex gap-1.5">
                     {/* Early stages: Dzwonię + Mail + Pomiar */}
                     {['new', 'formularz', 'contacted'].includes(lead.status) && (
                         <>
@@ -672,9 +681,9 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
     }, [leads, column.id, completedFormLeadIds]);
 
     return (
-        <div ref={setNodeRef} className="flex-shrink-0 w-72 flex flex-col h-full rounded-xl bg-slate-50/50 border border-slate-200/50">
+        <div ref={setNodeRef} className="flex-shrink-0 w-[280px] flex flex-col h-full rounded-2xl bg-slate-50/80 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
             {/* Column Header */}
-            <div className={`p-3 border-b border-slate-100 rounded-t-xl ${column.color.replace('text-', 'bg-').replace('50', '50/50')}`}>
+            <div className={`px-3.5 py-3 border-b border-slate-200/50 rounded-t-2xl bg-white/60 backdrop-blur-sm`}>
                 <div className="flex justify-between items-center">
                     <h3 className={`font-semibold text-sm flex items-center gap-1.5 ${column.color.split(' ')[2]}`}>
                         {COLUMN_ICONS[column.id]}
@@ -707,7 +716,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                                 {unassignedCount} <AlertTriangle className="w-3 h-3 inline" />
                             </span>
                         )}
-                        <span className="bg-white/60 px-2 py-0.5 rounded-full text-xs font-bold text-slate-600 shadow-sm">
+                        <span className="bg-white px-2.5 py-0.5 rounded-full text-xs font-bold text-slate-700 shadow-sm border border-slate-200">
                             {leads.length}
                         </span>
                     </div>
@@ -735,7 +744,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
             </div>
 
             {/* Column Content */}
-            <div className="p-2 flex-1 overflow-y-auto space-y-2 min-h-[100px]">
+            <div className="p-2.5 flex-1 overflow-y-auto space-y-2.5 min-h-[100px]">
                 <SortableContext
                     id={column.id}
                     items={sortedLeads.map(l => l.id)}
@@ -1190,62 +1199,52 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     return (
         <>
             {/* Pipeline Mini-Dashboard */}
-            <div className="mb-4 px-2">
-                <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-blue-200 rounded-lg px-3 py-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                            <Inbox className="w-4 h-4 text-blue-600" />
+            <div className="mb-5 px-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                            <Inbox className="w-[18px] h-[18px] text-blue-500" />
                         </div>
-                        <div>
-                            <div className="text-[10px] text-blue-500 font-medium">Nowe leady</div>
-                            <div className="text-sm font-bold text-blue-700">{pipelineStats.newCount}</div>
-                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Nowe leady</div>
+                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.newCount}</div>
+                        <div className="text-[10px] text-blue-500 mt-0.5">oczekujące</div>
                     </div>
-                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-amber-200 rounded-lg px-3 py-2">
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                            <TrendingUp className="w-4 h-4 text-amber-600" />
+                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                            <TrendingUp className="w-[18px] h-[18px] text-amber-500" />
                         </div>
-                        <div>
-                            <div className="text-[10px] text-amber-600 font-medium">W procesie</div>
-                            <div className="text-sm font-bold text-amber-700">{pipelineStats.advancedCount}</div>
-                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">W procesie</div>
+                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.advancedCount}</div>
                     </div>
-                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                            <Target className="w-4 h-4 text-slate-600" />
+                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                            <Target className="w-[18px] h-[18px] text-slate-500" />
                         </div>
-                        <div>
-                            <div className="text-[10px] text-slate-500 font-medium">Oferta %</div>
-                            <div className="text-sm font-bold text-slate-800">{pipelineStats.offerRate}%</div>
-                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Oferta %</div>
+                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.offerRate}%</div>
                     </div>
-                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                            <Trophy className="w-4 h-4 text-emerald-600" />
+                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                            <Trophy className="w-[18px] h-[18px] text-emerald-500" />
                         </div>
-                        <div>
-                            <div className="text-[10px] text-emerald-600 font-medium">Win Rate</div>
-                            <div className="text-sm font-bold text-emerald-700">{pipelineStats.winRate}%</div>
-                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Win Rate</div>
+                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.winRate}%</div>
                     </div>
-                    <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-slate-200 rounded-lg px-3 py-2">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                            <Timer className="w-4 h-4 text-slate-600" />
+                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                            <Timer className="w-[18px] h-[18px] text-slate-500" />
                         </div>
-                        <div>
-                            <div className="text-[10px] text-slate-500 font-medium">Śr. pipeline</div>
-                            <div className="text-sm font-bold text-slate-800">{pipelineStats.avgDays}d</div>
-                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Śr. pipeline</div>
+                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.avgDays}d</div>
                     </div>
                     {pipelineStats.monthWonValue > 0 && (
-                        <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur border border-emerald-200 rounded-lg px-3 py-2">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                <Wallet className="w-4 h-4 text-emerald-600" />
+                        <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+                            <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                                <Wallet className="w-[18px] h-[18px] text-emerald-500" />
                             </div>
-                            <div>
-                                <div className="text-[10px] text-emerald-600 font-medium">Wygrane (mies.)</div>
-                                <div className="text-sm font-bold text-emerald-700">€{pipelineStats.monthWonValue.toLocaleString()}</div>
-                            </div>
+                            <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Wygrane</div>
+                            <div className="text-xl font-bold text-emerald-700 mt-0.5">€{pipelineStats.monthWonValue.toLocaleString()}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">ten miesiąc</div>
                         </div>
                     )}
                 </div>
