@@ -1,0 +1,3 @@
+*.tsx text eol=lf
+*.ts text eol=lf
+*.tsx eol=lf
