@@ -203,7 +203,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
             {...attributes}
             {...listeners}
             onClick={() => onClick(lead.id)}
-            className={`p-3.5 rounded-xl border-l-[3px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group relative ${formCompleted
+            className={`p-3 rounded-xl border-l-[3px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group relative overflow-hidden min-w-0 ${formCompleted
                 ? 'bg-gradient-to-br from-emerald-50/80 to-white border-l-emerald-500 border-t border-r border-b border-emerald-200/60 ring-1 ring-emerald-100'
                 : lead.status === 'formularz'
                     ? 'bg-gradient-to-br from-teal-50/40 to-white border-l-teal-400 border-t border-r border-b border-teal-200/50'
@@ -257,15 +257,14 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             <Trash2 className="w-4 h-4" />
                         </button>
                     )}
-                </div>
-
-                {isStale && (
-                    <div className="absolute top-2.5 right-16 flex items-center gap-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm" title="Brak kontaktu > 3 dni">
-                        <AlertTriangle className="w-3 h-3" />
-                        ZALEGŁY
-                    </div>
-                )}
             </div>
+
+            {isStale && (
+                <div className="mb-2 flex items-center gap-1 w-fit bg-red-500 text-white px-2 py-0.5 rounded-md text-[9px] font-bold shadow-sm" title="Brak kontaktu > 3 dni">
+                    <AlertTriangle className="w-3 h-3" />
+                    ZALEGŁY
+                </div>
+            )}
 
             <div className="text-[11px] text-slate-500 space-y-0.5 mb-2.5">
                 {(lead.customerData.address || (lead.customerData as any).street) && (
@@ -428,7 +427,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 );
             })()}
 
-            <div className="pt-2.5 mt-1 border-t border-slate-100/80 flex items-center justify-between text-xs">
+            <div className="pt-2 mt-1 border-t border-slate-100/80 flex items-center justify-between text-xs min-w-0 gap-2">
                 <div className="flex items-center gap-2">
                     {lead.assignee ? (
                         <>
@@ -509,7 +508,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
 
             {/* One-Click Pipeline Actions — stage-specific */}
             {!['won', 'lost', 'fair'].includes(lead.status) && (
-                <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex gap-1.5">
+                <div className="mt-2 pt-2 border-t border-slate-100/80 flex flex-wrap gap-1.5">
                     {/* Early stages: Dzwonię + Mail + Pomiar */}
                     {['new', 'formularz', 'contacted'].includes(lead.status) && (
                         <>
@@ -521,7 +520,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                     }
                                     handleQuickContact(e as any);
                                 }}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 title={lead.customerData?.phone || 'Brak numeru'}
                             >
                                 <Phone className="w-3 h-3" />
@@ -529,7 +528,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             </button>
                             <button
                                 onClick={handleQuickEmail}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
                                 title="Wysłałem mail"
                             >
                                 <Mail className="w-3 h-3" />
@@ -537,7 +536,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             </button>
                             <button
                                 onClick={handleScheduleClick}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-lg text-[10px] font-bold border border-violet-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-lg text-[10px] font-bold border border-violet-200 transition-all hover:shadow-sm"
                                 title="Umów pomiar"
                             >
                                 <CalendarPlus className="w-3 h-3" />
@@ -556,7 +555,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                     }
                                     handleQuickContact(e as any);
                                 }}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 title={lead.customerData?.phone || 'Brak numeru'}
                             >
                                 <Phone className="w-3 h-3" />
@@ -572,7 +571,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                         leadCustomerData: lead.customerData
                                     }});
                                 }}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold border border-amber-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold border border-amber-200 transition-all hover:shadow-sm"
                             >
                                 <FileText className="w-3 h-3" />
                                 Nowa Oferta
@@ -600,7 +599,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                         e.stopPropagation();
                                         window.dispatchEvent(new CustomEvent('softphone-dial', { detail: { number: normalizePhone(lead.customerData!.phone), name: `${lead.customerData!.firstName || ''} ${lead.customerData!.lastName || ''}`.trim(), leadId: lead.id } }));
                                     }}
-                                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
+                                    className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 >
                                     <Phone className="w-3 h-3" />
                                     Zadzwoń
@@ -608,7 +607,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             )}
                             <button
                                 onClick={handleQuickEmail}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
                             >
                                 <Mail className="w-3 h-3" />
                                 Przypomnij
@@ -626,7 +625,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                     }
                                     handleQuickContact(e as any);
                                 }}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200 transition-all hover:shadow-sm"
                                 title={lead.customerData?.phone || 'Brak numeru'}
                             >
                                 <Phone className="w-3 h-3" />
@@ -642,7 +641,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                                         leadCustomerData: lead.customerData
                                     }});
                                 }}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold border border-amber-200 transition-all hover:shadow-sm"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold border border-amber-200 transition-all hover:shadow-sm"
                             >
                                 <FileText className="w-3 h-3" />
                                 Oferta
