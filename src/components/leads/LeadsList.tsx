@@ -13,7 +13,7 @@ import { LeadsFunnelChart } from './LeadsFunnelChart';
 import { LeadsStats } from './LeadsStats';
 import { LeadsMap } from './LeadsMap';
 import { ConfiguratorService } from '../../services/database/configurator.service';
-import { BarChart3, List, LayoutGrid, MapPin, Search, Trash2, Flame, ClipboardCheck, Building2, Globe, Calendar, Clock, User as UserIcon, Plus, ArrowDownUp, CheckCircle2, FileText, X, Loader2 } from 'lucide-react';
+import { BarChart3, List, LayoutGrid, MapPin, Search, Trash2, Flame, ClipboardCheck, Building2, Globe, Calendar, Clock, User as UserIcon, Plus, ArrowDownUp, CheckCircle2, FileText, X, Loader2, UserPlus, Users, Trophy } from 'lucide-react';
 
 
 export const LeadsList: React.FC = () => {
@@ -496,184 +496,208 @@ export const LeadsList: React.FC = () => {
         </div>
     );
 
+    // ── Compute quick KPIs for always-visible strip ──
+    const quickKpis = React.useMemo(() => {
+        const total = filteredLeads.length;
+        const newLeads = filteredLeads.filter(l => ['new', 'formularz'].includes(l.status)).length;
+        const inProcess = filteredLeads.filter(l => ['contacted', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'negotiation'].includes(l.status)).length;
+        const won = filteredLeads.filter(l => l.status === 'won').length;
+        const lost = filteredLeads.filter(l => l.status === 'lost').length;
+        const offerSent = filteredLeads.filter(l => ['offer_sent', 'negotiation'].includes(l.status)).length;
+        const offerRate = total > 0 ? ((offerSent / total) * 100).toFixed(0) : '0';
+        const totalClosed = won + lost;
+        const winRate = totalClosed > 0 ? ((won / totalClosed) * 100).toFixed(0) : '—';
+        // Avg pipeline age
+        const now = new Date();
+        const activeLeads = filteredLeads.filter(l => !['won', 'lost'].includes(l.status));
+        const totalDays = activeLeads.reduce((sum, l) => {
+            const days = Math.floor((now.getTime() - new Date(l.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            return sum + days;
+        }, 0);
+        const avgDays = activeLeads.length > 0 ? Math.round(totalDays / activeLeads.length) : 0;
+        return { total, newLeads, inProcess, offerRate, winRate, avgDays };
+    }, [filteredLeads]);
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-900">Leady</h1>
-                        <p className="text-slate-500 mt-1">Zarządzaj potencjalnymi klientami</p>
+        <div className="space-y-4">
+            {/* ═══════════ ROW 1: Title Bar ═══════════ */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Left: Title + Market */}
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Leady</h1>
+                        <p className="text-xs text-slate-400 mt-0.5">Zarządzaj potencjalnymi klientami</p>
                     </div>
-                    {/* ── Market Switcher ── */}
+
+                    {/* Market Switcher */}
                     {(canSwitchMarket || isPLOnly || isDEOnly) && (
-                        <div className="flex bg-slate-100 rounded-xl p-1 gap-1 ml-2">
+                        <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5 ml-1">
                             {(canSwitchMarket || isDEOnly) && (
                                 <button
                                     onClick={() => { setMarketFilter('de'); setFilterFair('all'); }}
-                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                                         marketFilter === 'de'
-                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80'
                                             : 'text-slate-500 hover:text-slate-700'
                                     }`}
                                 >
-                                    <span className="text-base">🇩🇪</span> polendach24.de
+                                    <span className="text-sm">🇩🇪</span> DE
                                 </button>
                             )}
                             {(canSwitchMarket || isPLOnly) && (
                                 <button
                                     onClick={() => { setMarketFilter('pl'); setFilterFair('all'); }}
-                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                                         marketFilter === 'pl'
-                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80'
                                             : 'text-slate-500 hover:text-slate-700'
                                     }`}
                                 >
-                                    <span className="text-base">🇵🇱</span> zadaszto.pl
+                                    <span className="text-sm">🇵🇱</span> PL
                                 </button>
                             )}
                         </div>
                     )}
                 </div>
-                <div className="flex gap-4">
-                    <div className="bg-white p-1 rounded-lg border border-slate-200 flex items-center">
-                        <button onClick={() => setShowStats(!showStats)} className={`p-2 rounded-md ${showStats ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400'}`}>
-                            <BarChart3 className="w-5 h-5" />
+
+                {/* Right: View Toggles + CTA */}
+                <div className="flex items-center gap-2">
+                    <div className="bg-white p-0.5 rounded-lg border border-slate-200 flex items-center">
+                        <button onClick={() => setShowStats(!showStats)} className={`p-1.5 rounded-md transition-colors ${showStats ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Statystyki">
+                            <BarChart3 className="w-4 h-4" />
                         </button>
-                        <div className="w-px h-6 bg-slate-200 mx-1"></div>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}>
-                            <List className="w-5 h-5" />
+                        <div className="w-px h-5 bg-slate-200 mx-0.5" />
+                        <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`} title="Lista">
+                            <List className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-md ${viewMode === 'kanban' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}>
-                            <LayoutGrid className="w-5 h-5" />
+                        <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`} title="Kanban">
+                            <LayoutGrid className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setViewMode('map')} className={`p-2 rounded-md ${viewMode === 'map' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`} title="Mapa">
-                            <MapPin className="w-5 h-5" />
+                        <button onClick={() => setViewMode('map')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'map' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`} title="Mapa">
+                            <MapPin className="w-4 h-4" />
                         </button>
                     </div>
-
-                    <Link to="/leads/new" className="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
-                        <Plus className="w-4 h-4" /> Dodaj Leada
+                    <Link to="/leads/new" className="bg-accent hover:bg-accent-dark text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm shadow-accent/20 transition-all hover:shadow-md hover:shadow-accent/30">
+                        <Plus className="w-3.5 h-3.5" /> Dodaj Leada
                     </Link>
                 </div>
             </div>
 
+            {/* ═══════════ ROW 2: KPI Strip (always visible) ═══════════ */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {[
+                    { label: 'Wszystkie', value: quickKpis.total, icon: <Users className="w-3.5 h-3.5" />, accent: 'text-slate-700', iconColor: 'text-slate-400', bg: 'bg-slate-50' },
+                    { label: 'Nowe leady', value: quickKpis.newLeads, icon: <UserPlus className="w-3.5 h-3.5" />, accent: 'text-blue-700', iconColor: 'text-blue-500', bg: 'bg-blue-50' },
+                    { label: 'W procesie', value: quickKpis.inProcess, icon: <Clock className="w-3.5 h-3.5" />, accent: 'text-indigo-700', iconColor: 'text-indigo-500', bg: 'bg-indigo-50' },
+                    { label: 'Oferta %', value: `${quickKpis.offerRate}%`, icon: <FileText className="w-3.5 h-3.5" />, accent: 'text-amber-700', iconColor: 'text-amber-500', bg: 'bg-amber-50' },
+                    { label: 'Win rate', value: quickKpis.winRate === '—' ? '—' : `${quickKpis.winRate}%`, icon: <Trophy className="w-3.5 h-3.5" />, accent: 'text-emerald-700', iconColor: 'text-emerald-500', bg: 'bg-emerald-50' },
+                    { label: 'Śr. pipeline', value: `${quickKpis.avgDays}d`, icon: <Calendar className="w-3.5 h-3.5" />, accent: quickKpis.avgDays > 14 ? 'text-red-600' : 'text-slate-700', iconColor: quickKpis.avgDays > 14 ? 'text-red-400' : 'text-slate-400', bg: quickKpis.avgDays > 14 ? 'bg-red-50' : 'bg-slate-50' },
+                ].map((kpi, i) => (
+                    <div key={i} className="bg-white rounded-lg border border-slate-200/80 px-3 py-2.5 flex items-center gap-2.5 hover:border-slate-300 transition-colors group">
+                        <div className={`w-7 h-7 rounded-md ${kpi.bg} flex items-center justify-center ${kpi.iconColor} flex-shrink-0 group-hover:scale-105 transition-transform`}>
+                            {kpi.icon}
+                        </div>
+                        <div className="min-w-0">
+                            <div className={`text-lg font-bold leading-none ${kpi.accent}`}>{kpi.value}</div>
+                            <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide mt-0.5 truncate">{kpi.label}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* ═══════════ ROW 2b: Detailed Stats (toggled) ═══════════ */}
             {showStats && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                     <LeadsStats leads={filteredLeads} fairs={fairs} />
                     <LeadsFunnelChart leads={filteredLeads} />
                 </div>
             )}
 
-            {/* Filters */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-                <div className="flex gap-4 flex-wrap flex-1">
-                    {/* Search Bar */}
+            {/* ═══════════ ROW 3: Filter Toolbar ═══════════ */}
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+                <div className="px-3 py-2.5 flex flex-wrap gap-2.5 items-center">
+                    {/* Search */}
                     <div className="relative">
                         <input
                             type="text"
-                            placeholder="Szukaj (Klient, Telefon, Miasto, Targi...)"
+                            placeholder="Szukaj..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-1.5 text-sm outline-none w-64 focus:border-accent focus:ring-1 focus:ring-accent"
+                            className="bg-slate-50 border border-slate-200 rounded-md pl-8 pr-3 py-1.5 text-xs outline-none w-48 focus:border-accent focus:ring-1 focus:ring-accent/30 transition-colors placeholder:text-slate-400"
                         />
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2" />
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-[7px]" />
                     </div>
 
-                    <div className="w-px h-8 bg-slate-100 mx-2"></div>
+                    <div className="w-px h-6 bg-slate-200" />
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-slate-600">Status:</span>
-                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none">
-                            <option value="all">Wszystkie</option>
-                            <option value="new">Nowy</option>
-                            <option value="fair">Targi (Nowy)</option>
-                            <option value="contacted">Skontaktowano</option>
-                            <option value="formularz">Nowy (Formularz)</option>
-                            <option value="measurement_scheduled">Umówiony na pomiar</option>
-                            <option value="measurement_completed">Pomiar odbył się</option>
-                            <option value="offer_sent">Oferta</option>
-                            <option value="negotiation">Negocjacje</option>
-                            <option value="won">Wygrany</option>
-                            <option value="lost">Utracony</option>
-                        </select>
-                    </div>
+                    {/* Status */}
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs outline-none text-slate-700 font-medium">
+                        <option value="all">Status: Wszystkie</option>
+                        <option value="new">Nowy</option>
+                        <option value="fair">Targi (Nowy)</option>
+                        <option value="contacted">Skontaktowano</option>
+                        <option value="formularz">Nowy (Formularz)</option>
+                        <option value="measurement_scheduled">Umówiony na pomiar</option>
+                        <option value="measurement_completed">Pomiar odbył się</option>
+                        <option value="offer_sent">Oferta</option>
+                        <option value="negotiation">Negocjacje</option>
+                        <option value="won">Wygrany</option>
+                        <option value="lost">Utracony</option>
+                    </select>
 
+                    {/* Source */}
                     {marketFilter === 'de' && currentUser?.role !== 'sales_rep_pl' && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-slate-600">Źródło:</span>
-                        <select
-                            value={filterFair}
-                            onChange={(e) => setFilterFair(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none min-w-[150px]"
-                        >
-                            <option value="all">Wszystkie Źródła</option>
+                        <select value={filterFair} onChange={(e) => setFilterFair(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs outline-none text-slate-700 font-medium min-w-[120px]">
+                            <option value="all">Źródło: Wszystkie</option>
                             <option value="website">Strona WWW (DE)</option>
-                            <option value="website_pl">🇵🇱 zadaszto.pl (PL)</option>
+                            <option value="website_pl">🇵🇱 zadaszto.pl</option>
                             <option value="fair_all">Targi (Wszystkie)</option>
                             {fairs.map(fair => (
-                                <option key={fair.id} value={fair.id}>
-                                    ⬡ {fair.name} {fair.is_active ? '(Aktywne)' : ''}
-                                </option>
+                                <option key={fair.id} value={fair.id}>⬡ {fair.name} {fair.is_active ? '(Aktywne)' : ''}</option>
                             ))}
                         </select>
-                    </div>
                     )}
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-slate-600">Opiekun:</span>
-                        <select
-                            value={filterAssignee}
-                            onChange={(e) => setFilterAssignee(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none min-w-[150px]"
-                        >
-                            <option value="all">Wszyscy</option>
-                            <option value="unassigned">Nieprzypisany</option>
-                            <optgroup label="Handlowcy">
-                                {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(user => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.firstName} {user.lastName}
-                                    </option>
-                                ))}
-                            </optgroup>
-                            <optgroup label="Administracja">
-                                {users.filter(u => u.role === 'admin' || u.role === 'manager').map(user => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.firstName} {user.lastName} ({user.role === 'admin' ? 'Admin' : 'Manager'})
-                                    </option>
-                                ))}
-                            </optgroup>
-                        </select>
-                    </div>
+                    {/* Assignee */}
+                    <select value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs outline-none text-slate-700 font-medium min-w-[120px]">
+                        <option value="all">Opiekun: Wszyscy</option>
+                        <option value="unassigned">Nieprzypisany</option>
+                        <optgroup label="Handlowcy">
+                            {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(user => (
+                                <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
+                            ))}
+                        </optgroup>
+                        <optgroup label="Administracja">
+                            {users.filter(u => u.role === 'admin' || u.role === 'manager').map(user => (
+                                <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
+                            ))}
+                        </optgroup>
+                    </select>
 
                     {viewMode === 'list' && (
-                        <label className="flex items-center gap-2 cursor-pointer border-l pl-4 border-slate-200">
-                            <input type="checkbox" checked={groupByRegion} onChange={(e) => setGroupByRegion(e.target.checked)} className="w-4 h-4 text-accent border-slate-300 rounded" />
-                            <span className="text-sm font-medium text-slate-600">Grupuj wg Regionu</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600 font-medium border-l pl-2.5 border-slate-200">
+                            <input type="checkbox" checked={groupByRegion} onChange={(e) => setGroupByRegion(e.target.checked)} className="w-3.5 h-3.5 text-accent border-slate-300 rounded" />
+                            Regiony
                         </label>
                     )}
-                </div>
 
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setSortOrder(p => p === 'desc' ? 'asc' : 'desc')} className="text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                        <ArrowDownUp className="w-3.5 h-3.5" />
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* Sort + Won/Lost */}
+                    <button onClick={() => setSortOrder(p => p === 'desc' ? 'asc' : 'desc')} className="text-xs bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-md flex items-center gap-1 text-slate-600 hover:bg-slate-100 transition-colors font-medium">
+                        <ArrowDownUp className="w-3 h-3" />
                         {sortOrder === 'desc' ? 'Najnowsze' : 'Najstarsze'}
                     </button>
                     <button
                         onClick={() => {
-                            if (!showClosedLeads) {
-                                setShowClosedLeads(true);
-                                loadClosedLeads();
-                            } else {
-                                setShowClosedLeads(false);
-                            }
+                            if (!showClosedLeads) { setShowClosedLeads(true); loadClosedLeads(); } else { setShowClosedLeads(false); }
                         }}
-                        className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
-                            showClosedLeads
-                                ? 'bg-slate-700 text-white border-slate-700'
-                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                        className={`text-xs px-2.5 py-1.5 rounded-md border transition-colors font-medium flex items-center gap-1 ${
+                            showClosedLeads ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
                         }`}
                     >
-                        {loadingClosed ? <><Loader2 className="w-3.5 h-3.5 inline animate-spin mr-1" />Ładuję...</> : showClosedLeads ? <><CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />Won/Lost</> : <><FileText className="w-3.5 h-3.5 inline mr-1" />+Won/Lost</>}
+                        {loadingClosed ? <><Loader2 className="w-3 h-3 animate-spin" />Ładuję...</> : showClosedLeads ? <><CheckCircle2 className="w-3 h-3" />Won/Lost</> : <><FileText className="w-3 h-3" />+Won/Lost</>}
                     </button>
                 </div>
             </div>
