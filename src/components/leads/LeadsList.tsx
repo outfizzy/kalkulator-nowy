@@ -302,6 +302,27 @@ export const LeadsList: React.FC = () => {
         }
     };
 
+    // ── Compute quick KPIs for always-visible strip ──
+    const quickKpis = React.useMemo(() => {
+        const total = filteredLeads.length;
+        const newLeads = filteredLeads.filter(l => ['new', 'formularz'].includes(l.status)).length;
+        const inProcess = filteredLeads.filter(l => ['contacted', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'negotiation'].includes(l.status)).length;
+        const won = filteredLeads.filter(l => l.status === 'won').length;
+        const lost = filteredLeads.filter(l => l.status === 'lost').length;
+        const offerSent = filteredLeads.filter(l => ['offer_sent', 'negotiation'].includes(l.status)).length;
+        const offerRate = total > 0 ? ((offerSent / total) * 100).toFixed(0) : '0';
+        const totalClosed = won + lost;
+        const winRate = totalClosed > 0 ? ((won / totalClosed) * 100).toFixed(0) : '—';
+        const now = new Date();
+        const activeLeads = filteredLeads.filter(l => !['won', 'lost'].includes(l.status));
+        const totalDays = activeLeads.reduce((sum, l) => {
+            const days = Math.floor((now.getTime() - new Date(l.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            return sum + days;
+        }, 0);
+        const avgDays = activeLeads.length > 0 ? Math.round(totalDays / activeLeads.length) : 0;
+        return { total, newLeads, inProcess, offerRate, winRate, avgDays };
+    }, [filteredLeads]);
+
     if (loading) {
         return <div className="p-12 text-center text-slate-400">Ładowanie leadów...</div>;
     }
@@ -496,27 +517,6 @@ export const LeadsList: React.FC = () => {
         </div>
     );
 
-    // ── Compute quick KPIs for always-visible strip ──
-    const quickKpis = React.useMemo(() => {
-        const total = filteredLeads.length;
-        const newLeads = filteredLeads.filter(l => ['new', 'formularz'].includes(l.status)).length;
-        const inProcess = filteredLeads.filter(l => ['contacted', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'negotiation'].includes(l.status)).length;
-        const won = filteredLeads.filter(l => l.status === 'won').length;
-        const lost = filteredLeads.filter(l => l.status === 'lost').length;
-        const offerSent = filteredLeads.filter(l => ['offer_sent', 'negotiation'].includes(l.status)).length;
-        const offerRate = total > 0 ? ((offerSent / total) * 100).toFixed(0) : '0';
-        const totalClosed = won + lost;
-        const winRate = totalClosed > 0 ? ((won / totalClosed) * 100).toFixed(0) : '—';
-        // Avg pipeline age
-        const now = new Date();
-        const activeLeads = filteredLeads.filter(l => !['won', 'lost'].includes(l.status));
-        const totalDays = activeLeads.reduce((sum, l) => {
-            const days = Math.floor((now.getTime() - new Date(l.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-            return sum + days;
-        }, 0);
-        const avgDays = activeLeads.length > 0 ? Math.round(totalDays / activeLeads.length) : 0;
-        return { total, newLeads, inProcess, offerRate, winRate, avgDays };
-    }, [filteredLeads]);
 
     return (
         <div className="space-y-4">
