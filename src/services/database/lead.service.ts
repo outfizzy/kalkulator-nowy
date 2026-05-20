@@ -419,7 +419,7 @@ export const LeadService = {
     async getLeads(options?: { excludeStatuses?: string[] }): Promise<Lead[]> {
         let query = supabase
             .from('leads')
-            .select('*')
+            .select('id, status, source, customer_data, customer_id, assigned_to, additional_assignees, notes, created_at, updated_at, last_contact_date, client_will_contact_at, ai_score, ai_summary, lost_reason, lost_by, lost_at, won_reason, won_value, won_at, fair_id, fair_products, fair_prize, email_message_id, technical_pdf_url, visualization_pdf_url')
             .order('updated_at', { ascending: false });
 
         // Optionally exclude certain statuses for faster loading

@@ -95,9 +95,15 @@ export const LeadsList: React.FC = () => {
         }
     };
 
-    const handleLeadUpdate = () => {
-        loadData(); // Refresh data after kanban drop
-    };
+    const handleLeadUpdate = useCallback(async () => {
+        // Only refresh leads — don't reload fairs, users, measurements
+        try {
+            const leadsData = await DatabaseService.getLeads({ excludeStatuses: showClosedLeads ? [] : ['won', 'lost'] });
+            setLeads(leadsData);
+        } catch (error) {
+            console.error('Error refreshing leads:', error);
+        }
+    }, [showClosedLeads]);
 
     useEffect(() => {
         loadData();

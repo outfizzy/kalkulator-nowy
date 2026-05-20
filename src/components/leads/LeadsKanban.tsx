@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
     Sparkles, ClipboardCheck, Phone, Mail, CalendarDays, CheckCircle2,
     MessageCircle, Trophy, XCircle, Building2, Check, CalendarPlus,
@@ -140,7 +140,7 @@ type OfferCardInfo = {
     interactionCount: number;
 };
 
-const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo, offerValue }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo; offerValue?: { total: number; count: number; lastNet: number; lastSentAt?: string } }) => {
+const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo, offerValue }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo; offerValue?: { total: number; count: number; lastNet: number; lastSentAt?: string } }) => {
     const navigate = useNavigate();
     const {
         attributes,
@@ -666,7 +666,7 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
             )}
         </div>
     );
-};
+});
 
 // Extracted Column Component with useDroppable
 interface KanbanColumnProps {
@@ -684,7 +684,7 @@ interface KanbanColumnProps {
     leadOfferValues: Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }>;
 }
 
-const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: KanbanColumnProps) => {
+const KanbanColumn = React.memo(({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: KanbanColumnProps) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
@@ -814,7 +814,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
             </div>
         </div>
     );
-};
+});
 
 export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate }) => {
     const { currentUser, isAdmin } = useAuth();
